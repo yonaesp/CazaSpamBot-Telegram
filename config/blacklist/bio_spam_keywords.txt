@@ -1,0 +1,26 @@
+# Palabras de spam adulto/cripto/casino/préstamo en la BIO del perfil (bio_spam).
+# Un patrón por línea (palabra o regex). # = comentario. Usa (?:...) no (...).
+onlyfans
+cam(?:girl)?
+escort
+sugar(?:daddy|baby)?
+crypto
+bitcoin
+btc
+casino
+bet
+prestamo
+préstamo
+payday
+forex
+trading\s+signal
+nft
+geil(?:e|en|er)?
+nackt
+sexy
+hot\s+girl
+teen
+videos?\s+priv
+fotos?\s+priv
+contenido\s+exclusivo
+18\+

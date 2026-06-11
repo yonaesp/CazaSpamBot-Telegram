@@ -1,0 +1,31 @@
+# Palabras NEUTRAS para el clasificador de aprendizaje (/spam y /legal).
+# Son palabras que aparecen tanto en spam como en mensajes normales de TUS
+# grupos (vocabulario temático), así que solo meten ruido al clasificador.
+# Adáptalas a la temática de tus comunidades. Una palabra por línea.
+# Las stop-words españolas comunes (que/de/la/...) ya se excluyen siempre.
+alexa
+echo
+windows
+win
+pc
+rutina
+rutinas
+dispositivo
+dispositivos
+luz
+luces
+bombilla
+enchufe
+actualizacion
+actualización
+driver
+drivers
+sistema
+ordenador
+movil
+móvil
+app
+aplicacion
+aplicación
+configurar
+instalar

@@ -1,0 +1,8 @@
+# Frases de bienvenida genéricas (ejemplo).
+# - Una frase por línea. Las líneas vacías y las que empiezan por # se ignoran.
+# - Usa {name} donde quieras que aparezca el nombre del usuario.
+# - Para personalizar un grupo concreto, crea config/welcomes/<chat_id>.txt
+#   (ese archivo NO se sube al repo; este genérico sí).
+# - Para desactivar los saludos: FRIENDLY_WELCOMES_ENABLED=false en .env
+👋 Bienvenido/a {name}. Echa un vistazo a las normas y al mensaje anclado.
+🤝 ¡Hola {name}! Bienvenido/a al grupo.

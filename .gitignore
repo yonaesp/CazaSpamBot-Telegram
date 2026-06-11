@@ -1,0 +1,62 @@
+# Secretos y credenciales
+.env
+.env.*
+!.env.example
+*.session
+*.session-journal
+.cookie_key
+cookies.enc
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+ENV/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+*.egg-info/
+dist/
+build/
+
+# Welcomes personalizados por grupo (el genérico versionado SÍ se sube)
+config/welcomes/*.txt
+!config/welcomes/generic.txt
+
+# Notas y herramientas personales del despliegue original (no útiles a terceros)
+SETUP-INICIAL.txt
+scripts/rose_inspector.py
+
+# Claude Code: config personal del workspace (opcional, no necesaria para el bot)
+.claude/
+
+# Data / logs
+data/
+logs/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Claude Code (local-only state — la carpeta .claude/ SI se commitea, las settings.local.json NO)
+.claude/settings.local.json
+.claude/cache/

@@ -1,0 +1,13 @@
+# Servicios ilegales / hacking declarados en la BIO del perfil (bio_spam).
+# Un patrón por línea (palabra o regex). # = comentario. Usa (?:...) no (...).
+# Caso real: bio "experto en materia de piratería informática + web externa".
+pirater[ií]a\s+inform[aá]tica
+hacking
+hacker
+hacke[oa]
+cracke[oa]
+experto\s+en\s+(?:pirater[ií]a|hacking|seguridad)
+robo\s+de\s+(?:cuentas?|datos)
+espionaje
+spyware
+recupera(?:r|ci[oó]n)\s+(?:cuentas?|contrase[ñn]as?|dinero)

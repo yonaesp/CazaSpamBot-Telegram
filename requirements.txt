@@ -1,0 +1,24 @@
+# Telegram Bot API (async)
+python-telegram-bot[ext]==21.6
+
+# Async HTTP (CAS lookup + Casa_Yona notifier)
+aiohttp==3.10.10
+
+# Telethon (MTProto client) — solo para el script scripts/analyze_members.py
+telethon==1.36.0
+
+# Variables de entorno
+python-dotenv==1.0.1
+
+# Logging estructurado
+structlog==24.4.0
+
+# UTS#39 confusables (detección de nombres decorativos/homográficos anti-FP)
+confusable-homoglyphs==3.3.1
+
+# Testing
+pytest==8.3.3
+pytest-asyncio==0.24.0
+
+# Lint
+ruff==0.7.4

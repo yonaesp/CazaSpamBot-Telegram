@@ -1,0 +1,16 @@
+# Servicios ilegales / scam en anuncios (detector commercial_ad).
+# Un patrón por línea (palabra o regex). # = comentario. Usa (?:...) no (...).
+# Caso real que motivó esta lista: "SERVICIOS PROFESIONALES DE HACKING".
+hacking
+hacke[oa]r?
+hacker
+cracke[oa]r?
+extracci[oó]n\s+de\s+(?:fotos|videos|datos|informaci[oó]n)
+acceso\s+a\s+(?:redes\s+sociales|instagram|tiktok|whatsapp|facebook|cuentas?)
+recuperaci[oó]n\s+de\s+(?:dinero|fondos|cuenta|contrase[ñn]a)
+espia(?:r|je)
+rastrear?\s+(?:tel[eé]fono|m[oó]vil|persona)
+servicios?\s+an[oó]nimos?
+clientes?\s+serios?
+clonar?\s+(?:whatsapp|tarjeta|sim)
+informaci[oó]n\s+(?:personal|privada)\s+de

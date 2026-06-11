@@ -1,0 +1,33 @@
+services:
+  antispam-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cazaspam-bot
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - TZ=Europe/Madrid
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./data:/app/data
+      - ./src:/app/src:ro
+      - ./scripts:/app/scripts:ro
+      - ./config:/app/config:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import os,time; p='/app/data/heartbeat'; exit(0 if os.path.exists(p) and time.time()-os.path.getmtime(p)<300 else 1)"]
+      interval: 2m
+      timeout: 10s
+      retries: 3
+      start_period: 1m
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - antispam-net
+
+networks:
+  antispam-net:
+    driver: bridge
