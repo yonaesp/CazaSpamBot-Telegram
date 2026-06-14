@@ -16,7 +16,7 @@ from telegram.constants import ChatMemberStatus
 from telegram.error import TelegramError
 from telegram.ext import ContextTypes
 
-from . import admin_report, gentle_warning, greetings, learning, quips, user_signals, verification
+from . import admin_report, gentle_warning, greetings, learning, quips, trust as _trust, user_signals, verification
 from .config import Config
 from .db import DB
 from .detectors import Hit
@@ -1015,7 +1015,7 @@ async def _send_review_request(
     name = (user.first_name or "user")[:40]
     info = (
         f"🔎 <b>Revisión de spam</b>\n\n"
-        f"👤 <code>{user_id}</code> ({name}) · trust={trust}\n"
+        f"👤 <code>{user_id}</code> ({name}) · confianza {_trust.render_trust(trust)}\n"
         f"📍 {msg.chat.title or chat_id}\n"
         f"🚨 Reglas: <code>{', '.join(rules)}</code>\n"
         f"⚖️ Acción propuesta: <b>{proposed_action}</b>\n"

@@ -9,7 +9,7 @@ from telegram.ext import ContextTypes
 
 from telegram.error import TelegramError
 
-from . import chat_picker, learning, permissions, quips
+from . import chat_picker, learning, permissions, quips, trust as _trust
 from .config import Config
 from .db import DB
 from .federation import federate_ban, unfederate_ban
@@ -560,7 +560,7 @@ async def cmd_recent(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         lines.append(
             f"[{ts}] <code>{r['action']}</code> user=<code>{r['user_id']}</code> "
             f"chat=<code>{r['chat_id']}</code> rule={html.escape(r['rule'])} "
-            f"score={r['score']} mode={r['mode']}"
+            f"spam={_trust.render_spam(r['score'])} mode={r['mode']}"
         )
     await update.effective_message.reply_text("\n".join(lines), parse_mode="HTML")
 
