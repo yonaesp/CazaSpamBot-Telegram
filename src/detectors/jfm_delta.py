@@ -27,8 +27,8 @@ def check(
     if delta_seconds < 30:
         return Hit(
             rule="jfm_fast",
-            score=40,
-            reason=f"Primer mensaje a los {int(delta_seconds)}s del join (sospechoso)",
+            score=30,
+            reason=f"Primer mensaje a los {int(delta_seconds)}s del join (algo rápido)",
             payload={"delta_s": int(delta_seconds)},
         )
     # Detector de cron pattern: cerca de múltiplos exactos de 24h

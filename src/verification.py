@@ -414,7 +414,16 @@ async def on_join(
             "verification SKIP user=%s chat=%s: perfil legítimo (%s)",
             user.id, chat.id, ", ".join(legit_reasons),
         )
-        # Perfil legítimo: nunca se le mutea. El saludo simpático es opcional.
+        # Perfil legítimo: no pasa por verificación. Como en on_chat_member se
+        # aplica un mute provisional a todo recién llegado (trust<70), aquí hay
+        # que DESMUTEARLO para que pueda escribir de inmediato.
+        try:
+            await context.bot.restrict_chat_member(
+                chat_id=chat.id, user_id=user.id, permissions=VERIFIED_PERMISSIONS,
+            )
+        except TelegramError as exc:
+            log.debug("unmute legítimo fallo user=%s: %s", user.id, exc)
+        # El saludo simpático es opcional.
         if friendly_welcomes_enabled():
             await _send_friendly_welcome(context, db, chat, user, settings)
         return

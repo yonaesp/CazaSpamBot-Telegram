@@ -182,6 +182,19 @@ async def on_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     # o 1 campo con ratio ≥0.7). Ban directo sin esperar a verificación ni primer
     # mensaje. Solo si NO es veterano (trust<70).
     if rejoin_trust < 70:
+        # Mute provisional INMEDIATO: cierra la ventana en la que un recién
+        # llegado podría escribir mientras corremos el análisis lento de perfil
+        # (bio/fotos via Telethon + CAS/lols por red, que tardan segundos). Sin
+        # esto, el botón SOY HUMANO no sirve: el user escribe antes de que lo
+        # muteemos. Si resulta ban → ya queda fuera; si el perfil es legítimo →
+        # verification.on_join lo desmutea al mandar el welcome amistoso.
+        try:
+            await context.bot.restrict_chat_member(
+                chat_id=cmu.chat.id, user_id=user.id,
+                permissions=verification.MUTED_PERMISSIONS,
+            )
+        except TelegramError as exc:
+            log.debug("mute provisional fallo user=%s: %s", user.id, exc)
         sig_pre = None
         reporter_pre = context.bot_data.get("reporter")
         client_pre = reporter_pre.get_client() if reporter_pre else None
