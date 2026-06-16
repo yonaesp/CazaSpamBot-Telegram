@@ -16,8 +16,9 @@ def db(tmp_path):
 
 
 def _ctx_for_trust(trust: int):
-    """Context falso con trust fijo (vía _trust_cache) y bot_data vacío para flood."""
-    bot_data = {"_trust_cache": {(1, 2): (trust, time.time() + 60)}}
+    """Context falso con trust fijo (vía _trust_cache) y cfg de flood por defecto."""
+    cfg = SimpleNamespace(flood_max_msgs=6, flood_window_s=60, flood_mute_hours=6)
+    bot_data = {"_trust_cache": {(1, 2): (trust, time.time() + 60)}, "cfg": cfg}
     return SimpleNamespace(bot_data=bot_data)
 
 

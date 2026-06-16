@@ -99,6 +99,13 @@ class Config:
     reporter_rate_per_hour: int = 20
     reporter_rate_per_day: int = 100
 
+    # Antiflood: N mensajes en una ventana de M segundos → mute de H horas.
+    # El umbral base es para usuarios normales; veteranos y "humanos confirmados"
+    # por el admin tienen más margen (se suma en el código).
+    flood_max_msgs: int = 6
+    flood_window_s: int = 60
+    flood_mute_hours: int = 6
+
     db_path: str = "/app/data/antispam.db"
     log_level: str = "INFO"
 
@@ -163,6 +170,9 @@ def load_config() -> Config:
         reaction_farming_enabled=_bool("REACTION_FARMING_ENABLED", True),
         reaction_threshold_count=_int("REACTION_THRESHOLD_COUNT", 5),
         reaction_threshold_seconds=_int("REACTION_THRESHOLD_SECONDS", 60),
+        flood_max_msgs=_int("FLOOD_MAX_MSGS", 6),
+        flood_window_s=_int("FLOOD_WINDOW_S", 60),
+        flood_mute_hours=_int("FLOOD_MUTE_HOURS", 6),
         cas_enabled=_bool("CAS_ENABLED", True),
         cas_cache_ttl_seconds=_int("CAS_CACHE_TTL_SECONDS", 86400),
         cas_autoban_min=_int("CAS_AUTOBAN_MIN", 2),

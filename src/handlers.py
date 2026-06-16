@@ -1198,38 +1198,38 @@ async def _moderate_via_bot_message(context, db, cfg, msg, user) -> bool:
     return True
 
 
-# Antiflood: ventana de 60s, mute de 6h, con revisión humana.
-_FLOOD_WINDOW_S = 60.0
-_FLOOD_MUTE_HOURS = 6
-
-
 def _antiflood_threshold(
     context: ContextTypes.DEFAULT_TYPE, db: DB, chat_id: int, user_id: int,
 ) -> int:
-    """Mensajes en 60s que cuentan como flood. Más margen para humanos confirmados."""
+    """Mensajes en la ventana que cuentan como flood. Base configurable; veteranos
+    y humanos confirmados por el admin tienen más margen (base+4 y base+6)."""
+    cfg: Config = context.bot_data["cfg"]
+    base = cfg.flood_max_msgs
     if db.flood_is_human_confirmed(chat_id, user_id):
-        return 12  # el admin ya dijo "no es bot" → más libertad
+        return base + 6  # el admin ya dijo "no es bot" → más libertad
     trust = _trust_score_cached(context, db, chat_id, user_id)
-    return 10 if trust >= 70 else 6
+    return base + 4 if trust >= 70 else base
 
 
 def _antiflood_check(
     context: ContextTypes.DEFAULT_TYPE, db: DB, chat_id: int, user_id: int,
 ) -> bool:
-    """True si el user supera su umbral de mensajes en la ventana de 60s."""
+    """True si el user supera su umbral de mensajes en la ventana configurada."""
+    cfg: Config = context.bot_data["cfg"]
+    window_s = float(cfg.flood_window_s)
     threshold = _antiflood_threshold(context, db, chat_id, user_id)
     log_store = context.bot_data.setdefault("_flood_log", {})
     key = (chat_id, user_id)
     now = time.time()
     if len(log_store) > 5000:
-        stale = [k for k, h in log_store.items() if not h or h[-1] < now - _FLOOD_WINDOW_S]
+        stale = [k for k, h in log_store.items() if not h or h[-1] < now - window_s]
         for k in stale:
             log_store.pop(k, None)
     history = log_store.get(key)
     if history is None:
-        history = deque(maxlen=30)
+        history = deque(maxlen=50)
         log_store[key] = history
-    while history and history[0] < now - _FLOOD_WINDOW_S:
+    while history and history[0] < now - window_s:
         history.popleft()
     history.append(now)
     if len(history) < threshold:
@@ -1256,8 +1256,9 @@ async def _antiflood_apply(
     if await _is_admin_of_chat(context, chat_id, user_id):
         return
     from telegram import ChatPermissions, InlineKeyboardButton, InlineKeyboardMarkup
+    mute_hours = cfg.flood_mute_hours
     now = time.time()
-    until = int(now) + _FLOOD_MUTE_HOURS * 3600
+    until = int(now) + mute_hours * 3600
     if not cfg.shadow:
         try:
             await context.bot.restrict_chat_member(
@@ -1273,7 +1274,7 @@ async def _antiflood_apply(
         chat_id=chat_id, user_id=user_id, username=getattr(user, "username", None),
         message_id=msg_id, rule="antiflood", action="mute",
         score=50, mode=("shadow" if cfg.shadow else "active"),
-        payload={"window_s": int(_FLOOD_WINDOW_S), "mute_hours": _FLOOD_MUTE_HOURS, "mute_count": mute_count},
+        payload={"window_s": cfg.flood_window_s, "mute_hours": mute_hours, "mute_count": mute_count},
     )
     name = _h.escape((getattr(user, "first_name", None) or str(user_id))[:40])
     # Aviso público con motivo (autoborra 1h)
@@ -1281,7 +1282,7 @@ async def _antiflood_apply(
         sent = await context.bot.send_message(
             chat_id=chat_id,
             text=(
-                f"🔒 {name} muteado <b>{_FLOOD_MUTE_HOURS}h</b> por seguridad "
+                f"🔒 {name} muteado <b>{mute_hours}h</b> por seguridad "
                 f"(flood: demasiados mensajes muy seguidos). Un administrador lo revisará."
             ),
             parse_mode="HTML", disable_notification=True,
@@ -1313,7 +1314,7 @@ async def _antiflood_apply(
                 f"🌊 <b>Flood detectado</b>\n"
                 f"👤 {user_link} (<code>{user_id}</code>)\n"
                 f"📍 chat <code>{chat_id}</code>\n"
-                f"⏱️ Muteado {_FLOOD_MUTE_HOURS}h. ¿Es un bot?\n\n"
+                f"⏱️ Muteado {mute_hours}h. ¿Es un bot?\n\n"
                 f"<i>«No es bot» le da más margen y lo desmuteo. Si vuelve a "
                 f"hacer flood, lo muteo igual sin preguntar.</i>"
             ),
