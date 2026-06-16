@@ -196,6 +196,9 @@ def main() -> int:
     # Callback de review de spam (botones ✅ Legítimo / ❌ Spam en DM admin)
     from .handlers import on_pending_review_callback
     app.add_handler(CallbackQueryHandler(on_pending_review_callback, pattern=r"^prev:"))
+    # Callback de antiflood (botones ✅ No es bot / ❌ Es bot en DM admin)
+    from .handlers import on_flood_callback
+    app.add_handler(CallbackQueryHandler(on_flood_callback, pattern=r"^flood:"))
 
     # Tracking de membership del bot.
     app.add_handler(ChatMemberHandler(on_my_chat_member, ChatMemberHandler.MY_CHAT_MEMBER))

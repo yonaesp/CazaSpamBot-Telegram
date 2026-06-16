@@ -206,6 +206,15 @@ CREATE TABLE IF NOT EXISTS admin_reports (
     PRIMARY KEY (chat_id, reporter_msg_id)
 );
 CREATE INDEX IF NOT EXISTS idx_ar_reported ON admin_reports(chat_id, reported_msg_id) WHERE resolved_at IS NULL;
+CREATE TABLE IF NOT EXISTS flood_state (
+    chat_id          INTEGER NOT NULL,
+    user_id          INTEGER NOT NULL,
+    human_confirmed  INTEGER NOT NULL DEFAULT 0,  -- un admin pulsó "no es bot"
+    mute_count       INTEGER NOT NULL DEFAULT 0,  -- nº de mutes por flood acumulados
+    last_mute_ts     REAL,
+    review_sent      INTEGER NOT NULL DEFAULT 0,  -- ya se preguntó al admin (es/no bot)
+    PRIMARY KEY (chat_id, user_id)
+);
 """
 
 
@@ -1049,6 +1058,52 @@ class DB:
             ).fetchone()["n"]
         score -= min(int(n_warns) * 10, 40)
         return max(0, min(100, int(round(score))))
+
+    # ------------- flood_state (antiflood con revisión humana) -------------
+
+    def flood_get(self, chat_id: int, user_id: int) -> sqlite3.Row | None:
+        with self._cur() as c:
+            return c.execute(
+                "SELECT * FROM flood_state WHERE chat_id=? AND user_id=?",
+                (chat_id, user_id),
+            ).fetchone()
+
+    def flood_is_human_confirmed(self, chat_id: int, user_id: int) -> bool:
+        row = self.flood_get(chat_id, user_id)
+        return bool(row and row["human_confirmed"])
+
+    def flood_record_mute(self, chat_id: int, user_id: int, ts: float) -> tuple[int, bool, bool]:
+        """Registra un mute por flood. Devuelve (mute_count, review_ya_enviado, human_confirmed)."""
+        with self._cur() as c:
+            c.execute(
+                "INSERT INTO flood_state (chat_id, user_id, mute_count, last_mute_ts) "
+                "VALUES (?, ?, 1, ?) "
+                "ON CONFLICT(chat_id, user_id) DO UPDATE SET "
+                "mute_count = mute_count + 1, last_mute_ts = excluded.last_mute_ts",
+                (chat_id, user_id, ts),
+            )
+            row = c.execute(
+                "SELECT mute_count, review_sent, human_confirmed FROM flood_state WHERE chat_id=? AND user_id=?",
+                (chat_id, user_id),
+            ).fetchone()
+        return int(row["mute_count"]), bool(row["review_sent"]), bool(row["human_confirmed"])
+
+    def flood_mark_review_sent(self, chat_id: int, user_id: int) -> None:
+        with self._cur() as c:
+            c.execute(
+                "UPDATE flood_state SET review_sent=1 WHERE chat_id=? AND user_id=?",
+                (chat_id, user_id),
+            )
+
+    def flood_confirm_human(self, chat_id: int, user_id: int) -> None:
+        """El admin marcó 'no es bot': más margen de flood en adelante."""
+        with self._cur() as c:
+            c.execute(
+                "INSERT INTO flood_state (chat_id, user_id, human_confirmed, review_sent) "
+                "VALUES (?, ?, 1, 1) "
+                "ON CONFLICT(chat_id, user_id) DO UPDATE SET human_confirmed=1, review_sent=1",
+                (chat_id, user_id),
+            )
 
     def remove_last_warn(self, user_id: int, chat_id: int) -> bool:
         with self._cur() as c:

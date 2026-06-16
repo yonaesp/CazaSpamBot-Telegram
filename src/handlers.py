@@ -555,20 +555,11 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         db.record_topweekly_msg(chat_id, user.id, len(text_or_caption))
     is_first = msg_count <= cfg.first_msg_window
 
-    # Antiflood per-user: muta temporalmente si envía X mensajes en Y segundos.
-    # Threshold graduado por trust_score:
-    #   trust >= 90: deshabilitado (veteranos muy fiables)
-    #   trust >= 70: 12 msgs en 10s (margen amplio para los que escriben rápido)
-    #   trust >= 40: 8 msgs en 10s
-    #   trust < 40:  5 msgs en 10s
-    # NO cuenta como flood los saltos de línea (cada msg es uno solo en Telegram).
-    flood_action = _antiflood_check(context, db, chat_id, user.id, msg.message_id)
-    if flood_action is not None:
-        log.info(
-            "antiflood user=%s chat=%s msg=%s → %s",
-            user.id, chat_id, msg.message_id, flood_action,
-        )
-        await _antiflood_apply(context, chat_id, user.id, msg.message_id, action=flood_action)
+    # Antiflood per-user: N mensajes en 60s → mute 6h + revisión del admin.
+    # Umbral graduado: humano confirmado por admin = 12, veterano = 10, resto = 6.
+    if _antiflood_check(context, db, chat_id, user.id):
+        log.info("antiflood user=%s chat=%s msg=%s → mute 6h", user.id, chat_id, msg.message_id)
+        await _antiflood_apply(context, chat_id, user.id, user, msg.message_id)
         return
 
     # Reacción amigable a saludos de usuarios marcados como greeters
@@ -1207,111 +1198,185 @@ async def _moderate_via_bot_message(context, db, cfg, msg, user) -> bool:
     return True
 
 
-def _antiflood_check(
-    context: ContextTypes.DEFAULT_TYPE, db: DB,
-    chat_id: int, user_id: int, msg_id: int,
-) -> str | None:
-    """Comprueba si el user está flooding. Devuelve None / 'warn' / 'mute_5m'.
+# Antiflood: ventana de 60s, mute de 6h, con revisión humana.
+_FLOOD_WINDOW_S = 60.0
+_FLOOD_MUTE_HOURS = 6
 
-    Graduado por trust_score: veteranos tienen margen amplio.
-    """
+
+def _antiflood_threshold(
+    context: ContextTypes.DEFAULT_TYPE, db: DB, chat_id: int, user_id: int,
+) -> int:
+    """Mensajes en 60s que cuentan como flood. Más margen para humanos confirmados."""
+    if db.flood_is_human_confirmed(chat_id, user_id):
+        return 12  # el admin ya dijo "no es bot" → más libertad
     trust = _trust_score_cached(context, db, chat_id, user_id)
-    if trust >= 90:
-        return None  # muy confiable, no aplica
-    if trust >= 70:
-        threshold = 12
-    elif trust >= 40:
-        threshold = 8
-    else:
-        threshold = 5
-    window_s = 10.0
+    return 10 if trust >= 70 else 6
 
+
+def _antiflood_check(
+    context: ContextTypes.DEFAULT_TYPE, db: DB, chat_id: int, user_id: int,
+) -> bool:
+    """True si el user supera su umbral de mensajes en la ventana de 60s."""
+    threshold = _antiflood_threshold(context, db, chat_id, user_id)
     log_store = context.bot_data.setdefault("_flood_log", {})
     key = (chat_id, user_id)
     now = time.time()
-    # Bound: purgar entries cuyo último mensaje fue hace >window para que el
-    # dict no crezca sin límite en servidores con muchos chats/users.
     if len(log_store) > 5000:
-        stale = [k for k, h in log_store.items() if not h or h[-1] < now - window_s]
+        stale = [k for k, h in log_store.items() if not h or h[-1] < now - _FLOOD_WINDOW_S]
         for k in stale:
             log_store.pop(k, None)
     history = log_store.get(key)
     if history is None:
-        history = deque(maxlen=20)
+        history = deque(maxlen=30)
         log_store[key] = history
-    # Limpia entries fuera de la ventana
-    while history and history[0] < now - window_s:
+    while history and history[0] < now - _FLOOD_WINDOW_S:
         history.popleft()
     history.append(now)
     if len(history) < threshold:
-        return None
-
-    # Anti-doble-disparo: si ya se aplicó antiflood a este user hace <30s, skip
+        return False
+    # Anti-doble-disparo: si ya se actuó hace <60s (mismo burst), no repetir
     last_action = context.bot_data.setdefault("_flood_last_action", {})
-    # Bound del dict de last_action (purga entries >5min)
     if len(last_action) > 5000:
-        for k in [k for k, t in last_action.items() if t < now - 300]:
+        for k in [k for k, t in last_action.items() if t < now - 600]:
             last_action.pop(k, None)
-    if last_action.get(key, 0) > now - 30:
-        return None
+    if last_action.get(key, 0) > now - 60:
+        return False
     last_action[key] = now
-    return "mute_5m"
+    return True
 
 
 async def _antiflood_apply(
     context: ContextTypes.DEFAULT_TYPE,
-    chat_id: int, user_id: int, msg_id: int,
-    action: str,
+    chat_id: int, user_id: int, user, msg_id: int,
 ) -> None:
-    """Aplica antiflood: borra el último msg + mute 5 min + aviso autoborrado 1min."""
+    """Mute 6h por flood + aviso público con motivo + (1ª vez) botón es/no-bot al admin."""
     db: DB = context.bot_data["db"]
     cfg: Config = context.bot_data["cfg"]
     # GUARD: nunca antiflood a admin del chat
     if await _is_admin_of_chat(context, chat_id, user_id):
         return
-    # Borrar el msg que disparó
-    try:
-        await context.bot.delete_message(chat_id=chat_id, message_id=msg_id)
-    except TelegramError as exc:
-        log.debug("antiflood delete fallo msg=%s: %s", msg_id, exc)
-    # Mute 5 min
-    from telegram import ChatPermissions
-    until = int(time.time()) + 5 * 60
-    try:
-        await context.bot.restrict_chat_member(
-            chat_id=chat_id, user_id=user_id,
-            permissions=ChatPermissions(can_send_messages=False),
-            until_date=until,
-        )
-    except TelegramError as exc:
-        log.warning("antiflood mute fallo user=%s: %s", user_id, exc)
-        return
-    # Loguear
+    from telegram import ChatPermissions, InlineKeyboardButton, InlineKeyboardMarkup
+    now = time.time()
+    until = int(now) + _FLOOD_MUTE_HOURS * 3600
+    if not cfg.shadow:
+        try:
+            await context.bot.restrict_chat_member(
+                chat_id=chat_id, user_id=user_id,
+                permissions=ChatPermissions(can_send_messages=False),
+                until_date=until,
+            )
+        except TelegramError as exc:
+            log.warning("antiflood mute fallo user=%s: %s", user_id, exc)
+            return
+    mute_count, review_sent, human_confirmed = db.flood_record_mute(chat_id, user_id, now)
     db.log_action(
-        chat_id=chat_id, user_id=user_id, username=None,
+        chat_id=chat_id, user_id=user_id, username=getattr(user, "username", None),
         message_id=msg_id, rule="antiflood", action="mute",
         score=50, mode=("shadow" if cfg.shadow else "active"),
-        payload={"action": action, "window_s": 10},
+        payload={"window_s": int(_FLOOD_WINDOW_S), "mute_hours": _FLOOD_MUTE_HOURS, "mute_count": mute_count},
     )
-    # Aviso público breve con autoborrado 60s
+    name = _h.escape((getattr(user, "first_name", None) or str(user_id))[:40])
+    # Aviso público con motivo (autoborra 1h)
     try:
         sent = await context.bot.send_message(
             chat_id=chat_id,
             text=(
-                f"🌊 Antiflood: <code>{user_id}</code> envió demasiados mensajes seguidos. "
-                f"Mute 5 min para enfriar."
+                f"🔒 {name} muteado <b>{_FLOOD_MUTE_HOURS}h</b> por seguridad "
+                f"(flood: demasiados mensajes muy seguidos). Un administrador lo revisará."
             ),
             parse_mode="HTML", disable_notification=True,
         )
         jq = context.application.job_queue
-        if jq is not None:
+        if jq is not None and sent is not None:
             jq.run_once(
-                _antiflood_delete_job, when=60,
+                _antiflood_delete_job, when=3600,
                 data={"chat_id": chat_id, "message_id": sent.message_id},
                 name=f"del_antiflood_{chat_id}_{sent.message_id}",
             )
     except TelegramError:
         pass
+    # Botón al admin SOLO la 1ª vez (reincidencia → re-mute sin preguntar).
+    if review_sent or human_confirmed:
+        return
+    admin_dm = cfg.admin_user_id
+    if not admin_dm:
+        return
+    user_link = f'<a href="tg://user?id={user_id}">{name}</a>'
+    kb = InlineKeyboardMarkup([[
+        InlineKeyboardButton("✅ No es bot", callback_data=f"flood:human:{chat_id}:{user_id}"),
+        InlineKeyboardButton("❌ Es bot (banear)", callback_data=f"flood:bot:{chat_id}:{user_id}"),
+    ]])
+    try:
+        await context.bot.send_message(
+            chat_id=admin_dm,
+            text=(
+                f"🌊 <b>Flood detectado</b>\n"
+                f"👤 {user_link} (<code>{user_id}</code>)\n"
+                f"📍 chat <code>{chat_id}</code>\n"
+                f"⏱️ Muteado {_FLOOD_MUTE_HOURS}h. ¿Es un bot?\n\n"
+                f"<i>«No es bot» le da más margen y lo desmuteo. Si vuelve a "
+                f"hacer flood, lo muteo igual sin preguntar.</i>"
+            ),
+            parse_mode="HTML", reply_markup=kb, disable_web_page_preview=True,
+        )
+        db.flood_mark_review_sent(chat_id, user_id)
+    except TelegramError as exc:
+        log.debug("antiflood admin prompt fallo: %s", exc)
+
+
+async def on_flood_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Botones del aviso de flood: «No es bot» (margen + unmute) / «Es bot» (ban)."""
+    query = update.callback_query
+    if not query or not query.data or not query.data.startswith("flood:"):
+        return
+    cfg: Config = context.bot_data["cfg"]
+    db: DB = context.bot_data["db"]
+    if not query.from_user or query.from_user.id != cfg.admin_user_id:
+        await query.answer("Solo el admin del bot.", show_alert=True)
+        return
+    parts = query.data.split(":")
+    if len(parts) != 4:
+        await query.answer()
+        return
+    _, verdict, chat_id_s, user_id_s = parts
+    chat_id, user_id = int(chat_id_s), int(user_id_s)
+    base = query.message.text_html if query.message else ""
+    if verdict == "human":
+        db.flood_confirm_human(chat_id, user_id)
+        try:
+            await context.bot.restrict_chat_member(
+                chat_id=chat_id, user_id=user_id,
+                permissions=verification.VERIFIED_PERMISSIONS,
+            )
+        except TelegramError as exc:
+            log.debug("flood unmute fallo user=%s: %s", user_id, exc)
+        invalidate_trust_cache(context, chat_id, user_id)
+        await query.answer("Marcado como humano y desmuteado.")
+        try:
+            await query.edit_message_text(
+                base + "\n\n✅ <b>Marcado como humano</b> (desmuteado, más margen).",
+                parse_mode="HTML",
+            )
+        except TelegramError:
+            pass
+    elif verdict == "bot":
+        await _apply_action(
+            context, db, cfg, chat_id=chat_id, chat_title=None,
+            user_id=user_id, username=None, message_id=None,
+            decision=Decision(action="ban", score=200, rule="flood_confirmed_bot",
+                              reason="Flood confirmado como bot por el admin", payload={}),
+            original_text=None, first_name=None,
+        )
+        await query.answer("Baneado.")
+        try:
+            await query.edit_message_text(
+                base + "\n\n🔨 <b>Baneado</b> (en todos los grupos).",
+                parse_mode="HTML",
+            )
+        except TelegramError:
+            pass
+    else:
+        await query.answer()
 
 
 async def _antiflood_delete_job(context: ContextTypes.DEFAULT_TYPE) -> None:
