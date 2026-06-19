@@ -346,8 +346,15 @@ class DB:
                 (chat_id, user_id),
             ).fetchone()
 
-    def record_join(self, chat_id: int, user_id: int, username: str | None) -> None:
-        now = time.time()
+    def record_join(
+        self, chat_id: int, user_id: int, username: str | None,
+        join_ts: float | None = None,
+    ) -> None:
+        """Registra la entrada de un user. `join_ts` debe ser la hora REAL del
+        evento de Telegram (cmu.date), no la de proceso: el bot puede procesar
+        el join con retraso y, si se usara time.time(), el delta join→primer
+        mensaje saldría falsamente corto (falso positivo de jfm_delta)."""
+        ts = join_ts if join_ts is not None else time.time()
         with self._cur() as c:
             c.execute(
                 """
@@ -357,7 +364,7 @@ class DB:
                   join_ts=COALESCE(seen_users.join_ts, excluded.join_ts),
                   username=COALESCE(excluded.username, seen_users.username)
                 """,
-                (chat_id, user_id, username, now, now),
+                (chat_id, user_id, username, ts, ts),
             )
 
     def record_topweekly_msg(self, chat_id: int, user_id: int, length: int, cooldown_s: int = 10) -> None:

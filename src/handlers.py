@@ -125,7 +125,11 @@ async def on_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     if not is_join:
         return
     user = cmu.new_chat_member.user
-    db.record_join(cmu.chat.id, user.id, user.username)
+    # join_ts = hora REAL del evento de Telegram (cmu.date), no la de proceso:
+    # si el bot procesa el join con retraso, usar time.time() inflaría la rapidez
+    # aparente del primer mensaje (falso positivo de jfm_delta, caso Yorscluni).
+    join_epoch = cmu.date.timestamp() if cmu.date else None
+    db.record_join(cmu.chat.id, user.id, user.username, join_ts=join_epoch)
     db.remember_username(user.username, user.id)
 
     if db.is_banned(user.id):

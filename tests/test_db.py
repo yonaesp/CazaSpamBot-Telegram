@@ -22,6 +22,19 @@ def test_record_join_creates_seen(tmp_db):
     assert row["msg_count"] == 0
 
 
+def test_record_join_honra_hora_real_del_evento(tmp_db):
+    """join_ts debe ser la hora REAL del evento (cmu.date), no la de proceso.
+
+    Evita el falso positivo de jfm_delta: si el bot procesa el join tarde y se
+    usara time.time(), el delta join→primer mensaje saldría falsamente corto.
+    """
+    real_join = 1_000_000.0  # hora del evento, muy anterior al "ahora"
+    tmp_db.record_join(-100, 77, "bob", join_ts=real_join)
+    row = tmp_db.get_seen(-100, 77)
+    assert row["join_ts"] == real_join
+    assert row["first_seen_ts"] == real_join
+
+
 def test_ban_and_unban(tmp_db):
     tmp_db.add_ban(user_id=42, reason="spam", rule="cas_match", banned_in_chat=-100)
     assert tmp_db.is_banned(42)
