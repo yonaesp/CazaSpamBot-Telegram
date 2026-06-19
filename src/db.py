@@ -419,9 +419,17 @@ class DB:
                 (msg_id, (text or "")[:500], time.time(), chat_id, user_id),
             )
 
-    def record_message(self, chat_id: int, user_id: int, username: str | None) -> int:
-        """Registra mensaje y devuelve msg_count POSTERIOR al incremento."""
-        now = time.time()
+    def record_message(
+        self, chat_id: int, user_id: int, username: str | None,
+        msg_ts: float | None = None,
+    ) -> int:
+        """Registra mensaje y devuelve msg_count POSTERIOR al incremento.
+
+        `msg_ts` debe ser la hora REAL del mensaje (message.date), no la de
+        proceso: first_msg_ts se compara con join_ts (también hora de evento)
+        para el delta de jfm_delta. Mezclar relojes desvirtúa ese delta.
+        """
+        now = msg_ts if msg_ts is not None else time.time()
         with self._cur() as c:
             c.execute(
                 """

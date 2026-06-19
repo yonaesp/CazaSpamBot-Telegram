@@ -512,12 +512,13 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
     db.remember_username(user.username, user.id)
 
+    _msg_ts = msg.date.timestamp() if msg.date else None
     if db.is_whitelisted(chat_id, user.id):
-        db.record_message(chat_id, user.id, user.username)
+        db.record_message(chat_id, user.id, user.username, msg_ts=_msg_ts)
         return
 
     if user.id == cfg.admin_user_id:
-        db.record_message(chat_id, user.id, user.username)
+        db.record_message(chat_id, user.id, user.username, msg_ts=_msg_ts)
         return
 
     # NUEVO: capturar el last_msg_ts PREVIO antes de actualizarlo, para detectar
@@ -540,7 +541,7 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         )
         return
 
-    msg_count = db.record_message(chat_id, user.id, user.username)
+    msg_count = db.record_message(chat_id, user.id, user.username, msg_ts=_msg_ts)
     # Guardar el último mensaje + first_name para revisar tras bans manuales
     text_or_caption = msg.text or msg.caption
     db.update_last_message(chat_id, user.id, msg.message_id, text_or_caption)
