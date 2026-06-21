@@ -48,7 +48,11 @@ def decide(
     elif score >= mute_score:
         action = "mute"
     else:
-        action = "delete"
+        # Score por debajo del umbral de mute: señal(es) demasiado débil(es) para
+        # actuar. NO se borra el mensaje (antes sí, y eso hacía que un detector
+        # de comportamiento como jfm_fast (30) borrara mensajes inocentes como
+        # "Hola"). Las señales débiles solo cuentan al SUMARSE con otras.
+        action = "noop"
 
     rule = "+".join(h.rule for h in real_hits)
     reason = " | ".join(h.reason for h in real_hits)

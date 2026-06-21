@@ -30,9 +30,17 @@ def test_mute_at_threshold():
     assert d.action == "mute"
 
 
-def test_delete_below_mute():
+def test_noop_below_mute():
+    """Señal débil sola (score < mute) → noop: NO se borra el mensaje.
+
+    Antes era 'delete', lo que hacía que un detector de comportamiento como
+    jfm_fast (30) borrara mensajes inocentes ("Hola"). Solo cuenta al sumarse.
+    """
     d = decide([_h(score=10)], 100, 70, 40, "ban", False)
-    assert d.action == "delete"
+    assert d.action == "noop"
+    # pero al combinarse hasta alcanzar mute, sí actúa
+    d2 = decide([_h(score=30), _h(score=15)], 100, 70, 40, "ban", False)
+    assert d2.action == "mute"
 
 
 def test_score_accumulates():
