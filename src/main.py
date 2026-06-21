@@ -114,6 +114,45 @@ async def _heartbeat_job(context) -> None:
         pass
 
 
+async def _on_error(update: object, context) -> None:
+    """Error handler global: captura excepciones NO atrapadas en handlers y jobs.
+
+    - Red transitoria (NetworkError/TimedOut/RetryAfter): el bot se recupera solo
+      con el polling; log breve sin traceback para no ensuciar.
+    - Error inesperado: traceback completo + aviso al admin con cooldown de 10 min
+      (para no spamear si algo entra en bucle). El bot sigue vivo.
+    """
+    from telegram.error import NetworkError, RetryAfter, TimedOut
+    elog = logging.getLogger("antispam")
+    err = context.error
+    if isinstance(err, (NetworkError, TimedOut, RetryAfter)):
+        elog.warning("Red transitoria (%s): %s", type(err).__name__, err)
+        return
+    elog.error("Excepción no capturada en handler/job", exc_info=err)
+    try:
+        cfg = context.bot_data.get("cfg")
+        admin_id = getattr(cfg, "admin_user_id", 0) if cfg else 0
+        if not admin_id:
+            return
+        import time as _t
+        now = _t.time()
+        if now - context.bot_data.get("_last_error_dm", 0) < 600:
+            return
+        context.bot_data["_last_error_dm"] = now
+        import html as _html
+        await context.bot.send_message(
+            chat_id=admin_id,
+            text=(
+                "⚠️ <b>Error interno del bot</b>\n"
+                f"<code>{_html.escape(type(err).__name__)}: {_html.escape(str(err))[:300]}</code>\n\n"
+                "<i>Capturado (el bot sigue vivo). Revisa los logs para el detalle.</i>"
+            ),
+            parse_mode="HTML",
+        )
+    except Exception:  # noqa: BLE001 — nunca dejar que el error handler lance
+        pass
+
+
 def main() -> int:
     cfg = load_config()
     logging.basicConfig(
@@ -232,6 +271,10 @@ def main() -> int:
 
     # Reacciones.
     app.add_handler(MessageReactionHandler(on_message_reaction))
+
+    # Error handler global: captura excepciones no atrapadas en cualquier handler
+    # o job (red transitoria → log breve; error real → traceback + aviso al admin).
+    app.add_error_handler(_on_error)
 
     # Lanza el polling pidiendo TODOS los update types relevantes.
     allowed = [
