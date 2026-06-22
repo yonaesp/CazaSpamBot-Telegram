@@ -7,7 +7,35 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from src.verification import _is_obvious_spam_profile, _is_decorative_mix
+from src.verification import _is_obvious_spam_profile, _is_decorative_mix, _han_dominant
+
+
+def test_han_dominant_chino_real():
+    """Nombre dominado por ideogramas chinos (Han) → True (señal de spam)."""
+    assert _han_dominant("苹果-web3前端") is True   # lurker baneado 2026-06-22
+    assert _han_dominant("看直播赚钱") is True       # spam chino típico
+
+
+def test_han_dominant_no_decorativo_ni_legitimo():
+    """Katakana decorativo, latino o 1 Han suelto → False (no es chino dominante)."""
+    assert _han_dominant("Lore ツ") is False         # katakana, no Han
+    assert _han_dominant("フアン・ホセ") is False      # katakana
+    assert _han_dominant("Óscar") is False
+    assert _han_dominant("Pro苹") is False            # 1 solo Han
+    assert _han_dominant("") is False
+    assert _han_dominant(None) is False
+
+
+def test_obvious_spam_han_un_solo_campo():
+    """1 campo en chino real (aunque username sea latino) → ban directo."""
+    ok, _ = _is_obvious_spam_profile(None, "liousweb3", "苹果-web3前端", None)
+    assert ok is True
+
+
+def test_obvious_spam_katakana_decorativo_no():
+    """Katakana decorativo NO debe disparar (sería FP como el incidente de mayo)."""
+    ok, _ = _is_obvious_spam_profile(None, None, "Lore", "ツ")
+    assert ok is False
 
 
 def _sig(photo_count=2, account_age_days=500):

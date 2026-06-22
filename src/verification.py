@@ -134,6 +134,27 @@ def _is_decorative_mix(s: str) -> bool:
     return len(_unique_scripts(norm)) >= 3
 
 
+_HAN_RE = __import__("re").compile(r'[㐀-䶿一-鿿豈-﫿\U00020000-\U0002a6df]')
+
+
+def _han_dominant(value: Optional[str]) -> bool:
+    """True si el campo está dominado por ideogramas chinos (Han) reales.
+
+    Requiere ≥2 ideogramas Han Y que sean ≥50% de las letras del campo. Así NO
+    cuenta el katakana decorativo (ツ, no es Han), ni un símbolo Han suelto en un
+    nombre por lo demás latino. NFKC primero por consistencia.
+    """
+    if not value:
+        return False
+    import unicodedata
+    norm = unicodedata.normalize("NFKC", value)
+    letters = [c for c in norm if c.isalpha()]
+    if not letters:
+        return False
+    han = sum(1 for c in letters if _HAN_RE.match(c))
+    return han >= 2 and han / len(letters) >= 0.5
+
+
 def _is_obvious_spam_profile(
     sig: Optional[user_signals.UserSignals],
     username: Optional[str],
@@ -177,6 +198,13 @@ def _is_obvious_spam_profile(
     # NUNCA ban directo por nombre. Es un user bilingüe probable.
     if sig is not None and sig.photo_count >= 1 and (sig.account_age_days or 0) >= 365:
         return False, reasons + ["bypass: cuenta antigua + foto"]
+    # Chino REAL (ideogramas Han) en cualquier campo: señal muy fuerte de spam en
+    # grupos hispanos. A diferencia del árabe/cirílico (con users legítimos) o el
+    # katakana decorativo (ツ), un nombre dominado por ideogramas Han en un grupo
+    # de habla hispana es casi siempre un bot de promo. Un solo campo basta. El
+    # bypass de cuenta antigua + foto de arriba protege al chino-hablante real.
+    if any(_han_dominant(v) for v in (first_name, last_name, username)):
+        return True, reasons + ["nombre dominado por ideogramas chinos (Han)"]
     # 2+ campos non-latín → señal fuerte, ban directo
     if non_latin_count >= 2:
         return True, reasons
