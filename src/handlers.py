@@ -343,19 +343,13 @@ async def _notify_manual_ban(
     db: DB,
     cmu: ChatMemberUpdated,
 ) -> None:
-    """Notifica al ADMIN_USER_ID por Casa_Yona cuando un admin (no el bot) bania a alguien.
+    """Avisa al admin del bot cuando OTRO admin (no el bot) banea/expulsa a alguien.
 
-    Incluye: quién baneó (admin), a quién baneó (user), último mensaje del baneado,
-    y un link tg://user?id para abrir el perfil.
+    El aviso PRIMARIO va al DM directo del admin del bot (mismo sitio que el resto
+    de alertas: revisiones, flood, borrados). Antes solo iba por Casa_Yona, así que
+    no se veía si Casa_Yona no estaba o el admin miraba el DM de CazaSpamBot.
     """
     cfg: Config = context.bot_data["cfg"]
-    notifier = context.bot_data.get("notifier")
-    if notifier is None or not notifier.is_configured():
-        return
-    session = context.bot_data.get("http")
-    if session is None:
-        return
-
     actor = cmu.from_user  # quien hizo el ban
     target = cmu.new_chat_member.user
     chat = cmu.chat
@@ -373,47 +367,47 @@ async def _notify_manual_ban(
     if last_msg_ts:
         last_msg_when = " (" + _dt.datetime.fromtimestamp(last_msg_ts).strftime("%Y-%m-%d %H:%M") + ")"
 
-    new_status_label = "BAN" if cmu.new_chat_member.status == ChatMemberStatus.BANNED else "KICK/LEFT"
-    chat_link = f"https://t.me/{db.chat_username(chat.id)}" if db.chat_username(chat.id) else ""
+    new_status_label = "BAN" if cmu.new_chat_member.status == ChatMemberStatus.BANNED else "KICK/salió"
 
     text = (
-        f"🚨 <b>Ban manual detectado en {_h.escape(chat.title or str(chat.id))}</b>\n\n"
+        f"🚨 <b>Ban manual de un admin en {_h.escape(chat.title or str(chat.id))}</b>\n\n"
         f"⚖️ Acción: <b>{new_status_label}</b>\n"
         f"👮 Por: <a href=\"tg://user?id={actor.id}\">{_h.escape(actor_label)}</a> (<code>{actor.id}</code>)\n"
         f"🎯 Sobre: <a href=\"tg://user?id={target.id}\">{_h.escape(target_label)}</a> (<code>{target.id}</code>)\n"
         f"\n"
-        f"💬 <b>Último mensaje del baneado{last_msg_when}:</b>\n"
+        f"💬 <b>Último mensaje del afectado{last_msg_when}:</b>\n"
         f"<pre>{_h.escape(last_msg_text[:500])}</pre>\n"
         f"\n"
-        f"<i>Revisa por si hay actividad fraudulenta o ban abusivo.</i>"
+        f"<i>Lo hizo OTRO admin (no yo). Revisa por si fue spam o un ban dudoso.</i>"
     )
 
-    try:
-        await notifier.send_action_alert(
-            session=session, action_id=0,
-            chat_title=chat.title, chat_id=chat.id,
-            user_id=target.id, username=target.username,
-            action="manual_ban_external",
-            rule=f"manual_ban_by_admin_{actor.id}",
-            reason=f"Ban manual por admin {actor_label}",
-            score=0,
-            original_text=last_msg_text,
-            mode="active",
-            federation_results=None,
-        )
-    except Exception:
-        # Fallback: envío directo via aiohttp si notifier falla por estructura
-        if cfg.casa_yona_token and cfg.casa_yona_chat_yona:
-            try:
-                async with session.post(
-                    f"https://api.telegram.org/bot{cfg.casa_yona_token}/sendMessage",
-                    json={"chat_id": cfg.casa_yona_chat_yona, "text": text, "parse_mode": "HTML",
-                          "disable_web_page_preview": True},
-                    timeout=aiohttp.ClientTimeout(total=10),
-                ) as r:
-                    await r.json()
-            except Exception as exc:
-                log.warning("manual_ban notif fallback fallo: %s", exc)
+    # 1) PRIMARIO: DM directo al admin del bot (donde recibe todo lo demás).
+    if cfg.admin_user_id:
+        try:
+            await context.bot.send_message(
+                chat_id=cfg.admin_user_id, text=text, parse_mode="HTML",
+                disable_web_page_preview=True,
+            )
+        except TelegramError as exc:
+            log.debug("manual_ban DM admin fallo: %s", exc)
+
+    # 2) SECUNDARIO opcional: Casa_Yona si está configurado.
+    notifier = context.bot_data.get("notifier")
+    session = context.bot_data.get("http")
+    if notifier is not None and notifier.is_configured() and session is not None:
+        try:
+            await notifier.send_action_alert(
+                session=session, action_id=0,
+                chat_title=chat.title, chat_id=chat.id,
+                user_id=target.id, username=target.username,
+                action="manual_ban_external",
+                rule=f"manual_ban_by_admin_{actor.id}",
+                reason=f"Ban manual por admin {actor_label}",
+                score=0, original_text=last_msg_text, mode="active",
+                federation_results=None,
+            )
+        except Exception:  # noqa: BLE001 — Casa_Yona es secundario, no debe romper
+            pass
     log.info(
         "manual ban detected: actor=%s target=%s chat=%s",
         actor.id, target.id, chat.id,

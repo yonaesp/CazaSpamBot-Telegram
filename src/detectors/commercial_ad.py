@@ -58,13 +58,22 @@ _CTA_RE = re.compile(
     r'env[ií]ame?\s+(un\s+)?(mensaje|dm|md|privado))',
     re.IGNORECASE,
 )
-# Vocabulario de oferta de trabajo formal
+# Vocabulario de oferta de trabajo / reclutamiento (lado del que OFRECE empleo,
+# que es el patrón spam; NO el de quien busca trabajo y pregunta sin enlace).
+# Caso real: "Si estás buscando trabajo... oportunidades de empleo disponibles".
 _WORK_RE = re.compile(
     r'\b(vacantes?|puestos?\s+disponibles?|sueldo|salario|'
     r'contrato\s+(legal|estable|indefinido)|trabajo\s+(estable|legal|garantizado)|'
-    r'oportunidad\s+laboral)\b',
+    r'oportunidad(?:es)?\s+(?:laboral(?:es)?|de\s+(?:empleo|trabajo|negocio))|'
+    r'ofertas?\s+de\s+(?:empleo|trabajo)|empleos?\s+disponibles?|'
+    r'(?:trabaja|trabajo|ingresos?|gana[rs]?|dinero)\s+desde\s+(?:casa|tu\s+m[oó]vil)|'
+    r'gana[rs]?\s+(?:dinero|hasta\s+\d)|ingresos?\s+(?:extra|adicionales|garantizados)|'
+    r'estamos\s+contratando|se\s+(?:busca|necesita[n]?)\s+(?:personal|empleados?|gente|colaboradores)|'
+    r'trabajo\s+que\s+m[aá]s\s+te\s+interese|si\s+est[aá]s\s+buscando\s+(?:trabajo|empleo))\b',
     re.IGNORECASE,
 )
+# URL externa (http/https) que NO sea t.me — enlaces a webs de "empleo"/scam.
+_EXTERNAL_URL_RE = re.compile(r'https?://(?!t\.me/|telegram\.me/)\S+', re.IGNORECASE)
 # Trabajo doméstico / búsqueda de persona — patrón scam "cuidar casa/mascota/niños"
 _DOMESTIC_OFFER_RE = re.compile(
     r'\b(cuidar|atender|alimentar|pasear|limpiar)\b[^.\n]{0,50}'
@@ -113,6 +122,7 @@ def check(msg: Message, is_first_msg: bool = False) -> Hit:
     has_cta = bool(_CTA_RE.search(text))
     has_work = bool(_WORK_RE.search(text))
     has_tg_link = "t.me/" in text.lower() or "telegram.me/" in text.lower()
+    has_external_url = bool(_EXTERNAL_URL_RE.search(text))
     has_domestic = bool(_DOMESTIC_OFFER_RE.search(text))
     has_urgency = bool(_URGENCY_RE.search(text))
     illegal = _ILLEGAL_SERVICES_RE.findall(text)
@@ -149,6 +159,17 @@ def check(msg: Message, is_first_msg: bool = False) -> Hit:
     if has_tg_link:
         score += 20
         reasons.append("enlace t.me/")
+    elif has_external_url:
+        # Enlace web SOLO (sin más señales) NO debe banear: un usuario fiable
+        # puede compartir una web en su primer mensaje. Pesa poco por sí mismo.
+        score += 15
+        reasons.append("enlace web externo")
+    # COMBO clave del job-spam: lenguaje de oferta de empleo + un enlace. Esto sí
+    # es el patrón inequívoco (reclutamiento + link), aunque el perfil parezca
+    # fiable (foto antigua, etc.). Caso real: empleo.vertexgloball.com.
+    if has_work and (has_tg_link or has_external_url):
+        score += 35
+        reasons.append("oferta de empleo + enlace (patrón de job-spam)")
     if has_domestic:
         score += 20
         reasons.append("oferta doméstica / búsqueda de persona")
@@ -175,6 +196,7 @@ def check(msg: Message, is_first_msg: bool = False) -> Hit:
             "has_cta": has_cta,
             "has_work": has_work,
             "has_tg_link": has_tg_link,
+            "has_external_url": has_external_url,
             "has_domestic": has_domestic,
             "has_urgency": has_urgency,
             "score": score,

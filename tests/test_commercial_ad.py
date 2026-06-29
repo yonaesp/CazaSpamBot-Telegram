@@ -187,3 +187,46 @@ def test_pregunta_instagram_normal_no_dispara():
         is_first_msg=False,
     )
     assert hit is None or hit.score < 60
+
+
+# --- Job-spam: oferta de empleo + enlace externo (caso vertexgloball 2026-06-29) ---
+
+JOB_SPAM = (
+    "Si estás buscando trabajo, echa un vistazo a este enlace. Hay muchas "
+    "oportunidades de empleo disponibles. Puedes elegir el trabajo que más te "
+    "interese.\n\nhttps://empleo.vertexgloball.com/."
+)
+
+
+def test_job_spam_empleo_mas_enlace_dispara():
+    hit = det.check(_msg(JOB_SPAM), is_first_msg=True)
+    assert hit is not None
+    assert hit.rule == "commercial_ad"
+    assert hit.score >= 70  # oferta empleo + enlace + primer msg → acción decidida
+    assert hit.payload["has_work"] and hit.payload["has_external_url"]
+
+
+def test_job_spam_gana_dinero_desde_casa_dispara():
+    hit = det.check(
+        _msg("Gana dinero desde casa, ingresos garantizados. Regístrate en https://chollo-fake.xyz/r"),
+        is_first_msg=True,
+    )
+    assert hit is not None and hit.score >= 60
+
+
+def test_enlace_web_solo_no_dispara():
+    """Usuario fiable comparte una web en su primer mensaje, SIN lenguaje de empleo → no banear."""
+    hit = det.check(
+        _msg("Mirad qué chulo este proyecto que he hecho, https://miweb.com os gustará seguro"),
+        is_first_msg=True,
+    )
+    assert hit is None or hit.score < 60
+
+
+def test_busca_trabajo_preguntando_sin_enlace_no_dispara():
+    """Alguien que pregunta por ofertas de empleo SIN enlace no es spam (anti-FP)."""
+    hit = det.check(
+        _msg("Hola, soy nuevo. ¿Alguien sabe si hay ofertas de empleo de informático por aquí? gracias"),
+        is_first_msg=True,
+    )
+    assert hit is None or hit.score < 60
