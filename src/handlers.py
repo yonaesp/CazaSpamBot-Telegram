@@ -97,6 +97,35 @@ async def _ban_join_direct(context, db, cfg, cmu, user, *, score, rule, reason, 
     )
 
 
+def _is_admin_ban_or_kick(
+    old_status: str | None,
+    new_status: str | None,
+    actor_id: int | None,
+    target_id: int,
+    bot_id: int,
+) -> bool:
+    """True si el cambio de membresía es un ban/kick hecho por OTRO admin (no el bot).
+
+    Distingue lo que el evento ChatMemberUpdated NO separa por sí solo:
+      - →BANNED: siempre acción de un admin.
+      - →LEFT: puede ser self-leave (el usuario se va solo: actor == afectado) o
+        kick por un admin (actor != afectado). Solo el kick cuenta.
+    Excluye acciones del propio bot y casos sin actor conocido.
+    """
+    if actor_id is None or actor_id == bot_id:
+        return False
+    was_active = old_status in (
+        ChatMemberStatus.MEMBER, ChatMemberStatus.RESTRICTED, ChatMemberStatus.ADMINISTRATOR,
+    )
+    if not was_active:
+        return False
+    if new_status == ChatMemberStatus.BANNED:
+        return True
+    if new_status == ChatMemberStatus.LEFT and actor_id != target_id:
+        return True
+    return False
+
+
 async def on_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Detectar JOINs y BANS de usuarios al grupo."""
     cfg: Config = context.bot_data["cfg"]
@@ -109,21 +138,14 @@ async def on_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     old_status = cmu.old_chat_member.status if cmu.old_chat_member else None
     new_status = cmu.new_chat_member.status
 
-    # Detección de ban/kick realizado por OTRO admin (no por el bot).
-    # cmu.from_user es quién hizo el cambio. Diferenciamos:
-    # - BAN directo: new_status == BANNED (siempre es acción de admin)
-    # - LEFT: puede ser self-leave o kick. Solo notificar si from_user != usuario que se fue.
-    just_banned = (
-        old_status in (ChatMemberStatus.MEMBER, ChatMemberStatus.RESTRICTED, ChatMemberStatus.ADMINISTRATOR)
-        and new_status == ChatMemberStatus.BANNED
-    )
-    just_kicked_by_admin = (
-        old_status in (ChatMemberStatus.MEMBER, ChatMemberStatus.RESTRICTED, ChatMemberStatus.ADMINISTRATOR)
-        and new_status == ChatMemberStatus.LEFT
-        and cmu.from_user
-        and cmu.from_user.id != cmu.new_chat_member.user.id  # fue expulsado, no se fue solo
-    )
-    if (just_banned or just_kicked_by_admin) and cmu.from_user.id != context.bot.id:
+    # Detección de ban/kick realizado por OTRO admin (no por el bot). Ver
+    # _is_admin_ban_or_kick: separa self-leave (se va solo) de kick por admin.
+    if _is_admin_ban_or_kick(
+        old_status, new_status,
+        actor_id=cmu.from_user.id if cmu.from_user else None,
+        target_id=cmu.new_chat_member.user.id,
+        bot_id=context.bot.id,
+    ):
         await _notify_manual_ban(context, db, cmu)
 
     is_join = (
