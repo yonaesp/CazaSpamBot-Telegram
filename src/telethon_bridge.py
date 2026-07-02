@@ -143,6 +143,17 @@ async def _notify_manual_delete(client, bot: Bot, db: DB, chat_id: int, msg_id: 
         log.debug("manual_delete skip: borrado por bot conocido %s msg=%s", actor_id_found, msg_id)
         return
 
+    # Si NO se pudo atribuir el borrado a un admin (actor "?"), casi siempre es el
+    # propio usuario borrando su mensaje (self-delete); admin_log solo registra
+    # borrados de admins. Para algunos es ruido, para otros es info útil. Se
+    # controla con NOTIFY_SELF_DELETES (default false → no avisar de self-deletes).
+    notify_self_deletes = os.getenv("NOTIFY_SELF_DELETES", "false").strip().lower() in (
+        "1", "true", "yes", "on",
+    )
+    if actor_id_found is None and not notify_self_deletes:
+        log.debug("manual_delete skip: borrador desconocido (self-delete) y NOTIFY_SELF_DELETES=false msg=%s", msg_id)
+        return
+
     # 4) Título del chat
     chat_title = str(chat_id)
     with db._cur() as c:

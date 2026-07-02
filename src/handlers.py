@@ -62,11 +62,13 @@ def _can_delete(member) -> bool:
 
 async def on_my_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Tracking de en qué chats está el bot y con qué permisos."""
+    cfg: Config = context.bot_data["cfg"]
     db: DB = context.bot_data["db"]
     cmu: ChatMemberUpdated = update.my_chat_member
     if not cmu:
         return
     chat = cmu.chat
+    old = cmu.old_chat_member
     new = cmu.new_chat_member
     am_admin = new.status in (ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER)
     db.upsert_bot_chat(
@@ -82,6 +84,35 @@ async def on_my_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         "my_chat_member chat=%s (%s) status=%s admin=%s restrict=%s delete=%s",
         chat.id, chat.title, new.status, am_admin, _can_restrict(new), _can_delete(new),
     )
+
+    # Aviso si EXPULSAN al bot de un grupo (estaba dentro y ahora está fuera).
+    # Activo por defecto, configurable con NOTIFY_BOT_REMOVED.
+    old_status = old.status if old else None
+    was_in = old_status in (
+        ChatMemberStatus.MEMBER, ChatMemberStatus.RESTRICTED,
+        ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER,
+    )
+    now_out = new.status in (ChatMemberStatus.LEFT, ChatMemberStatus.BANNED)
+    if was_in and now_out and cfg.notify_bot_removed and cfg.admin_user_id:
+        actor = cmu.from_user
+        actor_label = "?"
+        if actor:
+            actor_label = f"@{actor.username}" if actor.username else (actor.first_name or str(actor.id))
+        verbo = "me han BANEADO" if new.status == ChatMemberStatus.BANNED else "me han sacado"
+        try:
+            await context.bot.send_message(
+                chat_id=cfg.admin_user_id,
+                text=(
+                    f"⚠️ <b>Perdí acceso a un grupo</b>: {verbo} de "
+                    f"<b>{_h.escape(chat.title or str(chat.id))}</b> (<code>{chat.id}</code>)\n"
+                    f"👮 Por: {_h.escape(actor_label)}"
+                    + (f" (<code>{actor.id}</code>)" if actor else "")
+                    + "\n\n<i>Ya no puedo moderar ahí hasta que me vuelvan a añadir como admin.</i>"
+                ),
+                parse_mode="HTML",
+            )
+        except TelegramError as exc:
+            log.debug("aviso bot expulsado fallo: %s", exc)
 
 
 async def _ban_join_direct(context, db, cfg, cmu, user, *, score, rule, reason, payload=None):
