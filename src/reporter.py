@@ -45,11 +45,18 @@ class SpamReporter:
     """Worker async que reporta a Telegram via Telethon. Se inicia con start()."""
 
     def __init__(
-        self, enabled: bool,
+        self, telethon_enabled: bool, reporting_enabled: bool,
         rate_per_hour: int = DEFAULT_RATE_LIMIT_PER_HOUR,
         rate_per_day: int = DEFAULT_RATE_LIMIT_PER_DAY,
     ) -> None:
-        self.enabled = enabled
+        # telethon_enabled: conecta el cliente MTProto → habilita TODO lo que la
+        #   Bot API no puede (bio_spam, photos_batch, señales de perfil, admin_log
+        #   del bridge, get_participants). NO implica reportar.
+        # reporting_enabled: además ENVÍA reportes oficiales de spam (report_before_ban).
+        #   Es lo único con riesgo para la cuenta secundaria (falsos positivos), por
+        #   eso es un opt-in separado. Reportar requiere, obviamente, telethon_enabled.
+        self.telethon_enabled = telethon_enabled
+        self.reporting_enabled = reporting_enabled
         self.rate_per_hour = rate_per_hour
         self.rate_per_day = rate_per_day
         self._queue: asyncio.Queue[ReportTask] = asyncio.Queue()
@@ -70,17 +77,28 @@ class SpamReporter:
         return True, ""
 
     def is_ready(self) -> bool:
-        return self.enabled and self._client is not None
+        """True si el cliente Telethon está CONECTADO y disponible (bio, fotos,
+        admin_log, bridge, get_participants). Independiente de si se reportan spams."""
+        return self.telethon_enabled and self._client is not None
+
+    def reporting_ready(self) -> bool:
+        """True si además se ENVÍAN reportes oficiales de spam (report_before_ban
+        activo Y Telethon conectado)."""
+        return self.reporting_enabled and self._client is not None
 
     def get_client(self):
-        """Devuelve el cliente Telethon o None si no está listo. Uso seguro desde otros módulos."""
+        """Devuelve el cliente Telethon o None si no está conectado. Uso seguro
+        desde otros módulos. NO depende de reporting_enabled: bio/fotos/admin_log
+        siguen disponibles aunque los reportes estén desactivados."""
         if not self.is_ready():
             return None
         return self._client
 
     async def start(self) -> None:
-        if not self.enabled:
-            log.info("SpamReporter desactivado por configuración.")
+        # Conectamos el cliente si Telethon está habilitado (aunque NO se reporte):
+        # otras funciones (bio/fotos/admin_log/bridge) lo necesitan vía get_client().
+        if not self.telethon_enabled:
+            log.info("Telethon desactivado por configuración (bot solo Bot API).")
             return
         if not Path(SESSION_PATH).exists():
             log.warning(
@@ -115,7 +133,13 @@ class SpamReporter:
             log.warning("SpamReporter: fallo conectando Telethon: %s", exc)
             self._client = None
             return
-        self._worker_task = asyncio.create_task(self._worker())
+        # El worker de reportes solo hace falta si se van a enviar reportes.
+        # El cliente ya queda conectado para bio/fotos/admin_log aunque no se reporte.
+        if self.reporting_enabled:
+            self._worker_task = asyncio.create_task(self._worker())
+            log.info("Reportes oficiales de spam ACTIVOS (report_before_ban).")
+        else:
+            log.info("Reportes oficiales de spam desactivados (Telethon sí activo para bio/fotos/admin_log).")
 
     async def stop(self) -> None:
         if self._worker_task:
@@ -139,7 +163,9 @@ class SpamReporter:
         detail: str,
     ) -> None:
         """Encola una tarea. No bloquea aunque el worker esté ocupado."""
-        if not self.enabled:
+        # Solo si los reportes están activos Y Telethon conectado (si no, no hay
+        # worker ni cliente y la cola crecería sin fin).
+        if not self.reporting_ready():
             return
         self._queue.put_nowait(ReportTask(
             chat_id=chat_id, user_id=user_id, message_id=message_id,

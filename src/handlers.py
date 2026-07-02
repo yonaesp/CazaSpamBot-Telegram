@@ -1688,7 +1688,7 @@ async def _apply_action(
                 # Esto evita penalizar el "trust" de la cuenta Telethon como reporter en Native Antispam.
                 if decision.action == "ban" and _is_reportable(decision):
                     reporter = context.bot_data.get("reporter")
-                    if reporter is not None and reporter.is_ready():
+                    if reporter is not None and reporter.reporting_ready():
                         reason_kind = "fake" if decision.rule == "cas_match" else "spam"
                         reporter.enqueue(
                             chat_id=chat_id, user_id=user_id,
