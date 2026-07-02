@@ -126,6 +126,25 @@ def _is_admin_ban_or_kick(
     return False
 
 
+def _is_join(old_status: str | None, new_status: str | None, new_is_member: bool | None) -> bool:
+    """True si el evento representa una ENTRADA al grupo.
+
+    Cubre el join normal (→MEMBER) y el join que aterriza directo en RESTRICTED
+    con is_member=True (otro bot/admin lo mutea en el mismo instante del join, o
+    grupos que restringen al recién llegado). Sin esto, ese usuario se saltaría
+    todo el pipeline de entrada (federación, CAS, lols, verificación).
+    Excluye RESTRICTED→MEMBER (unmute, no es entrada) y RESTRICTED con
+    is_member=False (restringido y fuera, no está dentro).
+    """
+    if old_status not in (ChatMemberStatus.LEFT, ChatMemberStatus.BANNED, None):
+        return False
+    if new_status == ChatMemberStatus.MEMBER:
+        return True
+    if new_status == ChatMemberStatus.RESTRICTED and bool(new_is_member):
+        return True
+    return False
+
+
 async def on_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Detectar JOINs y BANS de usuarios al grupo."""
     cfg: Config = context.bot_data["cfg"]
@@ -148,11 +167,10 @@ async def on_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     ):
         await _notify_manual_ban(context, db, cmu)
 
-    is_join = (
-        old_status in (ChatMemberStatus.LEFT, ChatMemberStatus.BANNED, None)
-        and new_status == ChatMemberStatus.MEMBER
-    )
-    if not is_join:
+    if not _is_join(
+        old_status, new_status,
+        getattr(cmu.new_chat_member, "is_member", None),
+    ):
         return
     user = cmu.new_chat_member.user
     # join_ts = hora REAL del evento de Telegram (cmu.date), no la de proceso:
