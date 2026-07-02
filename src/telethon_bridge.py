@@ -22,6 +22,25 @@ from .db import DB
 log = logging.getLogger(__name__)
 
 
+def _marked_chat_id(telethon_chat_id: int) -> int:
+    """Normaliza el chat_id de un evento Telethon al formato Bot API (-100…).
+
+    Al handler MessageDeleted solo llega chat_id de CANALES/SUPERGRUPOS: los
+    borrados en grupos básicos y PM vienen como UpdateDeleteMessages sin peer
+    (chat_id None) y se filtran antes de llegar aquí. Por eso el destino es
+    siempre un canal, cuyo formato Bot API es -100<id>.
+
+    Robusto ante cualquier versión de Telethon:
+      - Telethon moderno (>=1.20, aquí 1.43) ya devuelve el id MARCADO y negativo
+        (-100…): se usa tal cual.
+      - Telethon antiguo lo devuelve CRUDO y positivo: se le antepone -100.
+    Idempotente: un id ya marcado (negativo) nunca se vuelve a marcar.
+    """
+    if telethon_chat_id < 0:
+        return telethon_chat_id
+    return int(f"-100{telethon_chat_id}")
+
+
 def attach(client, bot: Bot, db: DB) -> None:
     """Registra el handler MessageDeleted en el cliente Telethon."""
     try:
@@ -35,13 +54,10 @@ def attach(client, bot: Bot, db: DB) -> None:
         try:
             chat_id = event.chat_id
             if not chat_id:
+                # Borrado en grupo básico/PM: Telethon no sabe de qué chat es.
+                # No podemos actuar sin chat → salimos (no es un canal moderable).
                 return
-            # Telethon usa chat_id sin -100 prefix para canales/supergrupos.
-            # Para grupos PTB usamos -100xxxx. Compensamos.
-            if chat_id > 0:
-                full_chat_id = int(f"-100{chat_id}")
-            else:
-                full_chat_id = chat_id
+            full_chat_id = _marked_chat_id(chat_id)
             from . import admin_report as ar_mod
             for msg_id in event.deleted_ids:
                 # 1) Cascade gentle_warnings (bot avisó a user, user borra → borrar aviso)
