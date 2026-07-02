@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
 
 import aiohttp
@@ -31,6 +32,32 @@ from .notifier import Notifier
 from .reporter import SpamReporter
 
 
+def _warn_telethon_requirements(cfg, telethon_ready: bool) -> None:
+    """Avisa si hay opciones ACTIVADAS que requieren la cuenta Telethon (opcional)
+    pero Telethon no está disponible. Esas opciones se quedan desactivadas de facto.
+
+    Es el momento "al querer activarlas se avisa": el usuario pone la opción en
+    .env, arranca, y ve el aviso de que falta configurar Telethon.
+    """
+    if telethon_ready:
+        return
+    log = logging.getLogger("antispam")
+    faltan: list[str] = []
+    if cfg.report_before_ban:
+        faltan.append("REPORT_BEFORE_BAN (reportes oficiales de spam)")
+    if os.getenv("NOTIFY_SELF_DELETES", "false").strip().lower() in ("1", "true", "yes", "on"):
+        faltan.append("NOTIFY_SELF_DELETES (saber quién borró un mensaje, vía admin_log)")
+    if not faltan:
+        return
+    log.warning(
+        "OPCIONES QUE REQUIEREN LA CUENTA TELETHON (opcional) están activadas pero "
+        "Telethon no está disponible → se quedan DESACTIVADAS: %s. Para usarlas: pon "
+        "TELETHON_ENABLED=true, configura TG_API_ID/TG_API_HASH y genera la sesión con "
+        "scripts/telethon_login.py (crea data/telethon.session).",
+        "; ".join(faltan),
+    )
+
+
 async def _post_init(app: Application) -> None:
     cfg = app.bot_data["cfg"]
     app.bot_data["http"] = aiohttp.ClientSession()
@@ -44,7 +71,8 @@ async def _post_init(app: Application) -> None:
     # perfil, reportes oficiales, get_participants, bridge) degrada vía los
     # guards `if client is not None`. Los detectores Bot-API siguen activos.
     reporter = SpamReporter(
-        enabled=cfg.report_before_ban and cfg.telethon_enabled,
+        telethon_enabled=cfg.telethon_enabled,
+        reporting_enabled=cfg.report_before_ban,
         rate_per_hour=cfg.reporter_rate_per_hour,
         rate_per_day=cfg.reporter_rate_per_day,
     )
@@ -52,12 +80,19 @@ async def _post_init(app: Application) -> None:
         await reporter.start()
     else:
         logging.getLogger("antispam").warning(
-            "TELETHON_ENABLED=false → bot SOLO con Bot API (sin bio/fotos/reportes/bridge)."
+            "TELETHON_ENABLED=false → bot SOLO con Bot API. Desactivadas las funciones "
+            "que requieren la cuenta Telethon (opcional): bio_spam, photos_batch, señales "
+            "de perfil, reportes oficiales, aviso de quién borró un mensaje, get_participants."
         )
     app.bot_data["reporter"] = reporter
 
-    # Telethon bridge: listener MessageDeleted para borrar avisos en cascada
-    client = reporter.get_client() if cfg.telethon_enabled else None
+    # Avisos claros si hay opciones que REQUIEREN Telethon activadas sin que esté
+    # disponible (se quedan desactivadas de facto).
+    _warn_telethon_requirements(cfg, telethon_ready=reporter.is_ready())
+
+    # Telethon bridge: listener MessageDeleted para borrar avisos en cascada.
+    # get_client() devuelve el cliente aunque los reportes estén desactivados.
+    client = reporter.get_client()
     if client is not None:
         try:
             telethon_bridge.attach(client, app.bot, app.bot_data["db"])
@@ -67,10 +102,11 @@ async def _post_init(app: Application) -> None:
 
     me = await app.bot.get_me()
     logging.getLogger("antispam").info(
-        "Bot @%s (id=%s) listo. Modo=%s. Privacy=%s. Reporter=%s",
+        "Bot @%s (id=%s) listo. Modo=%s. Privacy=%s. Telethon=%s. Reportes=%s",
         me.username, me.id, cfg.mode,
         "off" if me.can_read_all_group_messages else "ON (¡desactiva en BotFather!)",
-        "ready" if reporter.is_ready() else "off",
+        "conectado" if reporter.is_ready() else "off",
+        "activos" if reporter.reporting_ready() else "off",
     )
     if app.job_queue:
         app.job_queue.run_repeating(_heartbeat_job, interval=30, first=1)

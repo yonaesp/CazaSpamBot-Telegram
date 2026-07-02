@@ -183,7 +183,9 @@ def load_config() -> Config:
         cas_autoban_min=_int("CAS_AUTOBAN_MIN", 2),
         lols_enabled=_bool("LOLS_ENABLED", True),
         rescan_edited_messages=_bool("RESCAN_EDITED_MESSAGES", True),
-        report_before_ban=_bool("REPORT_BEFORE_BAN", True),
+        # Opt-in: reportar puede enviar falsos positivos y arriesgar la cuenta
+        # Telethon. Default false para el repo público; en nuestro .env va en true.
+        report_before_ban=_bool("REPORT_BEFORE_BAN", False),
         telethon_enabled=_bool("TELETHON_ENABLED", True),
         llm_enabled=_bool("LLM_ENABLED", False),
         llm_provider=os.getenv("LLM_PROVIDER", "anthropic"),

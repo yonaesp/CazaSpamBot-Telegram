@@ -327,7 +327,7 @@ async def _spam_combo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     # de reglas automáticas (el rate-limit del reporter sigue aplicando).
     if not cfg.shadow:
         reporter = context.bot_data.get("reporter")
-        if reporter is not None and reporter.is_ready():
+        if reporter is not None and reporter.reporting_ready():
             reporter.enqueue(
                 chat_id=msg.chat_id, user_id=author.id,
                 message_id=target.message_id, reason="spam",

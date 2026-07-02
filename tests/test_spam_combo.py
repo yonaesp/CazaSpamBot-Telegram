@@ -48,6 +48,7 @@ def _context(db, *, member_status="member", quip=False):
     )
     reporter = MagicMock()
     reporter.is_ready = MagicMock(return_value=True)
+    reporter.reporting_ready = MagicMock(return_value=True)
     reporter.enqueue = MagicMock()
     return SimpleNamespace(
         args=[], bot=bot,
