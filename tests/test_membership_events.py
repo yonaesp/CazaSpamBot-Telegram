@@ -8,11 +8,45 @@ from __future__ import annotations
 
 from telegram.constants import ChatMemberStatus as S
 
-from src.handlers import _is_admin_ban_or_kick
+from src.handlers import _is_admin_ban_or_kick, _is_join
 
 BOT = 1000
 ADMIN = 2000
 USER = 3000
+
+
+# --- _is_join: detección de entrada al grupo ---
+
+def test_join_normal():
+    assert _is_join(S.LEFT, S.MEMBER, None) is True
+    assert _is_join(None, S.MEMBER, None) is True
+    assert _is_join(S.BANNED, S.MEMBER, None) is True  # reentra tras desban
+
+
+def test_join_directo_a_restricted_es_join():
+    """Otro bot mutea en el instante del join: →RESTRICTED con is_member=True.
+    Antes se saltaba TODO el pipeline de entrada (bug 1.1 del audit)."""
+    assert _is_join(S.LEFT, S.RESTRICTED, True) is True
+    assert _is_join(None, S.RESTRICTED, True) is True
+
+
+def test_restricted_fuera_no_es_join():
+    """RESTRICTED con is_member=False = restringido y fuera, no es entrada."""
+    assert _is_join(S.LEFT, S.RESTRICTED, False) is False
+
+
+def test_unmute_no_es_join():
+    """RESTRICTED→MEMBER (unmute) NO es un join (no re-welcome)."""
+    assert _is_join(S.RESTRICTED, S.MEMBER, None) is False
+
+
+def test_member_a_restricted_no_es_join():
+    """MEMBER→RESTRICTED (mute de un ya-miembro) no es entrada."""
+    assert _is_join(S.MEMBER, S.RESTRICTED, True) is False
+
+
+def test_leave_no_es_join():
+    assert _is_join(S.MEMBER, S.LEFT, None) is False
 
 
 def test_self_leave_no_notifica():
