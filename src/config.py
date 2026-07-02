@@ -106,6 +106,10 @@ class Config:
     flood_window_s: int = 60
     flood_mute_hours: int = 6
 
+    # Aviso al admin cuando EXPULSAN al bot de un grupo (perdió acceso). Activo
+    # por defecto: es útil enterarse. Se puede desactivar con NOTIFY_BOT_REMOVED=false.
+    notify_bot_removed: bool = True
+
     db_path: str = "/app/data/antispam.db"
     log_level: str = "INFO"
 
@@ -170,6 +174,7 @@ def load_config() -> Config:
         reaction_farming_enabled=_bool("REACTION_FARMING_ENABLED", True),
         reaction_threshold_count=_int("REACTION_THRESHOLD_COUNT", 5),
         reaction_threshold_seconds=_int("REACTION_THRESHOLD_SECONDS", 60),
+        notify_bot_removed=_bool("NOTIFY_BOT_REMOVED", True),
         flood_max_msgs=_int("FLOOD_MAX_MSGS", 6),
         flood_window_s=_int("FLOOD_WINDOW_S", 60),
         flood_mute_hours=_int("FLOOD_MUTE_HOURS", 6),
