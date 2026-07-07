@@ -278,11 +278,23 @@ def _is_suspicious_profile(
     return (bool(reasons), reasons)
 
 
-FRIENDLY_WELCOME_DELETE_AFTER_S = 900  # 15 min (igual que el welcome normal)
-# Cuánto dura en el chat el mensaje de "verificación correcta + welcome" tras
-# pulsar SOY HUMANO. Generoso (20 min) para que al recién llegado le dé tiempo a
-# leer el welcome, las normas y pulsar el botón del anclado. Configurable en .env.
-VERIFIED_WELCOME_DELETE_AFTER_S = int(os.getenv("VERIFIED_WELCOME_DELETE_AFTER_S", "1200"))
+def _int_env(name: str, default: int) -> int:
+    """Lee un entero de entorno; si falta o es inválido, usa el default (no crashea
+    el arranque por un valor mal puesto en .env)."""
+    try:
+        return int(os.getenv(name, str(default)))
+    except (TypeError, ValueError):
+        log.warning("%s inválido en .env, usando default %s", name, default)
+        return default
+
+
+# Duración en el chat del welcome amistoso (confianza alta, sin verificación).
+# 15 min por defecto. Configurable en .env.
+FRIENDLY_WELCOME_DELETE_AFTER_S = _int_env("FRIENDLY_WELCOME_DELETE_AFTER_S", 900)
+# Duración del mensaje de "verificación correcta + welcome" tras pulsar SOY HUMANO.
+# Generoso (20 min) para que al recién llegado le dé tiempo a leer el welcome, las
+# normas y pulsar el botón del anclado. Configurable en .env.
+VERIFIED_WELCOME_DELETE_AFTER_S = _int_env("VERIFIED_WELCOME_DELETE_AFTER_S", 1200)
 
 
 # Welcomes graciosos para perfiles legítimos. Se cargan de archivos editables
