@@ -279,6 +279,10 @@ def _is_suspicious_profile(
 
 
 FRIENDLY_WELCOME_DELETE_AFTER_S = 900  # 15 min (igual que el welcome normal)
+# Cuánto dura en el chat el mensaje de "verificación correcta + welcome" tras
+# pulsar SOY HUMANO. Generoso (20 min) para que al recién llegado le dé tiempo a
+# leer el welcome, las normas y pulsar el botón del anclado. Configurable en .env.
+VERIFIED_WELCOME_DELETE_AFTER_S = int(os.getenv("VERIFIED_WELCOME_DELETE_AFTER_S", "1200"))
 
 
 # Welcomes graciosos para perfiles legítimos. Se cargan de archivos editables
@@ -322,22 +326,26 @@ def friendly_welcomes_enabled() -> bool:
     return os.getenv("FRIENDLY_WELCOMES_ENABLED", "true").strip().lower() not in ("false", "0", "no")
 
 
-async def _send_friendly_welcome(context, db, chat, user, settings) -> None:
-    """Welcome amistoso para cuentas legítimas: sin mute, sin botón verify.
-    Incluye solo los botones URL configurados del chat (anclado, normas, etc.).
-    Auto-borrado a los 15 min para no ensuciar el chat.
-    """
+def _user_name_html(user) -> str:
+    """Nombre clicable del user para el welcome (@username o link tg://user)."""
     if user.username:
-        name = f"@{user.username}"
-    else:
-        display = html.escape(user.first_name or str(user.id))
-        name = f'<a href="tg://user?id={user.id}">{display}</a>'
-    catalog = _load_welcome_pack(chat.id)
-    greeting = random.choice(catalog).format(name=name)
-    text = f"{greeting}\n\n<i>{_WELCOME_FIXED_FOOTER}</i>"
+        return f"@{user.username}"
+    display = html.escape(user.first_name or str(user.id))
+    return f'<a href="tg://user?id={user.id}">{display}</a>'
+
+
+def _build_welcome_content(db, chat_id: int, name_html: str, verified: bool = False):
+    """Devuelve (texto, teclado) del welcome amistoso: quip aleatorio + footer +
+    botones URL configurados del chat (anclado, normas...). Si verified=True añade
+    una cabecera de 'verificación correcta'. Reutilizado por el welcome de
+    confianza alta y por el mensaje editado tras pulsar SOY HUMANO."""
+    catalog = _load_welcome_pack(chat_id)
+    greeting = random.choice(catalog).format(name=name_html)
+    header = "✅ <b>Verificación correcta.</b> ¡Bienvenido/a!\n\n" if verified else ""
+    text = f"{header}{greeting}\n\n<i>{_WELCOME_FIXED_FOOTER}</i>"
     rows: list[list[InlineKeyboardButton]] = []
-    db.migrate_legacy_welcome_button(chat.id)
-    buttons = db.list_welcome_buttons(chat.id)
+    db.migrate_legacy_welcome_button(chat_id)
+    buttons = db.list_welcome_buttons(chat_id)
     if buttons:
         current_row: list[InlineKeyboardButton] = []
         for b in buttons:
@@ -351,6 +359,15 @@ async def _send_friendly_welcome(context, db, chat, user, settings) -> None:
         if current_row:
             rows.append(current_row)
     keyboard = InlineKeyboardMarkup(rows) if rows else None
+    return text, keyboard
+
+
+async def _send_friendly_welcome(context, db, chat, user, settings) -> None:
+    """Welcome amistoso para cuentas legítimas: sin mute, sin botón verify.
+    Incluye solo los botones URL configurados del chat (anclado, normas, etc.).
+    Auto-borrado a los 15 min para no ensuciar el chat.
+    """
+    text, keyboard = _build_welcome_content(db, chat.id, _user_name_html(user))
     try:
         sent = await context.bot.send_message(
             chat_id=chat.id, text=text, parse_mode="HTML",
@@ -585,12 +602,41 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     db.mark_verified(chat_id, target_user_id)
     await query.answer("✅ Verificado, ya puedes escribir.")
 
-    # Borrar el mensaje welcome para no ensuciar el chat
-    if row["welcome_msg_id"]:
+    # En vez de BORRAR el mensaje de verificación, lo EDITAMOS a "verificación
+    # correcta" + welcome gracioso con los botones del chat (anclado, normas...),
+    # igual que el welcome de un miembro de confianza alta. Y lo dejamos más rato
+    # (VERIFIED_WELCOME_DELETE_AFTER_S) para que dé tiempo a leerlo.
+    welcome_msg_id = row["welcome_msg_id"]
+    if welcome_msg_id:
+        jq = context.application.job_queue
+        # Cancelar el auto-borrado CORTO que se programó al enviar la verificación
+        # (si no, borraría el welcome antes de tiempo).
+        if jq is not None:
+            for job in jq.get_jobs_by_name(f"del_welcome_{chat_id}_{welcome_msg_id}"):
+                job.schedule_removal()
+        text, keyboard = _build_welcome_content(
+            db, chat_id, _user_name_html(query.from_user), verified=True,
+        )
         try:
-            await context.bot.delete_message(chat_id=chat_id, message_id=row["welcome_msg_id"])
-        except TelegramError:
-            pass
+            await context.bot.edit_message_text(
+                chat_id=chat_id, message_id=welcome_msg_id,
+                text=text, parse_mode="HTML", reply_markup=keyboard,
+                disable_web_page_preview=True,
+            )
+            # Borrado más largo, contado desde AHORA (no desde el envío del prompt).
+            if jq is not None:
+                jq.run_once(
+                    _delete_friendly_welcome_job, when=VERIFIED_WELCOME_DELETE_AFTER_S,
+                    data={"chat_id": chat_id, "message_id": welcome_msg_id, "user_id": target_user_id},
+                    name=f"del_verified_welcome_{chat_id}_{welcome_msg_id}",
+                )
+        except TelegramError as exc:
+            # Si no se puede editar (mensaje viejo/borrado), lo borramos como antes.
+            log.debug("edit verificación→welcome fallo chat=%s: %s", chat_id, exc)
+            try:
+                await context.bot.delete_message(chat_id=chat_id, message_id=welcome_msg_id)
+            except TelegramError:
+                pass
     log.info("verification OK user=%s chat=%s", target_user_id, chat_id)
 
 
