@@ -7,7 +7,6 @@ cascada los avisos del bot que respondieron a esos mensajes.
 """
 from __future__ import annotations
 
-import asyncio
 import html as _h
 import logging
 import os

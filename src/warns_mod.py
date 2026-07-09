@@ -16,6 +16,7 @@ import logging
 import time
 
 from telegram import Update
+from telegram.error import TelegramError
 from telegram.ext import ContextTypes
 
 from .config import Config

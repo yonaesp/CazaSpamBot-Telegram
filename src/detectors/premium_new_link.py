@@ -6,7 +6,6 @@ combinación muy típica de spam.
 """
 from __future__ import annotations
 
-from urllib.parse import urlparse
 
 from telegram import Message, MessageEntity
 

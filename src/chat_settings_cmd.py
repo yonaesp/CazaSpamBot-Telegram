@@ -227,7 +227,6 @@ async def cmd_clearwelcomebuttons(update: Update, context: ContextTypes.DEFAULT_
 @_admin_only
 async def cmd_testwelcome(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Envía al admin el welcome configurado tal como lo vería un nuevo miembro."""
-    db: DB = context.bot_data["db"]
     if chat_picker.is_dm(update):
         await chat_picker.show_chat_picker(update, context, "testwelcome")
         return

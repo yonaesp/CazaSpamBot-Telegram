@@ -9,7 +9,7 @@ import sqlite3
 import time
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS bot_chats (

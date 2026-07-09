@@ -1002,7 +1002,7 @@ async def _top_picker_handler(update, context, chat_id: int, args: str) -> None:
     await update.callback_query.edit_message_text(text, parse_mode="HTML", disable_web_page_preview=True)
 
 
-def _topweekly_keyboard(db: DB) -> "InlineKeyboardMarkup":
+def _topweekly_keyboard(db: DB):
     """Genera el keyboard con un botón por grupo mostrando estado on/off."""
     from telegram import InlineKeyboardButton, InlineKeyboardMarkup
     rows = []

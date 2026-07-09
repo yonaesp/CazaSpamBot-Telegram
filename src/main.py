@@ -6,7 +6,6 @@ import os
 from pathlib import Path
 
 import aiohttp
-from telegram import Update
 from telegram.ext import (
     Application,
     CallbackQueryHandler,

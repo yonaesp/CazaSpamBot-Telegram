@@ -1,7 +1,6 @@
 """Tests de los archivos editables: welcomes y listas negras."""
 from __future__ import annotations
 
-import re
 
 from src import trust
 from src import verification as v

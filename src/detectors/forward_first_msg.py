@@ -13,7 +13,6 @@ Por tanto, "primer mensaje = forward desde canal/bot" es señal muy fuerte de sp
 """
 from __future__ import annotations
 
-import time
 
 from telegram import Message
 

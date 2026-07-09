@@ -1,7 +1,6 @@
 """Tests para naive_bayes_spam_prob + check_against_samples combinado."""
 from __future__ import annotations
 
-import pytest
 
 from src import learning
 

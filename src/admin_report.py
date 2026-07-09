@@ -23,7 +23,6 @@ import html
 import logging
 import random
 import re
-from typing import Optional
 
 from telegram import Message
 from telegram.error import TelegramError

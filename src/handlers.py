@@ -1070,7 +1070,7 @@ async def _send_review_request(
 
     # 1) Aviso público breve (autoborrado 6h)
     aviso_txt = (
-        f"🔎 Mensaje marcado como posible spam. Un administrador lo revisará en breve."
+        "🔎 Mensaje marcado como posible spam. Un administrador lo revisará en breve."
     )
     try:
         public = await context.bot.send_message(
@@ -1131,7 +1131,10 @@ async def on_pending_review_callback(update: Update, context: ContextTypes.DEFAU
         return
     try:
         _, verdict, chat_s, user_s, msg_s, public_s = q.data.split(":", 5)
-        chat_id = int(chat_s); user_id = int(user_s); msg_id = int(msg_s); public_id = int(public_s)
+        chat_id = int(chat_s)
+        user_id = int(user_s)
+        msg_id = int(msg_s)
+        public_id = int(public_s)
     except Exception as exc:  # noqa: BLE001
         await q.answer(f"Callback inválido: {exc}")
         return

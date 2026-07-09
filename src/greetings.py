@@ -12,7 +12,6 @@ import logging
 import random
 import re
 
-from telegram import Message
 from telegram.error import TelegramError
 from telegram.ext import ContextTypes
 

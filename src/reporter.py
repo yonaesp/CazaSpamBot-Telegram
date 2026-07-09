@@ -181,7 +181,6 @@ class SpamReporter:
           3. account.reportPeer — reporte del usuario sin mensaje específico
         """
         from telethon.errors import RPCError
-        from telethon.tl.functions.account import ReportPeerRequest
         from telethon.tl.functions.channels import ReportSpamRequest
         from telethon.tl.functions.messages import ReportRequest
         from telethon.tl.types import (

@@ -13,12 +13,10 @@ Criterio de "suspicious" (vía Telethon `user_signals`):
 """
 from __future__ import annotations
 
-import datetime as _dt
 import html
 import logging
 import os
 import random
-import time
 from pathlib import Path
 from typing import Optional
 
