@@ -200,6 +200,9 @@ def main() -> int:
     # WARNING para que el token NO acabe en los logs (regla "sin secretos en logs")
     # y de paso quitamos el ruido de una línea por cada poll.
     logging.getLogger("httpx").setLevel(logging.WARNING)
+    # apscheduler loguea a INFO cada ejecución de job (el _heartbeat_job cada 30s =
+    # ~5.700 líneas/día de puro ruido). A WARNING para dejar el log legible.
+    logging.getLogger("apscheduler").setLevel(logging.WARNING)
     log = logging.getLogger("antispam")
     log.info("CazaSpamBot arrancando en modo=%s", cfg.mode)
 
