@@ -195,6 +195,11 @@ def main() -> int:
         level=getattr(logging, cfg.log_level, logging.INFO),
         format="%(asctime)s %(levelname)s %(name)s — %(message)s",
     )
+    # httpx loguea a INFO la URL COMPLETA de cada petición, que en la Bot API
+    # incluye el TELEGRAM_BOT_TOKEN (…/bot<token>/getUpdates). Subimos su nivel a
+    # WARNING para que el token NO acabe en los logs (regla "sin secretos en logs")
+    # y de paso quitamos el ruido de una línea por cada poll.
+    logging.getLogger("httpx").setLevel(logging.WARNING)
     log = logging.getLogger("antispam")
     log.info("CazaSpamBot arrancando en modo=%s", cfg.mode)
 
