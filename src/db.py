@@ -843,17 +843,29 @@ class DB:
                 (chat_id, user_id),
             )
 
-    def pending_welcomes_past_ttl(self, ttl_seconds: int) -> list[sqlite3.Row]:
-        """Pendings con welcome_msg_id cuyo welcome ya superó el TTL.
+    def pending_welcomes_past_ttl(
+        self, prompt_ttl_seconds: int, verified_ttl_seconds: int,
+    ) -> list[sqlite3.Row]:
+        """Pendings con welcome_msg_id cuyo welcome ya superó su TTL.
 
-        Robusto ante reinicios: el auto-delete por jq.run_once vive en memoria
-        y se pierde al reiniciar; este barrido desde DB lo recupera.
+        Distingue dos vidas útiles (si no, el barrido borraba el welcome de un
+        usuario YA verificado a joined_at+prompt_ttl, anulando el TTL largo del
+        mensaje "verificación correcta"):
+          - SIN verificar (prompt SOY HUMANO): joined_at + prompt_ttl.
+          - Verificado (welcome editado / amistoso): verified_at + verified_ttl.
+
+        Robusto ante reinicios: el auto-delete por jq.run_once vive en memoria y
+        se pierde al reiniciar; este barrido desde DB lo recupera.
         """
+        now = time.time()
         with self._cur() as c:
             return c.execute(
                 "SELECT chat_id, user_id, welcome_msg_id FROM pending_verifications "
-                "WHERE welcome_msg_id IS NOT NULL AND joined_at <= ?",
-                (time.time() - ttl_seconds,),
+                "WHERE welcome_msg_id IS NOT NULL AND ("
+                "  (verified_at IS NULL AND joined_at <= ?) "
+                "  OR (verified_at IS NOT NULL AND verified_at <= ?)"
+                ")",
+                (now - prompt_ttl_seconds, now - verified_ttl_seconds),
             ).fetchall()
 
     def clear_welcome_msg_id(self, chat_id: int, user_id: int) -> None:

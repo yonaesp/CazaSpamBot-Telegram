@@ -417,7 +417,7 @@ async def _delete_friendly_welcome_job(context) -> None:
     db = context.bot_data.get("db")
     if db is not None and "user_id" in data:
         try:
-            db.delete_pending_verification(data["chat_id"], data["user_id"])
+            db.delete_pending(data["chat_id"], data["user_id"])
         except Exception:  # noqa: BLE001
             pass
 
@@ -624,10 +624,10 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         if jq is not None:
             for job in jq.get_jobs_by_name(f"del_welcome_{chat_id}_{welcome_msg_id}"):
                 job.schedule_removal()
-        text, keyboard = _build_welcome_content(
-            db, chat_id, _user_name_html(query.from_user), verified=True,
-        )
         try:
+            text, keyboard = _build_welcome_content(
+                db, chat_id, _user_name_html(query.from_user), verified=True,
+            )
             await context.bot.edit_message_text(
                 chat_id=chat_id, message_id=welcome_msg_id,
                 text=text, parse_mode="HTML", reply_markup=keyboard,
@@ -641,12 +641,19 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                     name=f"del_verified_welcome_{chat_id}_{welcome_msg_id}",
                 )
         except TelegramError as exc:
-            # Si no se puede editar (mensaje viejo/borrado), lo borramos como antes.
-            log.debug("edit verificación→welcome fallo chat=%s: %s", chat_id, exc)
-            try:
-                await context.bot.delete_message(chat_id=chat_id, message_id=welcome_msg_id)
-            except TelegramError:
-                pass
+            # "message is not modified" = doble callback con el mismo quip: el
+            # mensaje YA muestra un welcome (lo editó el otro click), NO lo borramos.
+            # Otros fallos (mensaje viejo/borrado): lo borramos para no dejar el
+            # prompt colgado (el barrido DB también lo cubre tras un restart).
+            if "not modified" not in str(exc).lower():
+                log.debug("edit verificación→welcome fallo chat=%s: %s", chat_id, exc)
+                try:
+                    await context.bot.delete_message(chat_id=chat_id, message_id=welcome_msg_id)
+                except TelegramError:
+                    pass
+        except Exception as exc:  # noqa: BLE001 — catálogo mal formado, etc.
+            # No romper la verificación: el user ya está desmuteado y verificado.
+            log.warning("welcome tras verificar falló chat=%s: %s", chat_id, exc)
     log.info("verification OK user=%s chat=%s", target_user_id, chat_id)
 
 
@@ -680,8 +687,11 @@ async def cleanup_job(context: ContextTypes.DEFAULT_TYPE) -> None:
         welcome_ttl = (settings["welcome_delete_after_s"] if settings else 900) or 900
 
         # 0) Barrido de welcomes vencidos (robusto ante reinicios del bot, que
-        # pierden los jobs jq.run_once en memoria). DB-driven.
-        for row in db.pending_welcomes_past_ttl(welcome_ttl):
+        # pierden los jobs jq.run_once en memoria). DB-driven. Los ya verificados
+        # (welcome editado / amistoso) usan su TTL largo desde verified_at, no el
+        # del prompt desde joined_at (si no, se borraban antes de tiempo).
+        verified_ttl = max(FRIENDLY_WELCOME_DELETE_AFTER_S, VERIFIED_WELCOME_DELETE_AFTER_S)
+        for row in db.pending_welcomes_past_ttl(welcome_ttl, verified_ttl):
             if row["chat_id"] != chat_id:
                 continue
             try:

@@ -713,7 +713,11 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     seen_row_fwd = db.get_seen(chat_id, user.id)
     secs_since_first = None
     if seen_row_fwd and seen_row_fwd["first_seen_ts"] is not None:
-        secs_since_first = max(0.0, time.time() - float(seen_row_fwd["first_seen_ts"]))
+        # Hora de EVENTO en ambos lados (msg.date y first_seen_ts) para que el
+        # delta sea consistente, igual que jfm_delta. Usar time.time() (proceso)
+        # aquí solo desviaría el delta tras un backlog (hacia falso negativo).
+        now_evt = msg.date.timestamp() if msg.date else time.time()
+        secs_since_first = max(0.0, now_evt - float(seen_row_fwd["first_seen_ts"]))
     hits.append(fwd_det.check(
         msg, is_first_msg=is_first, seconds_since_first_seen=secs_since_first,
     ))

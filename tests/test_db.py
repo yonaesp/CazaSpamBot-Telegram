@@ -97,3 +97,22 @@ def test_cas_cache(tmp_db):
     assert tmp_db.cas_lookup(42, ttl=3600) == 3
     # TTL=0 expira inmediatamente
     assert tmp_db.cas_lookup(42, ttl=0) is None
+
+
+def test_pending_welcomes_past_ttl_respeta_verified_at(tmp_db):
+    """El barrido NO debe borrar el welcome de un usuario verificado recientemente
+    aunque su join sea viejo (bug #1 del audit: anulaba VERIFIED_WELCOME_DELETE)."""
+    import time as _t
+    now = _t.time()
+    tmp_db.add_pending_verification(-100, 1, welcome_msg_id=11, is_suspicious=False)  # sin verificar
+    tmp_db.add_pending_verification(-100, 2, welcome_msg_id=22, is_suspicious=False)  # verificado reciente
+    tmp_db.add_pending_verification(-100, 3, welcome_msg_id=33, is_suspicious=False)  # verificado viejo
+    with tmp_db._cur() as c:
+        c.execute("UPDATE pending_verifications SET joined_at=? WHERE chat_id=-100 AND user_id=1", (now - 2000,))
+        c.execute("UPDATE pending_verifications SET joined_at=?, verified_at=? WHERE chat_id=-100 AND user_id=2", (now - 2000, now - 100))
+        c.execute("UPDATE pending_verifications SET joined_at=?, verified_at=? WHERE chat_id=-100 AND user_id=3", (now - 3000, now - 2000))
+    ids = {r["user_id"] for r in tmp_db.pending_welcomes_past_ttl(prompt_ttl_seconds=900, verified_ttl_seconds=1200)
+           if r["chat_id"] == -100}
+    assert 1 in ids        # sin verificar y join viejo → se barre
+    assert 3 in ids        # verificado hace mucho → se barre
+    assert 2 not in ids    # verificado hace 100s (< 1200) → NO se barre todavía
