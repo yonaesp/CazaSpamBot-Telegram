@@ -104,3 +104,17 @@ def test_render_no_revela_score_crudo():
     # confianza alta = verde, spam alto = rojo
     assert "🟢" in trust.render_trust(90)
     assert "🔴" in trust.render_spam(120)
+
+
+def test_load_casa_yona_ruta_vacia_no_peta(tmp_path):
+    """Deploy limpio: CASA_YONA_ENV_PATH vacío no debe petar.
+    Path('')=='.' y exists() da True (cwd), así que read_text() daría
+    IsADirectoryError. El fix usa is_file() y salida temprana."""
+    from src.config import _load_casa_yona
+    assert _load_casa_yona("") == ("", "")               # vacío (default público)
+    assert _load_casa_yona(str(tmp_path)) == ("", "")    # un directorio
+    assert _load_casa_yona(str(tmp_path / "no.env")) == ("", "")  # no existe
+    # un archivo válido sí se parsea
+    f = tmp_path / "casa.env"
+    f.write_text("TG_BOT_TOKEN=abc\nTG_CHAT_YONA=123\n")
+    assert _load_casa_yona(str(f)) == ("abc", "123")

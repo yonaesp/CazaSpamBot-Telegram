@@ -126,11 +126,21 @@ class Config:
 
 
 def _load_casa_yona(path: str) -> tuple[str, str]:
+    # Ruta vacía (default en .env.example) o inexistente → sin Casa_Yona.
+    # OJO: Path("") == Path(".") y exists() da True (¡es el cwd!), por eso NO
+    # vale `exists()`: hay que comprobar is_file() para no intentar leer un
+    # directorio (IsADirectoryError al montar sin CASA_YONA_ENV_PATH).
+    if not path:
+        return "", ""
     p = Path(path)
-    if not p.exists():
+    if not p.is_file():
+        return "", ""
+    try:
+        content = p.read_text()
+    except OSError:
         return "", ""
     token, chat = "", ""
-    for line in p.read_text().splitlines():
+    for line in content.splitlines():
         line = line.strip()
         if line.startswith("TG_BOT_TOKEN="):
             token = line.split("=", 1)[1].strip().strip('"').strip("'")
