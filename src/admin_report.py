@@ -184,10 +184,10 @@ async def handle_admin_mention(
     )
 
     # Reenviar al admin DM (ADMIN_USER_ID) el mensaje reportado para revisión
-    if cfg.admin_user_id and reported_msg_id:
+    if cfg.admin_notify_chat_id and reported_msg_id:
         try:
             await context.bot.copy_message(
-                chat_id=cfg.admin_user_id,
+                chat_id=cfg.admin_notify_chat_id,
                 from_chat_id=msg.chat_id,
                 message_id=reported_msg_id,
             )
@@ -205,7 +205,7 @@ async def handle_admin_mention(
                 f"👤 Autor del msg: <code>{reported_user_id or '?'}</code>"
             )
             await context.bot.send_message(
-                chat_id=cfg.admin_user_id, text=ctx_text, parse_mode="HTML",
+                chat_id=cfg.admin_notify_chat_id, text=ctx_text, parse_mode="HTML",
             )
         except TelegramError as exc:
             log.debug("admin_report copy to admin DM fallo: %s", exc)

@@ -166,7 +166,7 @@ async def _on_error(update: object, context) -> None:
     elog.error("Excepción no capturada en handler/job", exc_info=err)
     try:
         cfg = context.bot_data.get("cfg")
-        admin_id = getattr(cfg, "admin_user_id", 0) if cfg else 0
+        admin_id = getattr(cfg, "admin_notify_chat_id", 0) if cfg else 0
         if not admin_id:
             return
         import time as _t

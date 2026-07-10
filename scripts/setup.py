@@ -175,6 +175,18 @@ def main() -> int:
         validate=_valid_chatids,
     )
 
+    notify = ask(
+        "¿Dónde recibir los avisos del bot? (ADMIN_NOTIFY_CHAT_ID)",
+        help_text=(
+            "Pulsa Enter (VACÍO) = te llegan a tu DM privado con el bot (recomendado).\n"
+            "  IMPORTANTE: para recibir DMs, abre tu bot en Telegram y pulsa START una vez.\n"
+            "O pega el chat_id de un GRUPO de moderación (empieza por -100); el bot debe\n"
+            "estar en ese grupo. Ejemplo: -1001234567890"
+        ),
+        default="",
+        validate=_valid_chatids,
+    )
+
     mode = ask(
         "Modo de arranque (MODE)",
         help_text=(
@@ -189,6 +201,7 @@ def main() -> int:
     text = set_var(text, "TELEGRAM_BOT_TOKEN", token)
     text = set_var(text, "ADMIN_USER_ID", admin)
     text = set_var(text, "MODERATED_CHAT_IDS", chats)
+    text = set_var(text, "ADMIN_NOTIFY_CHAT_ID", notify)
     text = set_var(text, "MODE", mode)
     ENV.write_text(text)
 
@@ -202,6 +215,9 @@ def main() -> int:
     print(f"       {CYAN}docker compose up -d --build{RESET}")
     print("  4. Comprueba que arrancó:")
     print(f"       {CYAN}docker compose logs -f{RESET}   {DIM}(verás \"Bot @... listo\"){RESET}")
+    if not notify:
+        print(f"  5. {BOLD}Abre tu bot en Telegram y pulsa START/INICIAR una vez{RESET} — si no,")
+        print("     Telegram no le deja mandarte los avisos por DM (no puede escribirte primero).")
     if mode == "shadow":
         print(f"\n  {DIM}Estás en modo shadow: cuando confíes, cambia MODE=active en .env y{RESET}")
         print(f"  {DIM}reinicia con  docker compose up -d.{RESET}")

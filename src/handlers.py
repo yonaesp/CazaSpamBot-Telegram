@@ -93,7 +93,7 @@ async def on_my_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER,
     )
     now_out = new.status in (ChatMemberStatus.LEFT, ChatMemberStatus.BANNED)
-    if was_in and now_out and cfg.notify_bot_removed and cfg.admin_user_id:
+    if was_in and now_out and cfg.notify_bot_removed and cfg.admin_notify_chat_id:
         actor = cmu.from_user
         actor_label = "?"
         if actor:
@@ -101,7 +101,7 @@ async def on_my_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         verbo = "me han BANEADO" if new.status == ChatMemberStatus.BANNED else "me han sacado"
         try:
             await context.bot.send_message(
-                chat_id=cfg.admin_user_id,
+                chat_id=cfg.admin_notify_chat_id,
                 text=(
                     f"⚠️ <b>Perdí acceso a un grupo</b>: {verbo} de "
                     f"<b>{_h.escape(chat.title or str(chat.id))}</b> (<code>{chat.id}</code>)\n"
@@ -238,12 +238,12 @@ async def on_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 await context.bot.unban_chat_member(chat_id=cmu.chat.id, user_id=user.id, only_if_banned=True)
             except TelegramError as exc:
                 log.warning("auto-kick bot fallo: %s", exc)
-        if cfg.admin_user_id:
+        if cfg.admin_notify_chat_id:
             who = (f'@{added_by.username}' if added_by and added_by.username
                    else (added_by.first_name if added_by else "?"))
             try:
                 await context.bot.send_message(
-                    chat_id=cfg.admin_user_id,
+                    chat_id=cfg.admin_notify_chat_id,
                     text=(
                         f"🤖 <b>Bot añadido y expulsado</b>\n"
                         f"📍 Chat: {cmu.chat.title or cmu.chat.id}\n"
@@ -468,10 +468,10 @@ async def _notify_manual_ban(
     )
 
     # 1) PRIMARIO: DM directo al admin del bot (donde recibe todo lo demás).
-    if cfg.admin_user_id:
+    if cfg.admin_notify_chat_id:
         try:
             await context.bot.send_message(
-                chat_id=cfg.admin_user_id, text=text, parse_mode="HTML",
+                chat_id=cfg.admin_notify_chat_id, text=text, parse_mode="HTML",
                 disable_web_page_preview=True,
             )
         except TelegramError as exc:
@@ -1100,7 +1100,7 @@ async def _send_review_request(
         public = None
 
     # 2) DM al admin con copia del msg + botones
-    admin_dm = cfg.admin_user_id
+    admin_dm = cfg.admin_notify_chat_id
     if not admin_dm:
         return
     public_msg_id = public.message_id if public else 0
@@ -1268,11 +1268,11 @@ async def _moderate_via_bot_message(context, db, cfg, msg, user) -> bool:
         payload={"via_bot": via_uname},
     )
     # Avisar al admin (DM) con perfil clicable, para que decida sobre el user
-    if cfg.admin_user_id:
+    if cfg.admin_notify_chat_id:
         display = _h.escape(user.first_name or str(user.id))
         try:
             await context.bot.send_message(
-                chat_id=cfg.admin_user_id,
+                chat_id=cfg.admin_notify_chat_id,
                 text=(
                     f"⚠️ <b>Mensaje spam vía inline bot borrado</b>\n"
                     f"📍 Chat: {msg.chat.title or msg.chat_id}\n"
@@ -1391,7 +1391,7 @@ async def _antiflood_apply(
     # Botón al admin SOLO la 1ª vez (reincidencia → re-mute sin preguntar).
     if review_sent or human_confirmed:
         return
-    admin_dm = cfg.admin_user_id
+    admin_dm = cfg.admin_notify_chat_id
     if not admin_dm:
         return
     user_link = f'<a href="tg://user?id={user_id}">{name}</a>'
@@ -1521,7 +1521,7 @@ async def _cleanup_consecutive_after_ban(
     if banned_msg_id is None:
         return 0
     cfg = context.bot_data["cfg"]
-    admin_dm = cfg.admin_user_id
+    admin_dm = cfg.admin_notify_chat_id
     # Guard: evitar loops (sondear al propio bot o a chat <=0 sería absurdo)
     if not admin_dm or admin_dm <= 0 or admin_dm == context.bot.id:
         log.debug("cleanup_consecutive skip: admin_dm inválido (%s)", admin_dm)
@@ -1734,10 +1734,10 @@ async def _apply_action(
                 if message_id and decision.action in ("ban", "kick", "mute", "delete"):
                     action_label = "ban" if decision.action in ("ban", "kick") else "delete"
                     db.mark_admin_report_action(chat_id, message_id, action_label)
-                    if cfg.admin_user_id:
+                    if cfg.admin_notify_chat_id:
                         try:
                             await context.bot.copy_message(
-                                chat_id=cfg.admin_user_id,
+                                chat_id=cfg.admin_notify_chat_id,
                                 from_chat_id=chat_id,
                                 message_id=message_id,
                             )
@@ -1753,7 +1753,7 @@ async def _apply_action(
                                 "delete": "🗑️ <b>Mensaje borrado</b> (sin sanción al user)",
                             }.get(decision.action, f"<b>{decision.action}</b>")
                             await context.bot.send_message(
-                                chat_id=cfg.admin_user_id,
+                                chat_id=cfg.admin_notify_chat_id,
                                 text=(
                                     f"☝️ <b>Acción antispam</b>\n"
                                     f"📍 Chat: {chat_title or chat_id}\n"
