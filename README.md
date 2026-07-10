@@ -119,9 +119,9 @@ Cada carpeta tiene su `README.md` con el formato explicado.
 ## 🚀 Puesta en marcha
 
 ```bash
-# 1. Configura las credenciales
+# 1. Copia la plantilla y edítala
 cp .env.example .env
-nano .env   # TELEGRAM_BOT_TOKEN y ADMIN_USER_ID son lo único obligatorio
+nano .env
 
 # 2. Levanta con Docker
 docker compose up -d --build
@@ -130,7 +130,30 @@ docker compose up -d --build
 docker compose logs -f          # "Bot @... listo. Modo=shadow"
 ```
 
-El `.env.example` está comentado paso a paso: dónde crear el bot (@BotFather), cómo saber tu user_id (@userinfobot, @getidsbot), cómo obtener las credenciales de Telethon, etc.
+En el `.env`, **reemplaza** los dos valores obligatorios por los tuyos (todo lo
+demás tiene defaults). Los de aquí son **inventados**, solo para ver el formato:
+
+```ini
+# Token que te da @BotFather al crear el bot (/newbot):
+TELEGRAM_BOT_TOKEN=8123456789:AAF-EsteTokenEsFalsoReemplazaloPorElTuyo00
+# Tu user_id numérico de Telegram (te lo dice @userinfobot):
+ADMIN_USER_ID=123456789
+```
+
+El `.env.example` está comentado paso a paso y cada variable trae un **ejemplo inventado** del formato: dónde crear el bot (@BotFather), cómo saber tu user_id (@userinfobot, @getidsbot), cómo obtener las credenciales de Telethon, etc.
+
+> ⚠️ Los valores de ejemplo son **falsos**: reemplázalos siempre por los tuyos. Nunca subas tu `.env` a git (ya está en `.gitignore`).
+
+**No tienes que crear ninguna carpeta a mano.** La carpeta `data/` (base de datos, sesión, heartbeat) se crea sola al levantar el contenedor, y `config/` (bienvenidas y listas negras) ya viene en el repo con valores por defecto. Solo escribes en `data/`, que es el único volumen con permiso de escritura.
+
+*(Opcional, solo si activas Telethon)* la sesión se genera **dentro del contenedor**, una única vez:
+
+```bash
+# 1) Telegram envía un código a la app de la cuenta secundaria:
+docker compose exec antispam-bot python -m scripts.telethon_login request
+# 2) Confírmalo con el código recibido (añade tu contraseña 2FA al final si la tienes):
+docker compose exec antispam-bot python -m scripts.telethon_login confirm 12345
+```
 
 **Requisitos del bot en Telegram**: admin de los grupos con permisos de *borrar mensajes* y *expulsar usuarios*, y **Privacy Mode desactivado** (BotFather → `/setprivacy` → Disable) para que vea todos los mensajes.
 
