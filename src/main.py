@@ -210,6 +210,14 @@ def main() -> int:
     app = (
         Application.builder()
         .token(cfg.telegram_bot_token)
+        # Timeouts generosos: en el arranque, PTB hace get_me() y en redes lentas
+        # los 5s por defecto se exceden → TimedOut y el proceso muere (recuperado
+        # por restart:unless-stopped, pero deja un traceback feo). Subirlos evita
+        # el crash sin penalizar nada (solo afecta cuando la red va lenta).
+        .connect_timeout(30)
+        .read_timeout(30)
+        .write_timeout(30)
+        .pool_timeout(10)
         .post_init(_post_init)
         .post_shutdown(_post_shutdown)
         .build()
