@@ -25,7 +25,7 @@
 | `detectors/` | Un fichero por regla. Cada uno devuelve `Hit(rule, score, reason, payload)` |
 | `scoring.py` | Combina hits → `Decision(action, score, rule, reason)` con thresholds |
 | `federation.py` | `federate_ban` itera `bot_chats` y aplica `banChatMember` en todos |
-| `notifier.py` | Notificaciones via Casa_Yona con botones inline (Era spam / No / Whitelist) |
+| `notifier.py` | Notificaciones al admin (por DM directo, o bot externo opcional) con botones inline (Era spam / No / Whitelist) |
 | `quips.py` | Catálogo de frases sarcásticas en plural y singular. `pick()` y `batch_summary()` |
 | `reporter.py` | `SpamReporter` con cola async + worker Telethon. Estrategia 3-step: `channels.reportSpam` → `messages.report` → `account.reportPeer` |
 
@@ -61,7 +61,7 @@ detección                       persistencia            acción real           
 ─────────────                   ──────────────         ──────────────          ─────────────                ─────────────
 on_message              ──→     log_action()    ──→    delete_message()    ──→ reporter.enqueue()    ──→   quip público
 on_chat_member (join)           +                      ban/kick/mute            (channels.reportSpam        + notifier
-on_message_reaction             federation                                       o messages.report           Casa_Yona
+on_message_reaction             federation                                       o messages.report           notif externa
                                 table                                            o account.reportPeer        admin DM
 ```
 
@@ -101,7 +101,7 @@ No hay primitiva nativa Bot API. Patrón implementado (inspirado en DaisyX feds)
 
 Por defecto, el propio bot manda DM directo al `ADMIN_USER_ID` con cada acción.
 Opcionalmente puede reenviar también a un segundo bot de notificaciones
-(`NOTIFY_VIA_CASA_YONA=true` + `CASA_YONA_ENV_PATH` apuntando a un `.env` con
+(`EXTERNAL_NOTIFY_ENABLED=true` + `EXTERNAL_NOTIFY_ENV_PATH` apuntando a un `.env` con
 el token de ese bot). Cada acción incluye botones inline:
 
 - ✅ Confirmar (no-op, solo cierra)

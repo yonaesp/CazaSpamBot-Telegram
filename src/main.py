@@ -61,9 +61,9 @@ async def _post_init(app: Application) -> None:
     cfg = app.bot_data["cfg"]
     app.bot_data["http"] = aiohttp.ClientSession()
     app.bot_data["notifier"] = Notifier(
-        casa_yona_token=cfg.casa_yona_token,
-        notify_chat_id=cfg.admin_notify_chat_id or cfg.casa_yona_chat_yona,
-        enabled=cfg.notify_via_casa_yona,
+        external_notify_token=cfg.external_notify_token,
+        notify_chat_id=cfg.admin_notify_chat_id or cfg.external_notify_chat_id,
+        enabled=cfg.external_notify_enabled,
     )
     # Master switch: si TELETHON_ENABLED=false, el reporter NO conecta el cliente
     # Telethon. Todo lo que dependa de él (bio_spam, photos_batch, señales de

@@ -425,8 +425,8 @@ async def _notify_manual_ban(
     """Avisa al admin del bot cuando OTRO admin (no el bot) banea/expulsa a alguien.
 
     El aviso PRIMARIO va al DM directo del admin del bot (mismo sitio que el resto
-    de alertas: revisiones, flood, borrados). Antes solo iba por Casa_Yona, así que
-    no se veía si Casa_Yona no estaba o el admin miraba el DM de CazaSpamBot.
+    de alertas: revisiones, flood, borrados). Antes solo iba por el bot de notificaciones externo, así que
+    no se veía si ese bot no estaba o el admin miraba el DM del propio bot.
     """
     cfg: Config = context.bot_data["cfg"]
     actor = cmu.from_user  # quien hizo el ban
@@ -470,7 +470,7 @@ async def _notify_manual_ban(
         except TelegramError as exc:
             log.debug("manual_ban DM admin fallo: %s", exc)
 
-    # 2) SECUNDARIO opcional: Casa_Yona si está configurado.
+    # 2) SECUNDARIO opcional: bot de notificaciones externo si está configurado.
     notifier = context.bot_data.get("notifier")
     session = context.bot_data.get("http")
     if notifier is not None and notifier.is_configured() and session is not None:
@@ -485,7 +485,7 @@ async def _notify_manual_ban(
                 score=0, original_text=last_msg_text, mode="active",
                 federation_results=None,
             )
-        except Exception:  # noqa: BLE001 — Casa_Yona es secundario, no debe romper
+        except Exception:  # noqa: BLE001 — la notificación externa es secundaria, no debe romper
             pass
     log.info(
         "manual ban detected: actor=%s target=%s chat=%s",

@@ -1,4 +1,4 @@
-"""Notificaciones al admin vía Casa_Yona (bot separado).
+"""Notificaciones al admin vía un bot de notificaciones EXTERNO (separado del antispam).
 
 Incluye botones inline "Era spam / No era spam / Whitelist" que el handler
 de callbacks revierte si el admin lo decide.
@@ -18,18 +18,18 @@ log = logging.getLogger(__name__)
 
 @dataclass
 class Notifier:
-    casa_yona_token: str
+    external_notify_token: str
     notify_chat_id: int | str
     enabled: bool
 
     def is_configured(self) -> bool:
-        return self.enabled and bool(self.casa_yona_token) and bool(self.notify_chat_id)
+        return self.enabled and bool(self.external_notify_token) and bool(self.notify_chat_id)
 
     async def send_text(self, text: str, parse_mode: str = "HTML") -> bool:
         """Envío simple sin botones (acks técnicos de comandos admin)."""
         if not self.is_configured():
             return False
-        url = f"https://api.telegram.org/bot{self.casa_yona_token}/sendMessage"
+        url = f"https://api.telegram.org/bot{self.external_notify_token}/sendMessage"
         payload = {
             "chat_id": self.notify_chat_id,
             "text": text,
@@ -41,7 +41,7 @@ class Notifier:
                 async with session.post(url, json=payload, timeout=aiohttp.ClientTimeout(total=10)) as resp:
                     data = await resp.json()
                     if not data.get("ok"):
-                        log.warning("Casa_Yona send_text falló: %s", data)
+                        log.warning("notificación externa (send_text) falló: %s", data)
                         return False
                     return True
         except Exception as exc:
@@ -109,7 +109,7 @@ class Notifier:
             ]
         }
 
-        url = f"https://api.telegram.org/bot{self.casa_yona_token}/sendMessage"
+        url = f"https://api.telegram.org/bot{self.external_notify_token}/sendMessage"
         payload = {
             "chat_id": self.notify_chat_id,
             "text": msg,
@@ -121,7 +121,7 @@ class Notifier:
             async with session.post(url, json=payload, timeout=aiohttp.ClientTimeout(total=10)) as resp:
                 data = await resp.json()
                 if not data.get("ok"):
-                    log.error("Casa_Yona sendMessage falló: %s", data)
+                    log.error("notificación externa (sendMessage) falló: %s", data)
                     return False
                 return True
         except Exception as exc:

@@ -176,7 +176,7 @@ async def _notify_manual_delete(client, bot: Bot, db: DB, chat_id: int, msg_id: 
         if row and row["title"]:
             chat_title = row["title"]
 
-    # 5) Notif al admin via CazaSpamBot (no Casa_Yona, mismo flujo que admin_report)
+    # 5) Notif al admin via el propio bot (DM directo, mismo flujo que admin_report)
     admin_id_env = os.getenv("ADMIN_USER_ID", "0")
     try:
         admin_id = int(admin_id_env)

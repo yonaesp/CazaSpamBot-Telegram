@@ -183,7 +183,7 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
         "<b>ℹ️ Tips útiles</b>\n"
         "  · Los <i>números id</i> (de muestra, acción, botón, etc.) los ves siempre en el listado correspondiente: /recent, /samples, /welcomebuttons...\n"
-        "  · Los <i>user_id numéricos</i> los obtienes en las notificaciones que llegan a Casa_Yona, o usando @userinfobot.\n"
+        "  · Los <i>user_id numéricos</i> los obtienes en las notificaciones que te llegan al DM, o usando @userinfobot.\n"
         "  · En DM al bot, los comandos de consulta (/stats /welcome /rules) muestran botones para elegir grupo si estás en varios."
         + note,
         parse_mode="HTML",
@@ -688,7 +688,7 @@ async def _cleanup_welcome_on_ban(context: ContextTypes.DEFAULT_TYPE, db: DB, us
 
 
 async def _notify_admin_ack(context: ContextTypes.DEFAULT_TYPE, text: str) -> None:
-    """Envía el ack técnico (resultado del ban/unban) al admin via Casa_Yona DM."""
+    """Envía el ack técnico (resultado del ban/unban) al admin por DM (bot de notificaciones externo)."""
     notifier = context.bot_data.get("notifier")
     if notifier:
         try:
@@ -702,7 +702,7 @@ async def cmd_ban(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Ban federado (replica a TODOS los chats donde el bot es admin) + quip público con autoborrado.
 
     Si se ejecuta en grupo: borra el comando del admin, publica solo el quip (con motivo
-    si se dio) y manda el resumen técnico por DM al admin (Casa_Yona).
+    si se dio) y manda el resumen técnico por DM al admin (bot de notificaciones externo).
     """
     db: DB = context.bot_data["db"]
     is_group = bool(update.effective_chat and update.effective_chat.type in ("group", "supergroup"))
@@ -899,8 +899,8 @@ async def cmd_whitelist(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     )
 
 
-# ----- Callbacks de los botones inline en notificaciones Casa_Yona -----
-# Estos NO llegan a este bot, llegan a Casa_Yona. Casa_Yona necesitaría
+# ----- Callbacks de los botones inline en las notificaciones al admin -----
+# Estos NO llegan a este bot, llegan al bot de notificaciones externo, que necesitaría
 # un handler propio o un endpoint REST. Para no acoplar, exponemos también
 # comandos manuales: /notspam <action_id> y /confirm <action_id>.
 

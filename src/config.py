@@ -81,10 +81,10 @@ class Config:
     kick_score: int
     mute_score: int
 
-    notify_via_casa_yona: bool
-    casa_yona_env_path: str
-    casa_yona_token: str = ""
-    casa_yona_chat_yona: str = ""
+    external_notify_enabled: bool
+    external_notify_env_path: str
+    external_notify_token: str = ""
+    external_notify_chat_id: str = ""
 
     public_quip_enabled: bool = True
     public_quip_delete_after_s: int = 3600
@@ -125,11 +125,15 @@ class Config:
         return self.mode != "active"
 
 
-def _load_casa_yona(path: str) -> tuple[str, str]:
-    # Ruta vacía (default en .env.example) o inexistente → sin Casa_Yona.
-    # OJO: Path("") == Path(".") y exists() da True (¡es el cwd!), por eso NO
-    # vale `exists()`: hay que comprobar is_file() para no intentar leer un
-    # directorio (IsADirectoryError al montar sin CASA_YONA_ENV_PATH).
+def _load_external_notify(path: str) -> tuple[str, str]:
+    """Lee (token, chat_id) del bot de notificaciones externo desde un archivo
+    .env aparte. Claves esperadas: TG_BOT_TOKEN y TG_CHAT_ID.
+
+    Ruta vacía (default en .env.example) o inexistente → sin notificaciones
+    externas. OJO: Path("") == Path(".") y exists() da True (¡es el cwd!), por eso
+    NO vale `exists()`: hay que comprobar is_file() para no leer un directorio
+    (IsADirectoryError al montar sin EXTERNAL_NOTIFY_ENV_PATH).
+    """
     if not path:
         return "", ""
     p = Path(path)
@@ -144,7 +148,9 @@ def _load_casa_yona(path: str) -> tuple[str, str]:
         line = line.strip()
         if line.startswith("TG_BOT_TOKEN="):
             token = line.split("=", 1)[1].strip().strip('"').strip("'")
-        elif line.startswith("TG_CHAT_YONA="):
+        elif line.startswith("TG_CHAT_ID=") or line.startswith("TG_CHAT_YONA="):
+            # TG_CHAT_ID es el nombre genérico; TG_CHAT_YONA se acepta por
+            # compatibilidad con archivos antiguos.
             chat = line.split("=", 1)[1].strip().strip('"').strip("'")
     return token, chat
 
@@ -160,8 +166,8 @@ def load_config() -> Config:
     moderated_raw = _csv("MODERATED_CHAT_IDS")
     moderated = [int(x) for x in moderated_raw if x.lstrip("-").isdigit()]
 
-    casa_path = os.getenv("CASA_YONA_ENV_PATH", "")
-    casa_token, casa_chat = _load_casa_yona(casa_path)
+    ext_path = os.getenv("EXTERNAL_NOTIFY_ENV_PATH", "")
+    ext_token, ext_chat = _load_external_notify(ext_path)
 
     return Config(
         telegram_bot_token=token,
@@ -204,10 +210,10 @@ def load_config() -> Config:
         ban_score=_int("BAN_SCORE", 100),
         kick_score=_int("KICK_SCORE", 70),
         mute_score=_int("MUTE_SCORE", 40),
-        notify_via_casa_yona=_bool("NOTIFY_VIA_CASA_YONA", True),
-        casa_yona_env_path=casa_path,
-        casa_yona_token=casa_token,
-        casa_yona_chat_yona=casa_chat,
+        external_notify_enabled=_bool("EXTERNAL_NOTIFY_ENABLED", False),
+        external_notify_env_path=ext_path,
+        external_notify_token=ext_token,
+        external_notify_chat_id=ext_chat,
         public_quip_enabled=_bool("PUBLIC_QUIP_ENABLED", True),
         public_quip_delete_after_s=_int("PUBLIC_QUIP_DELETE_AFTER_S", 3600),
         quip_on_auto_ban=_bool("QUIP_ON_AUTO_BAN", False),
