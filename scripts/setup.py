@@ -92,10 +92,14 @@ def _valid_chatids(v: str) -> tuple[bool, str]:
 
 
 def set_var(text: str, key: str, value: str) -> str:
-    """Sustituye `KEY=...` (línea completa) por `KEY=value` conservando el resto."""
+    """Sustituye `KEY=...` (línea completa) por `KEY=value` conservando el resto.
+
+    Usa una FUNCIÓN de reemplazo (no un string): así el valor se inserta literal
+    y re.sub no interpreta escapes como `\\1` o `\\g<0>` si aparecen en el valor.
+    """
     pattern = re.compile(rf"^{re.escape(key)}=.*$", re.MULTILINE)
     if pattern.search(text):
-        return pattern.sub(f"{key}={value}", text, count=1)
+        return pattern.sub(lambda _m: f"{key}={value}", text, count=1)
     # Si por lo que sea no está en la plantilla, lo añadimos al final.
     return text.rstrip() + f"\n{key}={value}\n"
 
@@ -124,12 +128,15 @@ def main() -> int:
             print(f"   {DIM}Para cambiar algo, edita el archivo .env directamente,{RESET}")
             print(f"   {DIM}o fuerza el asistente de nuevo:  python3 scripts/setup.py --force{RESET}\n")
             return 0
-        print(f"\n{YELLOW}Ya existe un .env.{RESET} Si continúas se SOBRESCRIBIRÁ (perderás lo que tengas puesto).")
-        if input("   ¿Sobrescribir? (s/N): ").strip().lower() not in ("s", "si", "sí", "y", "yes"):
+        print(f"\n{YELLOW}Ya existe un .env.{RESET} Actualizaré token, user_id, grupos y modo;")
+        print(f"   {DIM}el RESTO de tu configuración (Telethon, umbrales, etc.) se conserva.{RESET}")
+        if input("   ¿Continuar? (s/N): ").strip().lower() not in ("s", "si", "sí", "y", "yes"):
             print("   Cancelado. No se ha tocado tu .env.")
             return 0
 
-    text = EXAMPLE.read_text()
+    # Si ya hay un .env, partimos de ÉL (conserva toda la config extra) y solo
+    # actualizamos las 4 variables preguntadas. Si no, partimos de la plantilla.
+    text = ENV.read_text() if ENV.is_file() else EXAMPLE.read_text()
 
     token = ask(
         "Token del bot (TELEGRAM_BOT_TOKEN)",
@@ -185,7 +192,7 @@ def main() -> int:
     text = set_var(text, "MODE", mode)
     ENV.write_text(text)
 
-    print(f"\n{GREEN}{BOLD}✅ .env creado en {ENV}{RESET}")
+    print(f"\n{GREEN}{BOLD}✅ .env guardado en {ENV}{RESET}")
     print(f"\n{BOLD}Siguientes pasos:{RESET}")
     print(f"  1. Añade tu bot como {BOLD}administrador{RESET} en cada grupo a moderar,")
     print(f"     con permisos de {BOLD}borrar mensajes{RESET} y {BOLD}expulsar/banear usuarios{RESET}.")

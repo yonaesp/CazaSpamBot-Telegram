@@ -229,12 +229,15 @@ async def on_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         added_by = cmu.from_user
         log.info("Bot añadido user=%s (@%s) chat=%s por %s → kick + aviso",
                  user.id, user.username, cmu.chat.id, added_by.id if added_by else "?")
-        try:
-            await context.bot.ban_chat_member(chat_id=cmu.chat.id, user_id=user.id)
-            await asyncio.sleep(0.3)
-            await context.bot.unban_chat_member(chat_id=cmu.chat.id, user_id=user.id, only_if_banned=True)
-        except TelegramError as exc:
-            log.warning("auto-kick bot fallo: %s", exc)
+        # En shadow no expulsamos (contrato: sin acciones reales); el aviso al
+        # admin sí se manda, es informativo.
+        if not cfg.shadow:
+            try:
+                await context.bot.ban_chat_member(chat_id=cmu.chat.id, user_id=user.id)
+                await asyncio.sleep(0.3)
+                await context.bot.unban_chat_member(chat_id=cmu.chat.id, user_id=user.id, only_if_banned=True)
+            except TelegramError as exc:
+                log.warning("auto-kick bot fallo: %s", exc)
         if cfg.admin_user_id:
             who = (f'@{added_by.username}' if added_by and added_by.username
                    else (added_by.first_name if added_by else "?"))
@@ -271,13 +274,17 @@ async def on_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         # esto, el botón SOY HUMANO no sirve: el user escribe antes de que lo
         # muteemos. Si resulta ban → ya queda fuera; si el perfil es legítimo →
         # verification.on_join lo desmutea al mandar el welcome amistoso.
-        try:
-            await context.bot.restrict_chat_member(
-                chat_id=cmu.chat.id, user_id=user.id,
-                permissions=verification.MUTED_PERMISSIONS,
-            )
-        except TelegramError as exc:
-            log.debug("mute provisional fallo user=%s: %s", user.id, exc)
+        # En modo shadow NO muteamos (contrato: shadow no ejecuta acciones reales);
+        # además, sin este guard el usuario quedaría muteado para siempre porque
+        # verification.on_join retorna temprano en shadow sin desmutear.
+        if not cfg.shadow:
+            try:
+                await context.bot.restrict_chat_member(
+                    chat_id=cmu.chat.id, user_id=user.id,
+                    permissions=verification.MUTED_PERMISSIONS,
+                )
+            except TelegramError as exc:
+                log.debug("mute provisional fallo user=%s: %s", user.id, exc)
         sig_pre = None
         reporter_pre = context.bot_data.get("reporter")
         client_pre = reporter_pre.get_client() if reporter_pre else None

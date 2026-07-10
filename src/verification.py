@@ -446,6 +446,15 @@ async def on_join(
     db.ensure_chat_settings(chat.id)
     settings = db.get_chat_settings(chat.id)
     if not settings or not settings["verification_enabled"]:
+        # Verificación desactivada en este chat: hay que DESHACER el mute
+        # provisional que on_chat_member aplicó a todo recién llegado (trust<70),
+        # o el usuario quedaría muteado para siempre sin botón ni recuperación.
+        try:
+            await context.bot.restrict_chat_member(
+                chat_id=chat.id, user_id=user.id, permissions=VERIFIED_PERMISSIONS,
+            )
+        except TelegramError as exc:
+            log.debug("unmute (verificación off) fallo user=%s: %s", user.id, exc)
         return
 
     # Señales del perfil: reutiliza prefetched si lo hay, o pide a Telethon.
