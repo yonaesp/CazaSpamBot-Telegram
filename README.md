@@ -118,26 +118,39 @@ Cada carpeta tiene su `README.md` con el formato explicado.
 
 ## 🚀 Puesta en marcha
 
+Configura las credenciales de una de estas dos formas (elige la que prefieras):
+
+**Opción A — Asistente interactivo** (recomendado si es tu primera vez). Te
+pregunta paso a paso y te dice de dónde sacar cada dato. No necesita nada
+instalado (solo Python 3). Si ya está configurado, no molesta:
+
 ```bash
-# 1. Copia la plantilla y edítala
-cp .env.example .env
-nano .env
-
-# 2. Levanta con Docker
-docker compose up -d --build
-
-# 3. Verifica
-docker compose logs -f          # "Bot @... listo. Modo=shadow"
+python3 scripts/setup.py          # crea el .env respondiendo unas preguntas
+# (para rehacerlo a propósito:  python3 scripts/setup.py --force)
 ```
 
-En el `.env`, **reemplaza** los dos valores obligatorios por los tuyos (todo lo
-demás tiene defaults). Los de aquí son **inventados**, solo para ver el formato:
+**Opción B — A mano** (si te manejas con archivos de texto):
+
+```bash
+cp .env.example .env
+nano .env    # reemplaza TELEGRAM_BOT_TOKEN y ADMIN_USER_ID; el resto tiene defaults
+```
+
+En ambos casos, lo obligatorio son solo esos dos valores. Los de aquí son
+**inventados**, solo para ver el formato:
 
 ```ini
 # Token que te da @BotFather al crear el bot (/newbot):
 TELEGRAM_BOT_TOKEN=8123456789:AAF-EsteTokenEsFalsoReemplazaloPorElTuyo00
 # Tu user_id numérico de Telegram (te lo dice @userinfobot):
 ADMIN_USER_ID=123456789
+```
+
+Después, levanta y verifica:
+
+```bash
+docker compose up -d --build
+docker compose logs -f            # "Bot @... listo. Modo=shadow"
 ```
 
 El `.env.example` está comentado paso a paso y cada variable trae un **ejemplo inventado** del formato: dónde crear el bot (@BotFather), cómo saber tu user_id (@userinfobot, @getidsbot), cómo obtener las credenciales de Telethon, etc.
