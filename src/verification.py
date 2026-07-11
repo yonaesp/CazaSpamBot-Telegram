@@ -311,7 +311,7 @@ _DEFAULT_WELCOMES = [
     "🤝 ¡Hola {name}! Bienvenido/a.",
 ]
 
-_WELCOME_FIXED_FOOTER = "Las normas y el mensaje anclado lo tienen todo."
+_WELCOME_FIXED_FOOTER = "Las normas y el mensaje anclado, lo tienen todo."
 
 
 def _read_phrase_file(path: Path) -> list[str]:
@@ -351,7 +351,9 @@ def _build_welcome_content(db, chat_id: int, name_html: str, verified: bool = Fa
     confianza alta y por el mensaje editado tras pulsar SOY HUMANO."""
     catalog = _load_welcome_pack(chat_id)
     greeting = random.choice(catalog).format(name=name_html)
-    header = "✅ <b>Verificación correcta.</b> ¡Bienvenido/a!\n\n" if verified else ""
+    # La cabecera NO saluda: el propio quip del catálogo ya dice "Bienvenido/a {name}"
+    # (si no, saldría "Bienvenido/a" dos veces).
+    header = "✅ <b>Verificación correcta.</b>\n\n" if verified else ""
     text = f"{header}{greeting}\n\n<i>{_WELCOME_FIXED_FOOTER}</i>"
     rows: list[list[InlineKeyboardButton]] = []
     db.migrate_legacy_welcome_button(chat_id)
