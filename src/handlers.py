@@ -16,7 +16,7 @@ from telegram.constants import ChatMemberStatus
 from telegram.error import TelegramError
 from telegram.ext import ContextTypes
 
-from . import admin_report, gentle_warning, greetings, learning, quips, trust as _trust, user_signals, verification
+from . import admin_report, gentle_warning, greetings, learning, quips, rule_explain, trust as _trust, user_signals, verification
 from .config import Config
 from .db import DB
 from .detectors import Hit
@@ -1855,6 +1855,8 @@ async def _apply_action(
                                 "mute": "🤐 <b>Muteado</b>",
                                 "delete": "🗑️ <b>Mensaje borrado</b> (sin sanción al user)",
                             }.get(decision.action, f"<b>{decision.action}</b>")
+                            motivo = rule_explain.explain(decision.rule)
+                            motivo_line = f"📖 Motivo: {_h.escape(motivo)}\n" if motivo else ""
                             await context.bot.send_message(
                                 chat_id=cfg.admin_notify_chat_id,
                                 text=(
@@ -1862,6 +1864,7 @@ async def _apply_action(
                                     f"📍 Chat: {chat_title or chat_id}\n"
                                     f"👤 {name_link} (<code>{user_id}</code>)\n"
                                     f"⚖️ Acción: {accion}\n"
+                                    f"{motivo_line}"
                                     f"🚨 Regla: <code>{decision.rule}</code>\n"
                                     f"📏 Score: {decision.score}"
                                 ),
