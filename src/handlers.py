@@ -1813,6 +1813,47 @@ async def _apply_action(
                     "[SHADOW] would %s user=%s chat=%s rule=%s score=%d reason=%s",
                     decision.action, user_id, chat_id, decision.rule, decision.score, decision.reason,
                 )
+                # En shadow NO actuamos, pero SÍ avisamos al canal para poder
+                # EVALUAR lo que haría (marcado [SHADOW]). Es lo más útil al probar:
+                # ver los "habría baneado" en Telegram en vez de en docker logs.
+                if cfg.admin_notify_chat_id:
+                    try:
+                        if message_id:
+                            await context.bot.copy_message(
+                                chat_id=cfg.admin_notify_chat_id,
+                                from_chat_id=chat_id, message_id=message_id,
+                            )
+                        display = (first_name or username or str(user_id))
+                        name_link = f'<a href="tg://user?id={user_id}">{_h.escape(display)}</a>'
+                        if username:
+                            name_link += f" (@{username})"
+                        habria = {
+                            "ban": "🔨 <b>Habría BANEADO</b> (sincronizado en todos los grupos)",
+                            "kick": "👢 <b>Habría EXPULSADO</b>",
+                            "mute": "🤐 <b>Habría MUTEADO</b>",
+                            "delete": "🗑️ <b>Habría BORRADO el mensaje</b>",
+                        }.get(decision.action, f"<b>Habría {decision.action}</b>")
+                        motivo = (
+                            rule_explain.explain(decision.rule)
+                            or (decision.reason or "").strip()
+                            or "Patrón de spam detectado."
+                        )
+                        await context.bot.send_message(
+                            chat_id=cfg.admin_notify_chat_id,
+                            text=(
+                                "🌒 <b>[MODO SHADOW — no se ha actuado]</b>\n"
+                                f"📍 Chat: {chat_title or chat_id}\n"
+                                f"👤 {name_link} (<code>{user_id}</code>)\n"
+                                f"⚖️ {habria}\n"
+                                f"📖 Motivo: {_h.escape(motivo)}\n"
+                                f"🚨 Regla: <code>{decision.rule}</code>\n"
+                                f"📏 Score: {decision.score}\n\n"
+                                "<i>Es modo prueba: pon MODE=active en el .env para que actúe de verdad.</i>"
+                            ),
+                            parse_mode="HTML", disable_web_page_preview=True,
+                        )
+                    except TelegramError as exc:
+                        log.debug("shadow notify fallo: %s", exc)
             else:
                 # Reportar oficialmente a Telegram ANTES del ban — SOLO si:
                 #   - decision.action == "ban" (kick es recuperable, no merece reporte permanente)
