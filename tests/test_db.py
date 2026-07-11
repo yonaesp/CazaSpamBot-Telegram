@@ -116,3 +116,19 @@ def test_pending_welcomes_past_ttl_respeta_verified_at(tmp_db):
     assert 1 in ids        # sin verificar y join viejo → se barre
     assert 3 in ids        # verificado hace mucho → se barre
     assert 2 not in ids    # verificado hace 100s (< 1200) → NO se barre todavía
+
+
+def test_admin_ban_abuse_counting(tmp_db):
+    """Cuenta baneos por admin en ventana; dedup por target; no mezcla admins."""
+    import time as _t
+    now = _t.time()
+    chat, admin = -100, 500
+    for i, tid in enumerate([1, 2, 3, 4, 5]):
+        tmp_db.record_admin_ban(chat, admin, tid, now - i * 60)   # 5 en ventana
+    tmp_db.record_admin_ban(chat, admin, 6, now - 6 * 3600)       # viejo, fuera de 5h
+    tmp_db.record_admin_ban(chat, admin, 1, now - 30)            # dup del target 1
+    since = now - 5 * 3600
+    bans = tmp_db.admin_bans_in_window(chat, admin, since)
+    assert len(bans) == 5                                          # 5 únicos (dup no suma, viejo fuera)
+    assert {r["target_id"] for r in bans} == {1, 2, 3, 4, 5}
+    assert tmp_db.admin_bans_in_window(chat, 999, since) == []    # otro admin, nada

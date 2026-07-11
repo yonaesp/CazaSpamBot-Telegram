@@ -289,6 +289,9 @@ def main() -> int:
     # Callback de antiflood (botones ✅ No es bot / ❌ Es bot en DM admin)
     from .handlers import on_flood_callback
     app.add_handler(CallbackQueryHandler(on_flood_callback, pattern=r"^flood:"))
+    # Callback de anti-abuse de admins (botones ↩️ Deshacer / ✅ Legítimo)
+    from .handlers import on_abuse_callback
+    app.add_handler(CallbackQueryHandler(on_abuse_callback, pattern=r"^abuse:"))
 
     # Tracking de membership del bot.
     app.add_handler(ChatMemberHandler(on_my_chat_member, ChatMemberHandler.MY_CHAT_MEMBER))

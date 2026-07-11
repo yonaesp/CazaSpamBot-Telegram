@@ -215,6 +215,17 @@ CREATE TABLE IF NOT EXISTS flood_state (
     review_sent      INTEGER NOT NULL DEFAULT 0,  -- ya se preguntó al admin (es/no bot)
     PRIMARY KEY (chat_id, user_id)
 );
+
+-- Baneos MANUALES hechos por otros admins (no el bot). Para detectar posible
+-- abuse: N baneos por el mismo admin en una ventana de tiempo.
+CREATE TABLE IF NOT EXISTS admin_ban_events (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    ts         REAL NOT NULL,
+    chat_id    INTEGER NOT NULL,
+    admin_id   INTEGER NOT NULL,   -- quién baneó
+    target_id  INTEGER NOT NULL    -- a quién baneó
+);
+CREATE INDEX IF NOT EXISTS idx_adminban ON admin_ban_events(chat_id, admin_id, ts DESC);
 """
 
 
@@ -471,6 +482,25 @@ class DB:
                 (user_id, since_ts),
             ).fetchone()
         return int(row["n"]) if row else 0
+
+    def record_admin_ban(self, chat_id: int, admin_id: int, target_id: int, ts: float) -> None:
+        """Registra un baneo manual hecho por un admin (para detección de abuse)."""
+        with self._cur() as c:
+            c.execute(
+                "INSERT INTO admin_ban_events (ts, chat_id, admin_id, target_id) VALUES (?, ?, ?, ?)",
+                (ts, chat_id, admin_id, target_id),
+            )
+
+    def admin_bans_in_window(self, chat_id: int, admin_id: int, since_ts: float) -> list[sqlite3.Row]:
+        """Baneos de ese admin en ese chat desde since_ts (más recientes primero).
+        Deduplica por target (un mismo usuario baneado 2 veces cuenta 1)."""
+        with self._cur() as c:
+            return c.execute(
+                "SELECT target_id, MAX(ts) AS ts FROM admin_ban_events "
+                "WHERE chat_id=? AND admin_id=? AND ts>=? "
+                "GROUP BY target_id ORDER BY ts DESC",
+                (chat_id, admin_id, since_ts),
+            ).fetchall()
 
     def total_msgs_user(self, user_id: int) -> int:
         with self._cur() as c:

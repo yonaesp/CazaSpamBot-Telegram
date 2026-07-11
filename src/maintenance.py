@@ -36,6 +36,12 @@ async def cleanup_nightly_job(context: ContextTypes.DEFAULT_TYPE) -> None:
         ).rowcount
         stats["reaction_events"] = n
 
+        # admin_ban_events > 7 días (solo se usan en ventanas de pocas horas)
+        n = c.execute(
+            "DELETE FROM admin_ban_events WHERE ts < ?", (now - 7 * 86400,),
+        ).rowcount
+        stats["admin_ban_events"] = n
+
         # gentle_warnings > 24h (el TTL es 5 min, esto barre huérfanos del bridge Telethon
         # que pudo no captar borrados muy antiguos)
         n = c.execute(

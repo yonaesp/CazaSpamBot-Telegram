@@ -110,6 +110,14 @@ class Config:
     # por defecto: es útil enterarse. Se puede desactivar con NOTIFY_BOT_REMOVED=false.
     notify_bot_removed: bool = True
 
+    # Anti-abuse de admins: si un admin banea a >= threshold usuarios en una ventana
+    # de window_h horas, avisar para revisar (con botón para deshacer los baneos).
+    # NOTA: el bot NO puede quitar permisos ni expulsar a un admin (Telegram no lo
+    # permite); solo detecta, avisa y puede DESBANEAR a los afectados.
+    admin_ban_abuse_enabled: bool = True
+    admin_ban_abuse_threshold: int = 5
+    admin_ban_abuse_window_h: int = 5
+
     db_path: str = "/app/data/antispam.db"
     log_level: str = "INFO"
 
@@ -191,6 +199,9 @@ def load_config() -> Config:
         reaction_threshold_count=_int("REACTION_THRESHOLD_COUNT", 5),
         reaction_threshold_seconds=_int("REACTION_THRESHOLD_SECONDS", 60),
         notify_bot_removed=_bool("NOTIFY_BOT_REMOVED", True),
+        admin_ban_abuse_enabled=_bool("ADMIN_BAN_ABUSE_ENABLED", True),
+        admin_ban_abuse_threshold=_int("ADMIN_BAN_ABUSE_THRESHOLD", 5),
+        admin_ban_abuse_window_h=_int("ADMIN_BAN_ABUSE_WINDOW_H", 5),
         flood_max_msgs=_int("FLOOD_MAX_MSGS", 6),
         flood_window_s=_int("FLOOD_WINDOW_S", 60),
         flood_mute_hours=_int("FLOOD_MUTE_HOURS", 6),

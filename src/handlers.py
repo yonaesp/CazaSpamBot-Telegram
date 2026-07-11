@@ -176,6 +176,105 @@ def _is_join(old_status: str | None, new_status: str | None, new_is_member: bool
     return False
 
 
+async def _check_admin_ban_abuse(context, db, cfg, cmu) -> None:
+    """Registra el ban manual de un admin y, si supera el umbral en la ventana,
+    avisa (con botón para DESHACER los baneos).
+
+    LÍMITE de Telegram: el bot NO puede quitar permisos ni expulsar a un admin
+    nombrado por el creador; solo detecta, avisa, y puede desbanear a los afectados.
+    """
+    actor = cmu.from_user
+    if actor is None:
+        return
+    chat = cmu.chat
+    admin_id = actor.id
+    ts = cmu.date.timestamp() if cmu.date else time.time()
+    db.record_admin_ban(chat.id, admin_id, cmu.new_chat_member.user.id, ts)
+
+    since = ts - cfg.admin_ban_abuse_window_h * 3600
+    bans = db.admin_bans_in_window(chat.id, admin_id, since)
+    if len(bans) < cfg.admin_ban_abuse_threshold:
+        return
+    # Dedup: no re-avisar por el mismo admin/chat dentro de la ventana.
+    dedup = context.bot_data.setdefault("_abuse_alerted", {})
+    key = (chat.id, admin_id)
+    now = time.time()
+    if now - dedup.get(key, 0) < cfg.admin_ban_abuse_window_h * 3600:
+        return
+    dedup[key] = now
+    if not cfg.admin_notify_chat_id:
+        return
+
+    from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+    n = len(bans)
+    label = f"@{actor.username}" if actor.username else (actor.first_name or str(admin_id))
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton(f"↩️ Deshacer ({n} desbaneos)",
+                              callback_data=f"abuse:undo:{chat.id}:{admin_id}:{int(since)}")],
+        [InlineKeyboardButton("✅ Es legítimo (ignorar)",
+                              callback_data=f"abuse:ok:{chat.id}:{admin_id}")],
+    ])
+    text = (
+        f"🚨 <b>Posible abuse de admin</b> en {_h.escape(chat.title or str(chat.id))}\n\n"
+        f"👮 <a href=\"tg://user?id={admin_id}\">{_h.escape(label)}</a> "
+        f"(<code>{admin_id}</code>) ha baneado <b>{n}</b> usuarios en "
+        f"{cfg.admin_ban_abuse_window_h}h.\n\n"
+        "<i>Telegram no deja que el bot le quite permisos ni lo expulse (protección "
+        "anti-golpe). Para eso: Ajustes del grupo → Administradores → toca al admin → "
+        "quítale el permiso de banear o elimínalo.</i>\n\n"
+        "El botón de abajo SÍ puede <b>deshacer</b> esos baneos (desbanear a los afectados)."
+    )
+    try:
+        await context.bot.send_message(
+            chat_id=cfg.admin_notify_chat_id, text=text, parse_mode="HTML",
+            reply_markup=kb, disable_web_page_preview=True,
+        )
+    except TelegramError as exc:
+        log.debug("aviso abuse admin fallo: %s", exc)
+
+
+async def on_abuse_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Botones del aviso de abuse: deshacer (desbanear) o ignorar."""
+    q = update.callback_query
+    if not q or not q.data or not q.data.startswith("abuse:"):
+        return
+    cfg: Config = context.bot_data["cfg"]
+    db: DB = context.bot_data["db"]
+    if q.from_user.id != cfg.admin_user_id:
+        await q.answer("Solo el admin del bot puede decidir esto.", show_alert=True)
+        return
+    parts = q.data.split(":")
+    action = parts[1] if len(parts) > 1 else ""
+    if action == "ok":
+        await q.answer("Marcado como legítimo.")
+        try:
+            await q.edit_message_reply_markup(reply_markup=None)
+        except TelegramError:
+            pass
+        return
+    if action == "undo" and len(parts) == 5:
+        chat_id, admin_id, since = int(parts[2]), int(parts[3]), float(parts[4])
+        bans = db.admin_bans_in_window(chat_id, admin_id, since)
+        ok = 0
+        for r in bans:
+            try:
+                await context.bot.unban_chat_member(
+                    chat_id=chat_id, user_id=r["target_id"], only_if_banned=True,
+                )
+                ok += 1
+            except TelegramError:
+                pass
+        await q.answer(f"Desbaneados {ok}/{len(bans)}.")
+        try:
+            base = q.message.text_html if q.message else ""
+            await q.edit_message_text(
+                base + f"\n\n↩️ <b>Deshecho:</b> {ok}/{len(bans)} usuarios desbaneados.",
+                parse_mode="HTML",
+            )
+        except TelegramError:
+            pass
+
+
 async def on_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Detectar JOINs y BANS de usuarios al grupo."""
     cfg: Config = context.bot_data["cfg"]
@@ -197,6 +296,10 @@ async def on_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         bot_id=context.bot.id,
     ):
         await _notify_manual_ban(context, db, cmu)
+        # Anti-abuse: solo cuenta los BANEOS (no kicks). Si un admin banea a muchos
+        # en poco tiempo, avisa para revisar (con botón para deshacer los baneos).
+        if new_status == ChatMemberStatus.BANNED and cfg.admin_ban_abuse_enabled:
+            await _check_admin_ban_abuse(context, db, cfg, cmu)
 
     if not _is_join(
         old_status, new_status,
