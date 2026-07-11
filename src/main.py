@@ -307,9 +307,14 @@ def main() -> int:
         & filters.StatusUpdate.ALL,
         on_service_message,
     ))
-    # Mensajes en grupos (excluye comandos, ya capturados arriba).
+    # Mensajes NUEVOS en grupos (excluye comandos, ya capturados arriba).
+    # UpdateType.MESSAGE es CLAVE: sin él este filtro también matchea los EDITADOS,
+    # y como on_message se registra antes que on_edited_message (mismo grupo), los
+    # editados los procesaría on_message como si fueran nuevos (inflando msg_count,
+    # antiflood y topweekly) y on_edited_message quedaría muerto (RESCAN ignorado).
     app.add_handler(MessageHandler(
-        (filters.ChatType.GROUPS | filters.ChatType.SUPERGROUP)
+        filters.UpdateType.MESSAGE
+        & (filters.ChatType.GROUPS | filters.ChatType.SUPERGROUP)
         & ~filters.COMMAND & ~filters.StatusUpdate.ALL,
         on_message,
     ))

@@ -730,28 +730,38 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         )
         return
 
-    msg_count = db.record_message(chat_id, user.id, user.username, msg_ts=_msg_ts)
-    # Guardar el último mensaje + first_name para revisar tras bans manuales
     text_or_caption = msg.text or msg.caption
-    db.update_last_message(chat_id, user.id, msg.message_id, text_or_caption)
-    db.update_seen_first_name(chat_id, user.id, user.first_name)
-    # Recolección topweekly:
-    # - Mensajes con media (foto/video/sticker/audio/voice/document/animation) SIEMPRE cuentan
-    #   (es participación real aunque la caption sea corta o no tenga).
-    # - Mensajes de solo texto: cuentan si ≥10 chars y no son saludo.
-    has_media = bool(
-        msg.photo or msg.video or msg.animation or msg.sticker
-        or msg.voice or msg.audio or msg.document or msg.video_note
-    )
-    if has_media:
-        db.record_topweekly_msg(chat_id, user.id, len(text_or_caption or ""))
-    elif text_or_caption and len(text_or_caption) >= 10 and not greetings.is_greeting(text_or_caption):
-        db.record_topweekly_msg(chat_id, user.id, len(text_or_caption))
+    # Una EDICIÓN re-escaneada (via on_edited_message) NO es un mensaje nuevo: no
+    # debe contar para msg_count, antiflood ni topweekly (si no, editar varias veces
+    # inflaría trust o dispararía un flood falso). Solo corremos los detectores sobre
+    # el contenido editado para pillar edit-attacks.
+    is_edit = update.edited_message is not None
+    if is_edit:
+        seen_row = db.get_seen(chat_id, user.id)
+        msg_count = int(seen_row["msg_count"]) if seen_row and seen_row["msg_count"] else 1
+        db.update_last_message(chat_id, user.id, msg.message_id, text_or_caption)
+    else:
+        msg_count = db.record_message(chat_id, user.id, user.username, msg_ts=_msg_ts)
+        # Guardar el último mensaje + first_name para revisar tras bans manuales
+        db.update_last_message(chat_id, user.id, msg.message_id, text_or_caption)
+        db.update_seen_first_name(chat_id, user.id, user.first_name)
+        # Recolección topweekly:
+        # - Media (foto/video/sticker/audio/voice/document/animation) SIEMPRE cuenta.
+        # - Solo texto: cuenta si ≥10 chars y no es saludo.
+        has_media = bool(
+            msg.photo or msg.video or msg.animation or msg.sticker
+            or msg.voice or msg.audio or msg.document or msg.video_note
+        )
+        if has_media:
+            db.record_topweekly_msg(chat_id, user.id, len(text_or_caption or ""))
+        elif text_or_caption and len(text_or_caption) >= 10 and not greetings.is_greeting(text_or_caption):
+            db.record_topweekly_msg(chat_id, user.id, len(text_or_caption))
     is_first = msg_count <= cfg.first_msg_window
 
-    # Antiflood per-user: N mensajes en 60s → mute 6h + revisión del admin.
-    # Umbral graduado: humano confirmado por admin = 12, veterano = 10, resto = 6.
-    if _antiflood_check(context, db, chat_id, user.id):
+    # Antiflood per-user: N mensajes en 60s → mute 6h + revisión del admin. Solo
+    # mensajes NUEVOS (una edición no es un mensaje nuevo). Umbral graduado:
+    # humano confirmado por admin = 12, veterano = 10, resto = 6.
+    if not is_edit and _antiflood_check(context, db, chat_id, user.id):
         log.info("antiflood user=%s chat=%s msg=%s → mute 6h", user.id, chat_id, msg.message_id)
         await _antiflood_apply(context, chat_id, user.id, user, msg.message_id)
         return

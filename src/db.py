@@ -40,6 +40,9 @@ CREATE TABLE IF NOT EXISTS seen_users (
     last_msg_ts    REAL,
     PRIMARY KEY (chat_id, user_id)
 );
+-- total_msgs_user() suma msg_count por user_id en TODOS los chats (se llama en
+-- cada reacción). Sin este índice sería full-scan por la PK (chat_id, user_id).
+CREATE INDEX IF NOT EXISTS idx_seen_user ON seen_users(user_id);
 
 CREATE TABLE IF NOT EXISTS banned_users (
     user_id        INTEGER PRIMARY KEY,

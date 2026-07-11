@@ -676,7 +676,7 @@ REMINDER_TEXT = (
 
 
 async def cleanup_job(context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Periódico (cada 30 min):
+    """Periódico (cada 15 min):
     - Para suspicious con >12h sin verificar → kick (sin ban)
     - Para CUALQUIER pending con >6h sin verificar y sin reminder → recordatorio
     """
