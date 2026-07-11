@@ -1855,8 +1855,15 @@ async def _apply_action(
                                 "mute": "🤐 <b>Muteado</b>",
                                 "delete": "🗑️ <b>Mensaje borrado</b> (sin sanción al user)",
                             }.get(decision.action, f"<b>{decision.action}</b>")
-                            motivo = rule_explain.explain(decision.rule)
-                            motivo_line = f"📖 Motivo: {_h.escape(motivo)}\n" if motivo else ""
+                            # Motivo comprensible SIEMPRE: explicación mapeada →
+                            # si la regla no está en el mapa, la razón del propio
+                            # detector → y si tampoco, un genérico. Nunca vacío.
+                            motivo = (
+                                rule_explain.explain(decision.rule)
+                                or (decision.reason or "").strip()
+                                or "Patrón de spam detectado."
+                            )
+                            motivo_line = f"📖 Motivo: {_h.escape(motivo)}\n"
                             await context.bot.send_message(
                                 chat_id=cfg.admin_notify_chat_id,
                                 text=(
