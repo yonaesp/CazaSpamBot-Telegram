@@ -162,11 +162,13 @@ async def _notify_manual_delete(client, bot: Bot, db: DB, chat_id: int, msg_id: 
     # propio usuario borrando su mensaje (self-delete); admin_log solo registra
     # borrados de admins. Para algunos es ruido, para otros es info útil. Se
     # controla con NOTIFY_SELF_DELETES (default false → no avisar de self-deletes).
-    notify_self_deletes = os.getenv("NOTIFY_SELF_DELETES", "false").strip().lower() in (
+    # Default desde el .env; se puede silenciar/reactivar en runtime (botón /alertas).
+    from . import notify_prefs
+    env_default = os.getenv("NOTIFY_SELF_DELETES", "false").strip().lower() in (
         "1", "true", "yes", "on",
     )
-    if actor_id_found is None and not notify_self_deletes:
-        log.debug("manual_delete skip: borrador desconocido (self-delete) y NOTIFY_SELF_DELETES=false msg=%s", msg_id)
+    if actor_id_found is None and not notify_prefs.is_enabled(db, "self_delete", env_default):
+        log.debug("manual_delete skip: self-delete y avisos silenciados msg=%s", msg_id)
         return
 
     # 4) Título del chat
@@ -211,10 +213,15 @@ async def _notify_manual_delete(client, bot: Bot, db: DB, chat_id: int, msg_id: 
         f"🆔 msg_id: <code>{msg_id}</code>\n\n"
         f"<b>Contenido:</b>\n<pre>{_h.escape(text[:600])}</pre>"
     )
+    # En self-deletes (actor desconocido), botón para silenciar este tipo de aviso.
+    kb = None
+    if actor_id_found is None:
+        from telegram import InlineKeyboardMarkup
+        kb = InlineKeyboardMarkup([[notify_prefs.mute_button("self_delete")]])
     try:
         await bot.send_message(
             chat_id=admin_id, text=notif, parse_mode="HTML",
-            disable_web_page_preview=True,
+            reply_markup=kb, disable_web_page_preview=True,
         )
     except TelegramError as exc:
         log.debug("manual_delete notif send fallo: %s", exc)

@@ -16,7 +16,7 @@ from telegram.constants import ChatMemberStatus
 from telegram.error import TelegramError
 from telegram.ext import ContextTypes
 
-from . import admin_report, gentle_warning, greetings, learning, quips, rule_explain, trust as _trust, user_signals, verification
+from . import admin_report, gentle_warning, greetings, learning, notify_prefs, quips, rule_explain, trust as _trust, user_signals, verification
 from .config import Config
 from .db import DB
 from .detectors import Hit
@@ -93,12 +93,14 @@ async def on_my_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER,
     )
     now_out = new.status in (ChatMemberStatus.LEFT, ChatMemberStatus.BANNED)
-    if was_in and now_out and cfg.notify_bot_removed and cfg.admin_notify_chat_id:
+    removed_default = cfg.notify_bot_removed and bool(cfg.admin_notify_chat_id)
+    if was_in and now_out and notify_prefs.is_enabled(db, "bot_removed", removed_default):
         actor = cmu.from_user
         actor_label = "?"
         if actor:
             actor_label = f"@{actor.username}" if actor.username else (actor.first_name or str(actor.id))
         verbo = "me han BANEADO" if new.status == ChatMemberStatus.BANNED else "me han sacado"
+        from telegram import InlineKeyboardMarkup
         try:
             await context.bot.send_message(
                 chat_id=cfg.admin_notify_chat_id,
@@ -110,6 +112,7 @@ async def on_my_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE) 
                     + "\n\n<i>Ya no puedo moderar ahí hasta que me vuelvan a añadir como admin.</i>"
                 ),
                 parse_mode="HTML",
+                reply_markup=InlineKeyboardMarkup([[notify_prefs.mute_button("bot_removed")]]),
             )
         except TelegramError as exc:
             log.debug("aviso bot expulsado fallo: %s", exc)
@@ -571,10 +574,13 @@ async def _notify_manual_ban(
     )
 
     # 1) PRIMARIO: DM directo al admin del bot (donde recibe todo lo demás).
-    if cfg.admin_notify_chat_id:
+    # Silenciable en runtime (botón / /alertas); default activado.
+    if cfg.admin_notify_chat_id and notify_prefs.is_enabled(db, "manual_ban", True):
+        from telegram import InlineKeyboardMarkup
         try:
             await context.bot.send_message(
                 chat_id=cfg.admin_notify_chat_id, text=text, parse_mode="HTML",
+                reply_markup=InlineKeyboardMarkup([[notify_prefs.mute_button("manual_ban")]]),
                 disable_web_page_preview=True,
             )
         except TelegramError as exc:

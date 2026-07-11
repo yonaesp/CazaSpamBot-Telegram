@@ -132,3 +132,17 @@ def test_admin_ban_abuse_counting(tmp_db):
     assert len(bans) == 5                                          # 5 únicos (dup no suma, viejo fuera)
     assert {r["target_id"] for r in bans} == {1, 2, 3, 4, 5}
     assert tmp_db.admin_bans_in_window(chat, 999, since) == []    # otro admin, nada
+
+
+def test_bot_prefs_get_set(tmp_db):
+    from src import notify_prefs
+    assert tmp_db.get_pref("notify_manual_ban") is None       # sin fijar → None
+    # sin pref, effective usa el default que le pasan
+    assert notify_prefs.is_enabled(tmp_db, "manual_ban", True) is True
+    assert notify_prefs.is_enabled(tmp_db, "manual_ban", False) is False
+    # al fijar, la preferencia manda sobre el default
+    tmp_db.set_pref("notify_manual_ban", False)
+    assert tmp_db.get_pref("notify_manual_ban") is False
+    assert notify_prefs.is_enabled(tmp_db, "manual_ban", True) is False
+    tmp_db.set_pref("notify_manual_ban", True)
+    assert notify_prefs.is_enabled(tmp_db, "manual_ban", False) is True

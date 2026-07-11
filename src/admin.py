@@ -9,7 +9,7 @@ from telegram.ext import ContextTypes
 
 from telegram.error import TelegramError
 
-from . import chat_picker, learning, permissions, quips, trust as _trust
+from . import chat_picker, learning, notify_prefs, permissions, quips, trust as _trust
 from .config import Config
 from .db import DB
 from .federation import federate_ban, unfederate_ban
@@ -123,7 +123,7 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "  /stats — métricas (en DM te pregunta de qué grupo)\n"
         "  /chats — lista de grupos donde el bot opera\n"
         "  /recent — últimas 10 acciones. Ejemplo: <code>/recent 30</code> para ver las últimas 30\n"
-        "  /comandos — esta misma guía\n\n"
+        "  /comandos — esta misma guía\n  /alertas — activar o silenciar avisos informativos (borrados, bans de otros admins...)\n\n"
 
         "<b>🔧 Moderación</b> (reply al mensaje o usando @usuario)\n"
         "  <code>/ban @usuario razón</code> — banea en todos tus grupos a la vez\n"
@@ -1113,3 +1113,62 @@ async def cmd_notspam(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     await update.effective_message.reply_text(
         f"Acción {aid} marcada como falso positivo. Ban revocado y regla suprimida 7 días."
     )
+
+
+# ===== Gestión de avisos informativos (silenciar/activar sin tocar el .env) =====
+
+def _alertas_keyboard(db: DB, cfg: Config):
+    from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+    rows = []
+    for key, label in notify_prefs.NOTIFY_TYPES.items():
+        on = notify_prefs.effective(db, key, cfg)
+        estado = "🔔 ACTIVADO " if on else "🔕 SILENCIADO"
+        rows.append([InlineKeyboardButton(f"{estado} · {label}", callback_data=f"npref:tog:{key}")])
+    return InlineKeyboardMarkup(rows)
+
+
+@_only_admin
+async def cmd_alertas(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Ver y activar/silenciar los avisos informativos (borrados, bans de otros admins...)."""
+    db: DB = context.bot_data["db"]
+    cfg: Config = context.bot_data["cfg"]
+    await update.effective_message.reply_text(
+        "🔔 <b>Avisos informativos</b>\n"
+        "Pulsa un botón para activarlo o silenciarlo. No afecta a los avisos de "
+        "acciones antispam (esos son el núcleo del bot).",
+        parse_mode="HTML", reply_markup=_alertas_keyboard(db, cfg),
+    )
+
+
+async def on_notifpref_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Botones de preferencias de aviso: '🔕 Silenciar' (junto al aviso) y toggles de /alertas."""
+    q = update.callback_query
+    if not q or not q.data or not q.data.startswith("npref:"):
+        return
+    db: DB = context.bot_data["db"]
+    cfg: Config = context.bot_data["cfg"]
+    if q.from_user.id != cfg.admin_user_id:
+        await q.answer("Solo el admin del bot puede cambiar esto.", show_alert=True)
+        return
+    parts = q.data.split(":")
+    action = parts[1] if len(parts) > 1 else ""
+    key = parts[2] if len(parts) > 2 else ""
+    if key not in notify_prefs.NOTIFY_TYPES:
+        await q.answer("Aviso desconocido.")
+        return
+    if action == "off":  # botón "silenciar" junto al aviso
+        db.set_pref(f"notify_{key}", False)
+        await q.answer("🔕 Silenciado. Reactívalo con /alertas.")
+        try:
+            await q.edit_message_reply_markup(reply_markup=None)
+        except TelegramError:
+            pass
+        return
+    if action == "tog":  # toggle desde /alertas
+        new_val = not notify_prefs.effective(db, key, cfg)
+        db.set_pref(f"notify_{key}", new_val)
+        await q.answer("🔔 Activado" if new_val else "🔕 Silenciado")
+        try:
+            await q.edit_message_reply_markup(reply_markup=_alertas_keyboard(db, cfg))
+        except TelegramError:
+            pass

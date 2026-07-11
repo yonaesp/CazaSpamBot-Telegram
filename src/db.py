@@ -226,6 +226,13 @@ CREATE TABLE IF NOT EXISTS admin_ban_events (
     target_id  INTEGER NOT NULL    -- a quién baneó
 );
 CREATE INDEX IF NOT EXISTS idx_adminban ON admin_ban_events(chat_id, admin_id, ts DESC);
+
+-- Preferencias globales del bot en runtime (p.ej. silenciar tipos de aviso desde
+-- un botón, sin tocar el .env). Clave -> activado/desactivado.
+CREATE TABLE IF NOT EXISTS bot_prefs (
+    pref_key   TEXT PRIMARY KEY,
+    enabled    INTEGER NOT NULL
+);
 """
 
 
@@ -482,6 +489,20 @@ class DB:
                 (user_id, since_ts),
             ).fetchone()
         return int(row["n"]) if row else 0
+
+    def get_pref(self, key: str) -> bool | None:
+        """Preferencia runtime: True/False si está guardada, None si no (usar default)."""
+        with self._cur() as c:
+            row = c.execute("SELECT enabled FROM bot_prefs WHERE pref_key=?", (key,)).fetchone()
+        return None if row is None else bool(row["enabled"])
+
+    def set_pref(self, key: str, enabled: bool) -> None:
+        with self._cur() as c:
+            c.execute(
+                "INSERT INTO bot_prefs (pref_key, enabled) VALUES (?, ?) "
+                "ON CONFLICT(pref_key) DO UPDATE SET enabled=excluded.enabled",
+                (key, 1 if enabled else 0),
+            )
 
     def record_admin_ban(self, chat_id: int, admin_id: int, target_id: int, ts: float) -> None:
         """Registra un baneo manual hecho por un admin (para detección de abuse)."""

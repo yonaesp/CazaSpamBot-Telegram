@@ -233,6 +233,7 @@ def main() -> int:
     app.add_handler(CommandHandler("stats", admin.cmd_stats))
     app.add_handler(CommandHandler("chats", admin.cmd_chats))
     app.add_handler(CommandHandler("recent", admin.cmd_recent))
+    app.add_handler(CommandHandler("alertas", admin.cmd_alertas))
     app.add_handler(CommandHandler("shadow", admin.cmd_shadow))
     app.add_handler(CommandHandler("ban", admin.cmd_ban))
     app.add_handler(CommandHandler("federban", admin.cmd_ban))  # alias retrocompatible
@@ -283,6 +284,8 @@ def main() -> int:
     chat_picker.register("top", admin._top_picker_handler)
     app.add_handler(CallbackQueryHandler(chat_picker.on_pick_callback, pattern=r"^pick:"))
     app.add_handler(CallbackQueryHandler(admin.on_topweekly_callback, pattern=r"^twk:"))
+    # Preferencias de avisos (botón 🔕 Silenciar + toggles de /alertas)
+    app.add_handler(CallbackQueryHandler(admin.on_notifpref_callback, pattern=r"^npref:"))
     # Callback de review de spam (botones ✅ Legítimo / ❌ Spam en DM admin)
     from .handlers import on_pending_review_callback
     app.add_handler(CallbackQueryHandler(on_pending_review_callback, pattern=r"^prev:"))
