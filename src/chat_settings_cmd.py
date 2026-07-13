@@ -355,6 +355,7 @@ async def cmd_verificacion(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         await reply(
             "🧩 <b>Verificación del chat</b>\n"
             f"• Verificación + bienvenida: <b>{'ON' if s['verification_enabled'] else 'OFF'}</b>\n"
+            f"• Revisión privada de sospechosos: <b>{'ON' if s['verification_review_suspicious'] else 'OFF'}</b>\n"
             f"• Recordatorios a los normales: <b>{'ON' if s['verification_reminders_enabled'] else 'OFF'}</b>\n"
             f"• Al no verificar (normales): <b>{accion}</b>\n"
             f"• Tiempos: sospechosos kick a <b>{s['verification_suspicious_kick_minutes']} min</b> · "
@@ -362,6 +363,8 @@ async def cmd_verificacion(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             f"kick <b>+{s['verification_kick_after_reminder_hours']} h</b> tras el recordatorio\n\n"
             "<b>Ajustes</b> (solo en este grupo):\n"
             "<code>/verificacion on|off</code> — activa/desactiva verificación Y bienvenida\n"
+            "<code>/verificacion revisar on|off</code> — sin verificar en grupo: aviso PRIVADO de "
+            "cada sospechoso con botones Permitir/Banear (entra permitido por defecto)\n"
             "<code>/verificacion avisos on|off</code> — recordatorio antes de expulsar\n"
             "<code>/verificacion accion kick|mute</code> — al no verificar: expulsar o quedar muteado\n"
             "<code>/verificacion tiempos &lt;susp_min&gt; &lt;recordatorio_h&gt; &lt;kick_h&gt;</code>\n"
@@ -386,6 +389,22 @@ async def cmd_verificacion(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                 "verificación ni bienvenida. La moderación de mensajes sigue activa.",
                 parse_mode="HTML",
             )
+        return
+
+    # --- revisar (revisión privada de sospechosos) on/off ---
+    if sub == "revisar" and len(args) >= 2:
+        val = 1 if args[1] in _ON else 0
+        db.update_chat_setting(chat_id, "verification_review_suspicious", val)
+        if val:
+            await reply(
+                "✅ Revisión privada de sospechosos <b>ON</b>. Los perfiles sospechosos entran "
+                "al grupo (sin verificación) y te llega un aviso privado con botones "
+                "<b>Permitir</b> / <b>Banear</b>. Por defecto quedan permitidos.\n"
+                "<i>Consejo: combínalo con <code>/verificacion off</code> si no quieres NINGUNA "
+                "verificación en el grupo.</i>", parse_mode="HTML",
+            )
+        else:
+            await reply("✅ Revisión privada de sospechosos <b>OFF</b>.", parse_mode="HTML")
         return
 
     # --- avisos (recordatorios) on/off ---

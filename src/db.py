@@ -131,6 +131,7 @@ CREATE TABLE IF NOT EXISTS chat_settings (
     verification_kick_after_reminder_hours INTEGER NOT NULL DEFAULT 6,
     verification_reminders_enabled INTEGER NOT NULL DEFAULT 1,  -- enviar recordatorio a los normales
     verification_kick_normal      INTEGER NOT NULL DEFAULT 1,   -- 1=kick al no verificar, 0=quedan muteados
+    verification_review_suspicious INTEGER NOT NULL DEFAULT 0,  -- 1=en vez de verificar en grupo, aviso privado con botones
     cleanservice                  INTEGER NOT NULL DEFAULT 1,
     updated_at                    REAL NOT NULL DEFAULT 0
 );
@@ -297,6 +298,10 @@ class DB:
         if "verification_kick_normal" not in cs_cols:
             self._conn.execute(
                 "ALTER TABLE chat_settings ADD COLUMN verification_kick_normal INTEGER NOT NULL DEFAULT 1"
+            )
+        if "verification_review_suspicious" not in cs_cols:
+            self._conn.execute(
+                "ALTER TABLE chat_settings ADD COLUMN verification_review_suspicious INTEGER NOT NULL DEFAULT 0"
             )
         if "topweekly_enabled" not in cs_cols:
             self._conn.execute(
@@ -803,7 +808,8 @@ class DB:
             "verification_enabled", "verification_suspicious_kick_h",
             "verification_suspicious_kick_minutes",
             "verification_reminder_hours", "verification_kick_after_reminder_hours",
-            "verification_reminders_enabled", "verification_kick_normal", "cleanservice",
+            "verification_reminders_enabled", "verification_kick_normal",
+            "verification_review_suspicious", "cleanservice",
             "topweekly_enabled",
         }
         if field not in ALLOWED:

@@ -297,6 +297,8 @@ def main() -> int:
     # Callback de anti-abuse de admins (botones ↩️ Deshacer / ✅ Legítimo)
     from .handlers import on_abuse_callback
     app.add_handler(CallbackQueryHandler(on_abuse_callback, pattern=r"^abuse:"))
+    # Callback de revisión de sospechosos (botones ✅ Permitir / 🔨 Banear)
+    app.add_handler(CallbackQueryHandler(admin.on_suspicious_review_callback, pattern=r"^susrev:"))
 
     # Tracking de membership del bot.
     app.add_handler(ChatMemberHandler(on_my_chat_member, ChatMemberHandler.MY_CHAT_MEMBER))

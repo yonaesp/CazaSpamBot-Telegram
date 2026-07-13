@@ -107,6 +107,7 @@ Todo por grupo, desde el propio Telegram (solo el admin del bot). `/verificacion
 | Subcomando | Qué hace |
 |---|---|
 | `/verificacion on\|off` | Activa/desactiva la verificación (botón *SOY HUMANO* + mute al entrar) **y** el mensaje de bienvenida a la vez. OFF = los nuevos entran directos. |
+| `/verificacion revisar on\|off` | **Modo revisión** (off por defecto). En vez de verificar en el grupo, cuando entra un perfil sospechoso te llega un aviso **privado** (a tu DM o al canal configurado) con botones **✅ Permitir** / **🔨 Banear**. El usuario entra **permitido por defecto**; si no haces nada, se queda. Ideal para no llenar el grupo de verificaciones. Combínalo con `/verificacion off`. |
 | `/verificacion avisos on\|off` | Enviar (o no) un recordatorio a los normales antes de expulsarlos. |
 | `/verificacion accion kick\|mute` | Qué pasa con un normal que no verifica: **kick** (expulsar) o **mute** (queda muteado para siempre, sin kick; puede verificar cuando quiera). |
 | `/verificacion tiempos <susp_min> <recordatorio_h> <kick_h>` | Tiempos: sospechosos se expulsan a los `susp_min` minutos; a los normales se les avisa a las `recordatorio_h` horas y se les expulsa `kick_h` horas después. Ej: `/verificacion tiempos 30 3 6`. |

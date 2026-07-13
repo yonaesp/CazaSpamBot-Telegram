@@ -40,6 +40,7 @@ RULE_EXPLANATIONS: dict[str, str] = {
     "verification_reminder_timeout": "No verificó que era humano ni siquiera tras el recordatorio.",
     "warns_limit": "Alcanzó el límite de avisos (warns).",
     "manual_admin_ban": "Ban manual hecho por el admin.",
+    "manual_review_ban": "Baneado por el admin al revisar un perfil sospechoso (modo revisión).",
 }
 
 

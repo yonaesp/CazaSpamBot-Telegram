@@ -424,6 +424,40 @@ async def _delete_friendly_welcome_job(context) -> None:
             pass
 
 
+async def _send_suspicious_review(context, db, cfg, chat, user, reasons, sig) -> None:
+    """Modo revisión: avisa al admin (DM o canal) de un sospechoso que ha ENTRADO,
+    con botones Permitir / Banear. El user ya está dentro (permitido por defecto)."""
+    if not cfg.admin_notify_chat_id:
+        return
+    label = f"@{user.username}" if user.username else (user.first_name or str(user.id))
+    reasons_str = ", ".join(reasons) if reasons else "perfil dudoso"
+    extra = ""
+    if sig is not None:
+        try:
+            extra = "\n" + user_signals.render_markup(sig)
+        except Exception:  # noqa: BLE001
+            pass
+    kb = InlineKeyboardMarkup([[
+        InlineKeyboardButton("✅ Permitir", callback_data=f"susrev:allow:{chat.id}:{user.id}"),
+        InlineKeyboardButton("🔨 Banear", callback_data=f"susrev:ban:{chat.id}:{user.id}"),
+    ]])
+    text = (
+        "🔍 <b>Usuario sospechoso (revisar)</b>\n"
+        f"📍 Chat: {html.escape(chat.title or str(chat.id))}\n"
+        f'👤 <a href="tg://user?id={user.id}">{html.escape(label)}</a> (<code>{user.id}</code>)\n'
+        f"🚩 Motivo: {html.escape(reasons_str)}"
+        f"{extra}\n\n"
+        "<i>Ya está DENTRO del grupo (permitido por defecto). Revisa su perfil y decide.</i>"
+    )
+    try:
+        await context.bot.send_message(
+            chat_id=cfg.admin_notify_chat_id, text=text, parse_mode="HTML",
+            reply_markup=kb, disable_web_page_preview=True,
+        )
+    except TelegramError as exc:
+        log.debug("suspicious review send fallo user=%s: %s", user.id, exc)
+
+
 async def on_join(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
@@ -447,16 +481,21 @@ async def on_join(
 
     db.ensure_chat_settings(chat.id)
     settings = db.get_chat_settings(chat.id)
-    if not settings or not settings["verification_enabled"]:
-        # Verificación desactivada en este chat: hay que DESHACER el mute
-        # provisional que on_chat_member aplicó a todo recién llegado (trust<70),
-        # o el usuario quedaría muteado para siempre sin botón ni recuperación.
+    verification_on = bool(settings and settings["verification_enabled"])
+    review_suspicious = bool(settings and settings["verification_review_suspicious"])
+
+    async def _unmute(reason: str) -> None:
+        # Deshace el mute provisional que on_chat_member aplica a todo recién llegado.
         try:
             await context.bot.restrict_chat_member(
                 chat_id=chat.id, user_id=user.id, permissions=VERIFIED_PERMISSIONS,
             )
         except TelegramError as exc:
-            log.debug("unmute (verificación off) fallo user=%s: %s", user.id, exc)
+            log.debug("unmute (%s) fallo user=%s: %s", reason, user.id, exc)
+
+    # Ni verificación en grupo ni revisión de sospechosos → nada que hacer: entra.
+    if not verification_on and not review_suspicious:
+        await _unmute("verificación off")
         return
 
     # Señales del perfil: reutiliza prefetched si lo hay, o pide a Telethon.
@@ -470,6 +509,19 @@ async def on_join(
             except Exception as exc:
                 log.debug("user_signals fetch user=%s exc: %s", user.id, exc)
     suspicious, susp_reasons = _is_suspicious_profile(sig, user.username, user.first_name, user.last_name)
+
+    # MODO REVISIÓN: sospechoso + review activo → NO se verifica en el grupo (sin
+    # mute ni botón); el user entra normal y avisamos al admin en privado con
+    # botones Permitir/Banear. Por defecto queda permitido si el admin no hace nada.
+    if review_suspicious and suspicious:
+        await _unmute("modo revisión")
+        await _send_suspicious_review(context, db, cfg, chat, user, susp_reasons, sig)
+        return
+
+    # Si solo estaba el modo revisión (verificación off) y NO era sospechoso → entra.
+    if not verification_on:
+        await _unmute("solo revisión, no sospechoso")
+        return
 
     # Si el perfil es claramente legítimo, saltar verificación y publicar
     # un welcome amistoso (sin botón SOY HUMANO, sin mute) con los botones

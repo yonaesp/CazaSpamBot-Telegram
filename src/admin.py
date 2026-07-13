@@ -155,6 +155,7 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "  /verificacion — verificación humana + bienvenida. Sin nada = ver estado y opciones:\n"
         "     · on|off (desactiva verificación Y welcome) · avisos on|off (recordatorio)\n"
         "     · accion kick|mute (al no verificar: expulsar o quedar muteado) · tiempos N N N\n"
+        "     · revisar on|off (sin verificar en grupo: aviso privado de sospechosos con botones)\n"
         "  /testwelcome — vista previa del welcome (te lo enseña como si fueras nuevo)\n\n"
 
         "<b>🔘 Botones del welcome</b>\n"
@@ -1175,3 +1176,43 @@ async def on_notifpref_callback(update: Update, context: ContextTypes.DEFAULT_TY
             await q.edit_message_reply_markup(reply_markup=_alertas_keyboard(db, cfg))
         except TelegramError:
             pass
+
+
+async def on_suspicious_review_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Modo revisión de sospechosos: botones ✅ Permitir / 🔨 Banear del aviso privado."""
+    q = update.callback_query
+    if not q or not q.data or not q.data.startswith("susrev:"):
+        return
+    cfg: Config = context.bot_data["cfg"]
+    db: DB = context.bot_data["db"]
+    if q.from_user.id != cfg.admin_user_id:
+        await q.answer("Solo el admin del bot puede decidir esto.", show_alert=True)
+        return
+    parts = q.data.split(":")
+    if len(parts) != 4:
+        await q.answer("Callback inválido.")
+        return
+    action, chat_id, user_id = parts[1], int(parts[2]), int(parts[3])
+    base = q.message.text_html if q.message else ""
+    if action == "allow":
+        await q.answer("✅ Permitido.")
+        try:
+            await q.edit_message_text(base + "\n\n✅ <b>Permitido por el admin.</b>", parse_mode="HTML")
+        except TelegramError:
+            pass
+        return
+    if action == "ban":
+        res = await federate_ban(
+            context.bot, db, user_id=user_id,
+            reason="Revisión manual: perfil sospechoso", rule="manual_review_ban",
+            triggered_in_chat=chat_id, shadow=cfg.shadow,
+        )
+        ok = sum(1 for v in (res or {}).values() if v == "ok")
+        await q.answer(f"🔨 Baneado ({ok} grupo/s).")
+        try:
+            await q.edit_message_text(
+                base + f"\n\n🔨 <b>Baneado por el admin</b> ({ok} grupo/s).", parse_mode="HTML",
+            )
+        except TelegramError:
+            pass
+        return
