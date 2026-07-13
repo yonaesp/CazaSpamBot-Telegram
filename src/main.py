@@ -57,6 +57,63 @@ def _warn_telethon_requirements(cfg, telethon_ready: bool) -> None:
     )
 
 
+# Menú de comandos de Telegram (el que sale al teclear "/"). Los admin-only se
+# muestran solo en el DM del admin; a todos los demás solo /help y /comandos.
+_ADMIN_MENU = [
+    ("help", "Guía y lista de comandos"),
+    ("comandos", "Lista de comandos"),
+    ("stats", "Métricas del grupo"),
+    ("chats", "Grupos donde opero"),
+    ("recent", "Últimas acciones antispam"),
+    ("ban", "Banear (reply o @usuario) en todos los grupos"),
+    ("unban", "Quitar el ban a un usuario"),
+    ("whitelist", "Marcar un usuario como inmune"),
+    ("notspam", "Revertir un falso positivo (id de /recent)"),
+    ("warn", "Avisar a un usuario (warn)"),
+    ("warns", "Ver los warns de un usuario"),
+    ("warnlimit", "Límite de warns antes de sancionar"),
+    ("warnaction", "Acción al llegar al límite (ban/kick/mute)"),
+    ("spam", "Aprender: marcar mensaje como spam + banear"),
+    ("legal", "Aprender: marcar mensaje como legítimo"),
+    ("samples", "Ver muestras aprendidas"),
+    ("forget", "Olvidar una muestra aprendida"),
+    ("verificacion", "Ajustar verificación humana del grupo"),
+    ("welcome", "Ver la bienvenida"),
+    ("setwelcome", "Cambiar la bienvenida"),
+    ("rules", "Ver las reglas"),
+    ("setrules", "Cambiar las reglas"),
+    ("cleanservice", "Borrar mensajes de 'X se ha unido'"),
+    ("alertas", "Activar o silenciar avisos informativos"),
+    ("shadow", "Ver o cambiar el modo shadow"),
+    ("top", "Ranking de mensajes"),
+    ("topweekly", "Ranking semanal"),
+]
+_PUBLIC_MENU = [
+    ("help", "Cómo funciona el bot y comandos"),
+    ("comandos", "Ver los comandos disponibles"),
+]
+
+
+async def _register_bot_commands(app: Application, cfg) -> None:
+    """Publica el menú de comandos en Telegram (el que aparece al teclear '/')."""
+    from telegram import BotCommand, BotCommandScopeChat, BotCommandScopeDefault
+    log = logging.getLogger("antispam")
+    try:
+        await app.bot.set_my_commands(
+            [BotCommand(c, d) for c, d in _PUBLIC_MENU],
+            scope=BotCommandScopeDefault(),
+        )
+        if cfg.admin_user_id:
+            await app.bot.set_my_commands(
+                [BotCommand(c, d) for c, d in _ADMIN_MENU],
+                scope=BotCommandScopeChat(chat_id=cfg.admin_user_id),
+            )
+        log.info("Menú de comandos de Telegram registrado (%d admin, %d público).",
+                 len(_ADMIN_MENU), len(_PUBLIC_MENU))
+    except Exception as exc:  # noqa: BLE001 — no debe impedir el arranque
+        log.warning("No se pudo registrar el menú de comandos: %s", exc)
+
+
 async def _post_init(app: Application) -> None:
     cfg = app.bot_data["cfg"]
     app.bot_data["http"] = aiohttp.ClientSession()
@@ -107,6 +164,7 @@ async def _post_init(app: Application) -> None:
         "conectado" if reporter.is_ready() else "off",
         "activos" if reporter.reporting_ready() else "off",
     )
+    await _register_bot_commands(app, cfg)
     if app.job_queue:
         app.job_queue.run_repeating(_heartbeat_job, interval=30, first=1)
         # Cada 15 min: cleanup verificaciones (3 tiers: kick suspicious 30min +
