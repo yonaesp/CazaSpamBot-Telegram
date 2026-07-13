@@ -259,6 +259,8 @@ def main() -> int:
     app.add_handler(CommandHandler("rules", chat_settings_cmd.cmd_rules))
     app.add_handler(CommandHandler("setrules", chat_settings_cmd.cmd_setrules))
     app.add_handler(CommandHandler("cleanservice", chat_settings_cmd.cmd_cleanservice))
+    app.add_handler(CommandHandler("verificacion", chat_settings_cmd.cmd_verificacion))
+    app.add_handler(CommandHandler("verification", chat_settings_cmd.cmd_verificacion))  # alias
     app.add_handler(CommandHandler("setwelcomebutton", chat_settings_cmd.cmd_setwelcomebutton))
     app.add_handler(CommandHandler("welcomebuttons", chat_settings_cmd.cmd_welcomebuttons))
     app.add_handler(CommandHandler("rmwelcomebutton", chat_settings_cmd.cmd_rmwelcomebutton))

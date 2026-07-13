@@ -332,3 +332,40 @@ async def cmd_cleanservice(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         await update.effective_message.reply_text("✅ Cleanservice OFF")
     else:
         await update.effective_message.reply_text("Uso: /cleanservice on|off")
+
+
+@_admin_only
+async def cmd_verificacion(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Activa/desactiva la verificación humana (botón SOY HUMANO) Y el welcome del chat.
+    OFF = los nuevos entran directos, sin fricción; la moderación de mensajes sigue."""
+    db: DB = context.bot_data["db"]
+    chat_id = update.effective_chat.id
+    db.ensure_chat_settings(chat_id)
+    if not context.args:
+        s = db.get_chat_settings(chat_id)
+        state = "ON" if s["verification_enabled"] else "OFF"
+        await update.effective_message.reply_text(
+            f"Verificación humana + bienvenida: <b>{state}</b>\n"
+            "Uso: <code>/verificacion on|off</code>\n\n"
+            "<i>OFF desactiva a la vez la verificación (botón SOY HUMANO + mute al "
+            "entrar) Y el mensaje de bienvenida: los nuevos entran directos. La "
+            "moderación de mensajes (spam, listas negras, etc.) sigue funcionando igual.</i>",
+            parse_mode="HTML",
+        )
+        return
+    val = context.args[0].lower()
+    if val in ("on", "true", "yes", "1"):
+        db.update_chat_setting(chat_id, "verification_enabled", 1)
+        await update.effective_message.reply_text(
+            "✅ Verificación + bienvenida <b>ON</b>. Los nuevos verán el botón SOY HUMANO "
+            "(o el welcome amistoso si el perfil es legítimo).", parse_mode="HTML",
+        )
+    elif val in ("off", "false", "no", "0"):
+        db.update_chat_setting(chat_id, "verification_enabled", 0)
+        await update.effective_message.reply_text(
+            "✅ Verificación + bienvenida <b>OFF</b>. Los nuevos entran directos, sin "
+            "verificación ni mensaje de bienvenida. La moderación de mensajes sigue activa.",
+            parse_mode="HTML",
+        )
+    else:
+        await update.effective_message.reply_text("Uso: /verificacion on|off")
