@@ -43,3 +43,16 @@ def test_incluye_botones_configurados_del_chat():
 def test_duracion_configurable_por_defecto_generosa():
     """El welcome verificado dura más que el prompt (para dar tiempo a leer)."""
     assert v.VERIFIED_WELCOME_DELETE_AFTER_S >= 600
+
+
+def test_verification_footer_tiempos():
+    from src.verification import _verification_footer
+    s = {"verification_suspicious_kick_minutes": 30, "verification_kick_normal": 1,
+         "verification_reminder_hours": 3, "verification_kick_after_reminder_hours": 6}
+    assert "30 min" in _verification_footer(s, True, ["sin foto"])       # sospechoso
+    assert "9h" in _verification_footer(s, False, [])                     # normal kick: 3+6
+    s2 = dict(s)
+    s2["verification_kick_normal"] = 0
+    assert "no podrás escribir" in _verification_footer(s2, False, [])    # normal mute
+    # NO duplica la instrucción del botón (esa va en el welcome)
+    assert "Pulsa el botón" not in _verification_footer(s, True, [])

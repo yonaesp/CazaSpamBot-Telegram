@@ -54,9 +54,25 @@ VERIFIED_PERMISSIONS = ChatPermissions(
 DEFAULT_WELCOME = (
     "👋 Hola {name}, bienvenido/a a <b>{chat}</b>.\n\n"
     "Para evitar spam, los nuevos miembros entran muteados. "
-    "<b>Pulsa el botón de abajo para verificar que eres humano</b> y poder escribir.\n\n"
-    "<i>Si eres un bot o no pulsas, no podrás participar.</i>"
+    "<b>Pulsa el botón de abajo para verificar que eres humano</b> y poder escribir."
 )
+
+
+def _verification_footer(settings, suspicious: bool, susp_reasons: list) -> str:
+    """Añade debajo del welcome (mismo mensaje) la CONSECUENCIA con los tiempos
+    configurados. No repite lo del botón (eso ya va en el welcome, custom o default),
+    solo informa de qué pasa si no verifica, siempre con la config real."""
+    if suspicious:
+        kick_minutes = settings["verification_suspicious_kick_minutes"] or 30
+        reasons_str = ", ".join(susp_reasons) if susp_reasons else "perfil dudoso"
+        return (
+            f"\n\n⏰ <i>Cuenta sospechosa ({html.escape(reasons_str)}): verifica en "
+            f"<b>{kick_minutes} min</b> o serás expulsado.</i>"
+        )
+    if settings["verification_kick_normal"]:
+        total_h = (settings["verification_reminder_hours"] or 3) + (settings["verification_kick_after_reminder_hours"] or 6)
+        return f"\n\n⏰ <i>Si no verificas, serás expulsado en unas <b>{total_h}h</b>.</i>"
+    return "\n\n⏰ <i>Hasta que no verifiques no podrás escribir (sin límite de tiempo).</i>"
 
 
 def _name_in_non_latin_script(name: Optional[str]) -> bool:
@@ -566,13 +582,7 @@ async def on_join(
         name = f'<a href="tg://user?id={user.id}">{display}</a>'
     chat_name = html.escape(chat.title or "el grupo")
     text = welcome_text.format(name=name, chat=chat_name)
-    if suspicious:
-        reasons_str = ", ".join(susp_reasons)
-        kick_minutes = settings["verification_suspicious_kick_minutes"] or 30
-        text += (
-            f"\n\n⏰ <i>Cuenta sospechosa ({html.escape(reasons_str)}). "
-            f"Si no verificas en <b>{kick_minutes} minutos</b> serás expulsado.</i>"
-        )
+    text += _verification_footer(settings, suspicious, susp_reasons)
 
     callback_data = f"{CALLBACK_PREFIX}:{chat.id}:{user.id}"
     rows = [[InlineKeyboardButton(
