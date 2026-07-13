@@ -147,6 +147,8 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "  <code>/forget 5</code> — borra la muestra número 5 (id que ves en /samples)\n\n"
 
         "<b>🌹 Welcome, reglas y servicios</b>\n"
+        "  /config — <b>panel visual con botones</b>: verificación, avisos, tiempos, bienvenida, "
+        "reglas y limpieza, todo de un vistazo. En DM te deja elegir el grupo. (alias /ajustes /panel)\n"
         "  /welcome — ver el mensaje de bienvenida del grupo actual\n"
         "  <code>/setwelcome texto</code> — cambia el welcome (acepta sintaxis Rose con botones)\n"
         "  /resetwelcome — vuelve al welcome por defecto\n"
@@ -459,6 +461,10 @@ async def on_private_message(update: Update, context: ContextTypes.DEFAULT_TYPE)
     user = update.effective_user
     if not user or user.id != cfg.admin_user_id:
         return  # silent ignore para no-admins
+    # ¿Hay una edición de texto pendiente del panel /config? (botón ✏️/📜)
+    from . import config_panel
+    if await config_panel.handle_capture(update, context):
+        return
     await update.effective_message.reply_text(
         "👋 Hola. Soy <b>CazaSpamBot</b>, tu bot de moderación.\n\n"
         "Solo respondo a comandos. Usa /help para ver la lista completa,\n"

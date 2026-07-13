@@ -16,7 +16,7 @@ from telegram.ext import (
     filters,
 )
 
-from . import admin, chat_picker, chat_settings_cmd, maintenance, telethon_bridge, topweekly, verification, warns_mod
+from . import admin, chat_picker, chat_settings_cmd, config_panel, maintenance, telethon_bridge, topweekly, verification, warns_mod
 from .config import load_config
 from .db import DB
 from .handlers import (
@@ -77,6 +77,7 @@ _ADMIN_MENU = [
     ("legal", "Aprender: marcar mensaje como legítimo"),
     ("samples", "Ver muestras aprendidas"),
     ("forget", "Olvidar una muestra aprendida"),
+    ("config", "Panel de ajustes del grupo con botones"),
     ("verificacion", "Ajustar verificación humana del grupo"),
     ("welcome", "Ver la bienvenida"),
     ("setwelcome", "Cambiar la bienvenida"),
@@ -319,6 +320,9 @@ def main() -> int:
     app.add_handler(CommandHandler("cleanservice", chat_settings_cmd.cmd_cleanservice))
     app.add_handler(CommandHandler("verificacion", chat_settings_cmd.cmd_verificacion))
     app.add_handler(CommandHandler("verification", chat_settings_cmd.cmd_verificacion))  # alias
+    app.add_handler(CommandHandler("config", config_panel.cmd_config))
+    app.add_handler(CommandHandler("ajustes", config_panel.cmd_config))  # alias
+    app.add_handler(CommandHandler("panel", config_panel.cmd_config))  # alias
     app.add_handler(CommandHandler("setwelcomebutton", chat_settings_cmd.cmd_setwelcomebutton))
     app.add_handler(CommandHandler("welcomebuttons", chat_settings_cmd.cmd_welcomebuttons))
     app.add_handler(CommandHandler("rmwelcomebutton", chat_settings_cmd.cmd_rmwelcomebutton))
@@ -357,6 +361,7 @@ def main() -> int:
     app.add_handler(CallbackQueryHandler(on_abuse_callback, pattern=r"^abuse:"))
     # Callback de revisión de sospechosos (botones ✅ Permitir / 🔨 Banear)
     app.add_handler(CallbackQueryHandler(admin.on_suspicious_review_callback, pattern=r"^susrev:"))
+    app.add_handler(CallbackQueryHandler(config_panel.on_callback, pattern=r"^cfg:"))
 
     # Tracking de membership del bot.
     app.add_handler(ChatMemberHandler(on_my_chat_member, ChatMemberHandler.MY_CHAT_MEMBER))
