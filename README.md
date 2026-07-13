@@ -96,8 +96,22 @@ Refuerzos: **NFKC + [confusable_homoglyphs](https://github.com/vhf/confusable_ho
 | Acortadores bloqueados | `.env` → `URL_BLOCKLIST` | CSV de dominios. |
 | Umbrales y acciones | `.env` | Scores de ban/kick/mute, acción ante primer mensaje sospechoso, etc. |
 | Bienvenida fija por grupo | comando `/setwelcome` | Sin tocar archivos, desde el propio Telegram. |
+| Verificación humana por grupo | comando `/verificacion` | Desde Telegram, por grupo. Ver abajo. |
 
 Cada carpeta tiene su `README.md` con el formato explicado.
+
+### Verificación humana (comando `/verificacion`)
+
+Todo por grupo, desde el propio Telegram (solo el admin del bot). `/verificacion` sin nada muestra el estado y las opciones:
+
+| Subcomando | Qué hace |
+|---|---|
+| `/verificacion on\|off` | Activa/desactiva la verificación (botón *SOY HUMANO* + mute al entrar) **y** el mensaje de bienvenida a la vez. OFF = los nuevos entran directos. |
+| `/verificacion avisos on\|off` | Enviar (o no) un recordatorio a los normales antes de expulsarlos. |
+| `/verificacion accion kick\|mute` | Qué pasa con un normal que no verifica: **kick** (expulsar) o **mute** (queda muteado para siempre, sin kick; puede verificar cuando quiera). |
+| `/verificacion tiempos <susp_min> <recordatorio_h> <kick_h>` | Tiempos: sospechosos se expulsan a los `susp_min` minutos; a los normales se les avisa a las `recordatorio_h` horas y se les expulsa `kick_h` horas después. Ej: `/verificacion tiempos 30 3 6`. |
+
+> Los usuarios con **perfil sospechoso** siempre se expulsan al pasar su tiempo (es la capa de seguridad); las opciones `avisos`/`accion` aplican a los usuarios **normales**. La moderación de mensajes (spam, listas negras, etc.) es independiente y sigue activa aunque desactives la verificación.
 
 ---
 

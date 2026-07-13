@@ -745,39 +745,55 @@ async def cleanup_job(context: ContextTypes.DEFAULT_TYPE) -> None:
                 # Por si _apply_action falla, limpiar manualmente
                 db.delete_pending(chat_id, row["user_id"])
 
-        # 2) Reminder: pending sin verificar tras N horas (default 3h)
-        for row in db.pending_needing_reminder(reminder_hours):
-            if row["chat_id"] != chat_id:
-                continue
-            await _send_reminder(context, db, chat_row, row, reminder_hours)
+        # Ajustes del tier 'normal' (no suspicious):
+        #   - kick_normal: si el que no verifica se EXPULSA (1) o se queda muteado
+        #     para siempre (0).
+        #   - reminders_on: si antes del kick se le envía un recordatorio.
+        reminders_on = bool(settings["verification_reminders_enabled"]) if settings else True
+        kick_normal = bool(settings["verification_kick_normal"]) if settings else True
+        total_h = reminder_hours + kick_after_reminder_h
 
-        # 3) Kick post-reminder: pending normales con reminder enviado hace >N horas (default 6h).
-        # Cierra el loop del tier 'normal': 3h → reminder, +6h sin verificar → kick.
-        for row in db.pending_kick_after_reminder(kick_after_reminder_h):
-            if row["chat_id"] != chat_id:
-                continue
-            total_h = reminder_hours + kick_after_reminder_h
-            decision = Decision(
-                action="kick", score=70,
-                rule="verification_reminder_timeout",
-                reason=f"No verificó en {total_h}h ({reminder_hours}h + {kick_after_reminder_h}h tras recordatorio)",
-                payload={},
-            )
-            try:
-                try:
-                    member = await context.bot.get_chat_member(chat_id=chat_id, user_id=row["user_id"])
-                    username = member.user.username
-                except Exception:
-                    username = None
-                await _apply_action(
-                    context, db, cfg,
-                    chat_id=chat_id, chat_title=chat_row["title"],
-                    user_id=row["user_id"], username=username, message_id=None,
-                    decision=decision, original_text=None,
+        # 2) Recordatorio: solo si están activados Y vamos a expulsar (el texto avisa
+        # del kick; no tiene sentido si van a quedarse muteados). Tras N horas (3h).
+        if reminders_on and kick_normal:
+            for row in db.pending_needing_reminder(reminder_hours):
+                if row["chat_id"] != chat_id:
+                    continue
+                await _send_reminder(context, db, chat_row, row, reminder_hours)
+
+        # 3) Kick de normales que no verificaron — solo si kick_normal=1. Con
+        # recordatorio: a reminder_hours + kick_after_reminder_h. Sin recordatorio:
+        # directo a ese mismo total desde el join. Si kick_normal=0 → NO se toca
+        # (quedan muteados para siempre).
+        if kick_normal:
+            if reminders_on:
+                rows = db.pending_kick_after_reminder(kick_after_reminder_h)
+                motivo = f"No verificó en {total_h}h ({reminder_hours}h + {kick_after_reminder_h}h tras recordatorio)"
+            else:
+                rows = db.pending_normal_past_hours(total_h)
+                motivo = f"No verificó en {total_h}h (recordatorios desactivados)"
+            for row in rows:
+                if row["chat_id"] != chat_id:
+                    continue
+                decision = Decision(
+                    action="kick", score=70,
+                    rule="verification_reminder_timeout", reason=motivo, payload={},
                 )
-                log.info("verification kick post-reminder user=%s chat=%s tras %dh", row["user_id"], chat_id, total_h)
-            except Exception as exc:
-                log.warning("verification kick post-reminder fallo user=%s: %s", row["user_id"], exc)
+                try:
+                    try:
+                        member = await context.bot.get_chat_member(chat_id=chat_id, user_id=row["user_id"])
+                        username = member.user.username
+                    except Exception:
+                        username = None
+                    await _apply_action(
+                        context, db, cfg,
+                        chat_id=chat_id, chat_title=chat_row["title"],
+                        user_id=row["user_id"], username=username, message_id=None,
+                        decision=decision, original_text=None,
+                    )
+                    log.info("verification kick normal user=%s chat=%s tras %dh", row["user_id"], chat_id, total_h)
+                except Exception as exc:
+                    log.warning("verification kick normal fallo user=%s: %s", row["user_id"], exc)
                 db.delete_pending(chat_id, row["user_id"])
 
 

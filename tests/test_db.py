@@ -146,3 +146,18 @@ def test_bot_prefs_get_set(tmp_db):
     assert notify_prefs.is_enabled(tmp_db, "manual_ban", True) is False
     tmp_db.set_pref("notify_manual_ban", True)
     assert notify_prefs.is_enabled(tmp_db, "manual_ban", False) is True
+
+
+def test_pending_normal_past_hours(tmp_db):
+    """Kick sin recordatorio: solo normales (no suspicious) sin verificar y viejos."""
+    import time as _t
+    now = _t.time()
+    tmp_db.add_pending_verification(-100, 1, welcome_msg_id=None, is_suspicious=False)  # normal viejo
+    tmp_db.add_pending_verification(-100, 2, welcome_msg_id=None, is_suspicious=True)   # suspicious → excluido
+    tmp_db.add_pending_verification(-100, 3, welcome_msg_id=None, is_suspicious=False)  # normal reciente
+    with tmp_db._cur() as c:
+        c.execute("UPDATE pending_verifications SET joined_at=? WHERE chat_id=-100 AND user_id=1", (now - 10 * 3600,))
+        c.execute("UPDATE pending_verifications SET joined_at=? WHERE chat_id=-100 AND user_id=2", (now - 10 * 3600,))
+        c.execute("UPDATE pending_verifications SET joined_at=? WHERE chat_id=-100 AND user_id=3", (now - 1 * 3600,))
+    ids = {r["user_id"] for r in tmp_db.pending_normal_past_hours(9)}
+    assert ids == {1}

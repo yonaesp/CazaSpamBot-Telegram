@@ -152,7 +152,9 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "  /resetwelcome — vuelve al welcome por defecto\n"
         "  /rules — ver reglas | <code>/setrules texto</code> — cambiarlas\n"
         "  /cleanservice on / off — borrar mensajes 'X se ha unido' automáticamente\n"
-        "  /verificacion on / off — activar/desactivar la verificación humana Y el welcome\n"
+        "  /verificacion — verificación humana + bienvenida. Sin nada = ver estado y opciones:\n"
+        "     · on|off (desactiva verificación Y welcome) · avisos on|off (recordatorio)\n"
+        "     · accion kick|mute (al no verificar: expulsar o quedar muteado) · tiempos N N N\n"
         "  /testwelcome — vista previa del welcome (te lo enseña como si fueras nuevo)\n\n"
 
         "<b>🔘 Botones del welcome</b>\n"

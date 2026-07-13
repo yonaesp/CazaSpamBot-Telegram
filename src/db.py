@@ -129,6 +129,8 @@ CREATE TABLE IF NOT EXISTS chat_settings (
     verification_suspicious_kick_minutes INTEGER NOT NULL DEFAULT 30,
     verification_reminder_hours   INTEGER NOT NULL DEFAULT 3,
     verification_kick_after_reminder_hours INTEGER NOT NULL DEFAULT 6,
+    verification_reminders_enabled INTEGER NOT NULL DEFAULT 1,  -- enviar recordatorio a los normales
+    verification_kick_normal      INTEGER NOT NULL DEFAULT 1,   -- 1=kick al no verificar, 0=quedan muteados
     cleanservice                  INTEGER NOT NULL DEFAULT 1,
     updated_at                    REAL NOT NULL DEFAULT 0
 );
@@ -287,6 +289,14 @@ class DB:
             self._conn.execute(
                 "UPDATE chat_settings SET verification_reminder_hours=3 "
                 "WHERE verification_reminder_hours=6"
+            )
+        if "verification_reminders_enabled" not in cs_cols:
+            self._conn.execute(
+                "ALTER TABLE chat_settings ADD COLUMN verification_reminders_enabled INTEGER NOT NULL DEFAULT 1"
+            )
+        if "verification_kick_normal" not in cs_cols:
+            self._conn.execute(
+                "ALTER TABLE chat_settings ADD COLUMN verification_kick_normal INTEGER NOT NULL DEFAULT 1"
             )
         if "topweekly_enabled" not in cs_cols:
             self._conn.execute(
@@ -792,7 +802,8 @@ class DB:
             "rules_text", "warns_limit", "warns_action",
             "verification_enabled", "verification_suspicious_kick_h",
             "verification_suspicious_kick_minutes",
-            "verification_reminder_hours", "cleanservice",
+            "verification_reminder_hours", "verification_kick_after_reminder_hours",
+            "verification_reminders_enabled", "verification_kick_normal", "cleanservice",
             "topweekly_enabled",
         }
         if field not in ALLOWED:
@@ -879,6 +890,16 @@ class DB:
                 "SELECT * FROM pending_verifications "
                 "WHERE verified_at IS NULL AND is_suspicious=0 "
                 "  AND reminder_sent_at IS NOT NULL AND reminder_sent_at <= ?",
+                (time.time() - hours * 3600,),
+            ).fetchall()
+
+    def pending_normal_past_hours(self, hours: int) -> list[sqlite3.Row]:
+        """Pending normales (no suspicious) sin verificar desde hace >hours (para kick
+        SIN recordatorio, cuando los recordatorios están desactivados)."""
+        with self._cur() as c:
+            return c.execute(
+                "SELECT * FROM pending_verifications "
+                "WHERE verified_at IS NULL AND is_suspicious=0 AND joined_at <= ?",
                 (time.time() - hours * 3600,),
             ).fetchall()
 

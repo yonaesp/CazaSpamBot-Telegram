@@ -334,38 +334,100 @@ async def cmd_cleanservice(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         await update.effective_message.reply_text("Uso: /cleanservice on|off")
 
 
+_ON = ("on", "true", "yes", "sí", "si", "1")
+_OFF = ("off", "false", "no", "0")
+
+
 @_admin_only
 async def cmd_verificacion(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Activa/desactiva la verificación humana (botón SOY HUMANO) Y el welcome del chat.
-    OFF = los nuevos entran directos, sin fricción; la moderación de mensajes sigue."""
+    """Gestiona la verificación humana del chat: on/off (con el welcome), recordatorios,
+    qué pasa al no verificar (kick o quedar muteado) y los tiempos."""
     db: DB = context.bot_data["db"]
     chat_id = update.effective_chat.id
     db.ensure_chat_settings(chat_id)
-    if not context.args:
+    args = [a.lower() for a in (context.args or [])]
+    reply = update.effective_message.reply_text
+
+    # --- Sin argumentos: estado completo + ayuda de subcomandos ---
+    if not args:
         s = db.get_chat_settings(chat_id)
-        state = "ON" if s["verification_enabled"] else "OFF"
-        await update.effective_message.reply_text(
-            f"Verificación humana + bienvenida: <b>{state}</b>\n"
-            "Uso: <code>/verificacion on|off</code>\n\n"
-            "<i>OFF desactiva a la vez la verificación (botón SOY HUMANO + mute al "
-            "entrar) Y el mensaje de bienvenida: los nuevos entran directos. La "
-            "moderación de mensajes (spam, listas negras, etc.) sigue funcionando igual.</i>",
+        accion = "expulsar (kick)" if s["verification_kick_normal"] else "dejar MUTEADO para siempre"
+        await reply(
+            "🧩 <b>Verificación del chat</b>\n"
+            f"• Verificación + bienvenida: <b>{'ON' if s['verification_enabled'] else 'OFF'}</b>\n"
+            f"• Recordatorios a los normales: <b>{'ON' if s['verification_reminders_enabled'] else 'OFF'}</b>\n"
+            f"• Al no verificar (normales): <b>{accion}</b>\n"
+            f"• Tiempos: sospechosos kick a <b>{s['verification_suspicious_kick_minutes']} min</b> · "
+            f"recordatorio a las <b>{s['verification_reminder_hours']} h</b> · "
+            f"kick <b>+{s['verification_kick_after_reminder_hours']} h</b> tras el recordatorio\n\n"
+            "<b>Ajustes</b> (solo en este grupo):\n"
+            "<code>/verificacion on|off</code> — activa/desactiva verificación Y bienvenida\n"
+            "<code>/verificacion avisos on|off</code> — recordatorio antes de expulsar\n"
+            "<code>/verificacion accion kick|mute</code> — al no verificar: expulsar o quedar muteado\n"
+            "<code>/verificacion tiempos &lt;susp_min&gt; &lt;recordatorio_h&gt; &lt;kick_h&gt;</code>\n"
+            "   ej. <code>/verificacion tiempos 30 3 6</code> (sospechoso 30min, recordatorio 3h, kick +6h)\n\n"
+            "<i>Los sospechosos (perfil dudoso) siempre se expulsan al pasar su tiempo; el resto "
+            "de opciones aplican a los usuarios normales. La moderación de mensajes es aparte.</i>",
             parse_mode="HTML",
         )
         return
-    val = context.args[0].lower()
-    if val in ("on", "true", "yes", "1"):
-        db.update_chat_setting(chat_id, "verification_enabled", 1)
-        await update.effective_message.reply_text(
-            "✅ Verificación + bienvenida <b>ON</b>. Los nuevos verán el botón SOY HUMANO "
-            "(o el welcome amistoso si el perfil es legítimo).", parse_mode="HTML",
-        )
-    elif val in ("off", "false", "no", "0"):
-        db.update_chat_setting(chat_id, "verification_enabled", 0)
-        await update.effective_message.reply_text(
-            "✅ Verificación + bienvenida <b>OFF</b>. Los nuevos entran directos, sin "
-            "verificación ni mensaje de bienvenida. La moderación de mensajes sigue activa.",
+
+    sub = args[0]
+
+    # --- on/off (verificación + welcome) ---
+    if sub in _ON or sub in _OFF:
+        val = 1 if sub in _ON else 0
+        db.update_chat_setting(chat_id, "verification_enabled", val)
+        if val:
+            await reply("✅ Verificación + bienvenida <b>ON</b>.", parse_mode="HTML")
+        else:
+            await reply(
+                "✅ Verificación + bienvenida <b>OFF</b>. Los nuevos entran directos, sin "
+                "verificación ni bienvenida. La moderación de mensajes sigue activa.",
+                parse_mode="HTML",
+            )
+        return
+
+    # --- avisos (recordatorios) on/off ---
+    if sub == "avisos" and len(args) >= 2:
+        val = 1 if args[1] in _ON else 0
+        db.update_chat_setting(chat_id, "verification_reminders_enabled", val)
+        await reply(f"✅ Recordatorios a los normales: <b>{'ON' if val else 'OFF'}</b>.", parse_mode="HTML")
+        return
+
+    # --- accion kick|mute ---
+    if sub in ("accion", "acción") and len(args) >= 2:
+        if args[1] == "kick":
+            db.update_chat_setting(chat_id, "verification_kick_normal", 1)
+            await reply("✅ Al no verificar, los normales serán <b>expulsados</b> (kick).", parse_mode="HTML")
+        elif args[1] == "mute":
+            db.update_chat_setting(chat_id, "verification_kick_normal", 0)
+            await reply(
+                "✅ Al no verificar, los normales quedarán <b>muteados para siempre</b> (sin kick, "
+                "sin recordatorio). Podrán verificar cuando quieran.", parse_mode="HTML",
+            )
+        else:
+            await reply("Uso: /verificacion accion kick|mute")
+        return
+
+    # --- tiempos <susp_min> <recordatorio_h> <kick_h> ---
+    if sub == "tiempos" and len(args) >= 4:
+        try:
+            susp, rem, kick = int(args[1]), int(args[2]), int(args[3])
+        except ValueError:
+            await reply("Números inválidos. Ej: /verificacion tiempos 30 3 6")
+            return
+        if not (0 < susp <= 1440 and 0 < rem <= 168 and 0 < kick <= 168):
+            await reply("Fuera de rango. susp_min 1-1440, horas 1-168. Ej: /verificacion tiempos 30 3 6")
+            return
+        db.update_chat_setting(chat_id, "verification_suspicious_kick_minutes", susp)
+        db.update_chat_setting(chat_id, "verification_reminder_hours", rem)
+        db.update_chat_setting(chat_id, "verification_kick_after_reminder_hours", kick)
+        await reply(
+            f"✅ Tiempos: sospechosos kick a <b>{susp} min</b> · recordatorio a las <b>{rem} h</b> · "
+            f"kick <b>+{kick} h</b> tras el recordatorio (total normales: {rem + kick} h).",
             parse_mode="HTML",
         )
-    else:
-        await update.effective_message.reply_text("Uso: /verificacion on|off")
+        return
+
+    await reply("Uso: /verificacion  (sin nada muestra el estado y las opciones)")
