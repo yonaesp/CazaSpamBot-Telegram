@@ -674,7 +674,13 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     cfg: Config = context.bot_data["cfg"]
     db: DB = context.bot_data["db"]
     msg = update.effective_message
-    if msg is None or msg.from_user is None:
+    if msg is None:
+        return
+    if msg.from_user is None:
+        # Mensaje "en nombre de un canal" (sender_chat): dentro se ignoran el post
+        # auto-reenviado que encabeza los comentarios y los admins anónimos; un
+        # canal externo comentando spam se banea con banChatSenderChat.
+        await _moderate_channel_message(context, db, cfg, msg)
         return
     chat_id = msg.chat_id
     if msg.chat.type in ("group", "supergroup"):
@@ -1364,6 +1370,73 @@ async def _moderate_bot_message(context, db, cfg, msg, user) -> None:
         decision=decision, original_text=(msg.text or msg.caption),
         first_name=user.first_name,
     )
+
+
+async def _moderate_channel_message(context, db, cfg, msg) -> None:
+    """Modera un mensaje publicado EN NOMBRE DE UN CANAL (sender_chat) en un grupo
+    de discusión/comentarios. Solo actúa ante reglas FUERTES (botones inline, URL en
+    blocklist, anuncio comercial): banea al canal con banChatSenderChat + borra.
+
+    Se descartan antes (no son spam):
+      - el post auto-reenviado que encabeza el hilo de comentarios (is_automatic_forward),
+      - los admins anónimos, que postean "como el propio grupo" (sender_chat == chat).
+    Falsos positivos > negativos: un canal legítimo que comente sin disparar reglas
+    fuertes no se toca.
+    """
+    sc = getattr(msg, "sender_chat", None)
+    if sc is None:
+        return
+    if getattr(msg, "is_automatic_forward", False):
+        return  # post del canal vinculado que abre el hilo: legítimo
+    if sc.id == msg.chat_id:
+        return  # admin anónimo del grupo posteando "como el grupo"
+    if msg.chat.type in ("group", "supergroup"):
+        await _ensure_chat_registered(context, db, msg.chat)
+    if not cfg.is_moderated(msg.chat_id):
+        return
+    hits = [
+        buttons_det.check(msg),
+        url_det.check(msg, cfg.url_blocklist, is_first_msg=True),
+        comad_det.check(msg, is_first_msg=True),
+    ]
+    real = [h for h in hits if h]
+    if not real:
+        return
+    rule = "channel_sender+" + "+".join(h.rule for h in real)
+    score = sum(h.score for h in real)
+    sc_name = sc.title or (f"@{sc.username}" if sc.username else str(sc.id))
+    mode = "shadow" if cfg.shadow else "active"
+    log.info("CHANNEL spam sender_chat=%s (%s) chat=%s reglas=%s → ban canal (%s)",
+             sc.id, sc_name, msg.chat_id, rule, mode)
+    if not cfg.shadow:
+        try:
+            await context.bot.ban_chat_sender_chat(chat_id=msg.chat_id, sender_chat_id=sc.id)
+        except TelegramError as exc:
+            log.warning("ban_chat_sender_chat fallo chat=%s sc=%s: %s", msg.chat_id, sc.id, exc)
+        try:
+            await context.bot.delete_message(chat_id=msg.chat_id, message_id=msg.message_id)
+        except TelegramError as exc:
+            log.debug("delete channel-sender msg fallo: %s", exc)
+    db.log_action(
+        chat_id=msg.chat_id, user_id=sc.id, username=(sc.username or None),
+        message_id=msg.message_id, rule=rule, action="ban", score=score, mode=mode,
+        payload={"sender_chat": True, "title": sc.title, "rules": [h.rule for h in real]},
+    )
+    if cfg.admin_notify_chat_id:
+        prefix = "🌒 <b>[MODO SHADOW — no se ha actuado]</b>\n" if cfg.shadow else ""
+        try:
+            await context.bot.send_message(
+                chat_id=cfg.admin_notify_chat_id,
+                text=(
+                    f"{prefix}🚫 <b>Canal baneado por spam en comentarios</b>\n"
+                    f"📍 Chat: {_h.escape(msg.chat.title or str(msg.chat_id))}\n"
+                    f"📢 Canal: {_h.escape(sc_name)} (<code>{sc.id}</code>)\n"
+                    f"📖 Motivo: {_h.escape(rule)}"
+                ),
+                parse_mode="HTML", disable_web_page_preview=True,
+            )
+        except TelegramError:
+            pass
 
 
 async def _moderate_via_bot_message(context, db, cfg, msg, user) -> bool:
