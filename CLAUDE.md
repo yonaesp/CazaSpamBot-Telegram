@@ -107,4 +107,4 @@ git add -A && git commit -m "..." && git push
 
 `docs/ARCHITECTURE.md`, `docs/ECOSYSTEM.md`, `docs/ROADMAP.md`, `docs/LEARNING.md` (actualizados 2026-05).
 
-*Actualizado: 2026-07-14 — bot en producción, 18 detectores, 312 tests.*
+*Actualizado: 2026-07-14 — bot en producción, 19 detectores, 318 tests.*

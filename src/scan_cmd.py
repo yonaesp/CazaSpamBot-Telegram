@@ -26,6 +26,7 @@ from .detectors import commercial_ad as comad_det
 from .detectors import contact_spam as contact_det
 from .detectors import emoji_only as emoji_det
 from .detectors import external_mention as ext_det
+from .detectors import external_reply as extreply_det
 from .detectors import forward_first_msg as fwd_det
 from .detectors import inline_buttons as buttons_det
 from .detectors import tg_deeplink as tgdeep_det
@@ -144,6 +145,7 @@ async def cmd_scan(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             resolve_username=db.resolve_username,
             own_chat_username=None,
         ),
+        extreply_det.check(target, is_first_msg=True, is_moderated_chat=cfg.is_moderated),
         comad_det.check(target, is_first_msg=True),
         emoji_det.check(target, is_first_msg=True),
         fwd_det.check(target, is_first_msg=True, seconds_since_first_seen=0.0),

@@ -27,6 +27,7 @@ from .detectors import forward_first_msg as fwd_det
 from .detectors import inline_buttons as buttons_det
 from .detectors import commercial_ad as comad_det
 from .detectors import contact_spam as contact_det
+from .detectors import external_reply as extreply_det
 from .detectors import photos_batch as photos_batch_det
 from .detectors import bio_spam as bio_spam_det
 from .detectors import dormant_bot_mention as dormant_bot_det
@@ -841,6 +842,9 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     hits.append(contact_det.check(
         msg, cfg.allowed_scripts, cfg.non_latin_ratio_threshold, is_first_msg=is_first,
     ))
+    # 3d-ter2) Promoción de canal externo mediante cita a otro chat (external_reply):
+    # el reclamo va en la cita y el texto visible es un CTA mínimo ("Please Join").
+    hits.append(extreply_det.check(msg, is_first_msg=is_first, is_moderated_chat=cfg.is_moderated))
     # 3d-quat) Estructura de anuncio comercial (señales acumuladas:
     # multilínea con emojis + cifras € + CTA + link).
     hits.append(comad_det.check(msg, is_first_msg=is_first))
