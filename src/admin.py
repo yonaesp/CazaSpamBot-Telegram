@@ -144,7 +144,9 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "  /legal — marca el mensaje como LEGÍTIMO (anti-falsos positivos, solo aprende).\n"
         "  El bot borra tu comando del grupo y te confirma por DM.\n"
         "  /samples — cuántas muestras hay. Ejemplo: <code>/samples spam 30</code> lista 30 spam\n"
-        "  <code>/forget 5</code> — borra la muestra número 5 (id que ves en /samples)\n\n"
+        "  <code>/forget 5</code> — borra la muestra número 5 (id que ves en /samples)\n"
+        "  /scan — <b>¿esto lo pillaría?</b> Responde a un mensaje (reenviado al DM vale) y te digo "
+        "qué reglas dispararía y qué estructura tiene (texto, contacto, botones, forward)\n\n"
 
         "<b>🌹 Welcome, reglas y servicios</b>\n"
         "  /config — <b>panel visual con botones</b>: verificación, avisos, tiempos, bienvenida, "

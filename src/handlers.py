@@ -26,6 +26,7 @@ from .detectors import first_msg_media as media_det
 from .detectors import forward_first_msg as fwd_det
 from .detectors import inline_buttons as buttons_det
 from .detectors import commercial_ad as comad_det
+from .detectors import contact_spam as contact_det
 from .detectors import photos_batch as photos_batch_det
 from .detectors import bio_spam as bio_spam_det
 from .detectors import dormant_bot_mention as dormant_bot_det
@@ -835,6 +836,11 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     # 3d-pre) Mensaje con botones inline → users normales no pueden enviarlos.
     # Casi siempre es forward desde canal/bot promocional.
     hits.append(buttons_det.check(msg))
+    # 3d-ter) Contacto compartido cuyo nombre/vCard es el reclamo de spam (el texto
+    # va en msg.contact, no en msg.text, así que el resto de detectores no lo ven).
+    hits.append(contact_det.check(
+        msg, cfg.allowed_scripts, cfg.non_latin_ratio_threshold, is_first_msg=is_first,
+    ))
     # 3d-quat) Estructura de anuncio comercial (señales acumuladas:
     # multilínea con emojis + cifras € + CTA + link).
     hits.append(comad_det.check(msg, is_first_msg=is_first))
@@ -1398,6 +1404,7 @@ async def _moderate_channel_message(context, db, cfg, msg) -> None:
         buttons_det.check(msg),
         url_det.check(msg, cfg.url_blocklist, is_first_msg=True),
         comad_det.check(msg, is_first_msg=True),
+        contact_det.check(msg, cfg.allowed_scripts, cfg.non_latin_ratio_threshold),
     ]
     real = [h for h in hits if h]
     if not real:

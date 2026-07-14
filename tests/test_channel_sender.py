@@ -29,6 +29,7 @@ def _msg(*, auto_forward=False, sc_id=SCID, title="Canal Spam", username="spamch
 def _ctx(shadow=False):
     cfg = SimpleNamespace(shadow=shadow, url_blocklist=set(),
                           admin_notify_chat_id=14573395,
+                          allowed_scripts=["latin"], non_latin_ratio_threshold=0.30,
                           is_moderated=lambda cid: True)
     db = MagicMock()
     bot = SimpleNamespace(
@@ -43,6 +44,7 @@ def _patch_detectors(monkeypatch, spam=False):
     none = SimpleNamespace(check=lambda *a, **k: Hit.none())
     monkeypatch.setattr(handlers, "buttons_det", none)
     monkeypatch.setattr(handlers, "url_det", none)
+    monkeypatch.setattr(handlers, "contact_det", none)
     if spam:
         hit = Hit(rule="commercial_ad", score=45, reason="oferta")
         monkeypatch.setattr(handlers, "comad_det", SimpleNamespace(check=lambda *a, **k: hit))

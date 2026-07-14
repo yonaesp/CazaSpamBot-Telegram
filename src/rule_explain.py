@@ -16,6 +16,7 @@ RULE_EXPLANATIONS: dict[str, str] = {
     "url_blocklist": "Compartió un enlace acortador de la lista negra (bit.ly, tinyurl, etc.).",
     "tg_deeplink": "Enlace tg:// de redirección o phishing.",
     "non_allowed_script": "Escribió en un alfabeto no permitido (por ejemplo chino o cirílico) en su primer mensaje: patrón clásico de spam.",
+    "contact_spam": "Compartió una tarjeta de contacto cuyo nombre era el propio anuncio (alfabeto extranjero o con enlaces): truco para colar spam esquivando los filtros de texto.",
     "emoji_only_first_msg": "Su primer mensaje eran solo emojis (captación de atención típica de spam).",
     "forward_first_msg": "Su primer mensaje fue un reenvío de un canal o bot (patrón de spam).",
     "first_msg_media": "Su primer mensaje fue una foto o vídeo, con un perfil sospechoso.",

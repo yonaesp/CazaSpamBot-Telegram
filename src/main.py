@@ -16,7 +16,7 @@ from telegram.ext import (
     filters,
 )
 
-from . import admin, chat_picker, chat_settings_cmd, config_panel, maintenance, telethon_bridge, topweekly, verification, warns_mod
+from . import admin, chat_picker, chat_settings_cmd, config_panel, maintenance, scan_cmd, telethon_bridge, topweekly, verification, warns_mod
 from .config import load_config
 from .db import DB
 from .handlers import (
@@ -77,6 +77,7 @@ _ADMIN_MENU = [
     ("legal", "Aprender: marcar mensaje como legítimo"),
     ("samples", "Ver muestras aprendidas"),
     ("forget", "Olvidar una muestra aprendida"),
+    ("scan", "Analizar un mensaje: ¿lo detectaría? (responde al mensaje)"),
     ("config", "Panel de ajustes del grupo con botones"),
     ("verificacion", "Ajustar verificación humana del grupo"),
     ("welcome", "Ver la bienvenida"),
@@ -304,6 +305,8 @@ def main() -> int:
     app.add_handler(CommandHandler("ham", admin.cmd_ham))  # alias retro
     app.add_handler(CommandHandler("samples", admin.cmd_samples))
     app.add_handler(CommandHandler("forget", admin.cmd_forget))
+    app.add_handler(CommandHandler("scan", scan_cmd.cmd_scan))
+    app.add_handler(CommandHandler("analizar", scan_cmd.cmd_scan))  # alias
     app.add_handler(CommandHandler("setgreeter", admin.cmd_setgreeter))
     app.add_handler(CommandHandler("rmgreeter", admin.cmd_rmgreeter))
     app.add_handler(CommandHandler("listgreeters", admin.cmd_listgreeters))

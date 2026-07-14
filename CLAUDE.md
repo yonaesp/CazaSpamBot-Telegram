@@ -54,7 +54,7 @@ nativa; se itera `banChatMember` sobre los chats donde el bot es admin.
 
 ## Detectores (`src/detectors/` + `verification.py`)
 
-`obvious_spam_profile`, `bio_spam`, `photos_batch`, `commercial_ad`, `forward_first_msg`, `first_msg_media`, `inline_buttons`, `external_mention`, `url_blocklist`, `tg_deeplink`, `non_allowed_script` (unicode_script), `reaction_farming`, `jfm_delta`, `premium_new_link`, `emoji_only`, `dormant_bot_mention`, `cas`, `lols_bot`, `learned_similarity` (Naive Bayes + cosine sobre samples). Listas negras de keywords editables en `config/blacklist/` (cargadas por `wordlists.py`).
+`obvious_spam_profile`, `bio_spam`, `photos_batch`, `commercial_ad`, `contact_spam` (contactos compartidos con reclamo), `forward_first_msg`, `first_msg_media`, `inline_buttons`, `external_mention`, `url_blocklist`, `tg_deeplink`, `non_allowed_script` (unicode_script), `reaction_farming`, `jfm_delta`, `premium_new_link`, `emoji_only`, `dormant_bot_mention`, `cas`, `lols_bot`, `learned_similarity` (Naive Bayes + cosine sobre samples). También banea spam publicado en nombre de un canal (`sender_chat` → `banChatSenderChat`) en grupos de comentarios. Listas negras de keywords editables en `config/blacklist/` (cargadas por `wordlists.py`).
 
 ## Comandos
 
@@ -107,4 +107,4 @@ git add -A && git commit -m "..." && git push
 
 `docs/ARCHITECTURE.md`, `docs/ECOSYSTEM.md`, `docs/ROADMAP.md`, `docs/LEARNING.md` (actualizados 2026-05).
 
-*Actualizado: 2026-06-11 — bot en producción, 17 detectores, 227 tests.*
+*Actualizado: 2026-07-14 — bot en producción, 18 detectores, 312 tests.*
