@@ -16,7 +16,7 @@ from telegram.ext import (
     filters,
 )
 
-from . import admin, chat_picker, chat_settings_cmd, config_panel, group_clean, maintenance, scan_cmd, telethon_bridge, topweekly, verification, warns_mod
+from . import admin, chat_picker, chat_settings_cmd, config_panel, group_clean, lang_cmd, maintenance, scan_cmd, telethon_bridge, topweekly, verification, warns_mod
 from .config import load_config
 from .db import DB
 from .handlers import (
@@ -71,6 +71,9 @@ async def _register_bot_commands(app: Application, cfg) -> None:
 
 async def _post_init(app: Application) -> None:
     cfg = app.bot_data["cfg"]
+    # Idioma global: pref guardada > env BOT_LANG / locale del sistema > 'es'.
+    lang = lang_cmd.resolve_and_apply(app.bot_data["db"])
+    logging.getLogger("antispam").info("Idioma del bot: %s", lang)
     app.bot_data["http"] = aiohttp.ClientSession()
     app.bot_data["notifier"] = Notifier(
         external_notify_token=cfg.external_notify_token,
@@ -283,6 +286,8 @@ def main() -> int:
     app.add_handler(CommandHandler("sincronizar", config_panel.cmd_sync))  # alias
     app.add_handler(CommandHandler("limpieza", group_clean.cmd_limpieza))
     app.add_handler(CommandHandler("grouplean", group_clean.cmd_limpieza))  # alias
+    app.add_handler(CommandHandler("idioma", lang_cmd.cmd_idioma))
+    app.add_handler(CommandHandler("language", lang_cmd.cmd_idioma))  # alias
     app.add_handler(CommandHandler("setwelcomebutton", chat_settings_cmd.cmd_setwelcomebutton))
     app.add_handler(CommandHandler("welcomebuttons", chat_settings_cmd.cmd_welcomebuttons))
     app.add_handler(CommandHandler("rmwelcomebutton", chat_settings_cmd.cmd_rmwelcomebutton))

@@ -13,6 +13,7 @@ from . import chat_picker, learning, notify_prefs, permissions, quips, trust as 
 from .config import Config
 from .db import DB
 from .federation import federate_ban, unfederate_ban
+from .i18n import t
 
 log = logging.getLogger(__name__)
 
@@ -155,6 +156,7 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "cada cambio se aplica a todos a la vez y /config no pide grupo. OFF = cada grupo por separado.\n"
         "  /limpieza — <b>mantener los grupos limpios</b>: ocultar los comandos del bot al teclear «/» "
         "en grupos y auto-borrar los comandos escritos en el chat (ambos ON por defecto).\n"
+        "  /idioma es|en — idioma del bot (por defecto se detecta del sistema; español si no).\n"
         "  <i>La bienvenida (👋) es independiente de la verificación: puedes saludar sin verificar.</i>\n"
         "  /welcome — ver el mensaje de bienvenida del grupo actual\n"
         "  <code>/setwelcome texto</code> — cambia el welcome (acepta sintaxis Rose con botones)\n"
@@ -1233,18 +1235,18 @@ async def on_suspicious_review_callback(update: Update, context: ContextTypes.DE
     # Toggles del panel (verificación / avisos / recordatorios). Respetan el sync y
     # re-renderizan el panel abierto.
     _TOG = {
-        "togverif": ("verification_enabled", "Verificación humana"),
-        "togreview": ("verification_review_suspicious", "Avisos de sospechosos"),
-        "togremind": ("verification_reminders_enabled", "Recordatorios de verificación"),
+        "togverif": ("verification_enabled", "toast.verif"),
+        "togreview": ("verification_review_suspicious", "toast.alerts"),
+        "togremind": ("verification_reminders_enabled", "toast.reminders"),
     }
     if action in _TOG:
-        field, nombre = _TOG[action]
+        field, nombre_key = _TOG[action]
         db.ensure_chat_settings(chat_id)
         s = db.get_chat_settings(chat_id)
         new_val = 0 if (s and s[field]) else 1
         n = settings_sync.apply_setting(db, chat_id, field, new_val)
         scope = f" · {n} grupos" if n > 1 else ""
-        await q.answer(f"{nombre}: {'ON' if new_val else 'OFF'}{scope}")
+        await q.answer(f"{t(nombre_key)}: {'ON' if new_val else 'OFF'}{scope}")
         try:
             await q.edit_message_reply_markup(
                 reply_markup=verification.build_review_settings_keyboard(db, chat_id, user_id))
@@ -1283,9 +1285,9 @@ async def on_suspicious_review_callback(update: Update, context: ContextTypes.DE
         return
 
     if action == "allow":
-        await q.answer("✅ Permitido.")
+        await q.answer(t("toast.allowed"))
         try:
-            await q.edit_message_text(base + "\n\n✅ <b>Permitido por el admin.</b>", parse_mode="HTML")
+            await q.edit_message_text(base + t("review.allowed"), parse_mode="HTML")
         except TelegramError:
             pass
         return
@@ -1296,11 +1298,9 @@ async def on_suspicious_review_callback(update: Update, context: ContextTypes.DE
             triggered_in_chat=chat_id, shadow=cfg.shadow,
         )
         ok = sum(1 for v in (res or {}).values() if v == "ok")
-        await q.answer(f"🔨 Baneado ({ok} grupo/s).")
+        await q.answer(t("toast.banned", n=ok))
         try:
-            await q.edit_message_text(
-                base + f"\n\n🔨 <b>Baneado por el admin</b> ({ok} grupo/s).", parse_mode="HTML",
-            )
+            await q.edit_message_text(base + t("review.banned", n=ok), parse_mode="HTML")
         except TelegramError:
             pass
         return

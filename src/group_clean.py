@@ -56,6 +56,7 @@ _ADMIN_MENU = [
     ("config", "Panel de ajustes del grupo con botones"),
     ("sync", "Sincronizar ajustes iguales en todos los grupos (on/off)"),
     ("limpieza", "Ocultar/auto-borrar comandos del bot en grupos"),
+    ("idioma", "Cambiar el idioma del bot (es/en)"),
     ("verificacion", "Ajustar verificación humana del grupo"),
     ("welcome", "Ver la bienvenida"),
     ("setwelcome", "Cambiar la bienvenida"),

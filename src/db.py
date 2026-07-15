@@ -245,6 +245,10 @@ CREATE TABLE IF NOT EXISTS bot_prefs (
     pref_key   TEXT PRIMARY KEY,
     enabled    INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS bot_text_prefs (
+    pref_key   TEXT PRIMARY KEY,
+    value      TEXT
+);
 """
 
 
@@ -526,6 +530,20 @@ class DB:
                 "INSERT INTO bot_prefs (pref_key, enabled) VALUES (?, ?) "
                 "ON CONFLICT(pref_key) DO UPDATE SET enabled=excluded.enabled",
                 (key, 1 if enabled else 0),
+            )
+
+    def get_text_pref(self, key: str) -> str | None:
+        """Preferencia runtime de texto (p.ej. idioma). None si no está guardada."""
+        with self._cur() as c:
+            row = c.execute("SELECT value FROM bot_text_prefs WHERE pref_key=?", (key,)).fetchone()
+        return None if row is None else row["value"]
+
+    def set_text_pref(self, key: str, value: str) -> None:
+        with self._cur() as c:
+            c.execute(
+                "INSERT INTO bot_text_prefs (pref_key, value) VALUES (?, ?) "
+                "ON CONFLICT(pref_key) DO UPDATE SET value=excluded.value",
+                (key, value),
             )
 
     def record_admin_ban(self, chat_id: int, admin_id: int, target_id: int, ts: float) -> None:

@@ -18,3 +18,11 @@ def tmp_db(tmp_path):
     db = DB(str(tmp_path / "test.db"))
     yield db
     db.close()
+
+
+@pytest.fixture(autouse=True)
+def _reset_i18n():
+    """El idioma de i18n es global; tras cada test se resetea a 'es' para aislarlos."""
+    yield
+    from src import i18n
+    i18n.set_lang("es")

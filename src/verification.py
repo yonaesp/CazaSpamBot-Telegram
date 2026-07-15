@@ -27,6 +27,7 @@ from telegram.ext import ContextTypes
 from . import user_signals
 from .db import DB
 from .detectors.unicode_script import non_allowed_ratio
+from .i18n import t
 
 log = logging.getLogger(__name__)
 
@@ -475,13 +476,13 @@ _REVIEW_TIME_FIELDS = {
 
 
 def _rv_onoff(v) -> str:
-    return "✅ ON" if v else "❌ OFF"
+    return t("on") if v else t("off")
 
 
 def _rv_decide_row(chat_id: int, user_id: int) -> list:
     return [
-        InlineKeyboardButton("✅ Permitir", callback_data=f"susrev:allow:{chat_id}:{user_id}"),
-        InlineKeyboardButton("🔨 Banear", callback_data=f"susrev:ban:{chat_id}:{user_id}"),
+        InlineKeyboardButton(t("btn.allow"), callback_data=f"susrev:allow:{chat_id}:{user_id}"),
+        InlineKeyboardButton(t("btn.ban"), callback_data=f"susrev:ban:{chat_id}:{user_id}"),
     ]
 
 
@@ -489,8 +490,7 @@ def build_review_keyboard(db: DB, chat_id: int, user_id: int) -> InlineKeyboardM
     """Vista COLAPSADA del aviso: decidir sobre el usuario + ⚙️ tuerca de ajustes."""
     return InlineKeyboardMarkup([
         _rv_decide_row(chat_id, user_id),
-        [InlineKeyboardButton("⚙️ Ajustes del grupo",
-                              callback_data=f"susrev:gear:{chat_id}:{user_id}")],
+        [InlineKeyboardButton(t("btn.gear"), callback_data=f"susrev:gear:{chat_id}:{user_id}")],
     ])
 
 
@@ -502,20 +502,20 @@ def build_review_settings_keyboard(db: DB, chat_id: int, user_id: int) -> Inline
     remind = bool(s and s["verification_reminders_enabled"])
     rows = [
         _rv_decide_row(chat_id, user_id),
-        [InlineKeyboardButton(f"🛡️ Verificación humana: {_rv_onoff(s and s['verification_enabled'])}",
+        [InlineKeyboardButton(t("btn.verif", state=_rv_onoff(s and s["verification_enabled"])),
                               callback_data=f"susrev:togverif:{chat_id}:{user_id}")],
-        [InlineKeyboardButton(f"🔔 Avisos de sospechosos: {_rv_onoff(s and s['verification_review_suspicious'])}",
+        [InlineKeyboardButton(t("btn.alerts", state=_rv_onoff(s and s["verification_review_suspicious"])),
                               callback_data=f"susrev:togreview:{chat_id}:{user_id}")],
-        [InlineKeyboardButton(f"⏰ Recordatorios de verificación: {_rv_onoff(remind)}",
+        [InlineKeyboardButton(t("btn.reminders", state=_rv_onoff(remind)),
                               callback_data=f"susrev:togremind:{chat_id}:{user_id}")],
     ]
     if remind:
         sk = (s["verification_suspicious_kick_minutes"] if s else None) or 30
         rh = (s["verification_reminder_hours"] if s else None) or 3
         kh = (s["verification_kick_after_reminder_hours"] if s else None) or 6
-        rows.append([InlineKeyboardButton(f"⏱️ Tiempos: {sk}min · {rh}h · +{kh}h ▸",
+        rows.append([InlineKeyboardButton(t("btn.times", sk=sk, rh=rh, kh=kh),
                                           callback_data=f"susrev:times:{chat_id}:{user_id}")])
-    rows.append([InlineKeyboardButton("⬅️ Ocultar ajustes",
+    rows.append([InlineKeyboardButton(t("btn.hide"),
                                       callback_data=f"susrev:collapse:{chat_id}:{user_id}")])
     return InlineKeyboardMarkup(rows)
 
@@ -534,7 +534,7 @@ def build_review_times_keyboard(db: DB, chat_id: int, user_id: int) -> InlineKey
             row.append(InlineKeyboardButton(
                 label, callback_data=f"susrev:st:{code}:{val}:{chat_id}:{user_id}"))
         rows.append(row)
-    rows.append([InlineKeyboardButton("⬅️ Volver", callback_data=f"susrev:gear:{chat_id}:{user_id}")])
+    rows.append([InlineKeyboardButton(t("btn.back"), callback_data=f"susrev:gear:{chat_id}:{user_id}")])
     return InlineKeyboardMarkup(rows)
 
 
@@ -544,7 +544,7 @@ async def _send_suspicious_review(context, db, cfg, chat, user, reasons, sig) ->
     if not cfg.admin_notify_chat_id:
         return
     label = f"@{user.username}" if user.username else (user.first_name or str(user.id))
-    reasons_str = ", ".join(reasons) if reasons else "perfil dudoso"
+    reasons_str = ", ".join(reasons) if reasons else t("review.reason_default")
     extra = ""
     if sig is not None:
         try:
@@ -553,12 +553,12 @@ async def _send_suspicious_review(context, db, cfg, chat, user, reasons, sig) ->
             pass
     kb = build_review_keyboard(db, chat.id, user.id)
     text = (
-        "🔍 <b>Usuario sospechoso (revisar)</b>\n"
-        f"📍 Chat: {html.escape(chat.title or str(chat.id))}\n"
-        f'👤 <a href="tg://user?id={user.id}">{html.escape(label)}</a> (<code>{user.id}</code>)\n'
-        f"🚩 Motivo: {html.escape(reasons_str)}"
-        f"{extra}\n\n"
-        "<i>Ya está DENTRO del grupo (permitido por defecto). Revisa su perfil y decide.</i>"
+        t("review.title") + "\n"
+        + t("review.chat", title=html.escape(chat.title or str(chat.id))) + "\n"
+        + t("review.user", uid=user.id, label=html.escape(label)) + "\n"
+        + t("review.reason", reasons=html.escape(reasons_str))
+        + f"{extra}\n\n"
+        + t("review.footer")
     )
     try:
         await context.bot.send_message(
