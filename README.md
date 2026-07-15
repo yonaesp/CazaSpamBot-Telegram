@@ -235,6 +235,7 @@ Solo el **admin del bot** (`ADMIN_USER_ID`) puede ejecutar acciones; los **admin
 | `/stats` `/recent` `/top` `/topweekly` | Métricas y rankings |
 | `/config` (alias `/ajustes` `/panel`) | Panel de ajustes con botones (verificación, bienvenida, reglas, tiempos...) |
 | `/sync on\|off` (alias `/sincronizar`) | Sincronizar ajustes iguales en todos los grupos (ON por defecto) |
+| `/limpieza` | Ocultar los comandos del bot en grupos (no salen al teclear «/») y auto-borrar los comandos escritos en el chat (ambos ON por defecto) |
 | `/setwelcome` `/setrules` `/welcome` `/rules` `/cleanservice` | Configurar bienvenida, reglas y limpieza de mensajes de servicio |
 | `/scan` (alias `/analizar`) | Analiza un mensaje (responde a él): ¿lo detectaría? y qué estructura tiene |
 | `/alertas` | Activa o silencia los avisos informativos (borrados, bans de otros admins...) |

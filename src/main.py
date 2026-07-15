@@ -16,7 +16,7 @@ from telegram.ext import (
     filters,
 )
 
-from . import admin, chat_picker, chat_settings_cmd, config_panel, maintenance, scan_cmd, telethon_bridge, topweekly, verification, warns_mod
+from . import admin, chat_picker, chat_settings_cmd, config_panel, group_clean, maintenance, scan_cmd, telethon_bridge, topweekly, verification, warns_mod
 from .config import load_config
 from .db import DB
 from .handlers import (
@@ -57,64 +57,16 @@ def _warn_telethon_requirements(cfg, telethon_ready: bool) -> None:
     )
 
 
-# Menú de comandos de Telegram (el que sale al teclear "/"). Los admin-only se
-# muestran solo en el DM del admin; a todos los demás solo /help y /comandos.
-_ADMIN_MENU = [
-    ("help", "Guía y lista de comandos"),
-    ("comandos", "Lista de comandos"),
-    ("stats", "Métricas del grupo"),
-    ("chats", "Grupos donde opero"),
-    ("recent", "Últimas acciones antispam"),
-    ("ban", "Banear (reply o @usuario) en todos los grupos"),
-    ("unban", "Quitar el ban a un usuario"),
-    ("whitelist", "Marcar un usuario como inmune"),
-    ("notspam", "Revertir un falso positivo (id de /recent)"),
-    ("warn", "Avisar a un usuario (warn)"),
-    ("warns", "Ver los warns de un usuario"),
-    ("warnlimit", "Límite de warns antes de sancionar"),
-    ("warnaction", "Acción al llegar al límite (ban/kick/mute)"),
-    ("spam", "Aprender: marcar mensaje como spam + banear"),
-    ("legal", "Aprender: marcar mensaje como legítimo"),
-    ("samples", "Ver muestras aprendidas"),
-    ("forget", "Olvidar una muestra aprendida"),
-    ("scan", "Analizar un mensaje: ¿lo detectaría? (responde al mensaje)"),
-    ("config", "Panel de ajustes del grupo con botones"),
-    ("sync", "Sincronizar ajustes iguales en todos los grupos (on/off)"),
-    ("verificacion", "Ajustar verificación humana del grupo"),
-    ("welcome", "Ver la bienvenida"),
-    ("setwelcome", "Cambiar la bienvenida"),
-    ("rules", "Ver las reglas"),
-    ("setrules", "Cambiar las reglas"),
-    ("cleanservice", "Borrar mensajes de 'X se ha unido'"),
-    ("alertas", "Activar o silenciar avisos informativos"),
-    ("shadow", "Ver o cambiar el modo shadow"),
-    ("top", "Ranking de mensajes"),
-    ("topweekly", "Ranking semanal"),
-]
-_PUBLIC_MENU = [
-    ("help", "Cómo funciona el bot y comandos"),
-    ("comandos", "Ver los comandos disponibles"),
-]
-
-
 async def _register_bot_commands(app: Application, cfg) -> None:
-    """Publica el menú de comandos en Telegram (el que aparece al teclear '/')."""
-    from telegram import BotCommand, BotCommandScopeChat, BotCommandScopeDefault
-    log = logging.getLogger("antispam")
-    try:
-        await app.bot.set_my_commands(
-            [BotCommand(c, d) for c, d in _PUBLIC_MENU],
-            scope=BotCommandScopeDefault(),
-        )
-        if cfg.admin_user_id:
-            await app.bot.set_my_commands(
-                [BotCommand(c, d) for c, d in _ADMIN_MENU],
-                scope=BotCommandScopeChat(chat_id=cfg.admin_user_id),
-            )
-        log.info("Menú de comandos de Telegram registrado (%d admin, %d público).",
-                 len(_ADMIN_MENU), len(_PUBLIC_MENU))
-    except Exception as exc:  # noqa: BLE001 — no debe impedir el arranque
-        log.warning("No se pudo registrar el menú de comandos: %s", exc)
+    """Publica el menú de comandos y cachea los nombres de comando registrados (para
+    la auto-limpieza de comandos en grupos)."""
+    names: set[str] = set()
+    for handlers in app.handlers.values():
+        for h in handlers:
+            if isinstance(h, CommandHandler):
+                names |= set(h.commands)
+    app.bot_data["command_names"] = names
+    await group_clean.apply_command_menu(app.bot, cfg, app.bot_data["db"])
 
 
 async def _post_init(app: Application) -> None:
@@ -329,6 +281,8 @@ def main() -> int:
     app.add_handler(CommandHandler("panel", config_panel.cmd_config))  # alias
     app.add_handler(CommandHandler("sync", config_panel.cmd_sync))
     app.add_handler(CommandHandler("sincronizar", config_panel.cmd_sync))  # alias
+    app.add_handler(CommandHandler("limpieza", group_clean.cmd_limpieza))
+    app.add_handler(CommandHandler("grouplean", group_clean.cmd_limpieza))  # alias
     app.add_handler(CommandHandler("setwelcomebutton", chat_settings_cmd.cmd_setwelcomebutton))
     app.add_handler(CommandHandler("welcomebuttons", chat_settings_cmd.cmd_welcomebuttons))
     app.add_handler(CommandHandler("rmwelcomebutton", chat_settings_cmd.cmd_rmwelcomebutton))
@@ -368,6 +322,7 @@ def main() -> int:
     # Callback de revisión de sospechosos (botones ✅ Permitir / 🔨 Banear)
     app.add_handler(CallbackQueryHandler(admin.on_suspicious_review_callback, pattern=r"^susrev:"))
     app.add_handler(CallbackQueryHandler(config_panel.on_callback, pattern=r"^cfg:"))
+    app.add_handler(CallbackQueryHandler(group_clean.on_clean_callback, pattern=r"^clean:"))
 
     # Tracking de membership del bot.
     app.add_handler(ChatMemberHandler(on_my_chat_member, ChatMemberHandler.MY_CHAT_MEMBER))
@@ -406,6 +361,14 @@ def main() -> int:
 
     # Reacciones.
     app.add_handler(MessageReactionHandler(on_message_reaction))
+
+    # Auto-limpieza de comandos del bot en grupos (grupo de handlers aparte para que
+    # corra ADEMÁS del CommandHandler que ya procesó el comando): borra el mensaje de
+    # comando para no ensuciar ni tentar a los usuarios a re-enviarlo tocándolo.
+    app.add_handler(MessageHandler(
+        (filters.ChatType.GROUPS | filters.ChatType.SUPERGROUP) & filters.COMMAND,
+        group_clean.on_group_command_message,
+    ), group=1)
 
     # Error handler global: captura excepciones no atrapadas en cualquier handler
     # o job (red transitoria → log breve; error real → traceback + aviso al admin).

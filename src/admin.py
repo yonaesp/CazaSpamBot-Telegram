@@ -153,6 +153,8 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "reglas y limpieza, todo de un vistazo. (alias /ajustes /panel)\n"
         "  /sync on|off — <b>sincronizar ajustes en TODOS los grupos</b> (ON por defecto): "
         "cada cambio se aplica a todos a la vez y /config no pide grupo. OFF = cada grupo por separado.\n"
+        "  /limpieza — <b>mantener los grupos limpios</b>: ocultar los comandos del bot al teclear «/» "
+        "en grupos y auto-borrar los comandos escritos en el chat (ambos ON por defecto).\n"
         "  <i>La bienvenida (👋) es independiente de la verificación: puedes saludar sin verificar.</i>\n"
         "  /welcome — ver el mensaje de bienvenida del grupo actual\n"
         "  <code>/setwelcome texto</code> — cambia el welcome (acepta sintaxis Rose con botones)\n"
