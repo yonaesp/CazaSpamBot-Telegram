@@ -86,11 +86,14 @@ class Config:
     external_notify_token: str = ""
     external_notify_chat_id: str = ""
 
-    public_quip_enabled: bool = True
+    # Por defecto False: los baneos NO se anuncian en el grupo, solo llega el aviso
+    # privado al admin / al chat de ADMIN_NOTIFY_CHAT_ID. Pon PUBLIC_QUIP_ENABLED=true
+    # si quieres el quip público (sarcástico) en el grupo al banear.
+    public_quip_enabled: bool = False
     public_quip_delete_after_s: int = 3600
-    # Híbrido: quip público SOLO en bans manuales del admin. Los bans automáticos
-    # de detectores (chino/bots/bio/etc.) son silenciosos (95% del volumen, no
-    # aportan al usuario verlos). True = también quip en auto-bans.
+    # Aunque actives el quip público, sigue siendo SOLO en bans manuales del admin.
+    # Los bans automáticos de detectores (chino/bots/bio/etc.) son silenciosos.
+    # True = también quip en auto-bans (requiere además PUBLIC_QUIP_ENABLED=true).
     quip_on_auto_ban: bool = False
     public_quip_batch_delete_after_s: int = 0
 
@@ -225,7 +228,7 @@ def load_config() -> Config:
         external_notify_env_path=ext_path,
         external_notify_token=ext_token,
         external_notify_chat_id=ext_chat,
-        public_quip_enabled=_bool("PUBLIC_QUIP_ENABLED", True),
+        public_quip_enabled=_bool("PUBLIC_QUIP_ENABLED", False),
         public_quip_delete_after_s=_int("PUBLIC_QUIP_DELETE_AFTER_S", 3600),
         quip_on_auto_ban=_bool("QUIP_ON_AUTO_BAN", False),
         public_quip_batch_delete_after_s=_int("PUBLIC_QUIP_BATCH_DELETE_AFTER_S", 0),
