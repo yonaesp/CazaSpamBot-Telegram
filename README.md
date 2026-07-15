@@ -21,7 +21,7 @@
 CazaSpamBot vigila tus grupos de Telegram y elimina el spam **antes de que moleste**, con una obsesión: **nunca banear a un usuario legítimo**. Prefiere dejar pasar un spam dudoso que expulsar a una persona real.
 
 - 🔗 **Bans sincronizados** — un ban en un grupo = ban en **todos** tus grupos (lo que otros bots llaman *federación*). Sin primitiva nativa: itera sobre los chats donde es admin.
-- 🧠 **17 detectores** combinados con un sistema de confianza graduado.
+- 🧠 **19 detectores** combinados con un sistema de confianza graduado.
 - 🤫 **Moderación silenciosa** — los bans automáticos no ensucian el chat.
 - 📚 **Aprendizaje activo** — aprende de tus `/spam` y `/legal` (Naive Bayes + similitud coseno).
 - 🛰️ **Reportes oficiales** a Telegram (Native Antispam) vía MTProto.
@@ -57,6 +57,8 @@ El resto  ──► bienvenida con botón "SOY HUMANO" (muteado hasta pulsar)
 | `external_mention` | Menciones/enlaces a otros grupos |
 | `url_blocklist` · `tg_deeplink` | Acortadores y deep-links de phishing |
 | `commercial_ad` | Anuncios (sueldos, "trabaja desde casa", cripto, servicios ilegales) |
+| `contact_spam` | Tarjeta de contacto compartida cuyo nombre es el anuncio (otro alfabeto o con enlaces) |
+| `external_reply` | Promoción de un canal externo mediante cita a otro chat (el "quote" que lleva fuera) |
 | `bio_spam` | Bio del perfil con promo porno/comercial/hacking |
 | `forward_first_msg` | Forward de canal en el primer mensaje |
 | `first_msg_media` · `inline_buttons` | Foto/botones sospechosos al empezar |
@@ -70,6 +72,8 @@ El resto  ──► bienvenida con botón "SOY HUMANO" (muteado hasta pulsar)
 | `cas` · `lols_bot` | Spammers fichados en las listas globales CAS y lols.bot |
 | `learned_similarity` | Lo que aprendió de tus `/spam` |
 | `antiflood` | Inundación de mensajes por usuario |
+
+También banea el **spam publicado "en nombre de un canal"** (`sender_chat` → `banChatSenderChat`) en grupos de comentarios, cuando dispara una regla fuerte. Con **`/scan`** (responde a un mensaje reenviado) puedes comprobar de antemano si el bot detectaría cualquier mensaje y qué estructura tiene.
 
 ### Niveles de confianza (anti-falsos-positivos)
 
@@ -228,10 +232,12 @@ Solo el **admin del bot** (`ADMIN_USER_ID`) puede ejecutar acciones; los **admin
 | `/warn` `/warns` `/rmwarn` `/warnlimit` | Sistema de avisos progresivos |
 | `/spam` · `/legal` | Enseña al clasificador (reply a un mensaje) |
 | `/whitelist @user` | Marca a un usuario como inmune |
-| `/stats` `/recent` `/top` | Métricas y rankings |
+| `/stats` `/recent` `/top` `/topweekly` | Métricas y rankings |
 | `/config` (alias `/ajustes` `/panel`) | Panel de ajustes con botones (verificación, bienvenida, reglas, tiempos...) |
 | `/sync on\|off` (alias `/sincronizar`) | Sincronizar ajustes iguales en todos los grupos (ON por defecto) |
-| `/setwelcome` `/setrules` `/welcome` | Configurar bienvenida y reglas |
+| `/setwelcome` `/setrules` `/welcome` `/rules` `/cleanservice` | Configurar bienvenida, reglas y limpieza de mensajes de servicio |
+| `/scan` (alias `/analizar`) | Analiza un mensaje (responde a él): ¿lo detectaría? y qué estructura tiene |
+| `/alertas` | Activa o silencia los avisos informativos (borrados, bans de otros admins...) |
 | `/notspam <id>` | Revierte un falso positivo (deshace el ban y aprende) |
 | `/forget <id>` | Borra una muestra del clasificador |
 | `/shadow on/off` | Modo prueba (solo loggea) / activo |

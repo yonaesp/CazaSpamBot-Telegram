@@ -1,6 +1,6 @@
 # CazaSpamBot — Bot Antispam Telegram
 
-Bot de moderación antispam **en producción 24/7**, multi-grupo y federado (textos del bot en español). ~9500 LOC, Docker, 227 tests.
+Bot de moderación antispam **en producción 24/7**, multi-grupo y federado (textos del bot en español). ~9500 LOC, Docker, 336 tests.
 
 > **Estado: PRODUCCIÓN.** No es un esqueleto. Cualquier cambio afecta grupos reales con miles de usuarios. **Investiga > Confirma > Actúa.**
 
@@ -98,7 +98,7 @@ nativa; se itera `banChatMember` sobre los chats donde el bot es admin.
 
 ```bash
 # tras editar código:
-.venv/bin/python -m pytest tests/ -q          # 227 tests
+.venv/bin/python -m pytest tests/ -q          # 336 tests
 sudo -n docker compose restart                # o up -d --build si cambia requirements
 sudo -n docker logs cazaspam-bot --tail 5     # verificar "Bot ... listo"
 git add -A && git commit -m "..." && git push
@@ -108,4 +108,4 @@ git add -A && git commit -m "..." && git push
 
 `docs/ARCHITECTURE.md`, `docs/ECOSYSTEM.md`, `docs/ROADMAP.md`, `docs/LEARNING.md` (actualizados 2026-05).
 
-*Actualizado: 2026-07-14 — bot en producción, 19 detectores, 318 tests.*
+*Actualizado: 2026-07-15 — bot en producción, 19 detectores, 336 tests.*
