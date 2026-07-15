@@ -466,6 +466,24 @@ async def _delete_friendly_welcome_job(context) -> None:
             pass
 
 
+def build_review_keyboard(db: DB, chat_id: int, user_id: int) -> InlineKeyboardMarkup:
+    """Teclado del aviso de sospechoso: Permitir/Banear para ESTE usuario + dos toggles
+    rápidos (verificación humana del grupo y los propios avisos de revisión) que editan
+    la notificación al pulsarlos. Respetan el modo de sincronización global."""
+    db.ensure_chat_settings(chat_id)
+    s = db.get_chat_settings(chat_id)
+    verif = "✅ ON" if (s and s["verification_enabled"]) else "❌ OFF"
+    review = "✅ ON" if (s and s["verification_review_suspicious"]) else "❌ OFF"
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("✅ Permitir", callback_data=f"susrev:allow:{chat_id}:{user_id}"),
+         InlineKeyboardButton("🔨 Banear", callback_data=f"susrev:ban:{chat_id}:{user_id}")],
+        [InlineKeyboardButton(f"🛡️ Verificación humana: {verif}",
+                              callback_data=f"susrev:togverif:{chat_id}:{user_id}")],
+        [InlineKeyboardButton(f"🔔 Avisos de sospechosos: {review}",
+                              callback_data=f"susrev:togreview:{chat_id}:{user_id}")],
+    ])
+
+
 async def _send_suspicious_review(context, db, cfg, chat, user, reasons, sig) -> None:
     """Modo revisión: avisa al admin (DM o canal) de un sospechoso que ha ENTRADO,
     con botones Permitir / Banear. El user ya está dentro (permitido por defecto)."""
@@ -479,10 +497,7 @@ async def _send_suspicious_review(context, db, cfg, chat, user, reasons, sig) ->
             extra = "\n" + user_signals.render_markup(sig)
         except Exception:  # noqa: BLE001
             pass
-    kb = InlineKeyboardMarkup([[
-        InlineKeyboardButton("✅ Permitir", callback_data=f"susrev:allow:{chat.id}:{user.id}"),
-        InlineKeyboardButton("🔨 Banear", callback_data=f"susrev:ban:{chat.id}:{user.id}"),
-    ]])
+    kb = build_review_keyboard(db, chat.id, user.id)
     text = (
         "🔍 <b>Usuario sospechoso (revisar)</b>\n"
         f"📍 Chat: {html.escape(chat.title or str(chat.id))}\n"

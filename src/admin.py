@@ -1206,6 +1206,26 @@ async def on_suspicious_review_callback(update: Update, context: ContextTypes.DE
         return
     action, chat_id, user_id = parts[1], int(parts[2]), int(parts[3])
     base = q.message.text_html if q.message else ""
+
+    # Toggles rápidos: activar/desactivar verificación del grupo o los avisos de
+    # revisión, editando la propia notificación. Respetan el modo de sincronización.
+    if action in ("togverif", "togreview"):
+        from . import settings_sync, verification
+        field = "verification_enabled" if action == "togverif" else "verification_review_suspicious"
+        nombre = "Verificación humana" if action == "togverif" else "Avisos de sospechosos"
+        db.ensure_chat_settings(chat_id)
+        s = db.get_chat_settings(chat_id)
+        new_val = 0 if (s and s[field]) else 1
+        n = settings_sync.apply_setting(db, chat_id, field, new_val)
+        scope = f" · {n} grupos" if n > 1 else ""
+        await q.answer(f"{nombre}: {'ON' if new_val else 'OFF'}{scope}")
+        try:
+            await q.edit_message_reply_markup(
+                reply_markup=verification.build_review_keyboard(db, chat_id, user_id))
+        except TelegramError:
+            pass
+        return
+
     if action == "allow":
         await q.answer("✅ Permitido.")
         try:
