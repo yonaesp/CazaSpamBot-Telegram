@@ -117,7 +117,9 @@ CREATE INDEX IF NOT EXISTS idx_samples_label_ts ON learning_samples(label, ts DE
 CREATE TABLE IF NOT EXISTS chat_settings (
     chat_id                       INTEGER PRIMARY KEY,
     welcome_text                  TEXT,
-    welcome_enabled               INTEGER NOT NULL DEFAULT 1,
+    -- Default OFF: en modo limpio no se saluda al entrar. Independiente de la
+    -- verificación (se puede tener welcome sin verificación y viceversa).
+    welcome_enabled               INTEGER NOT NULL DEFAULT 0,
     welcome_button_text           TEXT,
     welcome_button_url            TEXT,
     welcome_delete_after_s        INTEGER NOT NULL DEFAULT 900,
@@ -805,8 +807,8 @@ class DB:
         with self._cur() as c:
             c.execute(
                 "INSERT OR IGNORE INTO chat_settings "
-                "(chat_id, updated_at, verification_enabled, verification_review_suspicious) "
-                "VALUES (?, ?, 0, 1)",
+                "(chat_id, updated_at, verification_enabled, verification_review_suspicious, welcome_enabled) "
+                "VALUES (?, ?, 0, 1, 0)",
                 (chat_id, time.time()),
             )
 

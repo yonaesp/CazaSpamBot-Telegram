@@ -71,6 +71,21 @@ async def test_on_join_limpio_no_sospechoso_entra_silencioso(tmp_db):
 
 
 @pytest.mark.asyncio
+async def test_on_join_welcome_activo_saluda_en_grupo(tmp_db):
+    """Bienvenida desacoplada: welcome ON + verificación OFF → saluda en el grupo
+    (sin botón SOY HUMANO), no en privado."""
+    tmp_db.ensure_chat_settings(-100)
+    tmp_db.update_chat_setting(-100, "welcome_enabled", 1)
+    ctx = _ctx(tmp_db)
+    chat = SimpleNamespace(id=-100, title="G")
+    user = SimpleNamespace(id=9, username="pepe", first_name="Pepe", last_name=None, is_premium=False)
+    await v.on_join(update=None, context=ctx, chat=chat, user=user)
+    ctx.bot.restrict_chat_member.assert_awaited()     # unmute (entra)
+    ctx.bot.send_message.assert_awaited_once()         # welcome
+    assert ctx.bot.send_message.await_args.kwargs["chat_id"] == -100  # en el GRUPO, no privado
+
+
+@pytest.mark.asyncio
 async def test_on_join_limpio_sospechoso_avisa_por_privado(tmp_db):
     """Default: perfil dudoso (nombre no-latino) → aviso privado al admin, nada en grupo."""
     tmp_db.ensure_chat_settings(-100)

@@ -500,6 +500,59 @@ async def _send_suspicious_review(context, db, cfg, chat, user, reasons, sig) ->
         log.debug("suspicious review send fallo user=%s: %s", user.id, exc)
 
 
+# Default del welcome en modo limpio (sin instrucción de "pulsa el botón").
+_CLEAN_WELCOME_DEFAULT = "👋 ¡Bienvenido/a {name} a {chat}! Echa un vistazo a las normas del grupo."
+
+
+async def _send_clean_welcome(context, db, chat, user, settings) -> None:
+    """Welcome en MODO LIMPIO: saluda al recién llegado con el texto configurado del
+    grupo, SIN botón SOY HUMANO ni mute. Se autoborra tras welcome_delete_after_s.
+    Incluye los botones URL configurados del chat (anclado, normas...)."""
+    welcome_text = (settings["welcome_text"] if settings else None) or _CLEAN_WELCOME_DEFAULT
+    if user.username:
+        name = f"@{user.username}"
+    else:
+        display = html.escape(user.first_name or str(user.id))
+        name = f'<a href="tg://user?id={user.id}">{display}</a>'
+    chat_name = html.escape(chat.title or "el grupo")
+    try:
+        text = welcome_text.format(name=name, chat=chat_name)
+    except (KeyError, IndexError, ValueError):
+        text = welcome_text  # texto con llaves raras: se manda tal cual, sin romper
+    # Botones URL configurados del chat (sin SOY HUMANO).
+    db.migrate_legacy_welcome_button(chat.id)
+    rows: list[list[InlineKeyboardButton]] = []
+    current_row: list[InlineKeyboardButton] = []
+    for b in db.list_welcome_buttons(chat.id):
+        btn = InlineKeyboardButton(b["text"], url=b["url"])
+        if b["same_row"] and current_row:
+            current_row.append(btn)
+        else:
+            if current_row:
+                rows.append(current_row)
+            current_row = [btn]
+    if current_row:
+        rows.append(current_row)
+    keyboard = InlineKeyboardMarkup(rows) if rows else None
+    try:
+        sent = await context.bot.send_message(
+            chat_id=chat.id, text=text, parse_mode="HTML",
+            reply_markup=keyboard, disable_notification=True,
+        )
+    except TelegramError as exc:
+        log.warning("clean welcome send fallo chat=%s: %s", chat.id, exc)
+        return
+    delete_after = (settings["welcome_delete_after_s"] if settings else 0) or 0
+    if sent and delete_after > 0:
+        jq = context.application.job_queue
+        if jq:
+            jq.run_once(
+                _delete_welcome_job, when=delete_after,
+                data={"chat_id": chat.id, "message_id": sent.message_id},
+                name=f"del_clean_welcome_{chat.id}_{sent.message_id}",
+            )
+
+
 async def on_join(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
@@ -535,14 +588,12 @@ async def on_join(
         except TelegramError as exc:
             log.debug("unmute (%s) fallo user=%s: %s", reason, user.id, exc)
 
-    # Ni verificación en grupo ni revisión de sospechosos → nada que hacer: entra.
-    if not verification_on and not review_suspicious:
-        await _unmute("verificación off")
-        return
+    welcome_on = bool(settings and settings["welcome_enabled"])
 
-    # Señales del perfil: reutiliza prefetched si lo hay, o pide a Telethon.
+    # Señales del perfil: solo hacen falta si hay verificación o revisión activas.
+    # (En modo puramente limpio con o sin welcome no se molesta a Telethon.)
     sig = prefetched_sig
-    if sig is None:
+    if sig is None and (verification_on or review_suspicious):
         reporter = context.bot_data.get("reporter")
         client = reporter.get_client() if reporter else None
         if client is not None:
@@ -553,18 +604,20 @@ async def on_join(
     suspicious, susp_reasons = _is_suspicious_profile(sig, user.username, user.first_name, user.last_name)
     review_worthy, review_reasons = _is_review_worthy(sig, user.username, user.first_name, user.last_name)
 
-    # MODO REVISIÓN: perfil claramente dudoso + review activo → NO se verifica en el
-    # grupo (sin mute ni botón); el user entra normal y avisamos al admin en privado
-    # con botones Permitir/Banear. Por defecto queda permitido si el admin no hace
-    # nada. Un indicio débil suelto (p.ej. sin @username) NO genera aviso (anti-ruido).
+    # MODO REVISIÓN: perfil claramente dudoso + review activo → aviso privado al admin
+    # con Permitir/Banear (sin mute ni botón en el grupo); entra permitido por defecto.
+    # Aplica tanto en modo limpio como con verificación. Indicio débil suelto no avisa.
     if review_suspicious and review_worthy:
         await _unmute("modo revisión")
         await _send_suspicious_review(context, db, cfg, chat, user, review_reasons, sig)
         return
 
-    # Si solo estaba el modo revisión (verificación off) y NO era sospechoso → entra.
+    # MODO LIMPIO (verificación off): el user entra sin gate. Si la bienvenida está
+    # activa en el grupo, se le saluda (sin botón SOY HUMANO ni mute; se autoborra).
     if not verification_on:
-        await _unmute("solo revisión, no sospechoso")
+        await _unmute("modo limpio")
+        if welcome_on:
+            await _send_clean_welcome(context, db, chat, user, settings)
         return
 
     # Si el perfil es claramente legítimo, saltar verificación y publicar

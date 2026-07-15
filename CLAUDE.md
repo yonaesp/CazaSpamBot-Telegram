@@ -61,7 +61,8 @@ nativa; se itera `banChatMember` sobre los chats donde el bot es admin.
 - **Moderación** (bot_admin): `/ban` `/unban` (aceptan @username o reply), `/whitelist`, `/warn` `/warns` `/rmwarn` `/resetwarns` `/warnlimit` `/warnaction`
 - **Aprendizaje**: `/spam` `/legal` (alias `/ham`) — reply a un mensaje; borra el comando y confirma por DM
 - **Info** (chat_admin read-only): `/help` `/comandos` `/stats` `/chats` `/recent` `/samples` `/top` `/topweekly`
-- **Config chat**: `/welcome` `/setwelcome` `/rules` `/setrules` `/cleanservice` `/setwelcomebutton` ...
+- **Config chat**: `/config` (panel visual por botones) `/welcome` `/setwelcome` `/rules` `/setrules` `/cleanservice` `/setwelcomebutton` ...
+- **Sync de ajustes**: `/sync on|off` (ON por defecto) — cada cambio de ajuste se aplica a TODOS los grupos a la vez (via `settings_sync.apply_setting`/`apply_welcome`); con sync ON el panel no pide grupo. Bienvenida desacoplada de verificación (`welcome_enabled` independiente; welcome en modo limpio sin botón vía `verification._send_clean_welcome`).
 - **Greeters**: `/setgreeter` `/rmgreeter` `/listgreeters`
 - **Otros**: `/shadow`, `/notspam`, `/forget`
 

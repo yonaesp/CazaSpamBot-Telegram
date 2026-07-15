@@ -150,7 +150,10 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
         "<b>🌹 Welcome, reglas y servicios</b>\n"
         "  /config — <b>panel visual con botones</b>: verificación, avisos, tiempos, bienvenida, "
-        "reglas y limpieza, todo de un vistazo. En DM te deja elegir el grupo. (alias /ajustes /panel)\n"
+        "reglas y limpieza, todo de un vistazo. (alias /ajustes /panel)\n"
+        "  /sync on|off — <b>sincronizar ajustes en TODOS los grupos</b> (ON por defecto): "
+        "cada cambio se aplica a todos a la vez y /config no pide grupo. OFF = cada grupo por separado.\n"
+        "  <i>La bienvenida (👋) es independiente de la verificación: puedes saludar sin verificar.</i>\n"
         "  /welcome — ver el mensaje de bienvenida del grupo actual\n"
         "  <code>/setwelcome texto</code> — cambia el welcome (acepta sintaxis Rose con botones)\n"
         "  /resetwelcome — vuelve al welcome por defecto\n"

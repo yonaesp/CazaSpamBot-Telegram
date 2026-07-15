@@ -18,6 +18,7 @@ def _ctx(shadow: bool, verification_enabled):
     db.get_chat_settings.return_value = {
         "verification_enabled": verification_enabled,
         "verification_review_suspicious": 0,
+        "welcome_enabled": 0,
     }
     bot = SimpleNamespace(restrict_chat_member=AsyncMock())
     return SimpleNamespace(bot=bot, bot_data={"cfg": cfg, "db": db})

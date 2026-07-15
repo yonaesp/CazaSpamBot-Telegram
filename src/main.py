@@ -79,6 +79,7 @@ _ADMIN_MENU = [
     ("forget", "Olvidar una muestra aprendida"),
     ("scan", "Analizar un mensaje: ¿lo detectaría? (responde al mensaje)"),
     ("config", "Panel de ajustes del grupo con botones"),
+    ("sync", "Sincronizar ajustes iguales en todos los grupos (on/off)"),
     ("verificacion", "Ajustar verificación humana del grupo"),
     ("welcome", "Ver la bienvenida"),
     ("setwelcome", "Cambiar la bienvenida"),
@@ -326,6 +327,8 @@ def main() -> int:
     app.add_handler(CommandHandler("config", config_panel.cmd_config))
     app.add_handler(CommandHandler("ajustes", config_panel.cmd_config))  # alias
     app.add_handler(CommandHandler("panel", config_panel.cmd_config))  # alias
+    app.add_handler(CommandHandler("sync", config_panel.cmd_sync))
+    app.add_handler(CommandHandler("sincronizar", config_panel.cmd_sync))  # alias
     app.add_handler(CommandHandler("setwelcomebutton", chat_settings_cmd.cmd_setwelcomebutton))
     app.add_handler(CommandHandler("welcomebuttons", chat_settings_cmd.cmd_welcomebuttons))
     app.add_handler(CommandHandler("rmwelcomebutton", chat_settings_cmd.cmd_rmwelcomebutton))

@@ -104,12 +104,19 @@ Cada carpeta tiene su `README.md` con el formato explicado.
 
 La forma **visual y recomendada** de configurar cada grupo, sin recordar subcomandos. Escribe `/config` (alias `/ajustes`, `/panel`) en el grupo, o **en el DM del bot** para elegir el grupo con botones. Aparece un panel que se actualiza al instante al pulsar:
 
+- 🔗 **Sincronizar todos los grupos** on/off (ver abajo)
 - 🛡️ **Verificación** on/off · 👁️ **Revisar sospechosos en privado** on/off · 🔔 **Recordatorios** on/off
 - 🚪 **Al no verificar**: Expulsar / Silenciar · ⏱️ **Tiempos** (submenú con presets)
 - 👋 **Bienvenida** on/off · ✏️ **Editar bienvenida** · 📜 **Editar reglas** (el bot te pide el texto y lo guarda)
 - 🧹 **Limpiar mensajes de servicio** on/off · 🔔 **Avisos informativos**
 
 Es un atajo con la misma persistencia que los comandos sueltos de abajo; usa el que prefieras. Solo el admin del bot puede tocarlo.
+
+**Bienvenida independiente de la verificación**: la bienvenida (👋) es un interruptor aparte. Puedes tener **bienvenida sin verificación** (saluda al entrar, sin botón *SOY HUMANO* ni mute, se autoborra), verificación sin más, o ambas. Por defecto la bienvenida está **OFF** (grupo silencioso).
+
+### Sincronizar ajustes entre grupos (comando `/sync`, opción 🔗 en `/config`)
+
+**Activada por defecto.** Cuando la sincronización está **ON**, cualquier cambio de ajuste se aplica **a la vez a todos los grupos** donde el bot es admin (quedan idénticos), el texto de bienvenida es común (usa `{chat}` para el nombre del grupo y `{name}` para el usuario), y el panel `/config` **no pide elegir grupo** (configuras "para todos"). Ponla **OFF** (`/sync off` o el botón 🔗) para configurar cada grupo por separado, con selector de grupo. `/sync` sin argumentos muestra el estado.
 
 ### Verificación humana (comando `/verificacion`)
 
@@ -223,6 +230,7 @@ Solo el **admin del bot** (`ADMIN_USER_ID`) puede ejecutar acciones; los **admin
 | `/whitelist @user` | Marca a un usuario como inmune |
 | `/stats` `/recent` `/top` | Métricas y rankings |
 | `/config` (alias `/ajustes` `/panel`) | Panel de ajustes con botones (verificación, bienvenida, reglas, tiempos...) |
+| `/sync on\|off` (alias `/sincronizar`) | Sincronizar ajustes iguales en todos los grupos (ON por defecto) |
 | `/setwelcome` `/setrules` `/welcome` | Configurar bienvenida y reglas |
 | `/notspam <id>` | Revierte un falso positivo (deshace el ban y aprende) |
 | `/forget <id>` | Borra una muestra del clasificador |

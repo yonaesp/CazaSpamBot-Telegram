@@ -35,6 +35,7 @@ def _db(settings=None, chats=None):
     db.all_chats.return_value = chats if chats is not None else [
         {"chat_id": CID, "title": "Grupo Test", "am_admin": True},
     ]
+    db.get_pref.return_value = None  # sync ON por defecto (config_sync sin fijar)
     return db
 
 
@@ -221,6 +222,7 @@ async def test_cmd_config_dm_varios_grupos_muestra_selector():
         {"chat_id": -2, "title": "B", "am_admin": True},
     ]
     db = _db(chats=chats)
+    db.get_pref.return_value = False  # sync OFF → selector por grupo
     cfg = SimpleNamespace(admin_user_id=ADMIN)
     context = SimpleNamespace(bot_data={"cfg": cfg, "db": db}, user_data={})
     update = SimpleNamespace(
@@ -233,6 +235,30 @@ async def test_cmd_config_dm_varios_grupos_muestra_selector():
     assert "grupo" in args.args[0].lower()
     kb = args.kwargs["reply_markup"]
     assert len(kb.inline_keyboard) == 2
+
+
+@pytest.mark.asyncio
+async def test_cmd_config_sync_on_panel_unificado():
+    """Con sync ON (default), en DM con varios grupos NO hay selector: panel unificado."""
+    chats = [
+        {"chat_id": -1, "title": "A", "am_admin": True},
+        {"chat_id": -2, "title": "B", "am_admin": True},
+    ]
+    db = _db(chats=chats)  # get_pref None → sync ON
+    cfg = SimpleNamespace(admin_user_id=ADMIN)
+    context = SimpleNamespace(bot_data={"cfg": cfg, "db": db}, user_data={})
+    update = SimpleNamespace(
+        effective_user=SimpleNamespace(id=ADMIN),
+        effective_chat=SimpleNamespace(id=ADMIN, type="private"),
+        effective_message=SimpleNamespace(reply_text=AsyncMock()),
+    )
+    await cp.cmd_config(update, context)
+    args = update.effective_message.reply_text.await_args
+    assert "sincronizado" in args.args[0].lower()
+    kb = args.kwargs["reply_markup"]
+    assert len(kb.inline_keyboard) > 2  # panel completo, no selector de 2
+    # primera fila = toggle de sincronización
+    assert kb.inline_keyboard[0][0].callback_data.startswith("cfg:sync:")
 
 
 @pytest.mark.asyncio

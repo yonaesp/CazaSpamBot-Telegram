@@ -9,7 +9,7 @@ import re
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 
-from . import chat_picker, verification
+from . import chat_picker, settings_sync, verification
 from .config import Config
 from .db import DB
 
@@ -128,17 +128,15 @@ async def cmd_setwelcome(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     raw = " ".join(context.args)
     chat_id = update.effective_chat.id
     clean_text, buttons = _parse_rose_buttons(raw)
-    db.update_chat_setting(chat_id, "welcome_text", clean_text)
+    n = settings_sync.apply_welcome(db, chat_id, clean_text, buttons if buttons else None)
+    scope = f" en {n} grupos" if n > 1 else ""
     if buttons:
-        db.clear_welcome_buttons(chat_id)
-        for b in buttons:
-            db.add_welcome_button(chat_id, b["text"], b["url"], same_row=b["same_row"])
         await update.effective_message.reply_text(
-            f"✅ Welcome actualizado + <b>{len(buttons)} botón(es)</b> inline configurados.",
+            f"✅ Welcome actualizado + <b>{len(buttons)} botón(es)</b> inline configurados{scope}.",
             parse_mode="HTML",
         )
     else:
-        await update.effective_message.reply_text("✅ Welcome actualizado (sin botones).")
+        await update.effective_message.reply_text(f"✅ Welcome actualizado (sin botones){scope}.")
 
 
 @_admin_only
@@ -275,9 +273,9 @@ async def _render_test_welcome(update: Update, context: ContextTypes.DEFAULT_TYP
 @_admin_only
 async def cmd_resetwelcome(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     db: DB = context.bot_data["db"]
-    db.update_chat_setting(update.effective_chat.id, "welcome_text", None)
-    db.update_chat_setting(update.effective_chat.id, "welcome_button_text", None)
-    db.update_chat_setting(update.effective_chat.id, "welcome_button_url", None)
+    settings_sync.apply_setting(db, update.effective_chat.id, "welcome_text", None)
+    settings_sync.apply_setting(db, update.effective_chat.id, "welcome_button_text", None)
+    settings_sync.apply_setting(db, update.effective_chat.id, "welcome_button_url", None)
     await update.effective_message.reply_text("✅ Welcome resetado al default.")
 
 
@@ -306,7 +304,7 @@ async def cmd_setrules(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         await update.effective_message.reply_text("Uso: /setrules <texto>")
         return
     text = " ".join(context.args)
-    db.update_chat_setting(update.effective_chat.id, "rules_text", text)
+    settings_sync.apply_setting(db, update.effective_chat.id, "rules_text", text)
     await update.effective_message.reply_text("✅ Reglas actualizadas.")
 
 
@@ -325,10 +323,10 @@ async def cmd_cleanservice(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         return
     val = context.args[0].lower()
     if val in ("on", "true", "yes", "1"):
-        db.update_chat_setting(chat_id, "cleanservice", 1)
+        settings_sync.apply_setting(db, chat_id, "cleanservice", 1)
         await update.effective_message.reply_text("✅ Cleanservice ON")
     elif val in ("off", "false", "no", "0"):
-        db.update_chat_setting(chat_id, "cleanservice", 0)
+        settings_sync.apply_setting(db, chat_id, "cleanservice", 0)
         await update.effective_message.reply_text("✅ Cleanservice OFF")
     else:
         await update.effective_message.reply_text("Uso: /cleanservice on|off")
@@ -380,7 +378,7 @@ async def cmd_verificacion(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     # --- on/off (verificación + welcome) ---
     if sub in _ON or sub in _OFF:
         val = 1 if sub in _ON else 0
-        db.update_chat_setting(chat_id, "verification_enabled", val)
+        settings_sync.apply_setting(db, chat_id, "verification_enabled", val)
         if val:
             await reply("✅ Verificación + bienvenida <b>ON</b>.", parse_mode="HTML")
         else:
@@ -394,7 +392,7 @@ async def cmd_verificacion(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     # --- revisar (revisión privada de sospechosos) on/off ---
     if sub == "revisar" and len(args) >= 2:
         val = 1 if args[1] in _ON else 0
-        db.update_chat_setting(chat_id, "verification_review_suspicious", val)
+        settings_sync.apply_setting(db, chat_id, "verification_review_suspicious", val)
         if val:
             await reply(
                 "✅ Revisión privada de sospechosos <b>ON</b>. Los perfiles sospechosos entran "
@@ -410,17 +408,17 @@ async def cmd_verificacion(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     # --- avisos (recordatorios) on/off ---
     if sub == "avisos" and len(args) >= 2:
         val = 1 if args[1] in _ON else 0
-        db.update_chat_setting(chat_id, "verification_reminders_enabled", val)
+        settings_sync.apply_setting(db, chat_id, "verification_reminders_enabled", val)
         await reply(f"✅ Recordatorios a los normales: <b>{'ON' if val else 'OFF'}</b>.", parse_mode="HTML")
         return
 
     # --- accion kick|mute ---
     if sub in ("accion", "acción") and len(args) >= 2:
         if args[1] == "kick":
-            db.update_chat_setting(chat_id, "verification_kick_normal", 1)
+            settings_sync.apply_setting(db, chat_id, "verification_kick_normal", 1)
             await reply("✅ Al no verificar, los normales serán <b>expulsados</b> (kick).", parse_mode="HTML")
         elif args[1] == "mute":
-            db.update_chat_setting(chat_id, "verification_kick_normal", 0)
+            settings_sync.apply_setting(db, chat_id, "verification_kick_normal", 0)
             await reply(
                 "✅ Al no verificar, los normales quedarán <b>muteados para siempre</b> (sin kick, "
                 "sin recordatorio). Podrán verificar cuando quieran.", parse_mode="HTML",
@@ -439,9 +437,9 @@ async def cmd_verificacion(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         if not (0 < susp <= 1440 and 0 < rem <= 168 and 0 < kick <= 168):
             await reply("Fuera de rango. susp_min 1-1440, horas 1-168. Ej: /verificacion tiempos 30 3 6")
             return
-        db.update_chat_setting(chat_id, "verification_suspicious_kick_minutes", susp)
-        db.update_chat_setting(chat_id, "verification_reminder_hours", rem)
-        db.update_chat_setting(chat_id, "verification_kick_after_reminder_hours", kick)
+        settings_sync.apply_setting(db, chat_id, "verification_suspicious_kick_minutes", susp)
+        settings_sync.apply_setting(db, chat_id, "verification_reminder_hours", rem)
+        settings_sync.apply_setting(db, chat_id, "verification_kick_after_reminder_hours", kick)
         await reply(
             f"✅ Tiempos: sospechosos kick a <b>{susp} min</b> · recordatorio a las <b>{rem} h</b> · "
             f"kick <b>+{kick} h</b> tras el recordatorio (total normales: {rem + kick} h).",

@@ -21,6 +21,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.error import TelegramError
 from telegram.ext import ContextTypes
 
+from . import settings_sync
 from .config import Config
 from .db import DB
 
@@ -78,9 +79,16 @@ def _chat_title(db: DB, chat_id: int) -> str:
     return (row["title"] if row and row["title"] else str(chat_id))
 
 
+def _panel_title(db: DB, chat_id: int) -> str:
+    """Título del panel: unificado si la sincronización está ON, si no el del grupo."""
+    if settings_sync.is_sync_on(db):
+        return "Todos los grupos (sincronizado)"
+    return _chat_title(db, chat_id)
+
+
 # --------------------------- construcción de teclados ---------------------------
 
-def build_panel_keyboard(chat_id: int, s) -> InlineKeyboardMarkup:
+def build_panel_keyboard(chat_id: int, s, sync_on: bool = False) -> InlineKeyboardMarkup:
     """Teclado principal del panel. El estado va en la etiqueta (un tap lo invierte)."""
     cid = chat_id
     sk = _num(s, "verification_suspicious_kick_minutes", 30)
@@ -88,6 +96,9 @@ def build_panel_keyboard(chat_id: int, s) -> InlineKeyboardMarkup:
     kh = _num(s, "verification_kick_after_reminder_hours", 6)
     accion = "Expulsar" if _b(s, "verification_kick_normal") else "Silenciar"
     rows = [
+        [InlineKeyboardButton(
+            f"🔗 Sincronizar todos los grupos: {_onoff(sync_on)}",
+            callback_data=f"{PREFIX}:sync:{cid}")],
         [InlineKeyboardButton(f"🛡️ Verificación: {_onoff(_b(s, 'verification_enabled'))}",
                               callback_data=f"{PREFIX}:tog:verification_enabled:{cid}")],
         [InlineKeyboardButton(f"👁️ Revisar sospechosos en privado: {_onoff(_b(s, 'verification_review_suspicious'))}",
@@ -143,12 +154,13 @@ async def _show_panel(msg_edit, db: DB, chat_id: int) -> None:
     """Renderiza (editando el mensaje) el panel principal de un chat."""
     db.ensure_chat_settings(chat_id)
     s = db.get_chat_settings(chat_id)
-    title = html.escape(_chat_title(db, chat_id))
+    sync_on = settings_sync.is_sync_on(db)
+    title = html.escape(_panel_title(db, chat_id))
     try:
         await msg_edit(
             _HEADER.format(title=title),
             parse_mode="HTML",
-            reply_markup=build_panel_keyboard(chat_id, s),
+            reply_markup=build_panel_keyboard(chat_id, s, sync_on),
         )
     except TelegramError as exc:
         log.debug("no se pudo renderizar panel: %s", exc)
@@ -165,17 +177,35 @@ async def cmd_config(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         return
     chat = update.effective_chat
     msg = update.effective_message
-    # En un grupo → configura ese grupo directamente.
+    admin_chats = [c for c in db.all_chats() if c["am_admin"]]
+
+    # SINCRONIZACIÓN ON (por defecto): panel unificado, sin selector de grupo. Los
+    # cambios se aplican a todos. Representativo = grupo actual o el primero moderado.
+    if settings_sync.is_sync_on(db):
+        if chat and chat.type in ("group", "supergroup"):
+            cid = chat.id
+        elif admin_chats:
+            cid = admin_chats[0]["chat_id"]
+        else:
+            await msg.reply_text("No estoy de admin en ningún grupo todavía.")
+            return
+        db.ensure_chat_settings(cid)
+        s = db.get_chat_settings(cid)
+        await msg.reply_text(
+            _HEADER.format(title=html.escape(_panel_title(db, cid))),
+            parse_mode="HTML", reply_markup=build_panel_keyboard(cid, s, True),
+        )
+        return
+
+    # SINCRONIZACIÓN OFF: configuración por grupo (grupo actual o selector en DM).
     if chat and chat.type in ("group", "supergroup"):
         db.ensure_chat_settings(chat.id)
         s = db.get_chat_settings(chat.id)
         await msg.reply_text(
             _HEADER.format(title=html.escape(_chat_title(db, chat.id))),
-            parse_mode="HTML", reply_markup=build_panel_keyboard(chat.id, s),
+            parse_mode="HTML", reply_markup=build_panel_keyboard(chat.id, s, False),
         )
         return
-    # En DM → selector de grupo (o directo si solo hay uno).
-    admin_chats = [c for c in db.all_chats() if c["am_admin"]]
     if not admin_chats:
         await msg.reply_text("No estoy de admin en ningún grupo todavía.")
         return
@@ -185,7 +215,7 @@ async def cmd_config(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         s = db.get_chat_settings(cid)
         await msg.reply_text(
             _HEADER.format(title=html.escape(_chat_title(db, cid))),
-            parse_mode="HTML", reply_markup=build_panel_keyboard(cid, s),
+            parse_mode="HTML", reply_markup=build_panel_keyboard(cid, s, False),
         )
         return
     rows = [
@@ -194,7 +224,8 @@ async def cmd_config(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         for c in admin_chats
     ]
     await msg.reply_text(
-        "⚙️ <b>Ajustes</b> — ¿qué grupo quieres configurar?",
+        "⚙️ <b>Ajustes</b> — ¿qué grupo quieres configurar?\n"
+        "<i>(La sincronización está OFF: cada grupo por separado.)</i>",
         parse_mode="HTML", reply_markup=InlineKeyboardMarkup(rows),
     )
 
@@ -248,11 +279,13 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         db.ensure_chat_settings(cid)
         s = db.get_chat_settings(cid)
         new_val = 0 if _b(s, field) else 1
-        db.update_chat_setting(cid, field, new_val)
-        await q.answer("✅ Activado" if new_val else "❌ Desactivado")
+        n = settings_sync.apply_setting(db, cid, field, new_val)
+        estado = "✅ Activado" if new_val else "❌ Desactivado"
+        await q.answer(f"{estado} en {n} grupos" if n > 1 else estado)
         s = db.get_chat_settings(cid)
         try:
-            await q.edit_message_reply_markup(reply_markup=build_panel_keyboard(cid, s))
+            await q.edit_message_reply_markup(
+                reply_markup=build_panel_keyboard(cid, s, settings_sync.is_sync_on(db)))
         except TelegramError:
             pass
         return
@@ -265,13 +298,34 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         db.ensure_chat_settings(cid)
         s = db.get_chat_settings(cid)
         new_val = 0 if _b(s, "verification_kick_normal") else 1
-        db.update_chat_setting(cid, "verification_kick_normal", new_val)
-        await q.answer("Expulsar" if new_val else "Silenciar")
+        n = settings_sync.apply_setting(db, cid, "verification_kick_normal", new_val)
+        base = "Expulsar" if new_val else "Silenciar"
+        await q.answer(f"{base} · {n} grupos" if n > 1 else base)
         s = db.get_chat_settings(cid)
         try:
-            await q.edit_message_reply_markup(reply_markup=build_panel_keyboard(cid, s))
+            await q.edit_message_reply_markup(
+                reply_markup=build_panel_keyboard(cid, s, settings_sync.is_sync_on(db)))
         except TelegramError:
             pass
+        return
+
+    if action == "sync":
+        cid = _cid(2)
+        new = not settings_sync.is_sync_on(db)
+        settings_sync.set_sync(db, new)
+        await q.answer("🔗 Sincronización ON" if new else "Sincronización OFF")
+        if new:
+            rep = cid if cid is not None else (settings_sync.moderated_chat_ids(db) or [None])[0]
+            if rep is not None:
+                await _show_panel(q.edit_message_text, db, rep)
+        else:
+            try:
+                await q.edit_message_text(
+                    "🔗 <b>Sincronización desactivada.</b>\nAhora cada grupo se configura "
+                    "por separado: escribe /config para elegir grupo.",
+                    parse_mode="HTML")
+            except TelegramError:
+                pass
         return
 
     if action == "times":
@@ -311,8 +365,8 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             await q.answer("Valor fuera de rango.")
             return
         db.ensure_chat_settings(cid)
-        db.update_chat_setting(cid, field, val)
-        await q.answer(f"✅ {val}{unit}")
+        n = settings_sync.apply_setting(db, cid, field, val)
+        await q.answer(f"✅ {val}{unit}" + (f" · {n} grupos" if n > 1 else ""))
         s = db.get_chat_settings(cid)
         txt = _TIMES_TEXT.format(
             title=html.escape(_chat_title(db, cid)),
@@ -393,19 +447,43 @@ async def handle_capture(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     chat_id = pending["chat_id"]
     field = pending["field"]
     context.user_data.pop("cfg_await", None)  # un solo uso (aunque falle luego)
+    scope = " en todos los grupos" if settings_sync.is_sync_on(db) else ""
     if field == "welcome_text":
         from .chat_settings_cmd import _parse_rose_buttons
         clean, buttons = _parse_rose_buttons(raw)
-        db.update_chat_setting(chat_id, "welcome_text", clean)
-        if buttons:
-            db.clear_welcome_buttons(chat_id)
-            for btn in buttons:
-                db.add_welcome_button(chat_id, btn["text"], btn["url"], same_row=btn["same_row"])
-            extra = f" + {len(buttons)} botón(es)"
-        else:
-            extra = ""
-        await msg.reply_text(f"✅ Bienvenida actualizada{extra}. Escribe /config para seguir ajustando.")
+        settings_sync.apply_welcome(db, chat_id, clean, buttons if buttons else None)
+        extra = f" + {len(buttons)} botón(es)" if buttons else ""
+        await msg.reply_text(
+            f"✅ Bienvenida actualizada{extra}{scope}. Escribe /config para seguir ajustando.")
     else:  # rules_text
-        db.update_chat_setting(chat_id, "rules_text", raw)
-        await msg.reply_text("✅ Reglas actualizadas. Escribe /config para seguir ajustando.")
+        settings_sync.apply_setting(db, chat_id, "rules_text", raw)
+        await msg.reply_text(
+            f"✅ Reglas actualizadas{scope}. Escribe /config para seguir ajustando.")
     return True
+
+
+# ------------------------------- comando /sync -------------------------------
+
+async def cmd_sync(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/sync [on|off] — sincronizar (o no) los ajustes entre todos los grupos."""
+    cfg: Config = context.bot_data["cfg"]
+    db: DB = context.bot_data["db"]
+    user = update.effective_user
+    if not user or user.id != cfg.admin_user_id:
+        return
+    args = context.args or []
+    if args and args[0].lower() in ("on", "off"):
+        settings_sync.set_sync(db, args[0].lower() == "on")
+    state = settings_sync.is_sync_on(db)
+    n = len(settings_sync.moderated_chat_ids(db))
+    detalle = (
+        f"Cada cambio de ajuste se aplica a los <b>{n} grupos</b> a la vez y el panel "
+        "/config no pide elegir grupo."
+        if state else
+        "Cada grupo se configura por separado; /config te deja elegir grupo."
+    )
+    await update.effective_message.reply_text(
+        f"🔗 <b>Sincronización de ajustes: {'ON' if state else 'OFF'}</b>\n{detalle}\n"
+        "Cambia con <code>/sync on</code> o <code>/sync off</code> (o desde /config).",
+        parse_mode="HTML",
+    )
