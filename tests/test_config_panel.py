@@ -146,13 +146,56 @@ async def test_guard_solo_admin():
 
 
 @pytest.mark.asyncio
-async def test_edit_arma_estado_de_captura():
+async def test_edit_muestra_selector_de_grupo():
+    """Paso 1: 'Editar bienvenida' muestra el selector de grupo (aún sin captura)."""
     db = _db()
     update, context, q = _cbctx(db)
     q.data = f"cfg:edit:w:{CID}"
     await cp.on_callback(update, context)
-    assert context.user_data["cfg_await"] == {"chat_id": CID, "field": "welcome_text"}
+    assert "cfg_await" not in context.user_data           # todavía no captura
     q.edit_message_text.assert_awaited_once()
+    kb = q.edit_message_text.await_args.kwargs["reply_markup"]
+    flat = [b for row in kb.inline_keyboard for b in row]
+    assert any(b.callback_data == f"cfg:escope:w:all:{CID}" for b in flat)  # opción "Todos"
+
+
+@pytest.mark.asyncio
+async def test_escope_arma_captura_con_scope():
+    """Paso 2: elegido el scope, se arma la captura con ese scope."""
+    db = _db()
+    update, context, q = _cbctx(db)
+    q.data = f"cfg:escope:w:all:{CID}"
+    await cp.on_callback(update, context)
+    assert context.user_data["cfg_await"] == {"field": "welcome_text", "scope": "all"}
+    q.edit_message_text.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_escope_grupo_individual():
+    """Scope de un grupo concreto queda guardado como su chat_id."""
+    db = _db()
+    update, context, q = _cbctx(db)
+    q.data = f"cfg:escope:w:{CID}:{CID}"
+    await cp.on_callback(update, context)
+    assert context.user_data["cfg_await"] == {"field": "welcome_text", "scope": str(CID)}
+
+
+@pytest.mark.asyncio
+async def test_capture_welcome_scope_all_escribe_en_todos():
+    """Captura con scope 'all' escribe la bienvenida en todos los grupos moderados."""
+    chats = [
+        {"chat_id": -1, "title": "A", "am_admin": True},
+        {"chat_id": -2, "title": "B", "am_admin": True},
+    ]
+    db = _db(chats=chats)
+    context = SimpleNamespace(bot_data={"db": db},
+                              user_data={"cfg_await": {"field": "welcome_text", "scope": "all"}})
+    msg = SimpleNamespace(text="Hola {name} a {chat}", caption=None, reply_text=AsyncMock())
+    update = SimpleNamespace(effective_message=msg)
+    assert await cp.handle_capture(update, context) is True
+    text_calls = {c.args for c in db.update_chat_setting.call_args_list}
+    assert (-1, "welcome_text", "Hola {name} a {chat}") in text_calls
+    assert (-2, "welcome_text", "Hola {name} a {chat}") in text_calls
 
 
 # ------------------------------- captura -------------------------------

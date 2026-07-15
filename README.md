@@ -111,7 +111,7 @@ La forma **visual y recomendada** de configurar cada grupo, sin recordar subcoma
 - 🔗 **Sincronizar todos los grupos** on/off (ver abajo)
 - 🛡️ **Verificación** on/off · 👁️ **Revisar sospechosos en privado** on/off · 🔔 **Recordatorios** on/off
 - 🚪 **Al no verificar**: Expulsar / Silenciar · ⏱️ **Tiempos** (submenú con presets)
-- 👋 **Bienvenida** on/off · ✏️ **Editar bienvenida** · 📜 **Editar reglas** (el bot te pide el texto y lo guarda)
+- 👋 **Bienvenida** on/off · ✏️ **Editar bienvenida** · 📜 **Editar reglas** (al editar eliges **Todos los grupos** o **uno concreto**, y el bot te muestra un ejemplo para escribir el texto directamente)
 - 🧹 **Limpiar mensajes de servicio** on/off · 🔔 **Avisos informativos**
 
 Es un atajo con la misma persistencia que los comandos sueltos de abajo; usa el que prefieras. Solo el admin del bot puede tocarlo.

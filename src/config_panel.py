@@ -139,6 +139,29 @@ def build_times_keyboard(chat_id: int, s) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(rows)
 
 
+def _edit_scope_keyboard(db: DB, code: str, cid: int) -> InlineKeyboardMarkup:
+    """Selector de a qué grupo(s) aplicar la edición de texto: Todos o uno concreto."""
+    rows = [[InlineKeyboardButton("🌐 Todos los grupos",
+                                  callback_data=f"{PREFIX}:escope:{code}:all:{cid}")]]
+    for c in db.all_chats():
+        if not c["am_admin"]:
+            continue
+        title = (c["title"] or str(c["chat_id"]))[:40]
+        rows.append([InlineKeyboardButton(
+            f"📝 {title}", callback_data=f"{PREFIX}:escope:{code}:{c['chat_id']}:{cid}")])
+    rows.append([InlineKeyboardButton("✖️ Cancelar", callback_data=f"{PREFIX}:open:{cid}")])
+    return InlineKeyboardMarkup(rows)
+
+
+def _scope_label(db: DB, ids: list[int]) -> str:
+    """Texto para la confirmación: 'en N grupos' o 'en <grupo>'."""
+    if len(ids) > 1:
+        return f"en {len(ids)} grupos"
+    if len(ids) == 1:
+        return f"en {html.escape(_chat_title(db, ids[0]))}"
+    return ""
+
+
 _TIMES_TEXT = (
     "⏱️ <b>Tiempos de verificación · {title}</b>\n\n"
     "1ª fila · <b>sospechoso</b>: minutos hasta expulsar si no verifica.\n"
@@ -382,23 +405,52 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         return
 
     if action == "edit":
+        # Paso 1: elegir a qué grupo(s) aplicar la edición (Todos o uno concreto).
         code = parts[2] if len(parts) > 2 else ""
         cid = _cid(3)
         if code not in _EDIT_FIELDS or cid is None:
             await q.answer("Opción inválida.")
             return
         await q.answer()
-        context.user_data["cfg_await"] = {"chat_id": cid, "field": _EDIT_FIELDS[code]}
+        que = "la bienvenida" if code == "w" else "las reglas"
+        try:
+            await q.edit_message_text(
+                f"✏️ ¿En qué grupo(s) quieres cambiar <b>{que}</b>?\n"
+                "<i>Elige «Todos» o un grupo concreto.</i>",
+                parse_mode="HTML", reply_markup=_edit_scope_keyboard(db, code, cid))
+        except TelegramError:
+            pass
+        return
+
+    if action == "escope":
+        # Paso 2: scope elegido → pedir el texto con un ejemplo.
+        code = parts[2] if len(parts) > 2 else ""
+        scope = parts[3] if len(parts) > 3 else ""
+        cid = _cid(4)
+        if code not in _EDIT_FIELDS or cid is None or not scope:
+            await q.answer("Opción inválida.")
+            return
+        await q.answer()
+        context.user_data["cfg_await"] = {"field": _EDIT_FIELDS[code], "scope": scope}
+        destino = "todos los grupos" if scope == "all" else html.escape(
+            _chat_title(db, int(scope)) if scope.lstrip("-").isdigit() else scope)
         if code == "w":
             prompt = (
-                "✏️ <b>Envíame el nuevo texto de bienvenida.</b>\n\n"
-                "Placeholders: <code>{name}</code>, <code>{chat}</code>. "
-                "HTML permitido (&lt;b&gt;, &lt;i&gt;, &lt;code&gt;...).\n"
-                "Botones inline (sintaxis Rose): "
-                "<code>[Texto](buttonurl://https://url.com)</code>."
-            )
+                f"✏️ <b>Nueva bienvenida para {destino}.</b> Envíamela ahora.\n\n"
+                "Ejemplo (cópialo y edítalo):\n"
+                "<code>¡Hola {{name}}! 👋 Bienvenido/a a {{chat}}. Échale un ojo al "
+                "mensaje anclado con las normas.</code>\n\n"
+                "Placeholders: <code>{{name}}</code> (usuario) · <code>{{chat}}</code> "
+                "(nombre del grupo). HTML: &lt;b&gt; &lt;i&gt; &lt;code&gt;. "
+                "Botones: <code>[Texto](buttonurl://https://url.com)</code>."
+            ).replace("{{name}}", "{name}").replace("{{chat}}", "{chat}")
         else:
-            prompt = "📜 <b>Envíame el nuevo texto de las reglas.</b>\nHTML permitido."
+            prompt = (
+                f"📜 <b>Nuevas reglas para {destino}.</b> Envíamelas ahora.\n\n"
+                "Ejemplo:\n"
+                "<code>1) Respeto. 2) Nada de spam ni enlaces. 3) Solo temas del grupo.</code>\n\n"
+                "HTML permitido (&lt;b&gt;, &lt;i&gt;, &lt;code&gt;)."
+            )
         kb = InlineKeyboardMarkup([[InlineKeyboardButton("✖️ Cancelar",
                                     callback_data=f"{PREFIX}:open:{cid}")]])
         try:
@@ -444,21 +496,32 @@ async def handle_capture(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         context.user_data.pop("cfg_await", None)
         return True
     db: DB = context.bot_data["db"]
-    chat_id = pending["chat_id"]
     field = pending["field"]
+    scope = pending.get("scope")        # 'all' | chat_id (str) | None (legacy)
+    chat_id = pending.get("chat_id")    # legacy (sin scope elegido)
     context.user_data.pop("cfg_await", None)  # un solo uso (aunque falle luego)
-    scope = " en todos los grupos" if settings_sync.is_sync_on(db) else ""
     if field == "welcome_text":
         from .chat_settings_cmd import _parse_rose_buttons
         clean, buttons = _parse_rose_buttons(raw)
-        settings_sync.apply_welcome(db, chat_id, clean, buttons if buttons else None)
+        btns = buttons if buttons else None
+        if scope is not None:
+            ids = settings_sync.apply_welcome_scope(db, scope, clean, btns)
+        else:
+            settings_sync.apply_welcome(db, chat_id, clean, btns)
+            ids = settings_sync.target_ids(db, chat_id)
         extra = f" + {len(buttons)} botón(es)" if buttons else ""
         await msg.reply_text(
-            f"✅ Bienvenida actualizada{extra}{scope}. Escribe /config para seguir ajustando.")
+            f"✅ Bienvenida actualizada{extra} {_scope_label(db, ids)}. "
+            "Escribe /config para seguir ajustando.")
     else:  # rules_text
-        settings_sync.apply_setting(db, chat_id, "rules_text", raw)
+        if scope is not None:
+            ids = settings_sync.apply_setting_scope(db, scope, "rules_text", raw)
+        else:
+            settings_sync.apply_setting(db, chat_id, "rules_text", raw)
+            ids = settings_sync.target_ids(db, chat_id)
         await msg.reply_text(
-            f"✅ Reglas actualizadas{scope}. Escribe /config para seguir ajustando.")
+            f"✅ Reglas actualizadas {_scope_label(db, ids)}. "
+            "Escribe /config para seguir ajustando.")
     return True
 
 

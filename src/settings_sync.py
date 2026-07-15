@@ -51,11 +51,43 @@ def apply_welcome(db: DB, chat_id: int, clean_text, buttons) -> int:
     `buttons=None` deja los botones existentes intactos; una lista (posiblemente
     vacía) los reemplaza.
     """
-    ids = target_ids(db, chat_id)
+    return len(_write_welcome(db, target_ids(db, chat_id), clean_text, buttons))
+
+
+# --- Escritura con SCOPE explícito (el usuario elige 'all' o un grupo concreto,
+#     ignorando el modo sync global). Usado por el editor de bienvenida/reglas. ---
+
+def scope_ids(db: DB, scope) -> list[int]:
+    """`scope='all'` → todos los grupos moderados; si no, [int(scope)]."""
+    if scope == "all":
+        return moderated_chat_ids(db)
+    try:
+        return [int(scope)]
+    except (ValueError, TypeError):
+        return []
+
+
+def _write_setting(db: DB, ids: list[int], field: str, value) -> list[int]:
+    for cid in ids:
+        db.update_chat_setting(cid, field, value)
+    return ids
+
+
+def _write_welcome(db: DB, ids: list[int], clean_text, buttons) -> list[int]:
     for cid in ids:
         db.update_chat_setting(cid, "welcome_text", clean_text)
         if buttons is not None:
             db.clear_welcome_buttons(cid)
             for b in buttons:
                 db.add_welcome_button(cid, b["text"], b["url"], same_row=b["same_row"])
-    return len(ids)
+    return ids
+
+
+def apply_setting_scope(db: DB, scope, field: str, value) -> list[int]:
+    """Escribe un ajuste al scope elegido (all/grupo). Devuelve los chat_ids afectados."""
+    return _write_setting(db, scope_ids(db, scope), field, value)
+
+
+def apply_welcome_scope(db: DB, scope, clean_text, buttons) -> list[int]:
+    """Escribe la bienvenida al scope elegido (all/grupo). Devuelve los chat_ids afectados."""
+    return _write_welcome(db, scope_ids(db, scope), clean_text, buttons)

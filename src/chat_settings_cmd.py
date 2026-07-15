@@ -116,7 +116,9 @@ async def cmd_setwelcome(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     db: DB = context.bot_data["db"]
     if not context.args:
         await update.effective_message.reply_text(
-            "Uso: <code>/setwelcome &lt;texto&gt;</code>\n\n"
+            "Uso: <code>/setwelcome &lt;texto&gt;</code>\n"
+            "<b>Ejemplo</b>: <code>/setwelcome ¡Hola {name}! Bienvenido/a a {chat}. "
+            "Lee las normas del anclado.</code>\n\n"
             "<b>Placeholders</b>: <code>{name}</code>, <code>{chat}</code>\n"
             "<b>HTML</b> permitido: &lt;b&gt; &lt;i&gt; &lt;code&gt; etc.\n\n"
             "<b>Botones inline</b> (sintaxis Rose):\n"
