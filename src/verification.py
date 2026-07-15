@@ -466,22 +466,76 @@ async def _delete_friendly_welcome_job(context) -> None:
             pass
 
 
+# Presets de tiempos del panel de revisión (mismos que /config).
+_REVIEW_TIME_FIELDS = {
+    "sk": ("verification_suspicious_kick_minutes", [15, 30, 60, 120], "min"),
+    "rh": ("verification_reminder_hours", [1, 3, 6, 12], "h"),
+    "kh": ("verification_kick_after_reminder_hours", [3, 6, 12, 24], "h"),
+}
+
+
+def _rv_onoff(v) -> str:
+    return "✅ ON" if v else "❌ OFF"
+
+
+def _rv_decide_row(chat_id: int, user_id: int) -> list:
+    return [
+        InlineKeyboardButton("✅ Permitir", callback_data=f"susrev:allow:{chat_id}:{user_id}"),
+        InlineKeyboardButton("🔨 Banear", callback_data=f"susrev:ban:{chat_id}:{user_id}"),
+    ]
+
+
 def build_review_keyboard(db: DB, chat_id: int, user_id: int) -> InlineKeyboardMarkup:
-    """Teclado del aviso de sospechoso: Permitir/Banear para ESTE usuario + dos toggles
-    rápidos (verificación humana del grupo y los propios avisos de revisión) que editan
-    la notificación al pulsarlos. Respetan el modo de sincronización global."""
+    """Vista COLAPSADA del aviso: decidir sobre el usuario + ⚙️ tuerca de ajustes."""
+    return InlineKeyboardMarkup([
+        _rv_decide_row(chat_id, user_id),
+        [InlineKeyboardButton("⚙️ Ajustes del grupo",
+                              callback_data=f"susrev:gear:{chat_id}:{user_id}")],
+    ])
+
+
+def build_review_settings_keyboard(db: DB, chat_id: int, user_id: int) -> InlineKeyboardMarkup:
+    """Panel de ajustes tras pulsar la tuerca: verificación, avisos, recordatorios y
+    (si están activos) los tiempos. Los cambios respetan el modo de sincronización."""
     db.ensure_chat_settings(chat_id)
     s = db.get_chat_settings(chat_id)
-    verif = "✅ ON" if (s and s["verification_enabled"]) else "❌ OFF"
-    review = "✅ ON" if (s and s["verification_review_suspicious"]) else "❌ OFF"
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton("✅ Permitir", callback_data=f"susrev:allow:{chat_id}:{user_id}"),
-         InlineKeyboardButton("🔨 Banear", callback_data=f"susrev:ban:{chat_id}:{user_id}")],
-        [InlineKeyboardButton(f"🛡️ Verificación humana: {verif}",
+    remind = bool(s and s["verification_reminders_enabled"])
+    rows = [
+        _rv_decide_row(chat_id, user_id),
+        [InlineKeyboardButton(f"🛡️ Verificación humana: {_rv_onoff(s and s['verification_enabled'])}",
                               callback_data=f"susrev:togverif:{chat_id}:{user_id}")],
-        [InlineKeyboardButton(f"🔔 Avisos de sospechosos: {review}",
+        [InlineKeyboardButton(f"🔔 Avisos de sospechosos: {_rv_onoff(s and s['verification_review_suspicious'])}",
                               callback_data=f"susrev:togreview:{chat_id}:{user_id}")],
-    ])
+        [InlineKeyboardButton(f"⏰ Recordatorios de verificación: {_rv_onoff(remind)}",
+                              callback_data=f"susrev:togremind:{chat_id}:{user_id}")],
+    ]
+    if remind:
+        sk = (s["verification_suspicious_kick_minutes"] if s else None) or 30
+        rh = (s["verification_reminder_hours"] if s else None) or 3
+        kh = (s["verification_kick_after_reminder_hours"] if s else None) or 6
+        rows.append([InlineKeyboardButton(f"⏱️ Tiempos: {sk}min · {rh}h · +{kh}h ▸",
+                                          callback_data=f"susrev:times:{chat_id}:{user_id}")])
+    rows.append([InlineKeyboardButton("⬅️ Ocultar ajustes",
+                                      callback_data=f"susrev:collapse:{chat_id}:{user_id}")])
+    return InlineKeyboardMarkup(rows)
+
+
+def build_review_times_keyboard(db: DB, chat_id: int, user_id: int) -> InlineKeyboardMarkup:
+    """Submenú de tiempos del aviso: presets por fila, el actual marcado con ✅."""
+    db.ensure_chat_settings(chat_id)
+    s = db.get_chat_settings(chat_id)
+    rows = []
+    for code, (field, presets, unit) in _REVIEW_TIME_FIELDS.items():
+        cur = (s[field] if s else None) or presets[1]
+        row = []
+        for val in presets:
+            mark = "✅ " if val == cur else ""
+            label = f"{mark}{'+' if code == 'kh' else ''}{val}{unit}"
+            row.append(InlineKeyboardButton(
+                label, callback_data=f"susrev:st:{code}:{val}:{chat_id}:{user_id}"))
+        rows.append(row)
+    rows.append([InlineKeyboardButton("⬅️ Volver", callback_data=f"susrev:gear:{chat_id}:{user_id}")])
+    return InlineKeyboardMarkup(rows)
 
 
 async def _send_suspicious_review(context, db, cfg, chat, user, reasons, sig) -> None:

@@ -1200,19 +1200,43 @@ async def on_suspicious_review_callback(update: Update, context: ContextTypes.DE
     if q.from_user.id != cfg.admin_user_id:
         await q.answer("Solo el admin del bot puede decidir esto.", show_alert=True)
         return
+    from . import settings_sync, verification
     parts = q.data.split(":")
-    if len(parts) != 4:
+    action = parts[1] if len(parts) > 1 else ""
+    try:
+        chat_id, user_id = int(parts[-2]), int(parts[-1])  # siempre los dos últimos
+    except (IndexError, ValueError):
         await q.answer("Callback inválido.")
         return
-    action, chat_id, user_id = parts[1], int(parts[2]), int(parts[3])
     base = q.message.text_html if q.message else ""
 
-    # Toggles rápidos: activar/desactivar verificación del grupo o los avisos de
-    # revisión, editando la propia notificación. Respetan el modo de sincronización.
-    if action in ("togverif", "togreview"):
-        from . import settings_sync, verification
-        field = "verification_enabled" if action == "togverif" else "verification_review_suspicious"
-        nombre = "Verificación humana" if action == "togverif" else "Avisos de sospechosos"
+    # ⚙️ Tuerca: abre el panel de ajustes; "collapse" vuelve a la vista de decisión.
+    if action == "gear":
+        await q.answer()
+        try:
+            await q.edit_message_reply_markup(
+                reply_markup=verification.build_review_settings_keyboard(db, chat_id, user_id))
+        except TelegramError:
+            pass
+        return
+    if action == "collapse":
+        await q.answer()
+        try:
+            await q.edit_message_reply_markup(
+                reply_markup=verification.build_review_keyboard(db, chat_id, user_id))
+        except TelegramError:
+            pass
+        return
+
+    # Toggles del panel (verificación / avisos / recordatorios). Respetan el sync y
+    # re-renderizan el panel abierto.
+    _TOG = {
+        "togverif": ("verification_enabled", "Verificación humana"),
+        "togreview": ("verification_review_suspicious", "Avisos de sospechosos"),
+        "togremind": ("verification_reminders_enabled", "Recordatorios de verificación"),
+    }
+    if action in _TOG:
+        field, nombre = _TOG[action]
         db.ensure_chat_settings(chat_id)
         s = db.get_chat_settings(chat_id)
         new_val = 0 if (s and s[field]) else 1
@@ -1221,7 +1245,37 @@ async def on_suspicious_review_callback(update: Update, context: ContextTypes.DE
         await q.answer(f"{nombre}: {'ON' if new_val else 'OFF'}{scope}")
         try:
             await q.edit_message_reply_markup(
-                reply_markup=verification.build_review_keyboard(db, chat_id, user_id))
+                reply_markup=verification.build_review_settings_keyboard(db, chat_id, user_id))
+        except TelegramError:
+            pass
+        return
+
+    # ⏱️ Tiempos: submenú de presets y fijar valor.
+    if action == "times":
+        await q.answer()
+        try:
+            await q.edit_message_reply_markup(
+                reply_markup=verification.build_review_times_keyboard(db, chat_id, user_id))
+        except TelegramError:
+            pass
+        return
+    if action == "st":  # susrev:st:{code}:{val}:{chat}:{user}
+        code = parts[2] if len(parts) > 2 else ""
+        info = verification._REVIEW_TIME_FIELDS.get(code)
+        try:
+            val = int(parts[3])
+        except (IndexError, ValueError):
+            await q.answer("Valor inválido.")
+            return
+        if not info or val not in info[1]:
+            await q.answer("Opción inválida.")
+            return
+        field, _presets, unit = info
+        n = settings_sync.apply_setting(db, chat_id, field, val)
+        await q.answer(f"✅ {val}{unit}" + (f" · {n} grupos" if n > 1 else ""))
+        try:
+            await q.edit_message_reply_markup(
+                reply_markup=verification.build_review_times_keyboard(db, chat_id, user_id))
         except TelegramError:
             pass
         return
