@@ -292,6 +292,32 @@ def _is_suspicious_profile(
     return (bool(reasons), reasons)
 
 
+# Razones "fuertes": por sí solas justifican avisar al admin en el modo revisión.
+_STRONG_SUSP_REASONS = {"nombre en script no-latino", "username en script no-latino", "sin foto"}
+
+
+def _is_review_worthy(
+    sig: Optional[user_signals.UserSignals],
+    username: Optional[str],
+    first_name: Optional[str],
+    last_name: Optional[str] = None,
+) -> tuple[bool, list[str]]:
+    """¿Merece un aviso privado de revisión? Más estricto que _is_suspicious_profile.
+
+    En modo revisión (default), avisar por CADA usuario sin @username sería ruido
+    (muchos legítimos no lo tienen). Solo avisamos si hay una señal fuerte (nombre
+    en otro alfabeto, sin foto, cuenta reciente con foto) o al menos DOS señales
+    acumuladas. Un único indicio débil (p.ej. "sin username") no dispara aviso.
+    """
+    suspicious, reasons = _is_suspicious_profile(sig, username, first_name, last_name)
+    if not suspicious:
+        return (False, [])
+    strong = [r for r in reasons if r in _STRONG_SUSP_REASONS or r.startswith("foto reciente")]
+    if strong or len(reasons) >= 2:
+        return (True, reasons)
+    return (False, reasons)
+
+
 def _int_env(name: str, default: int) -> int:
     """Lee un entero de entorno; si falta o es inválido, usa el default (no crashea
     el arranque por un valor mal puesto en .env)."""
@@ -525,13 +551,15 @@ async def on_join(
             except Exception as exc:
                 log.debug("user_signals fetch user=%s exc: %s", user.id, exc)
     suspicious, susp_reasons = _is_suspicious_profile(sig, user.username, user.first_name, user.last_name)
+    review_worthy, review_reasons = _is_review_worthy(sig, user.username, user.first_name, user.last_name)
 
-    # MODO REVISIÓN: sospechoso + review activo → NO se verifica en el grupo (sin
-    # mute ni botón); el user entra normal y avisamos al admin en privado con
-    # botones Permitir/Banear. Por defecto queda permitido si el admin no hace nada.
-    if review_suspicious and suspicious:
+    # MODO REVISIÓN: perfil claramente dudoso + review activo → NO se verifica en el
+    # grupo (sin mute ni botón); el user entra normal y avisamos al admin en privado
+    # con botones Permitir/Banear. Por defecto queda permitido si el admin no hace
+    # nada. Un indicio débil suelto (p.ej. sin @username) NO genera aviso (anti-ruido).
+    if review_suspicious and review_worthy:
         await _unmute("modo revisión")
-        await _send_suspicious_review(context, db, cfg, chat, user, susp_reasons, sig)
+        await _send_suspicious_review(context, db, cfg, chat, user, review_reasons, sig)
         return
 
     # Si solo estaba el modo revisión (verificación off) y NO era sospechoso → entra.

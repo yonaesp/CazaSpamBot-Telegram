@@ -124,14 +124,18 @@ CREATE TABLE IF NOT EXISTS chat_settings (
     rules_text                    TEXT,
     warns_limit                   INTEGER NOT NULL DEFAULT 3,
     warns_action                  TEXT NOT NULL DEFAULT 'ban',
-    verification_enabled          INTEGER NOT NULL DEFAULT 1,
+    -- Default LIMPIO: verificación/bienvenida OFF, revisión de sospechosos por
+    -- privado ON. El grupo no se molesta con welcomes ni botón SOY HUMANO; solo
+    -- llega aviso privado al admin (Permitir/Banear) cuando entra un perfil dudoso.
+    -- Todo ajustable por chat con /config o /verificacion.
+    verification_enabled          INTEGER NOT NULL DEFAULT 0,
     verification_suspicious_kick_h INTEGER NOT NULL DEFAULT 12,
     verification_suspicious_kick_minutes INTEGER NOT NULL DEFAULT 30,
     verification_reminder_hours   INTEGER NOT NULL DEFAULT 3,
     verification_kick_after_reminder_hours INTEGER NOT NULL DEFAULT 6,
     verification_reminders_enabled INTEGER NOT NULL DEFAULT 1,  -- enviar recordatorio a los normales
     verification_kick_normal      INTEGER NOT NULL DEFAULT 1,   -- 1=kick al no verificar, 0=quedan muteados
-    verification_review_suspicious INTEGER NOT NULL DEFAULT 0,  -- 1=en vez de verificar en grupo, aviso privado con botones
+    verification_review_suspicious INTEGER NOT NULL DEFAULT 1,  -- 1=en vez de verificar en grupo, aviso privado con botones
     cleanservice                  INTEGER NOT NULL DEFAULT 1,
     updated_at                    REAL NOT NULL DEFAULT 0
 );
@@ -794,9 +798,15 @@ class DB:
             return c.execute("SELECT * FROM chat_settings WHERE chat_id=?", (chat_id,)).fetchone()
 
     def ensure_chat_settings(self, chat_id: int) -> None:
+        # Modo LIMPIO por defecto para todo chat nuevo (independiente de la antigüedad
+        # de la DB): verificación/bienvenida OFF, revisión de sospechosos por privado
+        # ON. Se fija explícitamente aquí (no solo por el DEFAULT del schema) para que
+        # también aplique en DBs antiguas donde las columnas ya existían con otro default.
         with self._cur() as c:
             c.execute(
-                "INSERT OR IGNORE INTO chat_settings (chat_id, updated_at) VALUES (?, ?)",
+                "INSERT OR IGNORE INTO chat_settings "
+                "(chat_id, updated_at, verification_enabled, verification_review_suspicious) "
+                "VALUES (?, ?, 0, 1)",
                 (chat_id, time.time()),
             )
 

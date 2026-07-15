@@ -44,7 +44,7 @@ nativa; se itera `banChatMember` sobre los chats donde el bot es admin.
 5. `photos_batch_upload` (≥3 fotos en ≤2min = identidad robada; bypass si cuenta >1 año)
 6. `lols.bot` lookup → ban (review humano si trust≥90)
 7. `cas` lookup → ban si offenses≥2 (review si =1 o trust≥90)
-8. `verification.on_join` — welcome con botón SOY HUMANO, o welcome amistoso si perfil legítimo (≥2 fotos + ≥365d + nombre latino)
+8. `verification.on_join` — **default LIMPIO**: verificación/bienvenida OFF + revisión de sospechosos por privado ON (aviso al admin con Permitir/Banear solo si hay señal real; entra permitido). Si se activa `/verificacion on`: welcome con botón SOY HUMANO, o welcome amistoso si perfil legítimo (≥2 fotos + ≥365d + nombre latino). Todo por chat vía `/config` o `/verificacion`
 
 **`on_message`** — recolecta hits de detectores, `decide()`, luego trust score:
 - trust ≥70 → SKIP (excepto HARD_RULES: cas/lols/federation/reaction_farming)
