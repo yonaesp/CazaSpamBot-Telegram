@@ -26,51 +26,53 @@ from telegram.error import TelegramError
 from telegram.ext import ContextTypes
 
 from .db import DB
+from .i18n import t
 
 log = logging.getLogger(__name__)
 
 HIDE_PREF = "hide_group_commands"
 CLEAN_PREF = "clean_group_commands"
 
-# Menú de comandos de Telegram (el que sale al teclear "/"). Los admin-only se
-# muestran solo en el DM del admin; a todos los demás solo /help y /comandos.
+# Menú de comandos de Telegram (el que sale al teclear "/"). Cada entrada es
+# (nombre_comando, clave_i18n); la descripción se traduce con t() según el idioma.
+# Los admin-only se muestran solo en el DM del admin; a todos los demás /help y /comandos.
 _ADMIN_MENU = [
-    ("help", "Guía y lista de comandos"),
-    ("comandos", "Lista de comandos"),
-    ("stats", "Métricas del grupo"),
-    ("chats", "Grupos donde opero"),
-    ("recent", "Últimas acciones antispam"),
-    ("ban", "Banear (reply o @usuario) en todos los grupos"),
-    ("unban", "Quitar el ban a un usuario"),
-    ("whitelist", "Marcar un usuario como inmune"),
-    ("notspam", "Revertir un falso positivo (id de /recent)"),
-    ("warn", "Avisar a un usuario (warn)"),
-    ("warns", "Ver los warns de un usuario"),
-    ("warnlimit", "Límite de warns antes de sancionar"),
-    ("warnaction", "Acción al llegar al límite (ban/kick/mute)"),
-    ("spam", "Aprender: marcar mensaje como spam + banear"),
-    ("legal", "Aprender: marcar mensaje como legítimo"),
-    ("samples", "Ver muestras aprendidas"),
-    ("forget", "Olvidar una muestra aprendida"),
-    ("scan", "Analizar un mensaje: ¿lo detectaría? (responde al mensaje)"),
-    ("config", "Panel de ajustes del grupo con botones"),
-    ("sync", "Sincronizar ajustes iguales en todos los grupos (on/off)"),
-    ("limpieza", "Ocultar/auto-borrar comandos del bot en grupos"),
-    ("idioma", "Cambiar el idioma del bot (es/en)"),
-    ("verificacion", "Ajustar verificación humana del grupo"),
-    ("welcome", "Ver la bienvenida"),
-    ("setwelcome", "Cambiar la bienvenida"),
-    ("rules", "Ver las reglas"),
-    ("setrules", "Cambiar las reglas"),
-    ("cleanservice", "Borrar mensajes de 'X se ha unido'"),
-    ("alertas", "Activar o silenciar avisos informativos"),
-    ("shadow", "Ver o cambiar el modo shadow"),
-    ("top", "Ranking de mensajes"),
-    ("topweekly", "Ranking semanal"),
+    ("help", "cmd.help"),
+    ("comandos", "cmd.comandos"),
+    ("stats", "cmd.stats"),
+    ("chats", "cmd.chats"),
+    ("recent", "cmd.recent"),
+    ("ban", "cmd.ban"),
+    ("unban", "cmd.unban"),
+    ("whitelist", "cmd.whitelist"),
+    ("notspam", "cmd.notspam"),
+    ("warn", "cmd.warn"),
+    ("warns", "cmd.warns"),
+    ("warnlimit", "cmd.warnlimit"),
+    ("warnaction", "cmd.warnaction"),
+    ("spam", "cmd.spam"),
+    ("legal", "cmd.legal"),
+    ("samples", "cmd.samples"),
+    ("forget", "cmd.forget"),
+    ("scan", "cmd.scan"),
+    ("config", "cmd.config"),
+    ("sync", "cmd.sync"),
+    ("limpieza", "cmd.limpieza"),
+    ("idioma", "cmd.idioma"),
+    ("verificacion", "cmd.verificacion"),
+    ("welcome", "cmd.welcome"),
+    ("setwelcome", "cmd.setwelcome"),
+    ("rules", "cmd.rules"),
+    ("setrules", "cmd.setrules"),
+    ("cleanservice", "cmd.cleanservice"),
+    ("alertas", "cmd.alertas"),
+    ("shadow", "cmd.shadow"),
+    ("top", "cmd.top"),
+    ("topweekly", "cmd.topweekly"),
 ]
 _PUBLIC_MENU = [
-    ("help", "Cómo funciona el bot y comandos"),
-    ("comandos", "Ver los comandos disponibles"),
+    ("help", "cmd.help"),
+    ("comandos", "cmd.comandos"),
 ]
 
 
@@ -95,18 +97,17 @@ def set_clean(db: DB, on: bool) -> None:
 async def apply_command_menu(bot, cfg, db: DB) -> None:
     """Publica el menú de comandos: público (privados), admin (su DM) y grupos
     (ocultos o solo público según la preferencia). No debe impedir el arranque."""
+    pub = [BotCommand(c, t(k)) for c, k in _PUBLIC_MENU]
     try:
-        await bot.set_my_commands(
-            [BotCommand(c, d) for c, d in _PUBLIC_MENU], scope=BotCommandScopeDefault())
+        await bot.set_my_commands(pub, scope=BotCommandScopeDefault())
         if cfg.admin_user_id:
             await bot.set_my_commands(
-                [BotCommand(c, d) for c, d in _ADMIN_MENU],
+                [BotCommand(c, t(k)) for c, k in _ADMIN_MENU],
                 scope=BotCommandScopeChat(chat_id=cfg.admin_user_id))
         if hide_on(db):
             await bot.set_my_commands([], scope=BotCommandScopeAllGroupChats())
         else:
-            await bot.set_my_commands(
-                [BotCommand(c, d) for c, d in _PUBLIC_MENU], scope=BotCommandScopeAllGroupChats())
+            await bot.set_my_commands(pub, scope=BotCommandScopeAllGroupChats())
         log.info("Menú de comandos publicado (%d admin, %d público; grupos: %s).",
                  len(_ADMIN_MENU), len(_PUBLIC_MENU), "ocultos" if hide_on(db) else "visibles")
     except Exception as exc:  # noqa: BLE001

@@ -36,4 +36,10 @@ async def cmd_idioma(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         return
     db.set_text_pref(LANG_PREF, want)
     i18n.set_lang(want)
+    # Re-publica el menú de comandos de Telegram en el nuevo idioma.
+    from . import group_clean
+    try:
+        await group_clean.apply_command_menu(context.bot, cfg, db)
+    except Exception:  # noqa: BLE001 — no debe impedir el cambio de idioma
+        pass
     await update.effective_message.reply_text(i18n.t("lang.set", lang=want), parse_mode="HTML")

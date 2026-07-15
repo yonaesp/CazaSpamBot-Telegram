@@ -80,7 +80,10 @@ def test_resolve_sin_pref_devuelve_soportado(tmp_db):
 
 def _ctx(tmp_db, args, uid=999):
     cfg = SimpleNamespace(admin_user_id=999)
-    context = SimpleNamespace(bot_data={"cfg": cfg, "db": tmp_db}, args=args)
+    context = SimpleNamespace(
+        bot_data={"cfg": cfg, "db": tmp_db}, args=args,
+        bot=SimpleNamespace(set_my_commands=AsyncMock()),
+    )
     update = SimpleNamespace(
         effective_user=SimpleNamespace(id=uid),
         effective_message=SimpleNamespace(reply_text=AsyncMock()),
@@ -94,6 +97,7 @@ async def test_cmd_idioma_cambia_y_persiste(tmp_db):
     await lang_cmd.cmd_idioma(update, context)
     assert tmp_db.get_text_pref("lang") == "en"
     assert i18n.current_lang() == "en"
+    context.bot.set_my_commands.assert_awaited()   # re-publicó el menú en el nuevo idioma
 
 
 @pytest.mark.asyncio
