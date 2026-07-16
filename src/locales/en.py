@@ -43,6 +43,20 @@ STRINGS = {
     "toast.alerts": "Suspicious alerts",
     "toast.reminders": "Verification reminders",
 
+    # --- moderation command confirmations ---
+    "shadow.usage": "Usage: /shadow on|off",
+    "shadow.changed": "Mode changed to <b>{mode}</b>",
+    "whitelist.usage": "Usage: /whitelist <user_id>",
+    "whitelist.done": "User <code>{uid}</code> whitelisted in this chat.",
+    "notspam.usage": "Usage: /notspam <action_id>",
+    "notspam.notfound": "action_id not found.",
+    "notspam.done": "Action {aid} marked as a false positive. Ban revoked and rule suppressed for 7 days.",
+    "alerts.panel": (
+        "🔔 <b>Informational alerts</b>\n"
+        "Tap a button to enable or silence it. It doesn't affect anti-spam action "
+        "alerts (those are the bot's core)."
+    ),
+
     # --- Telegram command menu (shown when typing "/") ---
     "cmd.help": "Guide and command list",
     "cmd.comandos": "Command list",

@@ -456,13 +456,13 @@ async def cmd_recent(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 @_only_admin
 async def cmd_shadow(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not context.args or context.args[0] not in ("on", "off"):
-        await update.effective_message.reply_text("Uso: /shadow on|off")
+        await update.effective_message.reply_text(t("shadow.usage"))
         return
     cfg: Config = context.bot_data["cfg"]
     new_mode = "shadow" if context.args[0] == "on" else "active"
     # Hot-swap del Config (no es frozen idealmente, pero replicamos atributo)
     object.__setattr__(cfg, "mode", new_mode)
-    await update.effective_message.reply_text(f"Modo cambiado a <b>{new_mode}</b>", parse_mode="HTML")
+    await update.effective_message.reply_text(t("shadow.changed", mode=new_mode), parse_mode="HTML")
     log.warning("Modo cambiado en runtime a %s por admin %s", new_mode, update.effective_user.id)
 
 
@@ -776,14 +776,13 @@ async def cmd_unban(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 @_only_admin
 async def cmd_whitelist(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not context.args or not context.args[0].lstrip("-").isdigit():
-        await update.effective_message.reply_text("Uso: /whitelist <user_id>")
+        await update.effective_message.reply_text(t("whitelist.usage"))
         return
     user_id = int(context.args[0])
     db: DB = context.bot_data["db"]
     db.whitelist(update.effective_chat.id, user_id)
     await update.effective_message.reply_text(
-        f"Usuario <code>{user_id}</code> whitelisted en este chat.",
-        parse_mode="HTML",
+        t("whitelist.done", uid=user_id), parse_mode="HTML",
     )
 
 
@@ -983,14 +982,14 @@ async def on_topweekly_callback(update: Update, context: ContextTypes.DEFAULT_TY
 @_only_admin
 async def cmd_notspam(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not context.args or not context.args[0].isdigit():
-        await update.effective_message.reply_text("Uso: /notspam <action_id>")
+        await update.effective_message.reply_text(t("notspam.usage"))
         return
     aid = int(context.args[0])
     db: DB = context.bot_data["db"]
     cfg: Config = context.bot_data["cfg"]
     row = db.get_action(aid)
     if not row:
-        await update.effective_message.reply_text("action_id no encontrado.")
+        await update.effective_message.reply_text(t("notspam.notfound"))
         return
     if row["user_id"]:
         await unfederate_ban(
@@ -998,9 +997,7 @@ async def cmd_notspam(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             revoked_by=update.effective_user.id, shadow=cfg.shadow,
         )
         db.suppress(row["user_id"], row["rule"], seconds=7 * 24 * 3600)
-    await update.effective_message.reply_text(
-        f"Acción {aid} marcada como falso positivo. Ban revocado y regla suprimida 7 días."
-    )
+    await update.effective_message.reply_text(t("notspam.done", aid=aid))
 
 
 # ===== Gestión de avisos informativos (silenciar/activar sin tocar el .env) =====
@@ -1021,9 +1018,7 @@ async def cmd_alertas(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     db: DB = context.bot_data["db"]
     cfg: Config = context.bot_data["cfg"]
     await update.effective_message.reply_text(
-        "🔔 <b>Avisos informativos</b>\n"
-        "Pulsa un botón para activarlo o silenciarlo. No afecta a los avisos de "
-        "acciones antispam (esos son el núcleo del bot).",
+        t("alerts.panel"),
         parse_mode="HTML", reply_markup=_alertas_keyboard(db, cfg),
     )
 

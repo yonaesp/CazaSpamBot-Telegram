@@ -44,6 +44,20 @@ STRINGS = {
     "toast.alerts": "Avisos de sospechosos",
     "toast.reminders": "Recordatorios de verificación",
 
+    # --- confirmaciones de comandos de moderación ---
+    "shadow.usage": "Uso: /shadow on|off",
+    "shadow.changed": "Modo cambiado a <b>{mode}</b>",
+    "whitelist.usage": "Uso: /whitelist <user_id>",
+    "whitelist.done": "Usuario <code>{uid}</code> whitelisted en este chat.",
+    "notspam.usage": "Uso: /notspam <action_id>",
+    "notspam.notfound": "action_id no encontrado.",
+    "notspam.done": "Acción {aid} marcada como falso positivo. Ban revocado y regla suprimida 7 días.",
+    "alerts.panel": (
+        "🔔 <b>Avisos informativos</b>\n"
+        "Pulsa un botón para activarlo o silenciarlo. No afecta a los avisos de "
+        "acciones antispam (esos son el núcleo del bot)."
+    ),
+
     # --- menú de comandos de Telegram (el que sale al teclear "/") ---
     "cmd.help": "Guía y lista de comandos",
     "cmd.comandos": "Lista de comandos",
