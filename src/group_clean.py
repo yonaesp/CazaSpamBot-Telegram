@@ -135,11 +135,11 @@ async def on_group_command_message(update: Update, context: ContextTypes.DEFAULT
 
 def _clean_keyboard(db: DB) -> InlineKeyboardMarkup:
     def onoff(v: bool) -> str:
-        return "✅ ON" if v else "❌ OFF"
+        return t("on") if v else t("off")
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton(f"🙈 Ocultar comandos en grupos: {onoff(hide_on(db))}",
+        [InlineKeyboardButton(t("clean.b.hide", state=onoff(hide_on(db))),
                               callback_data="clean:hide")],
-        [InlineKeyboardButton(f"🧽 Auto-borrar comandos en grupos: {onoff(clean_on(db))}",
+        [InlineKeyboardButton(t("clean.b.autodel", state=onoff(clean_on(db))),
                               callback_data="clean:autodel")],
     ])
 
@@ -152,10 +152,7 @@ async def cmd_limpieza(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     if not user or user.id != cfg.admin_user_id:
         return
     await update.effective_message.reply_text(
-        "🧹 <b>Limpieza en grupos</b>\n"
-        "Para mantener los grupos limpios: que los comandos del bot no salgan al teclear "
-        "«/» y que no queden escritos en el chat.",
-        parse_mode="HTML", reply_markup=_clean_keyboard(db))
+        t("clean.panel"), parse_mode="HTML", reply_markup=_clean_keyboard(db))
 
 
 async def on_clean_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -165,16 +162,16 @@ async def on_clean_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     cfg = context.bot_data["cfg"]
     db: DB = context.bot_data["db"]
     if q.from_user.id != cfg.admin_user_id:
-        await q.answer("Solo el admin del bot puede configurar.", show_alert=True)
+        await q.answer(t("cfg.only_admin"), show_alert=True)
         return
     action = q.data.split(":")[1]
     if action == "hide":
         set_hide(db, not hide_on(db))
         await apply_command_menu(context.bot, cfg, db)  # re-publica el menú
-        await q.answer("Comandos en grupos: " + ("ocultos" if hide_on(db) else "visibles"))
+        await q.answer(t("clean.hidden") if hide_on(db) else t("clean.visible"))
     elif action == "autodel":
         set_clean(db, not clean_on(db))
-        await q.answer("Auto-borrado: " + ("ON" if clean_on(db) else "OFF"))
+        await q.answer(t("clean.autodel_on") if clean_on(db) else t("clean.autodel_off"))
     else:
         await q.answer()
         return

@@ -24,6 +24,7 @@ from telegram.ext import ContextTypes
 from . import settings_sync
 from .config import Config
 from .db import DB
+from .i18n import t
 
 log = logging.getLogger(__name__)
 
@@ -48,10 +49,8 @@ _TIME_FIELDS = {
 # Textos libres capturables: code → columna.
 _EDIT_FIELDS = {"w": "welcome_text", "r": "rules_text"}
 
-_HEADER = (
-    "⚙️ <b>Ajustes · {title}</b>\n"
-    "Pulsa para cambiar. Los cambios se guardan al instante."
-)
+def _header(title: str) -> str:
+    return t("cfg.header", title=title)
 
 
 def _b(s, field: str) -> bool:
@@ -71,7 +70,7 @@ def _num(s, field: str, default: int) -> int:
 
 
 def _onoff(v: bool) -> str:
-    return "✅ ON" if v else "❌ OFF"
+    return t("on") if v else t("off")
 
 
 def _chat_title(db: DB, chat_id: int) -> str:
@@ -82,7 +81,7 @@ def _chat_title(db: DB, chat_id: int) -> str:
 def _panel_title(db: DB, chat_id: int) -> str:
     """Título del panel: unificado si la sincronización está ON, si no el del grupo."""
     if settings_sync.is_sync_on(db):
-        return "Todos los grupos (sincronizado)"
+        return t("cfg.title_all")
     return _chat_title(db, chat_id)
 
 
@@ -94,31 +93,30 @@ def build_panel_keyboard(chat_id: int, s, sync_on: bool = False) -> InlineKeyboa
     sk = _num(s, "verification_suspicious_kick_minutes", 30)
     rh = _num(s, "verification_reminder_hours", 3)
     kh = _num(s, "verification_kick_after_reminder_hours", 6)
-    accion = "Expulsar" if _b(s, "verification_kick_normal") else "Silenciar"
+    accion = t("cfg.kick") if _b(s, "verification_kick_normal") else t("cfg.mute")
     rows = [
-        [InlineKeyboardButton(
-            f"🔗 Sincronizar todos los grupos: {_onoff(sync_on)}",
-            callback_data=f"{PREFIX}:sync:{cid}")],
-        [InlineKeyboardButton(f"🛡️ Verificación: {_onoff(_b(s, 'verification_enabled'))}",
+        [InlineKeyboardButton(t("cfg.b.sync", state=_onoff(sync_on)),
+                              callback_data=f"{PREFIX}:sync:{cid}")],
+        [InlineKeyboardButton(t("cfg.b.verif", state=_onoff(_b(s, "verification_enabled"))),
                               callback_data=f"{PREFIX}:tog:verification_enabled:{cid}")],
-        [InlineKeyboardButton(f"👁️ Revisar sospechosos en privado: {_onoff(_b(s, 'verification_review_suspicious'))}",
+        [InlineKeyboardButton(t("cfg.b.review", state=_onoff(_b(s, "verification_review_suspicious"))),
                               callback_data=f"{PREFIX}:tog:verification_review_suspicious:{cid}")],
-        [InlineKeyboardButton(f"🔔 Recordatorios: {_onoff(_b(s, 'verification_reminders_enabled'))}",
+        [InlineKeyboardButton(t("cfg.b.reminders", state=_onoff(_b(s, "verification_reminders_enabled"))),
                               callback_data=f"{PREFIX}:tog:verification_reminders_enabled:{cid}")],
-        [InlineKeyboardButton(f"🚪 Al no verificar: {accion}",
+        [InlineKeyboardButton(t("cfg.b.action", action=accion),
                               callback_data=f"{PREFIX}:accion:{cid}")],
-        [InlineKeyboardButton(f"⏱️ Tiempos: {sk}min · {rh}h · +{kh}h ▸",
+        [InlineKeyboardButton(t("cfg.b.times", sk=sk, rh=rh, kh=kh),
                               callback_data=f"{PREFIX}:times:{cid}")],
-        [InlineKeyboardButton(f"👋 Bienvenida: {_onoff(_b(s, 'welcome_enabled'))}",
+        [InlineKeyboardButton(t("cfg.b.welcome", state=_onoff(_b(s, "welcome_enabled"))),
                               callback_data=f"{PREFIX}:tog:welcome_enabled:{cid}")],
-        [InlineKeyboardButton("✏️ Editar texto de bienvenida ▸",
+        [InlineKeyboardButton(t("cfg.b.edit_welcome"),
                               callback_data=f"{PREFIX}:edit:w:{cid}")],
-        [InlineKeyboardButton("📜 Editar reglas ▸",
+        [InlineKeyboardButton(t("cfg.b.edit_rules"),
                               callback_data=f"{PREFIX}:edit:r:{cid}")],
-        [InlineKeyboardButton(f"🧹 Limpiar mensajes de servicio: {_onoff(_b(s, 'cleanservice'))}",
+        [InlineKeyboardButton(t("cfg.b.cleanservice", state=_onoff(_b(s, "cleanservice"))),
                               callback_data=f"{PREFIX}:tog:cleanservice:{cid}")],
-        [InlineKeyboardButton("🔔 Avisos informativos ▸", callback_data=f"{PREFIX}:alertas:{cid}")],
-        [InlineKeyboardButton("✖️ Cerrar", callback_data=f"{PREFIX}:close:{cid}")],
+        [InlineKeyboardButton(t("cfg.b.alerts"), callback_data=f"{PREFIX}:alertas:{cid}")],
+        [InlineKeyboardButton(t("cfg.b.close"), callback_data=f"{PREFIX}:close:{cid}")],
     ]
     return InlineKeyboardMarkup(rows)
 
@@ -135,13 +133,13 @@ def build_times_keyboard(chat_id: int, s) -> InlineKeyboardMarkup:
             label = f"{mark}{'+' if code == 'kh' else ''}{val}{unit}"
             row.append(InlineKeyboardButton(label, callback_data=f"{PREFIX}:st:{code}:{val}:{cid}"))
         rows.append(row)
-    rows.append([InlineKeyboardButton("⬅️ Volver", callback_data=f"{PREFIX}:open:{cid}")])
+    rows.append([InlineKeyboardButton(t("cfg.b.back"), callback_data=f"{PREFIX}:open:{cid}")])
     return InlineKeyboardMarkup(rows)
 
 
 def _edit_scope_keyboard(db: DB, code: str, cid: int) -> InlineKeyboardMarkup:
     """Selector de a qué grupo(s) aplicar la edición de texto: Todos o uno concreto."""
-    rows = [[InlineKeyboardButton("🌐 Todos los grupos",
+    rows = [[InlineKeyboardButton(t("cfg.b.all_groups"),
                                   callback_data=f"{PREFIX}:escope:{code}:all:{cid}")]]
     for c in db.all_chats():
         if not c["am_admin"]:
@@ -149,26 +147,25 @@ def _edit_scope_keyboard(db: DB, code: str, cid: int) -> InlineKeyboardMarkup:
         title = (c["title"] or str(c["chat_id"]))[:40]
         rows.append([InlineKeyboardButton(
             f"📝 {title}", callback_data=f"{PREFIX}:escope:{code}:{c['chat_id']}:{cid}")])
-    rows.append([InlineKeyboardButton("✖️ Cancelar", callback_data=f"{PREFIX}:open:{cid}")])
+    rows.append([InlineKeyboardButton(t("cfg.b.cancel"), callback_data=f"{PREFIX}:open:{cid}")])
     return InlineKeyboardMarkup(rows)
 
 
 def _scope_label(db: DB, ids: list[int]) -> str:
     """Texto para la confirmación: 'en N grupos' o 'en <grupo>'."""
     if len(ids) > 1:
-        return f"en {len(ids)} grupos"
+        return t("cfg.scope_n", n=len(ids))
     if len(ids) == 1:
-        return f"en {html.escape(_chat_title(db, ids[0]))}"
+        return t("cfg.scope_one", title=html.escape(_chat_title(db, ids[0])))
     return ""
 
 
-_TIMES_TEXT = (
-    "⏱️ <b>Tiempos de verificación · {title}</b>\n\n"
-    "1ª fila · <b>sospechoso</b>: minutos hasta expulsar si no verifica.\n"
-    "2ª fila · <b>recordatorio</b>: horas hasta avisar al que no verifica.\n"
-    "3ª fila · <b>expulsión</b>: horas tras el recordatorio para expulsar.\n\n"
-    "Actual: <b>{sk}min · {rh}h · +{kh}h</b>"
-)
+def _times_text(db: DB, cid: int, s) -> str:
+    return t("cfg.times_text",
+             title=html.escape(_chat_title(db, cid)),
+             sk=_num(s, "verification_suspicious_kick_minutes", 30),
+             rh=_num(s, "verification_reminder_hours", 3),
+             kh=_num(s, "verification_kick_after_reminder_hours", 6))
 
 
 # ------------------------------- render helpers -------------------------------
@@ -181,7 +178,7 @@ async def _show_panel(msg_edit, db: DB, chat_id: int) -> None:
     title = html.escape(_panel_title(db, chat_id))
     try:
         await msg_edit(
-            _HEADER.format(title=title),
+            _header(title),
             parse_mode="HTML",
             reply_markup=build_panel_keyboard(chat_id, s, sync_on),
         )
@@ -210,12 +207,12 @@ async def cmd_config(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         elif admin_chats:
             cid = admin_chats[0]["chat_id"]
         else:
-            await msg.reply_text("No estoy de admin en ningún grupo todavía.")
+            await msg.reply_text(t("cfg.no_admin"))
             return
         db.ensure_chat_settings(cid)
         s = db.get_chat_settings(cid)
         await msg.reply_text(
-            _HEADER.format(title=html.escape(_panel_title(db, cid))),
+            _header(html.escape(_panel_title(db, cid))),
             parse_mode="HTML", reply_markup=build_panel_keyboard(cid, s, True),
         )
         return
@@ -225,19 +222,19 @@ async def cmd_config(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         db.ensure_chat_settings(chat.id)
         s = db.get_chat_settings(chat.id)
         await msg.reply_text(
-            _HEADER.format(title=html.escape(_chat_title(db, chat.id))),
+            _header(html.escape(_chat_title(db, chat.id))),
             parse_mode="HTML", reply_markup=build_panel_keyboard(chat.id, s, False),
         )
         return
     if not admin_chats:
-        await msg.reply_text("No estoy de admin en ningún grupo todavía.")
+        await msg.reply_text(t("cfg.no_admin"))
         return
     if len(admin_chats) == 1:
         cid = admin_chats[0]["chat_id"]
         db.ensure_chat_settings(cid)
         s = db.get_chat_settings(cid)
         await msg.reply_text(
-            _HEADER.format(title=html.escape(_chat_title(db, cid))),
+            _header(html.escape(_chat_title(db, cid))),
             parse_mode="HTML", reply_markup=build_panel_keyboard(cid, s, False),
         )
         return
@@ -247,8 +244,7 @@ async def cmd_config(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         for c in admin_chats
     ]
     await msg.reply_text(
-        "⚙️ <b>Ajustes</b> — ¿qué grupo quieres configurar?\n"
-        "<i>(La sincronización está OFF: cada grupo por separado.)</i>",
+        t("cfg.pick_group"),
         parse_mode="HTML", reply_markup=InlineKeyboardMarkup(rows),
     )
 
@@ -263,7 +259,7 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     cfg: Config = context.bot_data["cfg"]
     db: DB = context.bot_data["db"]
     if q.from_user.id != cfg.admin_user_id:
-        await q.answer("Solo el admin del bot puede configurar.", show_alert=True)
+        await q.answer(t("cfg.only_admin"), show_alert=True)
         return
     parts = q.data.split(":")
     action = parts[1] if len(parts) > 1 else ""
@@ -277,7 +273,7 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     if action == "open":
         cid = _cid(2)
         if cid is None:
-            await q.answer("Chat inválido.")
+            await q.answer(t("cfg.invalid_chat"))
             return
         await q.answer()
         context.user_data.pop("cfg_await", None)
@@ -286,9 +282,9 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 
     if action == "close":
         context.user_data.pop("cfg_await", None)
-        await q.answer("Cerrado.")
+        await q.answer(t("cfg.closed_toast"))
         try:
-            await q.edit_message_text("⚙️ Panel cerrado. Escribe /config para volver a abrirlo.")
+            await q.edit_message_text(t("cfg.closed_msg"))
         except TelegramError:
             pass
         return
@@ -297,14 +293,14 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         field = parts[2] if len(parts) > 2 else ""
         cid = _cid(3)
         if field not in _TOGGLE_FIELDS or cid is None:
-            await q.answer("Opción inválida.")
+            await q.answer(t("cfg.invalid_opt"))
             return
         db.ensure_chat_settings(cid)
         s = db.get_chat_settings(cid)
         new_val = 0 if _b(s, field) else 1
         n = settings_sync.apply_setting(db, cid, field, new_val)
-        estado = "✅ Activado" if new_val else "❌ Desactivado"
-        await q.answer(f"{estado} en {n} grupos" if n > 1 else estado)
+        estado = t("cfg.act_on") if new_val else t("cfg.act_off")
+        await q.answer(estado + t("cfg.in_n", n=n) if n > 1 else estado)
         s = db.get_chat_settings(cid)
         try:
             await q.edit_message_reply_markup(
@@ -316,14 +312,14 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     if action == "accion":
         cid = _cid(2)
         if cid is None:
-            await q.answer("Chat inválido.")
+            await q.answer(t("cfg.invalid_chat"))
             return
         db.ensure_chat_settings(cid)
         s = db.get_chat_settings(cid)
         new_val = 0 if _b(s, "verification_kick_normal") else 1
         n = settings_sync.apply_setting(db, cid, "verification_kick_normal", new_val)
-        base = "Expulsar" if new_val else "Silenciar"
-        await q.answer(f"{base} · {n} grupos" if n > 1 else base)
+        base = t("cfg.kick") if new_val else t("cfg.mute")
+        await q.answer(base + t("cfg.dot_n", n=n) if n > 1 else base)
         s = db.get_chat_settings(cid)
         try:
             await q.edit_message_reply_markup(
@@ -336,17 +332,14 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         cid = _cid(2)
         new = not settings_sync.is_sync_on(db)
         settings_sync.set_sync(db, new)
-        await q.answer("🔗 Sincronización ON" if new else "Sincronización OFF")
+        await q.answer(t("cfg.sync_on") if new else t("cfg.sync_off"))
         if new:
             rep = cid if cid is not None else (settings_sync.moderated_chat_ids(db) or [None])[0]
             if rep is not None:
                 await _show_panel(q.edit_message_text, db, rep)
         else:
             try:
-                await q.edit_message_text(
-                    "🔗 <b>Sincronización desactivada.</b>\nAhora cada grupo se configura "
-                    "por separado: escribe /config para elegir grupo.",
-                    parse_mode="HTML")
+                await q.edit_message_text(t("cfg.sync_off_msg"), parse_mode="HTML")
             except TelegramError:
                 pass
         return
@@ -354,17 +347,12 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     if action == "times":
         cid = _cid(2)
         if cid is None:
-            await q.answer("Chat inválido.")
+            await q.answer(t("cfg.invalid_chat"))
             return
         await q.answer()
         db.ensure_chat_settings(cid)
         s = db.get_chat_settings(cid)
-        txt = _TIMES_TEXT.format(
-            title=html.escape(_chat_title(db, cid)),
-            sk=_num(s, "verification_suspicious_kick_minutes", 30),
-            rh=_num(s, "verification_reminder_hours", 3),
-            kh=_num(s, "verification_kick_after_reminder_hours", 6),
-        )
+        txt = _times_text(db, cid, s)
         try:
             await q.edit_message_text(txt, parse_mode="HTML",
                                       reply_markup=build_times_keyboard(cid, s))
@@ -376,27 +364,22 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         code = parts[2] if len(parts) > 2 else ""
         cid = _cid(4)
         if code not in _TIME_FIELDS or cid is None:
-            await q.answer("Opción inválida.")
+            await q.answer(t("cfg.invalid_opt"))
             return
         field, presets, unit = _TIME_FIELDS[code]
         try:
             val = int(parts[3])
         except (IndexError, ValueError):
-            await q.answer("Valor inválido.")
+            await q.answer(t("cfg.invalid_val"))
             return
         if val not in presets:
-            await q.answer("Valor fuera de rango.")
+            await q.answer(t("cfg.val_range"))
             return
         db.ensure_chat_settings(cid)
         n = settings_sync.apply_setting(db, cid, field, val)
-        await q.answer(f"✅ {val}{unit}" + (f" · {n} grupos" if n > 1 else ""))
+        await q.answer(f"✅ {val}{unit}" + (t("cfg.dot_n", n=n) if n > 1 else ""))
         s = db.get_chat_settings(cid)
-        txt = _TIMES_TEXT.format(
-            title=html.escape(_chat_title(db, cid)),
-            sk=_num(s, "verification_suspicious_kick_minutes", 30),
-            rh=_num(s, "verification_reminder_hours", 3),
-            kh=_num(s, "verification_kick_after_reminder_hours", 6),
-        )
+        txt = _times_text(db, cid, s)
         try:
             await q.edit_message_text(txt, parse_mode="HTML",
                                       reply_markup=build_times_keyboard(cid, s))
@@ -409,14 +392,13 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         code = parts[2] if len(parts) > 2 else ""
         cid = _cid(3)
         if code not in _EDIT_FIELDS or cid is None:
-            await q.answer("Opción inválida.")
+            await q.answer(t("cfg.invalid_opt"))
             return
         await q.answer()
-        que = "la bienvenida" if code == "w" else "las reglas"
+        que = t("cfg.which_welcome") if code == "w" else t("cfg.which_rules")
         try:
             await q.edit_message_text(
-                f"✏️ ¿En qué grupo(s) quieres cambiar <b>{que}</b>?\n"
-                "<i>Elige «Todos» o un grupo concreto.</i>",
+                t("cfg.edit_which", what=que),
                 parse_mode="HTML", reply_markup=_edit_scope_keyboard(db, code, cid))
         except TelegramError:
             pass
@@ -428,30 +410,14 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         scope = parts[3] if len(parts) > 3 else ""
         cid = _cid(4)
         if code not in _EDIT_FIELDS or cid is None or not scope:
-            await q.answer("Opción inválida.")
+            await q.answer(t("cfg.invalid_opt"))
             return
         await q.answer()
         context.user_data["cfg_await"] = {"field": _EDIT_FIELDS[code], "scope": scope}
-        destino = "todos los grupos" if scope == "all" else html.escape(
+        destino = t("cfg.dest_all") if scope == "all" else html.escape(
             _chat_title(db, int(scope)) if scope.lstrip("-").isdigit() else scope)
-        if code == "w":
-            prompt = (
-                f"✏️ <b>Nueva bienvenida para {destino}.</b> Envíamela ahora.\n\n"
-                "Ejemplo (cópialo y edítalo):\n"
-                "<code>¡Hola {{name}}! 👋 Bienvenido/a a {{chat}}. Échale un ojo al "
-                "mensaje anclado con las normas.</code>\n\n"
-                "Placeholders: <code>{{name}}</code> (usuario) · <code>{{chat}}</code> "
-                "(nombre del grupo). HTML: &lt;b&gt; &lt;i&gt; &lt;code&gt;. "
-                "Botones: <code>[Texto](buttonurl://https://url.com)</code>."
-            ).replace("{{name}}", "{name}").replace("{{chat}}", "{chat}")
-        else:
-            prompt = (
-                f"📜 <b>Nuevas reglas para {destino}.</b> Envíamelas ahora.\n\n"
-                "Ejemplo:\n"
-                "<code>1) Respeto. 2) Nada de spam ni enlaces. 3) Solo temas del grupo.</code>\n\n"
-                "HTML permitido (&lt;b&gt;, &lt;i&gt;, &lt;code&gt;)."
-            )
-        kb = InlineKeyboardMarkup([[InlineKeyboardButton("✖️ Cancelar",
+        prompt = t("cfg.prompt_welcome" if code == "w" else "cfg.prompt_rules", dest=destino)
+        kb = InlineKeyboardMarkup([[InlineKeyboardButton(t("cfg.b.cancel"),
                                     callback_data=f"{PREFIX}:open:{cid}")]])
         try:
             await q.edit_message_text(prompt, parse_mode="HTML", reply_markup=kb)
@@ -467,7 +433,7 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         try:
             await context.bot.send_message(
                 chat_id=q.message.chat_id,
-                text="🔔 <b>Avisos informativos</b>\nPulsa para activar o silenciar.",
+                text=t("cfg.alerts_short"),
                 parse_mode="HTML",
                 reply_markup=admin._alertas_keyboard(db, cfg),
             )
@@ -492,7 +458,7 @@ async def handle_capture(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     msg = update.effective_message
     raw = (msg.text or msg.caption or "").strip() if msg else ""
     if not raw:
-        await msg.reply_text("El texto está vacío. Cancelado. Abre /config para reintentar.")
+        await msg.reply_text(t("cfg.empty_text"))
         context.user_data.pop("cfg_await", None)
         return True
     db: DB = context.bot_data["db"]
@@ -509,19 +475,15 @@ async def handle_capture(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         else:
             settings_sync.apply_welcome(db, chat_id, clean, btns)
             ids = settings_sync.target_ids(db, chat_id)
-        extra = f" + {len(buttons)} botón(es)" if buttons else ""
-        await msg.reply_text(
-            f"✅ Bienvenida actualizada{extra} {_scope_label(db, ids)}. "
-            "Escribe /config para seguir ajustando.")
+        extra = t("cfg.btn_extra", n=len(buttons)) if buttons else ""
+        await msg.reply_text(t("cfg.welcome_updated", extra=extra, scope=_scope_label(db, ids)))
     else:  # rules_text
         if scope is not None:
             ids = settings_sync.apply_setting_scope(db, scope, "rules_text", raw)
         else:
             settings_sync.apply_setting(db, chat_id, "rules_text", raw)
             ids = settings_sync.target_ids(db, chat_id)
-        await msg.reply_text(
-            f"✅ Reglas actualizadas {_scope_label(db, ids)}. "
-            "Escribe /config para seguir ajustando.")
+        await msg.reply_text(t("cfg.rules_updated", scope=_scope_label(db, ids)))
     return True
 
 
@@ -539,14 +501,8 @@ async def cmd_sync(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         settings_sync.set_sync(db, args[0].lower() == "on")
     state = settings_sync.is_sync_on(db)
     n = len(settings_sync.moderated_chat_ids(db))
-    detalle = (
-        f"Cada cambio de ajuste se aplica a los <b>{n} grupos</b> a la vez y el panel "
-        "/config no pide elegir grupo."
-        if state else
-        "Cada grupo se configura por separado; /config te deja elegir grupo."
-    )
+    detalle = t("cfg.sync_detail_on", n=n) if state else t("cfg.sync_detail_off")
     await update.effective_message.reply_text(
-        f"🔗 <b>Sincronización de ajustes: {'ON' if state else 'OFF'}</b>\n{detalle}\n"
-        "Cambia con <code>/sync on</code> o <code>/sync off</code> (o desde /config).",
+        t("cfg.sync_status", state=("ON" if state else "OFF"), detail=detalle),
         parse_mode="HTML",
     )

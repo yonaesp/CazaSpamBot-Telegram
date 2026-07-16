@@ -57,6 +57,88 @@ STRINGS = {
         "alerts (those are the bot's core)."
     ),
 
+    # --- /config and /sync panel ---
+    "cfg.header": "⚙️ <b>Settings · {title}</b>\nTap to change. Changes are saved instantly.",
+    "cfg.title_all": "All groups (synced)",
+    "cfg.kick": "Kick",
+    "cfg.mute": "Mute",
+    "cfg.b.sync": "🔗 Sync all groups: {state}",
+    "cfg.b.verif": "🛡️ Verification: {state}",
+    "cfg.b.review": "👁️ Review suspicious privately: {state}",
+    "cfg.b.reminders": "🔔 Reminders: {state}",
+    "cfg.b.action": "🚪 On failed verification: {action}",
+    "cfg.b.times": "⏱️ Timings: {sk}min · {rh}h · +{kh}h ▸",
+    "cfg.b.welcome": "👋 Welcome: {state}",
+    "cfg.b.edit_welcome": "✏️ Edit welcome text ▸",
+    "cfg.b.edit_rules": "📜 Edit rules ▸",
+    "cfg.b.cleanservice": "🧹 Delete service messages: {state}",
+    "cfg.b.alerts": "🔔 Informational alerts ▸",
+    "cfg.b.close": "✖️ Close",
+    "cfg.b.back": "⬅️ Back",
+    "cfg.b.all_groups": "🌐 All groups",
+    "cfg.b.cancel": "✖️ Cancel",
+    "cfg.scope_n": "in {n} groups",
+    "cfg.scope_one": "in {title}",
+    "cfg.times_text": (
+        "⏱️ <b>Verification timings · {title}</b>\n\n"
+        "1st row · <b>suspicious</b>: minutes until kick if they don't verify.\n"
+        "2nd row · <b>reminder</b>: hours until reminding those who don't verify.\n"
+        "3rd row · <b>kick</b>: hours after the reminder to kick.\n\n"
+        "Current: <b>{sk}min · {rh}h · +{kh}h</b>"
+    ),
+    "cfg.no_admin": "I'm not an admin in any group yet.",
+    "cfg.pick_group": "⚙️ <b>Settings</b> — which group do you want to configure?\n<i>(Sync is OFF: each group separately.)</i>",
+    "cfg.only_admin": "Only the bot admin can configure this.",
+    "cfg.invalid_chat": "Invalid chat.",
+    "cfg.invalid_opt": "Invalid option.",
+    "cfg.invalid_val": "Invalid value.",
+    "cfg.val_range": "Value out of range.",
+    "cfg.closed_toast": "Closed.",
+    "cfg.closed_msg": "⚙️ Panel closed. Type /config to open it again.",
+    "cfg.act_on": "✅ Enabled",
+    "cfg.act_off": "❌ Disabled",
+    "cfg.in_n": " in {n} groups",
+    "cfg.dot_n": " · {n} groups",
+    "cfg.sync_on": "🔗 Sync ON",
+    "cfg.sync_off": "Sync OFF",
+    "cfg.sync_off_msg": "🔗 <b>Sync disabled.</b>\nNow each group is configured separately: type /config to pick a group.",
+    "cfg.which_welcome": "the welcome",
+    "cfg.which_rules": "the rules",
+    "cfg.edit_which": "✏️ Which group(s) do you want to change <b>{what}</b> for?\n<i>Pick «All» or a specific group.</i>",
+    "cfg.dest_all": "all groups",
+    "cfg.prompt_welcome": (
+        "✏️ <b>New welcome for {dest}.</b> Send it now.\n\n"
+        "Example (copy and edit it):\n"
+        "<code>Hi {{name}}! 👋 Welcome to {{chat}}. Take a look at the "
+        "pinned message with the rules.</code>\n\n"
+        "Placeholders: <code>{{name}}</code> (user) · <code>{{chat}}</code> "
+        "(group name). HTML: &lt;b&gt; &lt;i&gt; &lt;code&gt;. "
+        "Buttons: <code>[Text](buttonurl://https://url.com)</code>."
+    ),
+    "cfg.prompt_rules": (
+        "📜 <b>New rules for {dest}.</b> Send them now.\n\n"
+        "Example:\n"
+        "<code>1) Respect. 2) No spam or links. 3) On-topic only.</code>\n\n"
+        "HTML allowed (&lt;b&gt;, &lt;i&gt;, &lt;code&gt;)."
+    ),
+    "cfg.alerts_short": "🔔 <b>Informational alerts</b>\nTap to enable or silence.",
+    "cfg.empty_text": "The text is empty. Cancelled. Open /config to retry.",
+    "cfg.welcome_updated": "✅ Welcome updated{extra} {scope}. Type /config to keep adjusting.",
+    "cfg.rules_updated": "✅ Rules updated {scope}. Type /config to keep adjusting.",
+    "cfg.btn_extra": " + {n} button(s)",
+    "cfg.sync_status": "🔗 <b>Settings sync: {state}</b>\n{detail}\nChange it with <code>/sync on</code> or <code>/sync off</code> (or from /config).",
+    "cfg.sync_detail_on": "Every setting change applies to all <b>{n} groups</b> at once and the /config panel doesn't ask which group.",
+    "cfg.sync_detail_off": "Each group is configured separately; /config lets you pick a group.",
+
+    # --- /limpieza panel ---
+    "clean.panel": "🧹 <b>Group cleanup</b>\nTo keep groups clean: the bot's commands don't show when typing «/» and don't stay written in the chat.",
+    "clean.b.hide": "🙈 Hide commands in groups: {state}",
+    "clean.b.autodel": "🧽 Auto-delete commands in groups: {state}",
+    "clean.hidden": "Commands in groups: hidden",
+    "clean.visible": "Commands in groups: visible",
+    "clean.autodel_on": "Auto-delete: ON",
+    "clean.autodel_off": "Auto-delete: OFF",
+
     # --- Telegram command menu (shown when typing "/") ---
     "cmd.help": "Guide and command list",
     "cmd.comandos": "Command list",
