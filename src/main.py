@@ -7,6 +7,7 @@ from pathlib import Path
 
 import aiohttp
 from telegram.ext import (
+    AIORateLimiter,
     Application,
     CallbackQueryHandler,
     ChatMemberHandler,
@@ -234,6 +235,14 @@ def main() -> int:
         .read_timeout(30)
         .write_timeout(30)
         .pool_timeout(10)
+        # Rate limiter: sin él, un 429 (RetryAfter) durante un ban federado se
+        # capturaba como TelegramError normal en federation.py y el ban se PERDÍA en
+        # silencio, sin reintento. max_retries viene a 0 por defecto: hay que pedirlo.
+        # group_max_rate=0 desactiva el límite por grupo A PROPÓSITO: ese límite (20/min)
+        # es de MENSAJES a un grupo, no de acciones de admin, y aplicarlo a banChatMember
+        # encolaría los bans justo durante una raid, que es cuando más urgen. Se mantiene
+        # el global de 30/s, que es el límite real de la Bot API.
+        .rate_limiter(AIORateLimiter(group_max_rate=0, max_retries=3))
         .post_init(_post_init)
         .post_shutdown(_post_shutdown)
         .build()
