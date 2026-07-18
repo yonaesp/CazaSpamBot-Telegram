@@ -197,7 +197,7 @@ async def cmd_warn(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     else:
         text = t("warn.counter", mention=mention, n=n, limit=limit)
         if reason:
-            text += f"\n💬 <b>Motivo:</b> {html.escape(reason)}"
+            text += t("warn.reason_line", reason=html.escape(reason))
 
     try:
         sent = await context.bot.send_message(

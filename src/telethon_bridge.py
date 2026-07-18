@@ -17,6 +17,7 @@ from telegram import Bot
 from telegram.error import TelegramError
 
 from .db import DB
+from .i18n import t
 
 log = logging.getLogger(__name__)
 
@@ -147,7 +148,7 @@ async def _notify_manual_delete(client, bot: Bot, db: DB, chat_id: int, msg_id: 
                     aid = getattr(actor, "id", "?")
                     actor_id_found = aid
                     tag = f"@{uname}" if uname else name
-                    actor_info = f"{_h.escape(tag)} (<code>{aid}</code>)"
+                    actor_info = t("tb.actor_info", tag=_h.escape(tag), uid=aid)
                 break
     except Exception as exc:  # noqa: BLE001
         log.debug("manual_delete admin_log lookup fallo chat=%s: %s", chat_id, exc)
@@ -201,17 +202,18 @@ async def _notify_manual_delete(client, bot: Bot, db: DB, chat_id: int, msg_id: 
                     "SELECT 1 FROM banned_users WHERE user_id=? AND revoked_at IS NULL",
                     (author_id,),
                 ).fetchone()
-            estado = "\n⚖️ Estado: 🔨 <b>baneado</b> en la federación" if row else "\n⚖️ Estado: sigue en el grupo (solo se borró el msg)"
+            estado = t("tb.del_state_banned") if row else t("tb.del_state_in_group")
         except Exception:  # noqa: BLE001
             pass
-    notif = (
-        f"🗑️ <b>Mensaje borrado manualmente</b>\n"
-        f"📍 Chat: {_h.escape(chat_title)}\n"
-        f"👮 Borrado por: {actor_info}\n"
-        f"👤 Autor del msg: {author_link} (<code>{author_id or '?'}</code>)"
-        f"{estado}\n"
-        f"🆔 msg_id: <code>{msg_id}</code>\n\n"
-        f"<b>Contenido:</b>\n<pre>{_h.escape(text[:600])}</pre>"
+    notif = t(
+        "tb.manual_delete",
+        chat=_h.escape(chat_title),
+        actor=actor_info,
+        author_link=author_link,
+        author_id=author_id or "?",
+        state=estado,
+        msg_id=msg_id,
+        content=_h.escape(text[:600]),
     )
     # En self-deletes (actor desconocido), botón para silenciar este tipo de aviso.
     kb = None

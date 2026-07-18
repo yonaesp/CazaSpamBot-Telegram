@@ -17,6 +17,8 @@ import time
 from telegram.error import TelegramError
 from telegram.ext import ContextTypes
 
+from .i18n import t
+
 log = logging.getLogger(__name__)
 
 # Bans dentro de esta ventana cuentan como "ráfaga" (misma tanda).
@@ -106,7 +108,7 @@ async def announce_ban(
     if burst["consolidated_msg_id"]:
         await _delete_msg(context, chat_id, burst["consolidated_msg_id"])
     # 3) publicar el consolidado
-    header = f"🧹 <b>Limpieza de spam ({n} baneados)</b>\n\n"
+    header = t("ban.cleanup_header", n=n)
     body = "\n".join(burst["lines"])
     text = header + body
     try:

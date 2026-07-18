@@ -29,6 +29,7 @@ from telegram.error import TelegramError
 from telegram.ext import ContextTypes
 
 from .db import DB
+from .i18n import t
 
 log = logging.getLogger(__name__)
 
@@ -196,13 +197,13 @@ async def handle_admin_mention(
                 f"@{reporter.username}" if reporter.username
                 else (reporter.first_name or f"id {reporter.id}")
             )
-            via = "reply explícito" if reported else "msg anterior (sin reply)"
-            ctx_text = (
-                f"🚨 <b>@admin reportado</b>\n"
-                f"📍 Chat: {html.escape(chat_title)}\n"
-                f"👤 Reporter: {html.escape(reporter_disp)} (<code>{reporter.id}</code>)\n"
-                f"🎯 Mensaje reportado: <code>{reported_msg_id}</code> ({via})\n"
-                f"👤 Autor del msg: <code>{reported_user_id or '?'}</code>"
+            via = t("report.via_reply") if reported else t("report.via_previous")
+            ctx_text = t(
+                "report.admin_dm",
+                chat=html.escape(chat_title),
+                reporter=html.escape(reporter_disp), reporter_id=reporter.id,
+                msg_id=reported_msg_id, via=via,
+                author_id=reported_user_id or "?",
             )
             await context.bot.send_message(
                 chat_id=cfg.admin_notify_chat_id, text=ctx_text, parse_mode="HTML",
@@ -252,9 +253,12 @@ async def on_reported_message_deleted(
     # textual (NO clicable, sin @, solo texto plano)
     if report["reporter_username"]:
         # Mostramos como referencia neutra, sin @ que abra perfil
-        reporter_label = f"<i>{html.escape(report['reporter_username'])}</i> (id: <code>{rep_uid}</code>)"
+        reporter_label = t(
+            "report.reporter_label",
+            name=html.escape(report["reporter_username"]), uid=rep_uid,
+        )
     else:
-        reporter_label = f"usuario (id: <code>{rep_uid}</code>)"
+        reporter_label = t("report.reporter_label_anon", uid=rep_uid)
     # Elegir template según action_taken (warn/delete → "avisado", ban/kick → "expulsado")
     try:
         action_taken = report["action_taken"]

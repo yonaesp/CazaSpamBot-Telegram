@@ -15,6 +15,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 
 from .db import DB
+from .i18n import t
 
 log = logging.getLogger(__name__)
 
@@ -36,7 +37,7 @@ async def show_chat_picker(
     chats = db.all_chats()
     admin_chats = [c for c in chats if c["am_admin"]]
     if not admin_chats:
-        await update.effective_message.reply_text("Sin chats registrados todavía.")
+        await update.effective_message.reply_text(t("picker.no_chats"))
         return
     rows = []
     for c in admin_chats:
@@ -46,7 +47,7 @@ async def show_chat_picker(
             cb += f":{args_suffix}"
         rows.append([InlineKeyboardButton(title, callback_data=cb)])
     await update.effective_message.reply_text(
-        f"🔍 ¿De qué grupo quieres ver <code>/{command_name}</code>?",
+        t("picker.pick_chat", command=command_name),
         parse_mode="HTML",
         reply_markup=InlineKeyboardMarkup(rows),
     )
@@ -73,18 +74,18 @@ async def on_pick_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         return
     parts = query.data.split(":", 3)
     if len(parts) < 3:
-        await query.answer("Botón inválido.")
+        await query.answer(t("picker.bad_button"))
         return
     command_name = parts[1]
     try:
         chat_id = int(parts[2])
     except ValueError:
-        await query.answer("Chat_id inválido.")
+        await query.answer(t("picker.bad_chat_id"))
         return
     args = parts[3] if len(parts) > 3 else ""
     handler = _HANDLERS.get(command_name)
     if not handler:
-        await query.answer(f"Sin handler para {command_name}")
+        await query.answer(t("picker.no_handler", command=command_name))
         return
     await query.answer()
     try:

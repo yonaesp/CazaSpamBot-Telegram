@@ -423,7 +423,7 @@ def _build_welcome_content(db, chat_id: int, name_html: str, verified: bool = Fa
     # La cabecera NO saluda: el propio quip del catálogo ya dice "Bienvenido/a {name}"
     # (si no, saldría "Bienvenido/a" dos veces).
     header = t("verif.ok_header") if verified else ""
-    text = f"{header}{greeting}\n\n<i>{t('welcome.footer_fixed')}</i>"
+    text = f"{header}{greeting}" + t("welcome.footer_wrap", footer=t("welcome.footer_fixed"))
     rows: list[list[InlineKeyboardButton]] = []
     db.migrate_legacy_welcome_button(chat_id)
     buttons = db.list_welcome_buttons(chat_id)
@@ -835,13 +835,13 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         return
     parts = query.data.split(":")
     if len(parts) != 3:
-        await query.answer("Botón inválido.")
+        await query.answer(t("verif.bad_button"))
         return
     try:
         chat_id = int(parts[1])
         target_user_id = int(parts[2])
     except ValueError:
-        await query.answer("Botón inválido.")
+        await query.answer(t("verif.bad_button"))
         return
 
     if query.from_user.id != target_user_id:
@@ -851,7 +851,7 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     db: DB = context.bot_data["db"]
     row = db.get_pending(chat_id, target_user_id)
     if not row:
-        await query.answer("Ya estás verificado o el botón ha expirado.")
+        await query.answer(t("verif.already_or_expired"))
         return
 
     # Unmute
@@ -862,7 +862,7 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         )
     except TelegramError as exc:
         log.warning("verification unmute fallo chat=%s user=%s: %s", chat_id, target_user_id, exc)
-        await query.answer("Error desmuteando, contacta admin.")
+        await query.answer(t("verif.unmute_error"))
         return
 
     db.mark_verified(chat_id, target_user_id)

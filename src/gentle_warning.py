@@ -18,6 +18,7 @@ from telegram.error import TelegramError
 from telegram.ext import ContextTypes
 
 from .db import DB
+from .i18n import t
 
 log = logging.getLogger(__name__)
 
@@ -71,7 +72,7 @@ async def send(
     template = random.choice(_GENTLE_TEMPLATES)
     text = template.format(name=_format_name(user))
     if reason_hint:
-        text += f"\n<i>Motivo detectado: {html.escape(reason_hint)}</i>"
+        text += t("gentle.reason_line", reason=html.escape(reason_hint))
     try:
         sent = await context.bot.send_message(
             chat_id=msg.chat_id,

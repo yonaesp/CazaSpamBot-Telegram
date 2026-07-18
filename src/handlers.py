@@ -220,15 +220,13 @@ async def _check_admin_ban_abuse(context, db, cfg, cmu) -> None:
         [InlineKeyboardButton("✅ Es legítimo (ignorar)",
                               callback_data=f"abuse:ok:{chat.id}:{admin_id}")],
     ])
-    text = (
-        f"🚨 <b>Posible abuse de admin</b> en {_h.escape(chat.title or str(chat.id))}\n\n"
-        f"👮 <a href=\"tg://user?id={admin_id}\">{_h.escape(label)}</a> "
-        f"(<code>{admin_id}</code>) ha baneado <b>{n}</b> usuarios en "
-        f"{cfg.admin_ban_abuse_window_h}h.\n\n"
-        "<i>Telegram no deja que el bot le quite permisos ni lo expulse (protección "
-        "anti-golpe). Para eso: Ajustes del grupo → Administradores → toca al admin → "
-        "quítale el permiso de banear o elimínalo.</i>\n\n"
-        "El botón de abajo SÍ puede <b>deshacer</b> esos baneos (desbanear a los afectados)."
+    text = t(
+        "hdl.admin_abuse_alert",
+        chat=_h.escape(chat.title or str(chat.id)),
+        admin_id=admin_id,
+        admin_label=_h.escape(label),
+        n=n,
+        hours=cfg.admin_ban_abuse_window_h,
     )
     try:
         await context.bot.send_message(
@@ -247,12 +245,12 @@ async def on_abuse_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     cfg: Config = context.bot_data["cfg"]
     db: DB = context.bot_data["db"]
     if q.from_user.id != cfg.admin_user_id:
-        await q.answer("Solo el admin del bot puede decidir esto.", show_alert=True)
+        await q.answer(t("hdl.only_admin_decide"), show_alert=True)
         return
     parts = q.data.split(":")
     action = parts[1] if len(parts) > 1 else ""
     if action == "ok":
-        await q.answer("Marcado como legítimo.")
+        await q.answer(t("hdl.marked_legit_toast"))
         try:
             await q.edit_message_reply_markup(reply_markup=None)
         except TelegramError:
@@ -270,7 +268,7 @@ async def on_abuse_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) 
                 ok += 1
             except TelegramError:
                 pass
-        await q.answer(f"Desbaneados {ok}/{len(bans)}.")
+        await q.answer(t("hdl.unbanned", ok=ok, total=len(bans)))
         try:
             base = q.message.text_html if q.message else ""
             await q.edit_message_text(
@@ -353,14 +351,13 @@ async def on_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             try:
                 await context.bot.send_message(
                     chat_id=cfg.admin_notify_chat_id,
-                    text=(
-                        f"🤖 <b>Bot añadido y expulsado</b>\n"
-                        f"📍 Chat: {cmu.chat.title or cmu.chat.id}\n"
-                        f"🤖 Bot: @{user.username or '?'} (<code>{user.id}</code>)\n"
-                        f"👤 Lo añadió: {_h.escape(who)}"
-                        f"{f' (<code>{added_by.id}</code>)' if added_by else ''}\n\n"
-                        f"<i>Lo expulsé por seguridad. Si es legítimo, vuelve a añadirlo "
-                        f"y dale permisos.</i>"
+                    text=t(
+                        "hdl.bot_added_kicked",
+                        chat=cmu.chat.title or cmu.chat.id,
+                        bot_username=user.username or "?",
+                        bot_id=user.id,
+                        adder=_h.escape(who),
+                        adder_id=(f" (<code>{added_by.id}</code>)" if added_by else ""),
                     ),
                     parse_mode="HTML", disable_web_page_preview=True,
                 )
@@ -563,7 +560,7 @@ async def _notify_manual_ban(
 
     # Último mensaje conocido del baneado
     seen = db.get_seen(chat.id, target.id)
-    last_msg_text = (seen["last_msg_text"] if seen else None) or "(sin mensajes registrados)"
+    last_msg_text = (seen["last_msg_text"] if seen else None) or t("hdl.no_messages_logged")
     last_msg_ts = seen["last_msg_ts"] if seen else None
 
     import datetime as _dt
@@ -571,18 +568,22 @@ async def _notify_manual_ban(
     if last_msg_ts:
         last_msg_when = " (" + _dt.datetime.fromtimestamp(last_msg_ts).strftime("%Y-%m-%d %H:%M") + ")"
 
-    new_status_label = "BAN" if cmu.new_chat_member.status == ChatMemberStatus.BANNED else "KICK/salió"
+    new_status_label = t(
+        "hdl.manual_ban_status_ban"
+        if cmu.new_chat_member.status == ChatMemberStatus.BANNED
+        else "hdl.manual_ban_status_kick"
+    )
 
-    text = (
-        f"🚨 <b>Ban manual de un admin en {_h.escape(chat.title or str(chat.id))}</b>\n\n"
-        f"⚖️ Acción: <b>{new_status_label}</b>\n"
-        f"👮 Por: <a href=\"tg://user?id={actor.id}\">{_h.escape(actor_label)}</a> (<code>{actor.id}</code>)\n"
-        f"🎯 Sobre: <a href=\"tg://user?id={target.id}\">{_h.escape(target_label)}</a> (<code>{target.id}</code>)\n"
-        f"\n"
-        f"💬 <b>Último mensaje del afectado{last_msg_when}:</b>\n"
-        f"<pre>{_h.escape(last_msg_text[:500])}</pre>\n"
-        f"\n"
-        f"<i>Lo hizo OTRO admin (no yo). Revisa por si fue spam o un ban dudoso.</i>"
+    text = t(
+        "hdl.manual_ban_alert",
+        chat=_h.escape(chat.title or str(chat.id)),
+        action=new_status_label,
+        actor_id=actor.id,
+        actor_label=_h.escape(actor_label),
+        target_id=target.id,
+        target_label=_h.escape(target_label),
+        when=last_msg_when,
+        last_msg=_h.escape(last_msg_text[:500]),
     )
 
     # 1) PRIMARIO: DM directo al admin del bot (donde recibe todo lo demás).
@@ -1226,9 +1227,7 @@ async def _send_review_request(
     user_id = user.id
 
     # 1) Aviso público breve (autoborrado 6h)
-    aviso_txt = (
-        "🔎 Mensaje marcado como posible spam. Un administrador lo revisará en breve."
-    )
+    aviso_txt = t("hdl.review_public_notice")
     try:
         public = await context.bot.send_message(
             chat_id=chat_id, text=aviso_txt, parse_mode="HTML",
@@ -1252,14 +1251,16 @@ async def _send_review_request(
     public_msg_id = public.message_id if public else 0
     text = msg.text or msg.caption or "(sin texto)"
     name = (user.first_name or "user")[:40]
-    info = (
-        f"🔎 <b>Revisión de spam</b>\n\n"
-        f"👤 <code>{user_id}</code> ({name}) · confianza {_trust.render_trust(trust)}\n"
-        f"📍 {msg.chat.title or chat_id}\n"
-        f"🚨 Reglas: <code>{', '.join(rules)}</code>\n"
-        f"⚖️ Acción propuesta: <b>{proposed_action}</b>\n"
-        f"💬 Razón: {reason}\n\n"
-        f"<b>Mensaje:</b>\n<pre>{text[:600]}</pre>"
+    info = t(
+        "hdl.review_dm",
+        uid=user_id,
+        name=name,
+        trust=_trust.render_trust(trust),
+        chat=msg.chat.title or chat_id,
+        rules=", ".join(rules),
+        action=proposed_action,
+        reason=reason,
+        text=text[:600],
     )
     # callback_data: prev:legit:CHAT:USER:MSG:PUBLIC  /  prev:spam:CHAT:USER:MSG:PUBLIC
     kb = InlineKeyboardMarkup([[
@@ -1284,7 +1285,7 @@ async def on_pending_review_callback(update: Update, context: ContextTypes.DEFAU
     cfg: Config = context.bot_data["cfg"]
     db: DB = context.bot_data["db"]
     if q.from_user.id != cfg.admin_user_id:
-        await q.answer("Solo el admin del bot puede revisar.")
+        await q.answer(t("hdl.only_admin_review"))
         return
     try:
         _, verdict, chat_s, user_s, msg_s, public_s = q.data.split(":", 5)
@@ -1293,7 +1294,7 @@ async def on_pending_review_callback(update: Update, context: ContextTypes.DEFAU
         msg_id = int(msg_s)
         public_id = int(public_s)
     except Exception as exc:  # noqa: BLE001
-        await q.answer(f"Callback inválido: {exc}")
+        await q.answer(t("hdl.callback_invalid", error=exc))
         return
 
     # Recuperar texto del msg vía seen_users.last_msg_text (lo guardamos al recibirlo)
@@ -1317,12 +1318,12 @@ async def on_pending_review_callback(update: Update, context: ContextTypes.DEFAU
         # Editar el DM para marcar resuelto
         try:
             await q.edit_message_text(
-                f"{q.message.text_html or q.message.text}\n\n✅ <b>Marcado legítimo</b> por admin.",
+                f"{q.message.text_html or q.message.text}{t('hdl.review_legit_suffix')}",
                 parse_mode="HTML", disable_web_page_preview=True,
             )
         except TelegramError:
             pass
-        await q.answer("Marcado legítimo. Sample ham guardada.")
+        await q.answer(t("hdl.review_legit_toast"))
         db.log_action(
             chat_id=chat_id, user_id=user_id, username=None,
             message_id=msg_id, rule="review_resolved", action="noop_legit",
@@ -1357,12 +1358,12 @@ async def on_pending_review_callback(update: Update, context: ContextTypes.DEFAU
             pass
     try:
         await q.edit_message_text(
-            f"{q.message.text_html or q.message.text}\n\n❌ <b>Confirmado spam</b> por admin → ban federado.",
+            f"{q.message.text_html or q.message.text}{t('hdl.review_spam_suffix')}",
             parse_mode="HTML", disable_web_page_preview=True,
         )
     except TelegramError:
         pass
-    await q.answer("Spam confirmado. Ban federado ejecutado.")
+    await q.answer(t("hdl.review_spam_toast"))
 
 
 async def _moderate_bot_message(context, db, cfg, msg, user) -> None:
@@ -1445,15 +1446,17 @@ async def _moderate_channel_message(context, db, cfg, msg) -> None:
         payload={"sender_chat": True, "title": sc.title, "rules": [h.rule for h in real]},
     )
     if cfg.admin_notify_chat_id:
-        prefix = "🌒 <b>[MODO SHADOW — no se ha actuado]</b>\n" if cfg.shadow else ""
+        prefix = t("hdl.shadow_prefix") if cfg.shadow else ""
         try:
             await context.bot.send_message(
                 chat_id=cfg.admin_notify_chat_id,
-                text=(
-                    f"{prefix}🚫 <b>Canal baneado por spam en comentarios</b>\n"
-                    f"📍 Chat: {_h.escape(msg.chat.title or str(msg.chat_id))}\n"
-                    f"📢 Canal: {_h.escape(sc_name)} (<code>{sc.id}</code>)\n"
-                    f"📖 Motivo: {_h.escape(rule)}"
+                text=t(
+                    "hdl.channel_banned",
+                    prefix=prefix,
+                    chat=_h.escape(msg.chat.title or str(msg.chat_id)),
+                    channel=_h.escape(sc_name),
+                    channel_id=sc.id,
+                    rule=_h.escape(rule),
                 ),
                 parse_mode="HTML", disable_web_page_preview=True,
             )
@@ -1487,15 +1490,13 @@ async def _moderate_via_bot_message(context, db, cfg, msg, user) -> bool:
         try:
             await context.bot.send_message(
                 chat_id=cfg.admin_notify_chat_id,
-                text=(
-                    f"⚠️ <b>Mensaje spam vía inline bot borrado</b>\n"
-                    f"📍 Chat: {msg.chat.title or msg.chat_id}\n"
-                    f'👤 Usuario: <a href="tg://user?id={user.id}">{display}</a> '
-                    f"(<code>{user.id}</code>)\n"
-                    f"🤖 Vía bot: @{via_uname or '?'}\n"
-                    f"🔘 {bhit.payload.get('n_buttons', '?')} botones spam\n\n"
-                    f"<i>No le he baneado (puede ser usuario establecido). "
-                    f"Si quieres, /ban respondiendo o por id.</i>"
+                text=t(
+                    "hdl.via_bot_deleted",
+                    chat=msg.chat.title or msg.chat_id,
+                    uid=user.id,
+                    name=display,
+                    via_bot=via_uname or "?",
+                    n_buttons=bhit.payload.get("n_buttons", "?"),
                 ),
                 parse_mode="HTML", disable_web_page_preview=True,
             )
@@ -1587,10 +1588,7 @@ async def _antiflood_apply(
     try:
         sent = await context.bot.send_message(
             chat_id=chat_id,
-            text=(
-                f"🔒 {name} muteado <b>{mute_hours}h</b> por seguridad "
-                f"(flood: demasiados mensajes muy seguidos). Un administrador lo revisará."
-            ),
+            text=t("hdl.flood_muted_public", name=name, hours=mute_hours),
             parse_mode="HTML", disable_notification=True,
         )
         jq = context.application.job_queue
@@ -1610,19 +1608,15 @@ async def _antiflood_apply(
         return
     user_link = f'<a href="tg://user?id={user_id}">{name}</a>'
     kb = InlineKeyboardMarkup([[
-        InlineKeyboardButton("✅ No es bot", callback_data=f"flood:human:{chat_id}:{user_id}"),
-        InlineKeyboardButton("❌ Es bot (banear)", callback_data=f"flood:bot:{chat_id}:{user_id}"),
+        InlineKeyboardButton(t("hdl.btn.not_bot"), callback_data=f"flood:human:{chat_id}:{user_id}"),
+        InlineKeyboardButton(t("hdl.btn.is_bot"), callback_data=f"flood:bot:{chat_id}:{user_id}"),
     ]])
     try:
         await context.bot.send_message(
             chat_id=admin_dm,
-            text=(
-                f"🌊 <b>Flood detectado</b>\n"
-                f"👤 {user_link} (<code>{user_id}</code>)\n"
-                f"📍 chat <code>{chat_id}</code>\n"
-                f"⏱️ Muteado {mute_hours}h. ¿Es un bot?\n\n"
-                f"<i>«No es bot» le da más margen y lo desmuteo. Si vuelve a "
-                f"hacer flood, lo muteo igual sin preguntar.</i>"
+            text=t(
+                "hdl.flood_detected_dm",
+                user_link=user_link, uid=user_id, chat_id=chat_id, hours=mute_hours,
             ),
             parse_mode="HTML", reply_markup=kb, disable_web_page_preview=True,
         )
@@ -1639,7 +1633,7 @@ async def on_flood_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     cfg: Config = context.bot_data["cfg"]
     db: DB = context.bot_data["db"]
     if not query.from_user or query.from_user.id != cfg.admin_user_id:
-        await query.answer("Solo el admin del bot.", show_alert=True)
+        await query.answer(t("hdl.only_bot_admin"), show_alert=True)
         return
     parts = query.data.split(":")
     if len(parts) != 4:
@@ -1658,7 +1652,7 @@ async def on_flood_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         except TelegramError as exc:
             log.debug("flood unmute fallo user=%s: %s", user_id, exc)
         invalidate_trust_cache(context, chat_id, user_id)
-        await query.answer("Marcado como humano y desmuteado.")
+        await query.answer(t("hdl.flood_human_toast"))
         try:
             await query.edit_message_text(
                 base + "\n\n✅ <b>Marcado como humano</b> (desmuteado, más margen).",
@@ -1923,27 +1917,27 @@ async def _apply_action(
                         if username:
                             name_link += f" (@{username})"
                         habria = {
-                            "ban": "🔨 <b>Habría BANEADO</b> (sincronizado en todos los grupos)",
-                            "kick": "👢 <b>Habría EXPULSADO</b>",
-                            "mute": "🤐 <b>Habría MUTEADO</b>",
-                            "delete": "🗑️ <b>Habría BORRADO el mensaje</b>",
-                        }.get(decision.action, f"<b>Habría {decision.action}</b>")
+                            "ban": t("hdl.would.ban"),
+                            "kick": t("hdl.would.kick"),
+                            "mute": t("hdl.would.mute"),
+                            "delete": t("hdl.would.delete"),
+                        }.get(decision.action, t("hdl.would.other", action=decision.action))
                         motivo = (
                             rule_explain.explain(decision.rule)
                             or (decision.reason or "").strip()
-                            or "Patrón de spam detectado."
+                            or t("hdl.reason_generic")
                         )
                         await context.bot.send_message(
                             chat_id=cfg.admin_notify_chat_id,
-                            text=(
-                                "🌒 <b>[MODO SHADOW — no se ha actuado]</b>\n"
-                                f"📍 Chat: {chat_title or chat_id}\n"
-                                f"👤 {name_link} (<code>{user_id}</code>)\n"
-                                f"⚖️ {habria}\n"
-                                f"📖 Motivo: {_h.escape(motivo)}\n"
-                                f"🚨 Regla: <code>{decision.rule}</code>\n"
-                                f"📏 Score: {decision.score}\n\n"
-                                "<i>Es modo prueba: pon MODE=active en el .env para que actúe de verdad.</i>"
+                            text=t(
+                                "hdl.shadow_notice",
+                                chat=chat_title or chat_id,
+                                user_link=name_link,
+                                uid=user_id,
+                                would=habria,
+                                reason=_h.escape(motivo),
+                                rule=decision.rule,
+                                score=decision.score,
                             ),
                             parse_mode="HTML", disable_web_page_preview=True,
                         )
@@ -2002,30 +1996,31 @@ async def _apply_action(
                             if username:
                                 name_link += f" (@{username})"
                             accion = {
-                                "ban": "🔨 <b>Baneado</b> (sincronizado en todos los grupos)",
-                                "kick": "👢 <b>Expulsado</b> (puede volver a entrar)",
-                                "mute": "🤐 <b>Muteado</b>",
-                                "delete": "🗑️ <b>Mensaje borrado</b> (sin sanción al user)",
-                            }.get(decision.action, f"<b>{decision.action}</b>")
+                                "ban": t("hdl.act.ban"),
+                                "kick": t("hdl.act.kick"),
+                                "mute": t("hdl.act.mute"),
+                                "delete": t("hdl.act.delete"),
+                            }.get(decision.action, t("hdl.act.other", action=decision.action))
                             # Motivo comprensible SIEMPRE: explicación mapeada →
                             # si la regla no está en el mapa, la razón del propio
                             # detector → y si tampoco, un genérico. Nunca vacío.
                             motivo = (
                                 rule_explain.explain(decision.rule)
                                 or (decision.reason or "").strip()
-                                or "Patrón de spam detectado."
+                                or t("hdl.reason_generic")
                             )
-                            motivo_line = f"📖 Motivo: {_h.escape(motivo)}\n"
+                            motivo_line = t("hdl.reason_line", reason=_h.escape(motivo))
                             await context.bot.send_message(
                                 chat_id=cfg.admin_notify_chat_id,
-                                text=(
-                                    f"☝️ <b>Acción antispam</b>\n"
-                                    f"📍 Chat: {chat_title or chat_id}\n"
-                                    f"👤 {name_link} (<code>{user_id}</code>)\n"
-                                    f"⚖️ Acción: {accion}\n"
-                                    f"{motivo_line}"
-                                    f"🚨 Regla: <code>{decision.rule}</code>\n"
-                                    f"📏 Score: {decision.score}"
+                                text=t(
+                                    "hdl.action_notice",
+                                    chat=chat_title or chat_id,
+                                    user_link=name_link,
+                                    uid=user_id,
+                                    action=accion,
+                                    reason_line=motivo_line,
+                                    rule=decision.rule,
+                                    score=decision.score,
                                 ),
                                 parse_mode="HTML",
                                 disable_web_page_preview=True,

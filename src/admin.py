@@ -34,17 +34,21 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     db: DB = context.bot_data["db"]
     s = db.stats()
     mode_emoji = "🌒" if cfg.shadow else "🔴"
+    on, off = t("admin.on"), t("admin.off")
     await update.effective_message.reply_text(
-        f"🤖 <b>CazaSpamBot operativo</b>\n\n"
-        f"{mode_emoji} <b>Modo:</b> <code>{cfg.mode}</code>\n"
-        f"🌐 <b>Federación:</b> {'✅ on' if cfg.federation_enabled else '❌ off'}\n"
-        f"🛡️ <b>CAS:</b> {'✅ on' if cfg.cas_enabled else '❌ off'}\n"
-        f"❤️ <b>Reacciones:</b> {'✅ on' if cfg.reaction_farming_enabled else '❌ off'}\n"
-        f"📜 <b>Scripts permitidos:</b> {', '.join(cfg.allowed_scripts)}\n\n"
-        f"📊 <b>Stats</b>\n"
-        f"  Chats: <b>{s['chats']}</b> · Usuarios vistos: <b>{s['seen_users']}</b>\n"
-        f"  Bans activos: <b>{s['banned']}</b> · Acciones 24h: <b>{s['actions_24h']}</b>\n\n"
-        f"Usa /help para ver todos los comandos.",
+        t(
+            "admin.start",
+            mode_emoji=mode_emoji,
+            mode=cfg.mode,
+            federation=on if cfg.federation_enabled else off,
+            cas=on if cfg.cas_enabled else off,
+            reactions=on if cfg.reaction_farming_enabled else off,
+            scripts=", ".join(cfg.allowed_scripts),
+            chats=s["chats"],
+            seen_users=s["seen_users"],
+            banned=s["banned"],
+            actions_24h=s["actions_24h"],
+        ),
         parse_mode="HTML",
     )
 
@@ -88,11 +92,10 @@ async def _add_sample_with_ux(
 
     cmd = "legal" if label == "ham" else "spam"
     if not msg.reply_to_message:
-        usage = (
-            f"📚 <b>/{cmd}</b>: Responde a un mensaje con este comando para que el bot lo "
-            f"añada al clasificador como muestra <b>{'legítima' if label=='ham' else 'spam'}</b>.\n\n"
-            f"Esto enseña al bot qué tipo de mensajes son normales en tu grupo "
-            f"y reduce falsos positivos en el futuro."
+        usage = t(
+            "admin.sample_usage",
+            cmd=cmd,
+            label=t("sample.label_ham") if label == "ham" else t("sample.label_spam"),
         )
         await msg.reply_text(usage, parse_mode="HTML")
         return
@@ -102,9 +105,9 @@ async def _add_sample_with_ux(
     if not text or len(text) < 5:
         if is_group:
             await _delete_command_safely(update)
-            await _notify_admin_ack(context, f"⚠️ /{cmd} ignorado: mensaje sin texto suficiente.")
+            await _notify_admin_ack(context, t("sample.ignored_ack", cmd=cmd))
         else:
-            await msg.reply_text("Mensaje sin texto suficiente. No se guarda.")
+            await msg.reply_text(t("sample.no_text"))
         return
 
     norm = learning.normalize(text)
@@ -114,21 +117,22 @@ async def _add_sample_with_ux(
         added_by=update.effective_user.id, chat_id=msg.chat_id,
         source_user=target.from_user.id if target.from_user else None,
     )
-    status = "añadida" if added else "ya estaba registrada"
+    status = t("sample.status_added") if added else t("sample.status_dup")
     emoji = "🛑" if label == "spam" else "✅"
-    label_es = "spam" if label == "spam" else "legítima"
+    label_txt = t("sample.label_spam") if label == "spam" else t("sample.label_ham")
 
     if is_group:
         # Borrar el comando del admin del grupo y confirmar al admin por DM
         await _delete_command_safely(update)
-        ack = (
-            f"{emoji} Muestra <b>{label_es}</b> {status} en {msg.chat.title or msg.chat_id}.\n"
-            f"<i>Texto:</i> <pre>{(text[:200])}</pre>"
+        ack = t(
+            "sample.ack_group",
+            emoji=emoji, label=label_txt, status=status,
+            chat=msg.chat.title or msg.chat_id, text=text[:200],
         )
         await _notify_admin_ack(context, ack)
     else:
         await msg.reply_text(
-            f"{emoji} Muestra <b>{label_es}</b> {status} al clasificador.",
+            t("sample.ack_dm", emoji=emoji, label=label_txt, status=status),
             parse_mode="HTML",
         )
 
@@ -147,13 +151,7 @@ async def _spam_combo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     cfg: Config = context.bot_data["cfg"]
 
     if not msg.reply_to_message:
-        await msg.reply_text(
-            "🛑 <b>/spam</b>: responde al mensaje de un spammer con este comando.\n\n"
-            "Banea al autor en todos tus grupos, reporta el mensaje a Telegram "
-            "y lo añade al clasificador.\n"
-            "Para banear por <code>@usuario</code> sin un mensaje, usa <code>/ban</code>.",
-            parse_mode="HTML",
-        )
+        await msg.reply_text(t("spam.usage"), parse_mode="HTML")
         return
 
     target = msg.reply_to_message
@@ -161,7 +159,7 @@ async def _spam_combo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     author = target.from_user
 
     # 1) Aprender (solo si hay texto suficiente)
-    sample_note = "sin texto para aprender"
+    sample_note = t("admin.spam.note_no_text")
     if text and len(text) >= 5:
         norm = learning.normalize(text)
         added = db.add_sample(
@@ -169,7 +167,7 @@ async def _spam_combo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             added_by=update.effective_user.id, chat_id=msg.chat_id,
             source_user=author.id if author else None,
         )
-        sample_note = "sample spam guardada" if added else "sample spam ya existía"
+        sample_note = t("admin.spam.note_saved") if added else t("admin.spam.note_dup")
 
     # Borrar el comando del admin del grupo cuanto antes
     if is_group:
@@ -177,7 +175,7 @@ async def _spam_combo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 
     # Sin autor resoluble (forward anónimo / post de canal): solo aprende.
     if author is None or author.is_bot:
-        ack = f"⚠️ /spam: no pude identificar al autor (anónimo o canal). {sample_note}."
+        ack = t("admin.spam.no_author", note=sample_note)
         if is_group:
             await _notify_admin_ack(context, ack)
         else:
@@ -194,9 +192,10 @@ async def _spam_combo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                 chat_id=chat_row["chat_id"], user_id=author.id,
             )
             if member.status in (ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER):
-                warn = (
-                    f"⚠️ {author.first_name} (id: {author.id}) es admin en "
-                    f"<b>{chat_row['title']}</b>. No lo baneo. {sample_note}."
+                warn = t(
+                    "admin.spam.is_admin",
+                    name=author.first_name, uid=author.id,
+                    chat=chat_row["title"], note=sample_note,
                 )
                 if is_group:
                     await _notify_admin_ack(context, warn)
@@ -250,9 +249,10 @@ async def _spam_combo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             )
 
     # 6) Ack al admin
-    ack = (
-        f"🛑 /spam → ban federado {author.first_name} (id: {author.id}): "
-        f"{ok} ok · {shadow} shadow · {err} err. Reporte encolado. {sample_note}."
+    ack = t(
+        "admin.spam.ack",
+        name=author.first_name, uid=author.id,
+        ok=ok, shadow=shadow, err=err, note=sample_note,
     )
     if is_group:
         await _notify_admin_ack(context, ack)
@@ -289,28 +289,24 @@ async def cmd_samples(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     if not context.args:
         c = db.sample_count()
         await update.effective_message.reply_text(
-            f"📚 <b>Muestras del clasificador</b>\n"
-            f"🛑 spam: <b>{c['spam']}</b>\n"
-            f"✅ ham: <b>{c['ham']}</b>\n\n"
-            f"<code>/samples spam 20</code> · <code>/samples ham 20</code>\n"
-            f"<code>/forget &lt;sample_id&gt;</code> para borrar",
+            t("samples.stats", spam=c["spam"], ham=c["ham"]),
             parse_mode="HTML",
         )
         return
     label = context.args[0].lower()
     if label not in ("spam", "ham"):
-        await update.effective_message.reply_text("Uso: /samples spam|ham [N]")
+        await update.effective_message.reply_text(t("samples.usage"))
         return
     n = 20
     if len(context.args) > 1 and context.args[1].isdigit():
         n = max(1, min(50, int(context.args[1])))
     rows = db.list_samples(label=label, limit=n)
     if not rows:
-        await update.effective_message.reply_text(f"Sin muestras {label}.")
+        await update.effective_message.reply_text(t("samples.empty", label=label))
         return
     import datetime as _dt
     import html as _html
-    lines = [f"📚 Últimas {n} muestras <b>{label}</b>:\n"]
+    lines = [t("samples.list_header", n=n, label=label)]
     for r in rows:
         ts = _dt.datetime.fromtimestamp(r["ts"]).strftime("%m-%d %H:%M")
         txt = (r["text_norm"] or "")[:80]
@@ -322,15 +318,15 @@ async def cmd_samples(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 async def cmd_forget(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Borra una muestra del clasificador."""
     if not context.args or not context.args[0].isdigit():
-        await update.effective_message.reply_text("Uso: /forget <sample_id>")
+        await update.effective_message.reply_text(t("forget.usage"))
         return
     sid = int(context.args[0])
     db: DB = context.bot_data["db"]
     ok = db.delete_sample(sid)
     if ok:
-        await update.effective_message.reply_text(f"🗑️ Muestra #{sid} borrada.")
+        await update.effective_message.reply_text(t("forget.done", sid=sid))
     else:
-        await update.effective_message.reply_text(f"No existe #{sid}.")
+        await update.effective_message.reply_text(t("forget.notfound", sid=sid))
 
 
 async def on_private_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -343,12 +339,7 @@ async def on_private_message(update: Update, context: ContextTypes.DEFAULT_TYPE)
     from . import config_panel
     if await config_panel.handle_capture(update, context):
         return
-    await update.effective_message.reply_text(
-        "👋 Hola. Soy <b>CazaSpamBot</b>, tu bot de moderación.\n\n"
-        "Solo respondo a comandos. Usa /help para ver la lista completa,\n"
-        "o /start para un resumen rápido del estado.",
-        parse_mode="HTML",
-    )
+    await update.effective_message.reply_text(t("dm.hint"), parse_mode="HTML")
 
 
 async def _render_chat_stats(db: DB, chat_id: int | None = None) -> str:
@@ -415,9 +406,9 @@ async def cmd_chats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     db: DB = context.bot_data["db"]
     rows = db.all_chats()
     if not rows:
-        await update.effective_message.reply_text("Sin chats registrados todavía.")
+        await update.effective_message.reply_text(t("chats.empty"))
         return
-    lines = ["<b>Chats:</b>"]
+    lines = [t("chats.header")]
     for r in rows:
         admin_mark = "✅" if r["am_admin"] else "❌"
         perms = []
@@ -426,7 +417,7 @@ async def cmd_chats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if r["can_delete"]:
             perms.append("delete")
         lines.append(
-            f"{admin_mark} <code>{r['chat_id']}</code> · {html.escape(r['title'] or '?')} ({r['type']}) [{','.join(perms) or 'sin perms'}]"
+            f"{admin_mark} <code>{r['chat_id']}</code> · {html.escape(r['title'] or '?')} ({r['type']}) [{','.join(perms) or t('chats.no_perms')}]"
         )
     await update.effective_message.reply_text("\n".join(lines), parse_mode="HTML")
 
@@ -439,9 +430,9 @@ async def cmd_recent(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         n = max(1, min(50, int(context.args[0])))
     rows = db.recent_actions(limit=n)
     if not rows:
-        await update.effective_message.reply_text("Sin acciones registradas.")
+        await update.effective_message.reply_text(t("recent.empty"))
         return
-    lines = [f"<b>Últimas {n} acciones</b>"]
+    lines = [t("recent.header", n=n)]
     import datetime as _dt
     for r in rows:
         ts = _dt.datetime.fromtimestamp(r["ts"]).strftime("%m-%d %H:%M")
@@ -624,10 +615,7 @@ async def cmd_ban(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 chat_id=chat_row["chat_id"], user_id=user_id,
             )
             if member.status in (ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER):
-                warn = (
-                    f"⚠️ <code>{user_id}</code> es admin en <b>{chat_row['title']}</b>. "
-                    f"No baneo admins automáticamente. Quítale el admin primero."
-                )
+                warn = t("admin.ban.is_admin", uid=user_id, chat=chat_row["title"])
                 if is_group:
                     await _delete_command_safely(update)
                     await _notify_admin_ack(context, warn)
@@ -667,7 +655,7 @@ async def cmd_ban(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     ok = sum(1 for v in results.values() if v == "ok")
     shadow = sum(1 for v in results.values() if v == "shadow")
     err = sum(1 for v in results.values() if v.startswith("error"))
-    ack = f"🔨 Ban federado user <code>{user_id}</code>: {ok} ok · {shadow} shadow · {err} err"
+    ack = t("admin.ban.ack", uid=user_id, ok=ok, shadow=shadow, err=err)
     # Borrar welcome huérfano del baneado si seguía pendiente
     if not cfg.shadow:
         await _cleanup_welcome_on_ban(context, db, user_id)
@@ -686,7 +674,7 @@ async def cmd_ban(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if quip:
             text = quip
             if has_explicit_reason:
-                text += f"\n<i>Motivo:</i> {reason}"
+                text += t("admin.quip_reason", reason=reason)
             await _post_ban_quip_to_chats(
                 context, chats=[update.effective_chat.id],
                 text=text,
@@ -750,7 +738,7 @@ async def cmd_unban(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     )
     ok = sum(1 for v in results.values() if v == "ok")
     err = sum(1 for v in results.values() if v.startswith("error"))
-    ack = f"🔓 Unban federado user <code>{user_id}</code>: {ok} ok · {err} err"
+    ack = t("admin.unban.ack", uid=user_id, ok=ok, err=err)
     if is_group:
         await _notify_admin_ack(context, ack)
     else:
@@ -765,7 +753,7 @@ async def cmd_unban(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if quip:
             text = quip
             if has_explicit_reason:
-                text += f"\n<i>Motivo:</i> {reason_raw}"
+                text += t("admin.quip_reason", reason=reason_raw)
             await _post_ban_quip_to_chats(
                 context, chats=[update.effective_chat.id],
                 text=text,
@@ -797,11 +785,7 @@ async def cmd_setgreeter(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     Uso: /setgreeter @username emoji1 emoji2 ...  | /setgreeter user_id emoji1 ...
     """
     if not context.args or len(context.args) < 2:
-        await update.effective_message.reply_text(
-            "Uso: <code>/setgreeter @username 🫡 🤝</code> o <code>/setgreeter user_id 🫡</code>\n"
-            "Reactions sugeridas: 🫡 🤝 🤗 ❤️ 👏 🎉 🌚 🔥",
-            parse_mode="HTML",
-        )
+        await update.effective_message.reply_text(t("greeter.usage"), parse_mode="HTML")
         return
     db: DB = context.bot_data["db"]
     target = context.args[0]
@@ -821,12 +805,16 @@ async def cmd_setgreeter(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             except Exception as exc:  # noqa: BLE001
                 log.debug("setgreeter get_chat(%s) fallo: %s", target, exc)
     if not target_id:
-        await update.effective_message.reply_text(f"No pude resolver {target}.")
+        await update.effective_message.reply_text(t("greeter.unresolved", target=target))
         return
     db.upsert_friendly_greeter(target_id, username, list(reactions), update.effective_user.id)
     await update.effective_message.reply_text(
-        f"✅ Greeter añadido: <code>{target_id}</code> "
-        f"({'@'+username if username else 'sin username'}) con reacciones: {' '.join(reactions)}",
+        t(
+            "greeter.added",
+            uid=target_id,
+            uname="@" + username if username else t("greeter.no_username"),
+            reactions=" ".join(reactions),
+        ),
         parse_mode="HTML",
     )
 
@@ -834,7 +822,7 @@ async def cmd_setgreeter(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 @_only_admin
 async def cmd_rmgreeter(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not context.args:
-        await update.effective_message.reply_text("Uso: /rmgreeter @username | user_id")
+        await update.effective_message.reply_text(t("rmgreeter.usage"))
         return
     db: DB = context.bot_data["db"]
     target = context.args[0]
@@ -844,10 +832,11 @@ async def cmd_rmgreeter(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     elif target.startswith("@"):
         target_id = db.resolve_username(target[1:])
     if not target_id:
-        await update.effective_message.reply_text("No pude resolver el usuario.")
+        await update.effective_message.reply_text(t("greeter.unresolved_user"))
         return
     ok = db.remove_friendly_greeter(target_id)
-    await update.effective_message.reply_text("✅ Eliminado." if ok else "No estaba en la lista.")
+    await update.effective_message.reply_text(
+        t("greeter.removed") if ok else t("greeter.not_in_list"))
 
 
 @_read_admin
@@ -856,16 +845,16 @@ async def cmd_listgreeters(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     db: DB = context.bot_data["db"]
     rows = db.list_friendly_greeters()
     if not rows:
-        await update.effective_message.reply_text("No hay greeters configurados.")
+        await update.effective_message.reply_text(t("greeters.empty"))
         return
-    lines = ["<b>🫡 Friendly greeters configurados</b>"]
+    lines = [t("greeters.header")]
     for r in rows:
         try:
             reactions = " ".join(_j.loads(r["reactions_json"]))
         except Exception as exc:  # noqa: BLE001
             log.debug("listgreeters parse reactions user=%s: %s", r["user_id"], exc)
             reactions = "?"
-        uname = "@" + r["username"] if r["username"] else "(sin username)"
+        uname = "@" + r["username"] if r["username"] else "(" + t("greeter.no_username") + ")"
         lines.append(f"  <code>{r['user_id']}</code> {uname} → {reactions}")
     await update.effective_message.reply_text("\n".join(lines), parse_mode="HTML")
 
@@ -921,11 +910,7 @@ async def cmd_topweekly(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     from . import chat_picker
     if chat_picker.is_dm(update):
         await update.effective_message.reply_text(
-            "🏆 <b>Top semanal de actividad — gestión</b>\n\n"
-            "Pulsa un grupo para alternar su estado.\n"
-            "✅ = activado (publica cada domingo 20:00)\n"
-            "⛔ = desactivado\n\n"
-            "<i>Filtros activos: texto ≥10 chars o con media, sin saludos, cooldown 10s.</i>",
+            t("topweekly.panel"),
             parse_mode="HTML",
             reply_markup=_topweekly_keyboard(db),
         )
@@ -937,20 +922,18 @@ async def cmd_topweekly(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         s = db.get_chat_settings(chat_id)
         state = "ON" if s["topweekly_enabled"] else "OFF"
         await update.effective_message.reply_text(
-            f"Top semanal automático en este chat: <b>{state}</b>\n"
-            f"Uso: <code>/topweekly on</code> o <code>/topweekly off</code>",
-            parse_mode="HTML",
+            t("topweekly.state", state=state), parse_mode="HTML",
         )
         return
     val = context.args[0].lower()
     if val in ("on", "true", "yes", "1"):
         db.update_chat_setting(chat_id, "topweekly_enabled", 1)
-        await update.effective_message.reply_text("✅ Top semanal ACTIVADO. Próxima publicación: domingo 20:00.")
+        await update.effective_message.reply_text(t("topweekly.on"))
     elif val in ("off", "false", "no", "0"):
         db.update_chat_setting(chat_id, "topweekly_enabled", 0)
-        await update.effective_message.reply_text("⛔ Top semanal DESACTIVADO en este chat.")
+        await update.effective_message.reply_text(t("topweekly.off"))
     else:
-        await update.effective_message.reply_text("Uso: /topweekly on|off")
+        await update.effective_message.reply_text(t("topweekly.usage"))
 
 
 async def on_topweekly_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -960,19 +943,19 @@ async def on_topweekly_callback(update: Update, context: ContextTypes.DEFAULT_TY
         return
     cfg: Config = context.bot_data["cfg"]
     if q.from_user.id != cfg.admin_user_id:
-        await q.answer("Solo el bot admin.", show_alert=True)
+        await q.answer(t("admin.only_bot_admin"), show_alert=True)
         return
     try:
         chat_id = int(q.data.split(":", 1)[1])
     except ValueError:
-        await q.answer("Botón inválido.")
+        await q.answer(t("admin.invalid_button"))
         return
     db: DB = context.bot_data["db"]
     db.ensure_chat_settings(chat_id)
     s = db.get_chat_settings(chat_id)
     new_value = 0 if s["topweekly_enabled"] else 1
     db.update_chat_setting(chat_id, "topweekly_enabled", new_value)
-    await q.answer(f"Top semanal {'ACTIVADO' if new_value else 'DESACTIVADO'}")
+    await q.answer(t("topweekly.toast_on") if new_value else t("topweekly.toast_off"))
     try:
         await q.edit_message_reply_markup(reply_markup=_topweekly_keyboard(db))
     except Exception as exc:  # noqa: BLE001
@@ -1031,17 +1014,17 @@ async def on_notifpref_callback(update: Update, context: ContextTypes.DEFAULT_TY
     db: DB = context.bot_data["db"]
     cfg: Config = context.bot_data["cfg"]
     if q.from_user.id != cfg.admin_user_id:
-        await q.answer("Solo el admin del bot puede cambiar esto.", show_alert=True)
+        await q.answer(t("admin.only_bot_admin_change"), show_alert=True)
         return
     parts = q.data.split(":")
     action = parts[1] if len(parts) > 1 else ""
     key = parts[2] if len(parts) > 2 else ""
     if key not in notify_prefs.NOTIFY_TYPES:
-        await q.answer("Aviso desconocido.")
+        await q.answer(t("alerts.unknown"))
         return
     if action == "off":  # botón "silenciar" junto al aviso
         db.set_pref(f"notify_{key}", False)
-        await q.answer("🔕 Silenciado. Reactívalo con /alertas.")
+        await q.answer(t("alerts.muted_toast"))
         try:
             await q.edit_message_reply_markup(reply_markup=None)
         except TelegramError:
@@ -1050,7 +1033,7 @@ async def on_notifpref_callback(update: Update, context: ContextTypes.DEFAULT_TY
     if action == "tog":  # toggle desde /alertas
         new_val = not notify_prefs.effective(db, key, cfg)
         db.set_pref(f"notify_{key}", new_val)
-        await q.answer("🔔 Activado" if new_val else "🔕 Silenciado")
+        await q.answer(t("alerts.toast_on") if new_val else t("alerts.toast_off"))
         try:
             await q.edit_message_reply_markup(reply_markup=_alertas_keyboard(db, cfg))
         except TelegramError:
@@ -1065,7 +1048,7 @@ async def on_suspicious_review_callback(update: Update, context: ContextTypes.DE
     cfg: Config = context.bot_data["cfg"]
     db: DB = context.bot_data["db"]
     if q.from_user.id != cfg.admin_user_id:
-        await q.answer("Solo el admin del bot puede decidir esto.", show_alert=True)
+        await q.answer(t("admin.only_bot_admin_decide"), show_alert=True)
         return
     from . import settings_sync, verification
     parts = q.data.split(":")
@@ -1073,7 +1056,7 @@ async def on_suspicious_review_callback(update: Update, context: ContextTypes.DE
     try:
         chat_id, user_id = int(parts[-2]), int(parts[-1])  # siempre los dos últimos
     except (IndexError, ValueError):
-        await q.answer("Callback inválido.")
+        await q.answer(t("review.invalid_callback"))
         return
     base = q.message.text_html if q.message else ""
 
@@ -1108,7 +1091,7 @@ async def on_suspicious_review_callback(update: Update, context: ContextTypes.DE
         s = db.get_chat_settings(chat_id)
         new_val = 0 if (s and s[field]) else 1
         n = settings_sync.apply_setting(db, chat_id, field, new_val)
-        scope = f" · {n} grupos" if n > 1 else ""
+        scope = t("cfg.dot_n", n=n) if n > 1 else ""
         await q.answer(f"{t(nombre_key)}: {'ON' if new_val else 'OFF'}{scope}")
         try:
             await q.edit_message_reply_markup(
@@ -1132,14 +1115,14 @@ async def on_suspicious_review_callback(update: Update, context: ContextTypes.DE
         try:
             val = int(parts[3])
         except (IndexError, ValueError):
-            await q.answer("Valor inválido.")
+            await q.answer(t("cfg.invalid_val"))
             return
         if not info or val not in info[1]:
-            await q.answer("Opción inválida.")
+            await q.answer(t("cfg.invalid_opt"))
             return
         field, _presets, unit = info
         n = settings_sync.apply_setting(db, chat_id, field, val)
-        await q.answer(f"✅ {val}{unit}" + (f" · {n} grupos" if n > 1 else ""))
+        await q.answer(f"✅ {val}{unit}" + (t("cfg.dot_n", n=n) if n > 1 else ""))
         try:
             await q.edit_message_reply_markup(
                 reply_markup=verification.build_review_times_keyboard(db, chat_id, user_id))

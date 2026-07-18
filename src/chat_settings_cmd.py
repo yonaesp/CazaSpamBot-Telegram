@@ -12,6 +12,7 @@ from telegram.ext import ContextTypes
 from . import chat_picker, i18n, settings_sync
 from .config import Config
 from .db import DB
+from .i18n import t
 
 # Sintaxis Rose: [Texto del botón](buttonurl://https://url.com)
 # Variante misma fila: [Texto2](buttonurl://https://url2.com:same)
@@ -52,17 +53,19 @@ async def _render_welcome(db: DB, chat_id: int) -> str:
     db.ensure_chat_settings(chat_id)
     s = db.get_chat_settings(chat_id)
     if not s or not s["welcome_text"]:
-        return (
-            "ℹ️ Sin welcome custom — se usa el default. Para configurar:\n"
-            "<code>/setwelcome &lt;texto&gt;</code> (placeholders {name} {chat})"
-        )
-    enabled = "✅ activado" if s["welcome_enabled"] else "❌ desactivado"
+        return t("welcome.none", name="{name}", chat="{chat}")
+    enabled = t("cfg.act_on") if s["welcome_enabled"] else t("cfg.act_off")
     btn_part = ""
     if s["welcome_button_text"]:
-        btn_part = f"\n\n🔘 Botón: <code>{html.escape(s['welcome_button_text'])}</code>"
+        btn_part = t("welcome.btn_line", text=html.escape(s["welcome_button_text"]))
         if s["welcome_button_url"]:
-            btn_part += f" → <code>{html.escape(s['welcome_button_url'])}</code>"
-    return f"<b>Welcome actual</b> ({enabled}):\n\n<pre>{html.escape(s['welcome_text'])}</pre>{btn_part}"
+            btn_part += t("welcome.btn_url", url=html.escape(s["welcome_button_url"]))
+    return t(
+        "welcome.current",
+        state=enabled,
+        text=html.escape(s["welcome_text"]),
+        buttons=btn_part,
+    )
 
 
 async def _welcome_picker_handler(update: Update, context: ContextTypes.DEFAULT_TYPE, chat_id: int, args: str) -> None:
@@ -76,10 +79,10 @@ async def _rules_picker_handler(update: Update, context: ContextTypes.DEFAULT_TY
     db.ensure_chat_settings(chat_id)
     s = db.get_chat_settings(chat_id)
     if not s or not s["rules_text"]:
-        await update.callback_query.edit_message_text("ℹ️ Sin reglas configuradas para ese chat.")
+        await update.callback_query.edit_message_text(t("rules.none_chat"))
         return
     await update.callback_query.edit_message_text(
-        f"📜 <b>Reglas</b>\n\n{s['rules_text']}", parse_mode="HTML",
+        t("rules.show", rules=s["rules_text"]), parse_mode="HTML",
     )
 
 
@@ -93,20 +96,21 @@ async def cmd_welcome(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     db.ensure_chat_settings(chat_id)
     s = db.get_chat_settings(chat_id)
     if not s["welcome_text"]:
-        await update.effective_message.reply_text(
-            "ℹ️ Sin welcome custom — se usa el default. Para configurar:\n"
-            "<code>/setwelcome &lt;texto&gt;</code> (usa {name} y {chat} como placeholders)",
-            parse_mode="HTML",
-        )
+        await update.effective_message.reply_text(t("welcome.none", name="{name}", chat="{chat}"), parse_mode="HTML")
         return
-    enabled = "✅ activado" if s["welcome_enabled"] else "❌ desactivado"
+    enabled = t("cfg.act_on") if s["welcome_enabled"] else t("cfg.act_off")
     btn_part = ""
     if s['welcome_button_text']:
-        btn_part = f"\n\n🔘 Botón: <code>{html.escape(s['welcome_button_text'])}</code>"
+        btn_part = t("welcome.btn_line", text=html.escape(s["welcome_button_text"]))
         if s['welcome_button_url']:
-            btn_part += f" → <code>{html.escape(s['welcome_button_url'])}</code>"
+            btn_part += t("welcome.btn_url", url=html.escape(s["welcome_button_url"]))
     await update.effective_message.reply_text(
-        f"<b>Welcome actual</b> ({enabled}):\n\n<pre>{html.escape(s['welcome_text'])}</pre>{btn_part}",
+        t(
+            "welcome.current",
+            state=enabled,
+            text=html.escape(s["welcome_text"]),
+            buttons=btn_part,
+        ),
         parse_mode="HTML",
     )
 
@@ -116,29 +120,21 @@ async def cmd_setwelcome(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     db: DB = context.bot_data["db"]
     if not context.args:
         await update.effective_message.reply_text(
-            "Uso: <code>/setwelcome &lt;texto&gt;</code>\n"
-            "<b>Ejemplo</b>: <code>/setwelcome ¡Hola {name}! Bienvenido/a a {chat}. "
-            "Lee las normas del anclado.</code>\n\n"
-            "<b>Placeholders</b>: <code>{name}</code>, <code>{chat}</code>\n"
-            "<b>HTML</b> permitido: &lt;b&gt; &lt;i&gt; &lt;code&gt; etc.\n\n"
-            "<b>Botones inline</b> (sintaxis Rose):\n"
-            "<code>[Texto](buttonurl://https://url.com)</code> — botón en fila propia\n"
-            "<code>[Texto](buttonurl://https://url.com:same)</code> — botón en la misma fila que el anterior",
-            parse_mode="HTML",
+            t("welcome.usage_set", name="{name}", chat="{chat}"), parse_mode="HTML",
         )
         return
     raw = " ".join(context.args)
     chat_id = update.effective_chat.id
     clean_text, buttons = _parse_rose_buttons(raw)
     n = settings_sync.apply_welcome(db, chat_id, clean_text, buttons if buttons else None)
-    scope = f" en {n} grupos" if n > 1 else ""
+    scope = t("cfg.in_n", n=n) if n > 1 else ""
     if buttons:
         await update.effective_message.reply_text(
-            f"✅ Welcome actualizado + <b>{len(buttons)} botón(es)</b> inline configurados{scope}.",
+            t("welcome.updated_buttons", n=len(buttons), scope=scope),
             parse_mode="HTML",
         )
     else:
-        await update.effective_message.reply_text(f"✅ Welcome actualizado (sin botones){scope}.")
+        await update.effective_message.reply_text(t("welcome.updated_nobuttons", scope=scope))
 
 
 @_admin_only
@@ -147,8 +143,7 @@ async def cmd_setwelcomebutton(update: Update, context: ContextTypes.DEFAULT_TYP
     db: DB = context.bot_data["db"]
     if not context.args:
         await update.effective_message.reply_text(
-            "Uso: <code>/setwelcomebutton Texto del botón | https://url.com [same]</code>\n"
-            "<code>same</code> al final = mismo renglón que el botón anterior.",
+            t("welcomebtn.usage_set"),
             parse_mode="HTML",
         )
         return
@@ -158,11 +153,11 @@ async def cmd_setwelcomebutton(update: Update, context: ContextTypes.DEFAULT_TYP
         same = True
         raw = raw.rstrip()[:-5].rstrip()
     if "|" not in raw:
-        await update.effective_message.reply_text("Falta el <code>|</code> separando texto y URL.", parse_mode="HTML")
+        await update.effective_message.reply_text(t("welcomebtn.missing_pipe"), parse_mode="HTML")
         return
     text, url = (s.strip() for s in raw.split("|", 1))
     if not text or not url:
-        await update.effective_message.reply_text("Texto y URL requeridos.")
+        await update.effective_message.reply_text(t("welcomebtn.missing_fields"))
         return
     if not url.startswith(("http://", "https://", "tg://")):
         url = "https://" + url
@@ -184,11 +179,11 @@ async def cmd_welcomebuttons(update: Update, context: ContextTypes.DEFAULT_TYPE)
     db.migrate_legacy_welcome_button(chat_id)
     btns = db.list_welcome_buttons(chat_id)
     if not btns:
-        await update.effective_message.reply_text("Sin botones configurados.")
+        await update.effective_message.reply_text(t("welcomebtn.none"))
         return
-    lines = ["<b>Botones welcome</b>"]
+    lines = [t("welcomebtn.list_header")]
     for b in btns:
-        row_tag = " <i>(misma fila)</i>" if b["same_row"] else ""
+        row_tag = t("welcomebtn.same_row") if b["same_row"] else ""
         lines.append(f"#{b['id']} — <code>{html.escape(b['text'])}</code> → <code>{html.escape(b['url'])}</code>{row_tag}")
     await update.effective_message.reply_text("\n".join(lines), parse_mode="HTML")
 
@@ -198,11 +193,11 @@ async def _welcomebuttons_picker_handler(update: Update, context, chat_id: int, 
     db.migrate_legacy_welcome_button(chat_id)
     btns = db.list_welcome_buttons(chat_id)
     if not btns:
-        await update.callback_query.edit_message_text("Sin botones configurados en ese chat.")
+        await update.callback_query.edit_message_text(t("welcomebtn.none_chat"))
         return
-    lines = ["<b>Botones welcome</b>"]
+    lines = [t("welcomebtn.list_header")]
     for b in btns:
-        row_tag = " <i>(misma fila)</i>" if b["same_row"] else ""
+        row_tag = t("welcomebtn.same_row") if b["same_row"] else ""
         lines.append(f"#{b['id']} — <code>{html.escape(b['text'])}</code> → <code>{html.escape(b['url'])}</code>{row_tag}")
     await update.callback_query.edit_message_text("\n".join(lines), parse_mode="HTML")
 
@@ -210,7 +205,7 @@ async def _welcomebuttons_picker_handler(update: Update, context, chat_id: int, 
 @_admin_only
 async def cmd_rmwelcomebutton(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not context.args or not context.args[0].isdigit():
-        await update.effective_message.reply_text("Uso: /rmwelcomebutton <id> (ID visible con /welcomebuttons)")
+        await update.effective_message.reply_text(t("welcomebtn.usage_rm"))
         return
     db: DB = context.bot_data["db"]
     ok = db.delete_welcome_button(int(context.args[0]))
@@ -221,7 +216,7 @@ async def cmd_rmwelcomebutton(update: Update, context: ContextTypes.DEFAULT_TYPE
 async def cmd_clearwelcomebuttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     db: DB = context.bot_data["db"]
     n = db.clear_welcome_buttons(update.effective_chat.id)
-    await update.effective_message.reply_text(f"✅ {n} botón(es) eliminados.")
+    await update.effective_message.reply_text(t("welcomebtn.cleared", n=n))
 
 
 @_admin_only
@@ -264,7 +259,7 @@ async def _render_test_welcome(update: Update, context: ContextTypes.DEFAULT_TYP
                 current_row = [btn]
         if current_row:
             rows.append(current_row)
-    header = f"🧪 <b>Preview del welcome — {html.escape(chat_title)}</b>\n<i>(Así lo verá un nuevo miembro)</i>\n\n"
+    header = t("welcome.preview_header", chat=html.escape(chat_title))
     target_chat = update.effective_chat.id
     await context.bot.send_message(
         chat_id=target_chat, text=header + text,
@@ -278,7 +273,7 @@ async def cmd_resetwelcome(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     settings_sync.apply_setting(db, update.effective_chat.id, "welcome_text", None)
     settings_sync.apply_setting(db, update.effective_chat.id, "welcome_button_text", None)
     settings_sync.apply_setting(db, update.effective_chat.id, "welcome_button_url", None)
-    await update.effective_message.reply_text("✅ Welcome resetado al default.")
+    await update.effective_message.reply_text(t("welcome.reset"))
 
 
 @_admin_only
@@ -291,10 +286,10 @@ async def cmd_rules(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     db.ensure_chat_settings(chat_id)
     s = db.get_chat_settings(chat_id)
     if not s["rules_text"]:
-        await update.effective_message.reply_text("ℹ️ Sin reglas configuradas. Usa <code>/setrules</code>", parse_mode="HTML")
+        await update.effective_message.reply_text(t("rules.none"), parse_mode="HTML")
         return
     await update.effective_message.reply_text(
-        f"📜 <b>Reglas</b>\n\n{s['rules_text']}",
+        t("rules.show", rules=s["rules_text"]),
         parse_mode="HTML",
     )
 
@@ -303,11 +298,11 @@ async def cmd_rules(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 async def cmd_setrules(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     db: DB = context.bot_data["db"]
     if not context.args:
-        await update.effective_message.reply_text("Uso: /setrules <texto>")
+        await update.effective_message.reply_text(t("rules.usage_set"))
         return
     text = " ".join(context.args)
     settings_sync.apply_setting(db, update.effective_chat.id, "rules_text", text)
-    await update.effective_message.reply_text("✅ Reglas actualizadas.")
+    await update.effective_message.reply_text(t("rules.updated"))
 
 
 @_admin_only
@@ -319,19 +314,19 @@ async def cmd_cleanservice(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         s = db.get_chat_settings(chat_id)
         state = "ON" if s["cleanservice"] else "OFF"
         await update.effective_message.reply_text(
-            f"Cleanservice actual: <b>{state}</b>\nUso: /cleanservice on|off",
+            t("cleanservice.status", state=state),
             parse_mode="HTML",
         )
         return
     val = context.args[0].lower()
     if val in ("on", "true", "yes", "1"):
         settings_sync.apply_setting(db, chat_id, "cleanservice", 1)
-        await update.effective_message.reply_text("✅ Cleanservice ON")
+        await update.effective_message.reply_text(t("cleanservice.on"))
     elif val in ("off", "false", "no", "0"):
         settings_sync.apply_setting(db, chat_id, "cleanservice", 0)
-        await update.effective_message.reply_text("✅ Cleanservice OFF")
+        await update.effective_message.reply_text(t("cleanservice.off"))
     else:
-        await update.effective_message.reply_text("Uso: /cleanservice on|off")
+        await update.effective_message.reply_text(t("cleanservice.usage"))
 
 
 _ON = ("on", "true", "yes", "sí", "si", "1")

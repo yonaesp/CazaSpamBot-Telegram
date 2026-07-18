@@ -32,6 +32,7 @@ from .detectors import inline_buttons as buttons_det
 from .detectors import tg_deeplink as tgdeep_det
 from .detectors import unicode_script as script_det
 from .detectors import url_blocklist as url_det
+from .i18n import t
 
 
 def _entity_urls(msg) -> list[str]:
@@ -121,10 +122,7 @@ async def cmd_scan(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     target = msg.reply_to_message if msg else None
     if target is None:
         await msg.reply_text(
-            "🔎 <b>/scan</b> — reenvíame (o trae al DM) el mensaje sospechoso, "
-            "respóndele con <code>/scan</code> y te digo si el bot lo detectaría y por qué.\n"
-            "<i>Para citas a otro chat (quote raro), es más fiable usarlo sobre el "
-            "mensaje original en el grupo: el reenvío pierde ese contexto.</i>",
+            t("scan.usage"),
             parse_mode="HTML",
         )
         return

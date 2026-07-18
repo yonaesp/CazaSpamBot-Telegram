@@ -28,6 +28,7 @@ from .handlers import (
     on_my_chat_member,
     on_service_message,
 )
+from .i18n import t
 from .notifier import Notifier
 from .reporter import SpamReporter
 
@@ -194,10 +195,10 @@ async def _on_error(update: object, context) -> None:
         import html as _html
         await context.bot.send_message(
             chat_id=admin_id,
-            text=(
-                "⚠️ <b>Error interno del bot</b>\n"
-                f"<code>{_html.escape(type(err).__name__)}: {_html.escape(str(err))[:300]}</code>\n\n"
-                "<i>Capturado (el bot sigue vivo). Revisa los logs para el detalle.</i>"
+            text=t(
+                "main.internal_error",
+                error_type=_html.escape(type(err).__name__),
+                error_msg=_html.escape(str(err))[:300],
             ),
             parse_mode="HTML",
         )
