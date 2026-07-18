@@ -204,7 +204,7 @@ async def _spam_combo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                     await msg.reply_text(warn, parse_mode="HTML")
                 return
         except Exception as exc:  # noqa: BLE001
-            log.debug("/spam admin-guard fallo chat=%s: %s", chat_row.get("chat_id"), exc)
+            log.debug("/spam admin-guard fallo chat=%s: %s", chat_row["chat_id"], exc)
 
     # 2) Reporte oficial ANTES del ban (no bloquea; el msg aún existe). Manual
     # del admin = máxima confianza, así que reporta sin pasar por la whitelist
@@ -636,7 +636,7 @@ async def cmd_ban(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 return
         except Exception as exc:  # noqa: BLE001
             log.debug("ban admin-guard get_chat_member fallo chat=%s user=%s: %s",
-                      chat_row.get("chat_id"), user_id, exc)
+                      chat_row["chat_id"], user_id, exc)
 
     # Resolver nombre amigable
     username = None
