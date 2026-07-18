@@ -52,11 +52,7 @@ VERIFIED_PERMISSIONS = ChatPermissions(
     can_add_web_page_previews=True, can_invite_users=True,
 )
 
-DEFAULT_WELCOME = (
-    "👋 Hola {name}, bienvenido/a a <b>{chat}</b>.\n\n"
-    "Para evitar spam, los nuevos miembros entran muteados. "
-    "<b>Pulsa el botón de abajo para verificar que eres humano</b> y poder escribir."
-)
+
 
 
 def _verification_footer(settings, suspicious: bool, susp_reasons: list) -> str:
@@ -65,15 +61,12 @@ def _verification_footer(settings, suspicious: bool, susp_reasons: list) -> str:
     solo informa de qué pasa si no verifica, siempre con la config real."""
     if suspicious:
         kick_minutes = settings["verification_suspicious_kick_minutes"] or 30
-        reasons_str = ", ".join(susp_reasons) if susp_reasons else "perfil dudoso"
-        return (
-            f"\n\n⏰ <i>Cuenta sospechosa ({html.escape(reasons_str)}): verifica en "
-            f"<b>{kick_minutes} min</b> o serás expulsado.</i>"
-        )
+        reasons_str = ", ".join(susp_reasons) if susp_reasons else t("review.reason_default")
+        return t("verif.footer_susp", reasons=html.escape(reasons_str), mins=kick_minutes)
     if settings["verification_kick_normal"]:
         total_h = (settings["verification_reminder_hours"] or 3) + (settings["verification_kick_after_reminder_hours"] or 6)
-        return f"\n\n⏰ <i>Si no verificas, serás expulsado en unas <b>{total_h}h</b>.</i>"
-    return "\n\n⏰ <i>Hasta que no verifiques no podrás escribir (sin límite de tiempo).</i>"
+        return t("verif.footer_kick", hours=total_h)
+    return t("verif.footer_mute")
 
 
 def _name_in_non_latin_script(name: Optional[str]) -> bool:
@@ -349,12 +342,11 @@ VERIFIED_WELCOME_DELETE_AFTER_S = _int_env("VERIFIED_WELCOME_DELETE_AFTER_S", 12
 # desactivar del todo con FRIENDLY_WELCOMES_ENABLED=false.
 _WELCOMES_DIR = Path(__file__).resolve().parent.parent / "config" / "welcomes"
 
-_DEFAULT_WELCOMES = [
-    "👋 Bienvenido/a {name}. Echa un vistazo al grupo.",
-    "🤝 ¡Hola {name}! Bienvenido/a.",
-]
+def _default_welcomes() -> list[str]:
+    """Fallback en código de los saludos amistosos, en el idioma activo.
+    Son PLANTILLAS: su {name} lo formatea después quien las envía."""
+    return [t("welcome.friendly1"), t("welcome.friendly2")]
 
-_WELCOME_FIXED_FOOTER = "Las normas y el mensaje anclado, lo tienen todo."
 
 
 def _read_phrase_file(path: Path) -> list[str]:
@@ -371,7 +363,7 @@ def _load_welcome_pack(chat_id: int) -> list[str]:
     pack = _read_phrase_file(_WELCOMES_DIR / f"{chat_id}.txt")
     if not pack:
         pack = _read_phrase_file(_WELCOMES_DIR / "generic.txt")
-    return pack or _DEFAULT_WELCOMES
+    return pack or _default_welcomes()
 
 
 def friendly_welcomes_enabled() -> bool:
@@ -396,8 +388,8 @@ def _build_welcome_content(db, chat_id: int, name_html: str, verified: bool = Fa
     greeting = random.choice(catalog).format(name=name_html)
     # La cabecera NO saluda: el propio quip del catálogo ya dice "Bienvenido/a {name}"
     # (si no, saldría "Bienvenido/a" dos veces).
-    header = "✅ <b>Verificación correcta.</b>\n\n" if verified else ""
-    text = f"{header}{greeting}\n\n<i>{_WELCOME_FIXED_FOOTER}</i>"
+    header = t("verif.ok_header") if verified else ""
+    text = f"{header}{greeting}\n\n<i>{t('welcome.footer_fixed')}</i>"
     rows: list[list[InlineKeyboardButton]] = []
     db.migrate_legacy_welcome_button(chat_id)
     buttons = db.list_welcome_buttons(chat_id)
@@ -570,14 +562,13 @@ async def _send_suspicious_review(context, db, cfg, chat, user, reasons, sig) ->
 
 
 # Default del welcome en modo limpio (sin instrucción de "pulsa el botón").
-_CLEAN_WELCOME_DEFAULT = "👋 ¡Bienvenido/a {name} a {chat}! Echa un vistazo a las normas del grupo."
 
 
 async def _send_clean_welcome(context, db, chat, user, settings) -> None:
     """Welcome en MODO LIMPIO: saluda al recién llegado con el texto configurado del
     grupo, SIN botón SOY HUMANO ni mute. Se autoborra tras welcome_delete_after_s.
     Incluye los botones URL configurados del chat (anclado, normas...)."""
-    welcome_text = (settings["welcome_text"] if settings else None) or _CLEAN_WELCOME_DEFAULT
+    welcome_text = (settings["welcome_text"] if settings else None) or t("welcome.clean_default")
     if user.username:
         name = f"@{user.username}"
     else:
@@ -723,7 +714,7 @@ async def on_join(
         return
 
     # 2) Welcome con botón
-    welcome_text = settings["welcome_text"] or DEFAULT_WELCOME
+    welcome_text = settings["welcome_text"] or t("welcome.default")
     # Mención preferente con @username (más natural). Fallback tg://user?id=N si no.
     if user.username:
         name = f"@{user.username}"
@@ -744,7 +735,7 @@ async def on_join(
 
     callback_data = f"{CALLBACK_PREFIX}:{chat.id}:{user.id}"
     rows = [[InlineKeyboardButton(
-        "✅ SOY HUMANO (PULSA PARA ENTRAR)",
+        t("verif.btn_human"),
         callback_data=callback_data,
     )]]
     # Migración legacy + lectura múltiples botones URL
@@ -820,7 +811,7 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         return
 
     if query.from_user.id != target_user_id:
-        await query.answer("Este botón no es para ti.", show_alert=True)
+        await query.answer(t("verif.not_for_you"), show_alert=True)
         return
 
     db: DB = context.bot_data["db"]
@@ -841,7 +832,7 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         return
 
     db.mark_verified(chat_id, target_user_id)
-    await query.answer("✅ Verificado, ya puedes escribir.")
+    await query.answer(t("verif.done"))
 
     # En vez de BORRAR el mensaje de verificación, lo EDITAMOS a "verificación
     # correcta" + welcome gracioso con los botones del chat (anclado, normas...),
@@ -888,13 +879,7 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     log.info("verification OK user=%s chat=%s", target_user_id, chat_id)
 
 
-REMINDER_TEXT = (
-    "⏰ <b>Recordatorio para {name}</b>\n\n"
-    "Llevas {hours}h en <b>{chat}</b> y aún no has verificado que eres humano. "
-    "Te quedan <b>{remaining_hours}h</b> para pulsar el botón o serás "
-    "<b>expulsado</b> por considerarte posible bot.\n\n"
-    "👇 Pulsa el botón para poder escribir."
-)
+
 
 
 async def cleanup_job(context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1057,7 +1042,8 @@ async def _send_reminder(
     chat_name = html.escape(chat_row["title"] or "el grupo")
     settings = db.get_chat_settings(chat_id)
     remaining_hours = (settings["verification_kick_after_reminder_hours"] if settings else 6) or 6
-    text = REMINDER_TEXT.format(name=name, hours=hours, chat=chat_name, remaining_hours=remaining_hours)
+    text = t("verif.reminder", name=name, hours=hours, chat=chat_name,
+             remaining_hours=remaining_hours)
 
     callback_data = f"{CALLBACK_PREFIX}:{chat_id}:{user_id}"
     rows = [[InlineKeyboardButton(

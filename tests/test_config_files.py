@@ -63,7 +63,7 @@ def test_welcome_pack_cae_a_generic(tmp_path, monkeypatch):
 
 def test_welcome_pack_cae_a_default_en_codigo(tmp_path, monkeypatch):
     monkeypatch.setattr(v, "_WELCOMES_DIR", tmp_path)  # dir vacío, sin generic.txt
-    assert v._load_welcome_pack(-999) == v._DEFAULT_WELCOMES
+    assert v._load_welcome_pack(-999) == v._default_welcomes()
 
 
 def test_friendly_welcomes_toggle(monkeypatch):

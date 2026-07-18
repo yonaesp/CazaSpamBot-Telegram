@@ -9,7 +9,7 @@ import re
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 
-from . import chat_picker, settings_sync, verification
+from . import chat_picker, i18n, settings_sync
 from .config import Config
 from .db import DB
 
@@ -246,7 +246,7 @@ async def _render_test_welcome(update: Update, context: ContextTypes.DEFAULT_TYP
     btns = db.list_welcome_buttons(chat_id)
     chat_row = next((c for c in db.all_chats() if c["chat_id"] == chat_id), None)
     chat_title = chat_row["title"] if chat_row else str(chat_id)
-    welcome_text = s["welcome_text"] or verification.DEFAULT_WELCOME
+    welcome_text = s["welcome_text"] or i18n.t("welcome.default")
     user = update.effective_user
     name = html.escape(user.first_name or user.username or str(user.id))
     text = welcome_text.format(name=name, chat=html.escape(chat_title))

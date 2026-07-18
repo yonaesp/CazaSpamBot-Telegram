@@ -129,6 +129,33 @@ STRINGS = {
     "cfg.sync_detail_on": "Every setting change applies to all <b>{n} groups</b> at once and the /config panel doesn't ask which group.",
     "cfg.sync_detail_off": "Each group is configured separately; /config lets you pick a group.",
 
+    # --- welcomes and verification (what group members see) ---
+    # NOTE: welcome.* are TEMPLATES: their {name}/{chat} is formatted later by the
+    # sender (with a guard). t() returns them unformatted on purpose.
+    "welcome.default": (
+        "👋 Hi {name}, welcome to <b>{chat}</b>.\n\n"
+        "To keep spam out, new members join muted. "
+        "<b>Tap the button below to verify you're human</b> and be able to write."
+    ),
+    "welcome.clean_default": "👋 Welcome {name} to {chat}! Take a look at the group rules.",
+    "welcome.friendly1": "👋 Welcome {name}. Have a look around.",
+    "welcome.friendly2": "🤝 Hi {name}! Welcome aboard.",
+    "welcome.footer_fixed": "The rules and the pinned message have everything.",
+    "verif.ok_header": "✅ <b>Verification successful.</b>\n\n",
+    "verif.btn_human": "✅ I AM HUMAN (TAP TO JOIN IN)",
+    "verif.not_for_you": "This button isn't for you.",
+    "verif.done": "✅ Verified, you can write now.",
+    "verif.footer_susp": "\n\n⏰ <i>Suspicious account ({reasons}): verify within <b>{mins} min</b> or you'll be removed.</i>",
+    "verif.footer_kick": "\n\n⏰ <i>If you don't verify, you'll be removed in about <b>{hours}h</b>.</i>",
+    "verif.footer_mute": "\n\n⏰ <i>Until you verify you won't be able to write (no time limit).</i>",
+    "verif.reminder": (
+        "⏰ <b>Reminder for {name}</b>\n\n"
+        "You've been in <b>{chat}</b> for {hours}h and still haven't verified you're human. "
+        "You have <b>{remaining_hours}h</b> left to tap the button or you'll be "
+        "<b>removed</b> as a suspected bot.\n\n"
+        "👇 Tap the button to be able to write."
+    ),
+
     # --- /limpieza panel ---
     "clean.panel": "🧹 <b>Group cleanup</b>\nTo keep groups clean: the bot's commands don't show when typing «/» and don't stay written in the chat.",
     "clean.b.hide": "🙈 Hide commands in groups: {state}",

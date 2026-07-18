@@ -130,6 +130,33 @@ STRINGS = {
     "cfg.sync_detail_on": "Cada cambio de ajuste se aplica a los <b>{n} grupos</b> a la vez y el panel /config no pide elegir grupo.",
     "cfg.sync_detail_off": "Cada grupo se configura por separado; /config te deja elegir grupo.",
 
+    # --- bienvenidas y verificación (lo que ve el usuario del grupo) ---
+    # OJO: welcome.* son PLANTILLAS: su {name}/{chat} lo formatea después quien las
+    # envía (con guard). t() las devuelve sin formatear a propósito.
+    "welcome.default": (
+        "👋 Hola {name}, bienvenido/a a <b>{chat}</b>.\n\n"
+        "Para evitar spam, los nuevos miembros entran muteados. "
+        "<b>Pulsa el botón de abajo para verificar que eres humano</b> y poder escribir."
+    ),
+    "welcome.clean_default": "👋 ¡Bienvenido/a {name} a {chat}! Echa un vistazo a las normas del grupo.",
+    "welcome.friendly1": "👋 Bienvenido/a {name}. Echa un vistazo al grupo.",
+    "welcome.friendly2": "🤝 ¡Hola {name}! Bienvenido/a.",
+    "welcome.footer_fixed": "Las normas y el mensaje anclado, lo tienen todo.",
+    "verif.ok_header": "✅ <b>Verificación correcta.</b>\n\n",
+    "verif.btn_human": "✅ SOY HUMANO (PULSA PARA ENTRAR)",
+    "verif.not_for_you": "Este botón no es para ti.",
+    "verif.done": "✅ Verificado, ya puedes escribir.",
+    "verif.footer_susp": "\n\n⏰ <i>Cuenta sospechosa ({reasons}): verifica en <b>{mins} min</b> o serás expulsado.</i>",
+    "verif.footer_kick": "\n\n⏰ <i>Si no verificas, serás expulsado en unas <b>{hours}h</b>.</i>",
+    "verif.footer_mute": "\n\n⏰ <i>Hasta que no verifiques no podrás escribir (sin límite de tiempo).</i>",
+    "verif.reminder": (
+        "⏰ <b>Recordatorio para {name}</b>\n\n"
+        "Llevas {hours}h en <b>{chat}</b> y aún no has verificado que eres humano. "
+        "Te quedan <b>{remaining_hours}h</b> para pulsar el botón o serás "
+        "<b>expulsado</b> por considerarte posible bot.\n\n"
+        "👇 Pulsa el botón para poder escribir."
+    ),
+
     # --- panel /limpieza ---
     "clean.panel": "🧹 <b>Limpieza en grupos</b>\nPara mantener los grupos limpios: que los comandos del bot no salgan al teclear «/» y que no queden escritos en el chat.",
     "clean.b.hide": "🙈 Ocultar comandos en grupos: {state}",

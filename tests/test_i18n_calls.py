@@ -20,6 +20,17 @@ from string import Formatter
 from src.locales import STRINGS
 
 
+# Claves PLANTILLA: t() las devuelve a propósito sin formatear porque su {name}/{chat}
+# lo sustituye después quien las envía (con el guard de llaves raras). Pedirles que
+# cuadren con los kwargs de la llamada sería un falso positivo.
+_PLANTILLAS = {
+    "welcome.default",
+    "welcome.clean_default",
+    "welcome.friendly1",
+    "welcome.friendly2",
+}
+
+
 def _placeholders(text: str) -> set[str]:
     """Nombres de placeholder de un texto ('{a} {b}' -> {'a','b'}); ignora {{escapados}}."""
     return {f for _, f, _, _ in Formatter().parse(text) if f}
@@ -50,6 +61,8 @@ def test_llamadas_t_cuadran_con_sus_claves():
             texto = STRINGS["es"].get(key)
             if texto is None:
                 problemas.append(f"{path}:{line} → clave inexistente: {key!r}")
+                continue
+            if key in _PLANTILLAS:
                 continue
             if key not in STRINGS["en"]:
                 problemas.append(f"{path}:{line} → {key!r} no está en el paquete en")

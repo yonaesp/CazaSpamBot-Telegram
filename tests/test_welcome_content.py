@@ -8,6 +8,7 @@ from __future__ import annotations
 from unittest.mock import MagicMock
 
 from src import verification as v
+from src.i18n import t
 
 
 def _db_sin_botones():
@@ -20,7 +21,7 @@ def test_verified_incluye_cabecera_y_nombre_y_footer():
     text, kb = v._build_welcome_content(_db_sin_botones(), -100123, "@juan", verified=True)
     assert "Verificación correcta" in text
     assert "@juan" in text
-    assert v._WELCOME_FIXED_FOOTER in text
+    assert t("welcome.footer_fixed") in text
     assert kb is None  # sin botones configurados en el chat
 
 
