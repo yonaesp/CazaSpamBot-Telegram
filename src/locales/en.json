@@ -790,5 +790,16 @@
   "reason.forward_early_window": "(within {seconds}s of first seen)",
   "reason.forward_origin": "source: {origin_name}",
   "reason.external_quote": "Quote of external channel «{title}» (@{username}) via a cross-chat quote",
-  "reason.external_quote_first_msg": "as first message"
+  "reason.external_quote_first_msg": "as first message",
+  "cfg.b.quips": "😏 Ban one-liners: {state} ▸",
+  "cmd.quips": "Preview ban one-liners",
+  "quipcfg.b.on": "Turn on",
+  "quipcfg.b.off": "Turn off",
+  "quipcfg.state_own": "Status: <b>{state}</b>, set from here.",
+  "quipcfg.state_inherited": "Status: <b>{state}</b>, inherited from the config file (nothing has been set here yet).",
+  "quipcfg.no_example": "No one-liners are available in this language right now.",
+  "quipcfg.text": "😏 <b>Ban one-liners</b>\n\n{state}\n\n<b>This is how it would look in the group</b> (made-up user):\n{example}\n\n<i>It only goes out after a ban and deletes itself after a while. It never links to the banned user's profile.</i>",
+  "quipcfg.cmd_title": "😏 <b>Ban one-liners</b>, a random sample of the catalogue:",
+  "quipcfg.cmd_item": "<b>{rule}</b>\n{quip}",
+  "quipcfg.cmd_footer": "Current status: <b>{state}</b>. Change it in /config, with a preview."
 }

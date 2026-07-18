@@ -2070,7 +2070,7 @@ async def _apply_action(
     # del admin (cmd_ban/cmd_spam, que no pasan por aquí). Toggle con
     # QUIP_ON_AUTO_BAN=true si se quiere también quip en auto-bans.
     if (
-        cfg.public_quip_enabled
+        quips.quips_on(db, chat_id, cfg)
         and cfg.quip_on_auto_ban
         and not cfg.shadow
         and decision.action in ("ban", "kick")

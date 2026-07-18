@@ -145,6 +145,8 @@ CREATE TABLE IF NOT EXISTS chat_settings (
     verification_review_suspicious INTEGER NOT NULL DEFAULT 1,  -- 1=en vez de verificar en grupo, aviso privado con botones
     cleanservice                  INTEGER NOT NULL DEFAULT 1,
     topweekly_enabled             INTEGER NOT NULL DEFAULT 0,
+    -- NULL = hereda de PUBLIC_QUIP_ENABLED (.env). Ver quips_on() en quips.py.
+    quips_enabled                 INTEGER DEFAULT NULL,
     updated_at                    REAL NOT NULL DEFAULT 0
 );
 -- Migración blanda para bases ya creadas
@@ -322,6 +324,14 @@ class DB:
         if "topweekly_enabled" not in cs_cols:
             self._conn.execute(
                 "ALTER TABLE chat_settings ADD COLUMN topweekly_enabled INTEGER NOT NULL DEFAULT 0"
+            )
+        if "quips_enabled" not in cs_cols:
+            # SIN default 0 y aceptando NULL a propósito: NULL significa «lo que
+            # diga PUBLIC_QUIP_ENABLED del .env». Si la columna naciera en 0, una
+            # instalación que hoy tiene los quips activados por .env se quedaría
+            # sin ellos al actualizar, en silencio y sin que nadie lo pidiera.
+            self._conn.execute(
+                "ALTER TABLE chat_settings ADD COLUMN quips_enabled INTEGER DEFAULT NULL"
             )
         su_cols2 = {r[1] for r in self._conn.execute("PRAGMA table_info(seen_users)").fetchall()}
         if "first_name" not in su_cols2:
@@ -846,7 +856,7 @@ class DB:
             "verification_reminder_hours", "verification_kick_after_reminder_hours",
             "verification_reminders_enabled", "verification_kick_normal",
             "verification_review_suspicious", "cleanservice",
-            "topweekly_enabled",
+            "topweekly_enabled", "quips_enabled",
         }
         if field not in ALLOWED:
             raise ValueError(f"campo no permitido: {field}")

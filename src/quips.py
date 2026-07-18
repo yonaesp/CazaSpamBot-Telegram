@@ -19,6 +19,28 @@ import random
 from .i18n import DEFAULT, current_lang, t
 from .locales import STRINGS
 
+
+def quips_on(db, chat_id: int, cfg) -> bool:
+    """¿Se publican quips en este chat?
+
+    `chat_settings.quips_enabled` manda, y su NULL significa «no se ha decidido en
+    este chat» → se hereda `PUBLIC_QUIP_ENABLED` del .env. Esa herencia es
+    deliberada: si la columna naciera en 0, quien tuviera los quips activados por
+    .env se quedaría sin ellos al actualizar sin haber tocado nada.
+
+    Ante cualquier problema de lectura se cae al valor del .env: el quip es
+    cosmético y jamás debe impedir que un ban se ejecute.
+    """
+    try:
+        row = db.get_chat_settings(chat_id)
+        val = row["quips_enabled"] if row is not None else None
+    except Exception:  # noqa: BLE001 — chat sin settings, columna vieja, BD ocupada...
+        return bool(getattr(cfg, "public_quip_enabled", False))
+    if val is None:
+        return bool(getattr(cfg, "public_quip_enabled", False))
+    return bool(val)
+
+
 # Reglas CON catálogo de quips. Una regla que no esté aquí no tiene frase (pick
 # devuelve None y el ban es silencioso), igual que antes de mover los textos a JSON.
 # El catálogo real de cada una son las claves `quip.<regla>.<n>` del idioma.
@@ -151,6 +173,54 @@ def pick(
     extra = _format_extra(chosen_rule, payload)
     template = random.choice(frases)
     return template.format(name=name, extra=extra)
+
+
+# --------------------------- previsualización (demo) ---------------------------
+
+# Identidad FICTICIA para los ejemplos que se enseñan en /quips y en el panel. Nunca
+# se previsualiza con una persona real: ni su nombre ni su id salen de la base de datos.
+DEMO_FIRST_NAME = "Spammer"
+DEMO_USER_ID = 1234567890
+
+# Payload de mentira para las reglas cuyo quip incrusta un dato ({extra}). El resto
+# funciona con payload vacío: `_format_extra` devuelve "" y la frase queda entera.
+_DEMO_PAYLOADS: dict[str, dict] = {
+    "non_allowed_script": {"non_allowed_script": {"dominant_script": "han"}},
+    "reaction_farming": {"reaction_farming": {"reactions": 7, "window_s": 60}},
+    "url_blocklist": {"url_blocklist": {"hosts": ["chollos-falsos.example"]}},
+    "external_mention_or_link": {
+        "external_mention_or_link": {"external_mentions": [1, 2], "external_tg_links": ["t.me/x"]},
+    },
+    "jfm_too_fast": {"jfm_too_fast": {"delta_s": 4}},
+    "jfm_fast": {"jfm_fast": {"delta_s": 25}},
+    "jfm_cron": {"jfm_cron": {"delta_s": 90}},
+}
+
+# Fuera de los ejemplos: su quip celebra que alguien VUELVE, y enseñarlo en una
+# pantalla titulada «frases al banear» hace pensar que el bot readmite gente.
+_DEMO_EXCLUDED: frozenset[str] = frozenset({"manual_admin_unban"})
+
+
+def demo(rule: str) -> str | None:
+    """Quip de ejemplo de una regla, con datos inventados. None si no tiene catálogo."""
+    return pick(rule, None, DEMO_USER_ID, _DEMO_PAYLOADS.get(rule), first_name=DEMO_FIRST_NAME)
+
+
+def demo_samples(n: int = 3) -> list[tuple[str, str]]:
+    """`n` ejemplos (regla, quip) de reglas DISTINTAS elegidas al azar.
+
+    Las reglas sin catálogo en el idioma actual se saltan en vez de romper, así que
+    la lista puede salir más corta que `n` (o vacía) y quien llama lo maneja.
+    """
+    out: list[tuple[str, str]] = []
+    candidatas = [r for r in _RULES if r not in _DEMO_EXCLUDED]
+    for rule in random.sample(candidatas, len(candidatas)):
+        if len(out) >= n:
+            break
+        frase = demo(rule)
+        if frase:
+            out.append((rule, frase))
+    return out
 
 
 def _reason_summary(username: str | None, user_id: int, info: dict) -> str:

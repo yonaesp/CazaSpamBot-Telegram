@@ -239,7 +239,7 @@ async def _spam_combo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         await _cleanup_welcome_on_ban(context, db, author.id)
 
     # 5) Quip público SOLO en el chat actual
-    if cfg.public_quip_enabled and not cfg.shadow and is_group:
+    if is_group and not cfg.shadow and quips.quips_on(db, msg.chat_id, cfg):
         quip = quips.pick(
             rule="manual_admin_ban", username=author.username,
             user_id=author.id, payload={}, first_name=author.first_name,
@@ -664,7 +664,7 @@ async def cmd_ban(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     # Quip público SOLO en el chat donde se ejecutó /ban (no en todos los federados).
     # Si /ban se ejecuta desde DM con el bot → ban silencioso sin publicar en grupos.
-    if cfg.public_quip_enabled and not cfg.shadow and is_group:
+    if is_group and not cfg.shadow and quips.quips_on(db, update.effective_chat.id, cfg):
         quip = quips.pick(
             rule="manual_admin_ban", username=username, user_id=user_id,
             payload={"reason": reason}, first_name=first_name,
@@ -746,7 +746,7 @@ async def cmd_unban(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await update.effective_message.reply_text(ack, parse_mode="HTML")
 
     # Quip público de unban en el chat donde se ejecutó
-    if cfg.public_quip_enabled and not cfg.shadow and is_group:
+    if is_group and not cfg.shadow and quips.quips_on(db, update.effective_chat.id, cfg):
         quip = quips.pick(
             rule="manual_admin_unban", username=username, user_id=user_id,
             payload={"reason": reason_raw}, first_name=first_name,

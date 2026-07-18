@@ -292,6 +292,8 @@ def main() -> int:
     app.add_handler(CommandHandler("config", config_panel.cmd_config))
     app.add_handler(CommandHandler("ajustes", config_panel.cmd_config))  # alias
     app.add_handler(CommandHandler("panel", config_panel.cmd_config))  # alias
+    app.add_handler(CommandHandler("quips", config_panel.cmd_quips))
+    app.add_handler(CommandHandler("frases", config_panel.cmd_quips))  # alias
     app.add_handler(CommandHandler("sync", config_panel.cmd_sync))
     app.add_handler(CommandHandler("sincronizar", config_panel.cmd_sync))  # alias
     app.add_handler(CommandHandler("limpieza", group_clean.cmd_limpieza))

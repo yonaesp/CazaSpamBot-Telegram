@@ -790,5 +790,16 @@
   "reason.forward_early_window": "(dentro de {seconds}s tras primer seen)",
   "reason.forward_origin": "origen: {origin_name}",
   "reason.external_quote": "Cita a un canal externo «{title}» (@{username}) mediante quote a otro chat",
-  "reason.external_quote_first_msg": "en primer mensaje"
+  "reason.external_quote_first_msg": "en primer mensaje",
+  "cfg.b.quips": "😏 Frases al banear: {state} ▸",
+  "cmd.quips": "Ver frases al banear",
+  "quipcfg.b.on": "Activar",
+  "quipcfg.b.off": "Desactivar",
+  "quipcfg.state_own": "Estado: <b>{state}</b>, fijado desde aquí.",
+  "quipcfg.state_inherited": "Estado: <b>{state}</b>, heredado del archivo de configuración (aquí no se ha tocado nada todavía).",
+  "quipcfg.no_example": "Ahora mismo no hay ninguna frase disponible en este idioma.",
+  "quipcfg.text": "😏 <b>Frases al banear</b>\n\n{state}\n\n<b>Así se vería en el grupo</b> (usuario inventado):\n{example}\n\n<i>Se publica solo al banear y se borra sola al cabo de un rato. Nunca enlaza al perfil del baneado.</i>",
+  "quipcfg.cmd_title": "😏 <b>Frases al banear</b>, muestra al azar del catálogo:",
+  "quipcfg.cmd_item": "<b>{rule}</b>\n{quip}",
+  "quipcfg.cmd_footer": "Estado actual: <b>{state}</b>. Se cambia en /config, con previsualización."
 }

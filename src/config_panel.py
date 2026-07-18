@@ -21,7 +21,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.error import TelegramError
 from telegram.ext import ContextTypes
 
-from . import settings_sync
+from . import quips, rule_explain, settings_sync
 from .config import Config
 from .db import DB
 from .i18n import t
@@ -73,6 +73,26 @@ def _onoff(v: bool) -> str:
     return t("on") if v else t("off")
 
 
+def _quips_state(db: DB, cfg, chat_id: int) -> bool:
+    """Estado REAL de los quips en un chat (lo que verá el grupo).
+
+    NO se lee la columna con `_b()` a propósito: `quips_enabled` es NULL mientras
+    nadie la haya tocado en ese chat, y ese NULL significa «hereda
+    PUBLIC_QUIP_ENABLED del .env», no «apagado». Con `_b()` el panel enseñaría OFF a
+    quien tiene los quips funcionando desde siempre por el .env, y el admin tocaría
+    el botón creyendo activarlos cuando en realidad los estaría apagando.
+    """
+    return quips.quips_on(db, chat_id, cfg)
+
+
+def _quips_inherited(s) -> bool:
+    """True si el chat no ha decidido nada y va con lo que diga el .env."""
+    try:
+        return s["quips_enabled"] is None
+    except (KeyError, IndexError, TypeError):
+        return True
+
+
 def _chat_title(db: DB, chat_id: int) -> str:
     row = next((c for c in db.all_chats() if c["chat_id"] == chat_id), None)
     return (row["title"] if row and row["title"] else str(chat_id))
@@ -87,9 +107,18 @@ def _panel_title(db: DB, chat_id: int) -> str:
 
 # --------------------------- construcción de teclados ---------------------------
 
-def build_panel_keyboard(chat_id: int, s, sync_on: bool = False) -> InlineKeyboardMarkup:
-    """Teclado principal del panel. El estado va en la etiqueta (un tap lo invierte)."""
+def build_panel_keyboard(
+    chat_id: int, s, sync_on: bool = False, quips_state: bool | None = None,
+) -> InlineKeyboardMarkup:
+    """Teclado principal del panel. El estado va en la etiqueta (un tap lo invierte).
+
+    `quips_state` viene ya resuelto por quien llama (`_quips_state`, que consulta el
+    .env cuando la columna es NULL). Sin él solo queda mirar la columna a pelo, que
+    para `quips_enabled` da OFF a quien los hereda activados: por eso el panel real
+    siempre lo pasa y el defecto None es solo un respaldo para llamadas sin `cfg`.
+    """
     cid = chat_id
+    quips_on = _b(s, "quips_enabled") if quips_state is None else quips_state
     sk = _num(s, "verification_suspicious_kick_minutes", 30)
     rh = _num(s, "verification_reminder_hours", 3)
     kh = _num(s, "verification_kick_after_reminder_hours", 6)
@@ -115,6 +144,8 @@ def build_panel_keyboard(chat_id: int, s, sync_on: bool = False) -> InlineKeyboa
                               callback_data=f"{PREFIX}:edit:r:{cid}")],
         [InlineKeyboardButton(t("cfg.b.cleanservice", state=_onoff(_b(s, "cleanservice"))),
                               callback_data=f"{PREFIX}:tog:cleanservice:{cid}")],
+        [InlineKeyboardButton(t("cfg.b.quips", state=_onoff(quips_on)),
+                              callback_data=f"{PREFIX}:quips:{cid}")],
         [InlineKeyboardButton(t("cfg.b.alerts"), callback_data=f"{PREFIX}:alertas:{cid}")],
         [InlineKeyboardButton(t("cfg.b.close"), callback_data=f"{PREFIX}:close:{cid}")],
     ]
@@ -135,6 +166,27 @@ def build_times_keyboard(chat_id: int, s) -> InlineKeyboardMarkup:
         rows.append(row)
     rows.append([InlineKeyboardButton(t("cfg.b.back"), callback_data=f"{PREFIX}:open:{cid}")])
     return InlineKeyboardMarkup(rows)
+
+
+def build_quips_keyboard(chat_id: int, state_on: bool) -> InlineKeyboardMarkup:
+    """Vista de frases al banear: activar / desactivar (✅ = estado actual) y volver."""
+    cid = chat_id
+    on = ("✅ " if state_on else "") + t("quipcfg.b.on")
+    off = ("✅ " if not state_on else "") + t("quipcfg.b.off")
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton(on, callback_data=f"{PREFIX}:qset:1:{cid}"),
+         InlineKeyboardButton(off, callback_data=f"{PREFIX}:qset:0:{cid}")],
+        [InlineKeyboardButton(t("cfg.b.back"), callback_data=f"{PREFIX}:open:{cid}")],
+    ])
+
+
+def _quips_text(state_on: bool, inherited: bool) -> str:
+    """Texto de la vista de quips: estado (propio o heredado) + ejemplo real."""
+    estado_key = "quipcfg.state_inherited" if inherited else "quipcfg.state_own"
+    estado = t(estado_key, state=_onoff(state_on))
+    muestras = quips.demo_samples(1)
+    ejemplo = muestras[0][1] if muestras else t("quipcfg.no_example")
+    return t("quipcfg.text", state=estado, example=ejemplo)
 
 
 def _edit_scope_keyboard(db: DB, code: str, cid: int) -> InlineKeyboardMarkup:
@@ -170,7 +222,7 @@ def _times_text(db: DB, cid: int, s) -> str:
 
 # ------------------------------- render helpers -------------------------------
 
-async def _show_panel(msg_edit, db: DB, chat_id: int) -> None:
+async def _show_panel(msg_edit, db: DB, chat_id: int, cfg=None) -> None:
     """Renderiza (editando el mensaje) el panel principal de un chat."""
     db.ensure_chat_settings(chat_id)
     s = db.get_chat_settings(chat_id)
@@ -180,10 +232,27 @@ async def _show_panel(msg_edit, db: DB, chat_id: int) -> None:
         await msg_edit(
             _header(title),
             parse_mode="HTML",
-            reply_markup=build_panel_keyboard(chat_id, s, sync_on),
+            reply_markup=build_panel_keyboard(
+                chat_id, s, sync_on,
+                _quips_state(db, cfg, chat_id) if cfg is not None else None),
         )
     except TelegramError as exc:
         log.debug("no se pudo renderizar panel: %s", exc)
+
+
+async def _show_quips(msg_edit, db: DB, cfg, chat_id: int) -> None:
+    """Renderiza la vista de previsualización de quips de un chat."""
+    db.ensure_chat_settings(chat_id)
+    s = db.get_chat_settings(chat_id)
+    estado = _quips_state(db, cfg, chat_id)
+    try:
+        await msg_edit(
+            _quips_text(estado, _quips_inherited(s)),
+            parse_mode="HTML",
+            reply_markup=build_quips_keyboard(chat_id, estado),
+        )
+    except TelegramError as exc:
+        log.debug("no se pudo renderizar la vista de quips: %s", exc)
 
 
 # --------------------------------- comando ---------------------------------
@@ -213,7 +282,8 @@ async def cmd_config(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         s = db.get_chat_settings(cid)
         await msg.reply_text(
             _header(html.escape(_panel_title(db, cid))),
-            parse_mode="HTML", reply_markup=build_panel_keyboard(cid, s, True),
+            parse_mode="HTML",
+            reply_markup=build_panel_keyboard(cid, s, True, _quips_state(db, cfg, cid)),
         )
         return
 
@@ -223,7 +293,8 @@ async def cmd_config(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         s = db.get_chat_settings(chat.id)
         await msg.reply_text(
             _header(html.escape(_chat_title(db, chat.id))),
-            parse_mode="HTML", reply_markup=build_panel_keyboard(chat.id, s, False),
+            parse_mode="HTML",
+            reply_markup=build_panel_keyboard(chat.id, s, False, _quips_state(db, cfg, chat.id)),
         )
         return
     if not admin_chats:
@@ -235,7 +306,8 @@ async def cmd_config(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         s = db.get_chat_settings(cid)
         await msg.reply_text(
             _header(html.escape(_chat_title(db, cid))),
-            parse_mode="HTML", reply_markup=build_panel_keyboard(cid, s, False),
+            parse_mode="HTML",
+            reply_markup=build_panel_keyboard(cid, s, False, _quips_state(db, cfg, cid)),
         )
         return
     rows = [
@@ -277,7 +349,7 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             return
         await q.answer()
         context.user_data.pop("cfg_await", None)
-        await _show_panel(q.edit_message_text, db, cid)
+        await _show_panel(q.edit_message_text, db, cid, cfg)
         return
 
     if action == "close":
@@ -304,7 +376,8 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         s = db.get_chat_settings(cid)
         try:
             await q.edit_message_reply_markup(
-                reply_markup=build_panel_keyboard(cid, s, settings_sync.is_sync_on(db)))
+                reply_markup=build_panel_keyboard(cid, s, settings_sync.is_sync_on(db),
+                                                 _quips_state(db, cfg, cid)))
         except TelegramError:
             pass
         return
@@ -323,9 +396,34 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         s = db.get_chat_settings(cid)
         try:
             await q.edit_message_reply_markup(
-                reply_markup=build_panel_keyboard(cid, s, settings_sync.is_sync_on(db)))
+                reply_markup=build_panel_keyboard(cid, s, settings_sync.is_sync_on(db),
+                                                 _quips_state(db, cfg, cid)))
         except TelegramError:
             pass
+        return
+
+    if action == "quips":
+        # Solo ABRE la previsualización: el ajuste no se toca hasta que el admin
+        # pulse activar/desactivar viendo un ejemplo de lo que publicaría el bot.
+        cid = _cid(2)
+        if cid is None:
+            await q.answer(t("cfg.invalid_chat"))
+            return
+        await q.answer()
+        await _show_quips(q.edit_message_text, db, cfg, cid)
+        return
+
+    if action == "qset":
+        cid = _cid(3)
+        val = parts[2] if len(parts) > 2 else ""
+        if cid is None or val not in ("0", "1"):
+            await q.answer(t("cfg.invalid_opt"))
+            return
+        db.ensure_chat_settings(cid)
+        n = settings_sync.apply_setting(db, cid, "quips_enabled", int(val))
+        estado = t("cfg.act_on") if val == "1" else t("cfg.act_off")
+        await q.answer(estado + t("cfg.in_n", n=n) if n > 1 else estado)
+        await _show_quips(q.edit_message_text, db, cfg, cid)
         return
 
     if action == "sync":
@@ -336,7 +434,7 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         if new:
             rep = cid if cid is not None else (settings_sync.moderated_chat_ids(db) or [None])[0]
             if rep is not None:
-                await _show_panel(q.edit_message_text, db, rep)
+                await _show_panel(q.edit_message_text, db, rep, cfg)
         else:
             try:
                 await q.edit_message_text(t("cfg.sync_off_msg"), parse_mode="HTML")
@@ -485,6 +583,39 @@ async def handle_capture(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             ids = settings_sync.target_ids(db, chat_id)
         await msg.reply_text(t("cfg.rules_updated", scope=_scope_label(db, ids)))
     return True
+
+
+# ------------------------------- comando /quips -------------------------------
+
+def _rep_chat_id(db: DB, chat) -> int | None:
+    """Chat representativo para consultar el estado: el actual si es grupo, si no el
+    primer grupo moderado. None si el bot no es admin en ninguno."""
+    if chat is not None and getattr(chat, "type", None) in ("group", "supergroup"):
+        return chat.id
+    ids = settings_sync.moderated_chat_ids(db)
+    return ids[0] if ids else None
+
+
+async def cmd_quips(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/quips — enseña ejemplos del catálogo de frases. NO cambia ningún ajuste."""
+    cfg: Config = context.bot_data["cfg"]
+    db: DB = context.bot_data["db"]
+    user = update.effective_user
+    if not user or user.id != cfg.admin_user_id:
+        return
+    muestras = quips.demo_samples(4)
+    if not muestras:
+        await update.effective_message.reply_text(t("quipcfg.no_example"))
+        return
+    partes = [t("quipcfg.cmd_title")]
+    for rule, frase in muestras:
+        etiqueta = rule_explain.explain(rule) or rule
+        partes.append(t("quipcfg.cmd_item", rule=html.escape(etiqueta), quip=frase))
+    cid = _rep_chat_id(db, update.effective_chat)
+    if cid is not None:
+        partes.append(t("quipcfg.cmd_footer", state=_onoff(_quips_state(db, cfg, cid))))
+    await update.effective_message.reply_text(
+        "\n\n".join(partes), parse_mode="HTML", disable_web_page_preview=True)
 
 
 # ------------------------------- comando /sync -------------------------------
