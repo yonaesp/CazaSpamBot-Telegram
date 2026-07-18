@@ -13,8 +13,9 @@ from __future__ import annotations
 
 import re
 
-from . import Hit
+from ..i18n import t
 from ..wordlists import load_and_compile
+from . import Hit
 
 # t.me/+ABC o t.me/joinchat/ → invite link a canal/grupo externo
 _TG_INVITE_RE = re.compile(
@@ -88,29 +89,29 @@ def check(bio: str | None) -> Hit:
 
     if _TG_INVITE_RE.search(text):
         score += 40  # invite privado t.me/+ en bio = señal fuerte (users reales no lo ponen)
-        reasons.append("invite link privado en bio (t.me/+...)")
+        reasons.append(t("reason.bio_invite_link"))
     elif _TG_LINK_RE.search(text):
         score += 25
-        reasons.append("link t.me/ a canal/grupo externo")
+        reasons.append(t("reason.bio_tg_link"))
     elif _EXTERNAL_URL_RE.search(text):
         score += 15
-        reasons.append("URL externa en bio")
+        reasons.append(t("reason.bio_external_url"))
 
     if _SEXUAL_EMOJI_RE.search(text):
         score += 20
-        reasons.append("emojis sexuales/promo")
+        reasons.append(t("reason.bio_sexual_emoji"))
     if _MONEY_EMOJI_RE.search(text) or _MONEY_RE.search(text):
         score += 15
-        reasons.append("promesa monetaria")
+        reasons.append(t("reason.bio_money"))
     if _CTA_RE.search(text) or _FOREIGN_LANG_HINT_RE.search(text):
         score += 15
-        reasons.append("call-to-action / idioma extranjero")
+        reasons.append(t("reason.bio_cta"))
     if _SPAM_KEYWORDS_RE.search(text):
         score += 30
-        reasons.append("keywords spam (onlyfans/crypto/casino/etc.)")
+        reasons.append(t("reason.bio_keywords"))
     if _ILLEGAL_RE.search(text):
         score += 30
-        reasons.append("servicios ilegales/hacking (piratería informática/etc.)")
+        reasons.append(t("reason.bio_illegal"))
 
     if score < 60:
         return Hit.none()
@@ -118,6 +119,6 @@ def check(bio: str | None) -> Hit:
     return Hit(
         rule="bio_spam",
         score=min(score, 200),
-        reason="Bio sospechosa: " + " + ".join(reasons),
+        reason=t("reason.bio_spam", details=" + ".join(reasons)),
         payload={"bio_preview": text[:200], "score": score},
     )

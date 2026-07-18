@@ -24,8 +24,9 @@ import unicodedata
 
 from telegram import Message
 
-from . import Hit
+from ..i18n import t
 from ..wordlists import load_and_compile
+from . import Hit
 
 # Líneas que empiezan con emoji o pictograma
 _EMOJI_LINE_RE = re.compile(
@@ -133,53 +134,53 @@ def check(msg: Message, is_first_msg: bool = False) -> Hit:
     # Servicios ilegales/scam: señal MUY fuerte. 1 keyword = 35, 2+ = 55.
     if n_illegal >= 2:
         score += 55
-        reasons.append(f"servicios ilegales/scam ({n_illegal} señales: hacking/acceso cuentas/etc.)")
+        reasons.append(t("reason.ad_illegal_multi", n=n_illegal))
     elif n_illegal == 1:
         score += 35
-        reasons.append("vocabulario de servicios ilegales/scam")
+        reasons.append(t("reason.ad_illegal_single"))
     if emoji_lines >= 3:
         score += 30
-        reasons.append(f"{emoji_lines} líneas con emoji header (anuncio formateado)")
+        reasons.append(t("reason.ad_emoji_lines", n=emoji_lines))
     elif emoji_lines >= 2:
         score += 15
-        reasons.append("varias líneas con emoji header")
+        reasons.append(t("reason.ad_emoji_lines_few"))
     # Periodic money pesa más que money simple (oferta laboral típica scam)
     if has_periodic_money:
         score += 25
-        reasons.append("cifra € + periodicidad (al mes/semanal/...)")
+        reasons.append(t("reason.ad_periodic_money"))
     elif has_money:
         score += 20
-        reasons.append("promesa monetaria explícita")
+        reasons.append(t("reason.ad_money"))
     if has_cta:
         score += 20
-        reasons.append("call-to-action publicitario")
+        reasons.append(t("reason.ad_cta"))
     if has_work:
         score += 15
-        reasons.append("vocabulario de oferta laboral")
+        reasons.append(t("reason.ad_work"))
     if has_tg_link:
         score += 20
-        reasons.append("enlace t.me/")
+        reasons.append(t("reason.ad_tg_link"))
     elif has_external_url:
         # Enlace web SOLO (sin más señales) NO debe banear: un usuario fiable
         # puede compartir una web en su primer mensaje. Pesa poco por sí mismo.
         score += 15
-        reasons.append("enlace web externo")
+        reasons.append(t("reason.ad_external_url"))
     # COMBO clave del job-spam: lenguaje de oferta de empleo + un enlace. Esto sí
     # es el patrón inequívoco (reclutamiento + link), aunque el perfil parezca
     # fiable (foto antigua, etc.). Caso real: empleo.vertexgloball.com.
     if has_work and (has_tg_link or has_external_url):
         score += 35
-        reasons.append("oferta de empleo + enlace (patrón de job-spam)")
+        reasons.append(t("reason.ad_job_spam"))
     if has_domestic:
         score += 20
-        reasons.append("oferta doméstica / búsqueda de persona")
+        reasons.append(t("reason.ad_domestic"))
     if has_urgency:
         score += 10
-        reasons.append("urgencia gritada (URGENTE, INMEDIATO, etc.)")
+        reasons.append(t("reason.ad_urgency"))
 
     if is_first_msg and score > 0:
         score += 15
-        reasons.append("primer mensaje del user")
+        reasons.append(t("reason.ad_first_msg"))
 
     # Umbral mínimo: una sola señal NO basta. Se requieren al menos 2-3 combinadas.
     if score < 60:
@@ -188,7 +189,7 @@ def check(msg: Message, is_first_msg: bool = False) -> Hit:
     return Hit(
         rule="commercial_ad",
         score=score,
-        reason="Anuncio comercial: " + " + ".join(reasons),
+        reason=t("reason.commercial_ad", details=" + ".join(reasons)),
         payload={
             "emoji_lines": emoji_lines,
             "has_money": has_money,

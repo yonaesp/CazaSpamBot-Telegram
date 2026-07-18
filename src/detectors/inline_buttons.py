@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from telegram import Message
 
+from ..i18n import t
 from . import Hit
 
 
@@ -37,9 +38,9 @@ def check(msg: Message) -> Hit:
                 urls.append(url)
 
     score = 90  # alto pero no max, para que el trust score pueda degradar
-    reasons = [f"mensaje con {n_buttons} botones inline (los users normales no pueden enviarlos)"]
+    reasons = [t("reason.inline_buttons", n_buttons=n_buttons)]
     if urls:
-        reasons.append(f"botones llevan a {len(urls)} URLs")
+        reasons.append(t("reason.inline_buttons_urls", n_urls=len(urls)))
     return Hit(
         rule="inline_buttons_from_user",
         score=score,

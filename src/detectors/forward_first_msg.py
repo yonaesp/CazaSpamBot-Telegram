@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from telegram import Message
 
+from ..i18n import t
 from . import Hit
 
 # Ventana en segundos desde el primer_seen del user para que un forward cuente
@@ -91,22 +92,22 @@ def check(
     # - Forward desde user/hidden_user en primer msg → KICK (score 80)
     if origin_type in ("channel", "chat"):
         score = 100
-        sev = "forward de CANAL en primer mensaje"
+        sev = t("reason.forward_channel")
     elif origin_type == "bot":
         score = 95
-        sev = "forward de BOT en primer mensaje"
+        sev = t("reason.forward_bot")
     else:
         score = 80
-        sev = f"forward de {origin_type} en primer mensaje"
+        sev = t("reason.forward_other", origin_type=origin_type)
 
     # Si está en la ventana temprana pero ya tiene varios mensajes, suaviza un poco
     if not is_first_msg and in_early_window:
         score = max(70, score - 15)
-        sev += f" (dentro de {EARLY_WINDOW_S}s tras primer seen)"
+        sev += " " + t("reason.forward_early_window", seconds=EARLY_WINDOW_S)
 
     reasons = [sev]
     if origin_name:
-        reasons.append(f"origen: {origin_name}")
+        reasons.append(t("reason.forward_origin", origin_name=origin_name))
 
     return Hit(
         rule="forward_first_msg",

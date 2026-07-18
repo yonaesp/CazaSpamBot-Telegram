@@ -25,6 +25,7 @@ import re
 
 from telegram import Message
 
+from ..i18n import t
 from . import Hit
 from .unicode_script import non_allowed_ratio
 
@@ -54,18 +55,20 @@ def check(
         ratio, dominant = non_allowed_ratio(name, allowed_scripts)
         if ratio >= non_latin_threshold:
             score = max(score, 80)
-            reasons.append(f"nombre del contacto en «{dominant}» (ratio={ratio:.0%})")
+            reasons.append(
+                t("reason.contact_spam_script", dominant=dominant, ratio=f"{ratio:.0%}")
+            )
 
     # 2) Enlace / handle promocional en el nombre o en el vCard.
     if _LINK_RE.search(name) or _LINK_RE.search(vcard):
         score = max(score, 90)
-        reasons.append("el contacto incluye enlaces o handles promocionales")
+        reasons.append(t("reason.contact_spam_link"))
 
     if score == 0:
         return Hit.none()
     return Hit(
         rule="contact_spam",
         score=score,
-        reason="Contacto compartido con reclamo de spam: " + "; ".join(reasons),
+        reason=t("reason.contact_spam", details="; ".join(reasons)),
         payload={"name": name[:80], "first_msg": is_first_msg},
     )

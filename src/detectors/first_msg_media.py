@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from telegram import Message
 
+from ..i18n import t
 from . import Hit
 
 
@@ -28,17 +29,17 @@ def check(
         return Hit.none()
     media_type = None
     if msg.photo:
-        media_type = "foto"
+        media_type = t("reason.media_photo")
     elif msg.video:
-        media_type = "vídeo"
+        media_type = t("reason.media_video")
     elif msg.animation:
-        media_type = "GIF"
+        media_type = t("reason.media_gif")
     elif msg.sticker:
-        media_type = "sticker"
+        media_type = t("reason.media_sticker")
     elif msg.document:
-        media_type = "documento"
+        media_type = t("reason.media_document")
     elif msg.video_note:
-        media_type = "video_note"
+        media_type = t("reason.media_video_note")
     if not media_type:
         return Hit.none()
 
@@ -46,17 +47,17 @@ def check(
     short_caption = len(caption) < 20
 
     score = 70  # base
-    reasons = [f"primer mensaje es {media_type}"]
+    reasons = [t("reason.fmm_first_media", media_type=media_type)]
     if short_caption:
         score += 20
-        reasons.append("sin caption o caption corto")
+        reasons.append(t("reason.fmm_short_caption"))
     if is_suspicious:
         # Cuenta sospechosa + media primer msg = patrón spam clarísimo
         score += 50
         if suspicious_reasons:
-            reasons.append("cuenta sospechosa: " + ", ".join(suspicious_reasons[:3]))
+            reasons.append(t("reason.fmm_suspicious_detail", details=", ".join(suspicious_reasons[:3])))
         else:
-            reasons.append("cuenta sospechosa")
+            reasons.append(t("reason.fmm_suspicious"))
     return Hit(
         rule="first_msg_media",
         score=score,

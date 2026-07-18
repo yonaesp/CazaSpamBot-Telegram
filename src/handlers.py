@@ -102,17 +102,18 @@ async def on_my_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         actor_label = "?"
         if actor:
             actor_label = f"@{actor.username}" if actor.username else (actor.first_name or str(actor.id))
-        verbo = "me han BANEADO" if new.status == ChatMemberStatus.BANNED else "me han sacado"
+        verbo = t("hdl.bot_removed.verb_banned") if new.status == ChatMemberStatus.BANNED else t("hdl.bot_removed.verb_kicked")
         from telegram import InlineKeyboardMarkup
         try:
             await context.bot.send_message(
                 chat_id=cfg.admin_notify_chat_id,
-                text=(
-                    f"⚠️ <b>Perdí acceso a un grupo</b>: {verbo} de "
-                    f"<b>{_h.escape(chat.title or str(chat.id))}</b> (<code>{chat.id}</code>)\n"
-                    f"👮 Por: {_h.escape(actor_label)}"
-                    + (f" (<code>{actor.id}</code>)" if actor else "")
-                    + "\n\n<i>Ya no puedo moderar ahí hasta que me vuelvan a añadir como admin.</i>"
+                text=t(
+                    "hdl.bot_removed_alert",
+                    verb=verbo,
+                    chat=_h.escape(chat.title or str(chat.id)),
+                    chat_id=chat.id,
+                    actor=_h.escape(actor_label),
+                    actor_id=(f" (<code>{actor.id}</code>)" if actor else ""),
                 ),
                 parse_mode="HTML",
                 reply_markup=InlineKeyboardMarkup([[notify_prefs.mute_button("bot_removed")]]),
@@ -215,9 +216,9 @@ async def _check_admin_ban_abuse(context, db, cfg, cmu) -> None:
     n = len(bans)
     label = f"@{actor.username}" if actor.username else (actor.first_name or str(admin_id))
     kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton(f"↩️ Deshacer ({n} desbaneos)",
+        [InlineKeyboardButton(t("hdl.btn.undo_unbans", n=n),
                               callback_data=f"abuse:undo:{chat.id}:{admin_id}:{int(since)}")],
-        [InlineKeyboardButton("✅ Es legítimo (ignorar)",
+        [InlineKeyboardButton(t("hdl.btn.ignore_legit"),
                               callback_data=f"abuse:ok:{chat.id}:{admin_id}")],
     ])
     text = t(
@@ -518,7 +519,7 @@ async def on_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                     chat_id=cmu.chat.id, user_id=user.id, username=user.username,
                     message_id=None, rule="cas_low_offense", action="noop",
                     score=hit.score, mode=cfg.mode,
-                    payload={"offenses": offenses, "reason": "CAS offenses < umbral autoban (revisión manual)"},
+                    payload={"offenses": offenses, "reason": t("reason.cas_low_offense")},
                 )
                 log.info(
                     "CAS match user=%s offenses=%d < autoban_min=%d → revisión manual",
@@ -922,8 +923,8 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
             hits.append(Hit(
                 rule="learned_similarity" if learned_score > 0 else "learned_negative",
                 score=learned_score,
-                reason=(f"Match con sample spam previo: '{(sample_match or '')[:60]}'"
-                        if learned_score > 0 else "Match con sample ham (legítimo) previo"),
+                reason=(t("reason.learned_spam_match", sample=(sample_match or "")[:60])
+                        if learned_score > 0 else t("reason.learned_ham_match")),
                 payload={"sample_match": sample_match} if sample_match else None,
             ))
 
@@ -1088,7 +1089,8 @@ async def on_message_reaction(update: Update, context: ContextTypes.DEFAULT_TYPE
         chat_id=mru.chat.id, chat_title=mru.chat.title,
         user_id=user.id, username=user.username,
         message_id=mru.message_id, decision=decision,
-        original_text=f"[reacción farming: {count} en {cfg.reaction_threshold_seconds}s]",
+        original_text=t("hdl.reaction_farming_text", count=count,
+                        seconds=cfg.reaction_threshold_seconds),
         first_name=user.first_name,
     )
 
@@ -1264,8 +1266,8 @@ async def _send_review_request(
     )
     # callback_data: prev:legit:CHAT:USER:MSG:PUBLIC  /  prev:spam:CHAT:USER:MSG:PUBLIC
     kb = InlineKeyboardMarkup([[
-        InlineKeyboardButton("✅ Legítimo", callback_data=f"prev:legit:{chat_id}:{user_id}:{msg_id}:{public_msg_id}"),
-        InlineKeyboardButton("❌ Spam", callback_data=f"prev:spam:{chat_id}:{user_id}:{msg_id}:{public_msg_id}"),
+        InlineKeyboardButton(t("hdl.btn.legit"), callback_data=f"prev:legit:{chat_id}:{user_id}:{msg_id}:{public_msg_id}"),
+        InlineKeyboardButton(t("hdl.btn.spam"), callback_data=f"prev:spam:{chat_id}:{user_id}:{msg_id}:{public_msg_id}"),
     ]])
     try:
         await context.bot.send_message(
@@ -1655,7 +1657,7 @@ async def on_flood_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         await query.answer(t("hdl.flood_human_toast"))
         try:
             await query.edit_message_text(
-                base + "\n\n✅ <b>Marcado como humano</b> (desmuteado, más margen).",
+                base + t("hdl.flood_human_suffix"),
                 parse_mode="HTML",
             )
         except TelegramError:
@@ -1668,10 +1670,10 @@ async def on_flood_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) 
                               reason=t("reason.flood_confirmed_bot"), payload={}),
             original_text=None, first_name=None,
         )
-        await query.answer("Baneado.")
+        await query.answer(t("hdl.flood_banned_toast"))
         try:
             await query.edit_message_text(
-                base + "\n\n🔨 <b>Baneado</b> (en todos los grupos).",
+                base + t("hdl.flood_banned_suffix"),
                 parse_mode="HTML",
             )
         except TelegramError:

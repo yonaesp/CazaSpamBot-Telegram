@@ -23,6 +23,7 @@ from __future__ import annotations
 
 from telegram import Message
 
+from ..i18n import t
 from . import Hit
 
 
@@ -49,7 +50,7 @@ def check(msg: Message, is_first_msg: bool, is_moderated_chat=None) -> Hit:
     return Hit(
         rule="external_quote_channel",
         score=score,
-        reason=(f"Cita a un canal externo «{title}» (@{username}) mediante quote a otro chat"
-                + (" en primer mensaje" if is_first_msg else "")),
+        reason=(t("reason.external_quote", title=title, username=username)
+                + (" " + t("reason.external_quote_first_msg") if is_first_msg else "")),
         payload={"channel": username, "first_msg": is_first_msg},
     )

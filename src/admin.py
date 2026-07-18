@@ -348,12 +348,10 @@ async def _render_chat_stats(db: DB, chat_id: int | None = None) -> str:
     """Si chat_id=None devuelve stats globales. Si no, stats de ese chat."""
     if chat_id is None:
         s = db.stats()
-        return (
-            f"<b>📊 Stats globales</b>\n"
-            f"Chats activos: {s['chats']}\n"
-            f"Usuarios vistos: {s['seen_users']}\n"
-            f"Baneados (en todos los grupos): {s['banned']}\n"
-            f"Acciones 24h: {s['actions_24h']}"
+        return t(
+            "admin.stats.global",
+            chats=s["chats"], seen_users=s["seen_users"],
+            banned=s["banned"], actions_24h=s["actions_24h"],
         )
     # Por chat
     chat_row = next((c for c in db.all_chats() if c["chat_id"] == chat_id), None)
@@ -372,14 +370,11 @@ async def _render_chat_stats(db: DB, chat_id: int | None = None) -> str:
             "SELECT COUNT(*) AS n FROM pending_verifications WHERE chat_id=? AND verified_at IS NULL",
             (chat_id,),
         ).fetchone()["n"]
-    return (
-        f"<b>📊 Stats — {_h.escape(title)}</b>\n"
-        f"<code>{chat_id}</code>\n\n"
-        f"👥 Usuarios vistos: <b>{users}</b>\n"
-        f"💬 Mensajes registrados: <b>{msgs}</b>\n"
-        f"⚠️ Warns activos: <b>{warns}</b>\n"
-        f"🔒 Pendientes verificación: <b>{pending}</b>\n"
-        f"🔨 Acciones 24h: <b>{actions24}</b>"
+    return t(
+        "admin.stats.chat",
+        title=_h.escape(title), chat_id=chat_id,
+        users=users, msgs=msgs, warns=warns,
+        pending=pending, actions24=actions24,
     )
 
 
@@ -509,7 +504,7 @@ async def _resolve_target_user(
     # 3) Username (@nombre o nombre pelado)
     uname = first.lstrip("@").strip()
     if not uname:
-        return None, args, "Argumento vacío."
+        return None, args, t("admin.resolve.empty_arg")
     # 3a) Cache local
     uid = db.resolve_username(uname)
     if uid is not None:
@@ -535,7 +530,7 @@ async def _resolve_target_user(
                 return int(entity.id), rest, None
         except Exception as exc:  # noqa: BLE001
             log.debug("Telethon get_entity(@%s) fallo: %s", uname, exc)
-    return None, args, f"No pude resolver @{uname} (ni Bot API ni Telethon). Usa el user_id numérico."
+    return None, args, t("admin.resolve.unresolved", username=uname)
 
 
 async def _delete_command_safely(update: Update) -> None:
@@ -591,19 +586,20 @@ async def cmd_ban(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if user_id is None:
         # Error de resolución: si grupo, borrar comando + avisar admin por DM; si DM, contestar inline.
         usage = (
-            "Uso: <code>/ban &lt;user_id | @username&gt; [razón]</code>\n"
-            "  · También puedes responder a un mensaje del user con <code>/ban [razón]</code>.\n"
-            "Banea en TODOS los chats federados y publica un mensaje en cada grupo.\n"
+            t("admin.ban.usage")
             + (f"\n⚠️ {resolve_err}" if resolve_err else "")
         )
         if is_group:
             await _delete_command_safely(update)
-            await _notify_admin_ack(context, f"❌ /ban inválido: {resolve_err or 'argumento ausente'}")
+            await _notify_admin_ack(context, t(
+                "admin.cmd_invalid", cmd="ban",
+                error=resolve_err or t("admin.resolve.missing_arg"),
+            ))
         else:
             await update.effective_message.reply_text(usage, parse_mode="HTML")
         return
     reason_raw = " ".join(args_remaining).strip()
-    reason = reason_raw or "Ban manual del admin"
+    reason = reason_raw or t("reason.manual_ban_admin")
     has_explicit_reason = bool(reason_raw)
     cfg: Config = context.bot_data["cfg"]
 
@@ -714,12 +710,15 @@ async def cmd_unban(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id, args_remaining, resolve_err = await _resolve_target_user(update, context, db)
     if user_id is None:
         usage = (
-            "Uso: <code>/unban &lt;user_id | @username&gt; [razón]</code>"
+            t("admin.unban.usage")
             + (f"\n⚠️ {resolve_err}" if resolve_err else "")
         )
         if is_group:
             await _delete_command_safely(update)
-            await _notify_admin_ack(context, f"❌ /unban inválido: {resolve_err or 'argumento ausente'}")
+            await _notify_admin_ack(context, t(
+                "admin.cmd_invalid", cmd="unban",
+                error=resolve_err or t("admin.resolve.missing_arg"),
+            ))
         else:
             await update.effective_message.reply_text(usage, parse_mode="HTML")
         return

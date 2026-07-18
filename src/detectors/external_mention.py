@@ -16,6 +16,7 @@ from urllib.parse import urlparse
 from telegram import Message, MessageEntity
 
 from .. import lang
+from ..i18n import t
 from . import Hit
 
 _TG_HOSTS = {"t.me", "telegram.me", "telegram.dog"}
@@ -130,23 +131,23 @@ def check(
             if is_first_msg:
                 if not ctx_text or len(ctx_text) < 5:
                     score += 130
-                    reasons.append(f"Mención sin contexto ({len(externals)} externo/s)")
+                    reasons.append(t("reason.mention_no_context", n=len(externals)))
                 elif not lang.likely_spanish(ctx_text):
                     score += 130
-                    reasons.append(f"Mención + texto NO español: '{ctx_text[:50]}'")
+                    reasons.append(t("reason.mention_not_spanish", text=ctx_text[:50]))
                 else:
                     score += 60  # mención con texto español = sospechoso pero no ban directo
-                    reasons.append(f"Mención a {len(externals)} externo/s (con contexto ES)")
+                    reasons.append(t("reason.mention_with_context", n=len(externals)))
             else:
                 score += 40
-                reasons.append(f"Mención a {len(externals)} externo/s")
+                reasons.append(t("reason.mention_external", n=len(externals)))
 
     if detect_tg_links:
         ext_links = find_external_telegram_links(msg, own_chat_username=own_chat_username)
         if ext_links:
             payload["external_tg_links"] = ext_links
             score += 100 if is_first_msg else 50
-            reasons.append(f"Enlace t.me/... a chat externo ({len(ext_links)})")
+            reasons.append(t("reason.external_tg_link", n=len(ext_links)))
 
     if score == 0:
         return Hit.none()
