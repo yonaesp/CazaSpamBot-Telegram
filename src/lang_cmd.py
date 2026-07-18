@@ -32,7 +32,9 @@ async def cmd_idioma(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         return
     want = args[0].strip().lower()[:2]
     if not i18n.is_supported(want):
-        await update.effective_message.reply_text(i18n.t("lang.invalid"), parse_mode="HTML")
+        disponibles = ", ".join(f"<code>{c}</code>" for c in i18n.SUPPORTED)
+        await update.effective_message.reply_text(
+            i18n.t("lang.invalid", langs=disponibles), parse_mode="HTML")
         return
     db.set_text_pref(LANG_PREF, want)
     i18n.set_lang(want)

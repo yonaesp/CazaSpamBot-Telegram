@@ -12,12 +12,14 @@ from __future__ import annotations
 import logging
 import os
 
-from .locales import STRINGS
+from .locales import AVAILABLE, FALLBACK, STRINGS
 
 log = logging.getLogger(__name__)
 
-SUPPORTED = ("es", "en")
-DEFAULT = "es"
+# Idiomas soportados = archivos de idioma encontrados (autodescubrimiento). Soltar un
+# `fr.json` en src/locales/ basta para que /idioma lo acepte: cero cambios de código.
+SUPPORTED = AVAILABLE
+DEFAULT = FALLBACK
 _current = DEFAULT
 
 
