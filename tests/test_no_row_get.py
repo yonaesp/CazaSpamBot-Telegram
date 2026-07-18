@@ -15,9 +15,15 @@ import glob
 import re
 
 # Variables que SIEMPRE son sqlite3.Row en src/ (vienen de los helpers de db).
+# OJO: `row` a secas iba fuera en la primera versión de este test — justo el nombre
+# más probable. El bug original fue `chat_row.get()`; un `row.get()` idéntico se
+# habría colado por el agujero del propio guard. NO incluir `pending` (es un dict
+# real: context.user_data en config_panel).
 _ROW_PATTERNS = (
-    r"\b\w*_row\.get\(",   # chat_row, seen_row, action_row, ...
+    r"\brow\.get\(",       # el nombre más obvio
+    r"\b\w+_row\.get\(",   # chat_row, seen_row, action_row, ...
     r"\bseen\.get\(",      # db.get_seen(...) → Row
+    r"\bsettings\.get\(",  # db.get_chat_settings(...) → Row
 )
 
 

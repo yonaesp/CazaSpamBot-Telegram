@@ -98,8 +98,15 @@ async def cleanup_nightly_job(context: ContextTypes.DEFAULT_TYPE) -> None:
         # VACUUM para reclamar espacio (solo si borramos >1000 filas)
         total = sum(stats.values())
         if total > 1000:
-            c.execute("VACUUM")
-            log.info("cleanup_nightly_job: VACUUM ejecutado tras borrar %d filas", total)
+            # VACUUM pide lock exclusivo de toda la BD. Si otro proceso (p.ej. un
+            # script de análisis) tiene una lectura abierta, falla con "database is
+            # locked". Sin proteger, esa excepción abortaba cleanup_nightly_job y
+            # _reconcile_banned_users NO llegaba a correr esa noche.
+            try:
+                c.execute("VACUUM")
+                log.info("cleanup_nightly_job: VACUUM ejecutado tras borrar %d filas", total)
+            except Exception as exc:  # noqa: BLE001
+                log.warning("cleanup_nightly_job: VACUUM omitido (%s); se reintenta mañana", exc)
 
     if any(v > 0 for v in stats.values()):
         log.info("cleanup_nightly_job stats: %s", stats)
@@ -145,17 +152,28 @@ async def _reconcile_banned_users(context, db) -> None:
         return
     log.info("reconcile_banned_users: %d users a verificar", len(pending))
     revoked = 0
+    sin_respuesta = 0
     for uid in pending:
         kicked_anywhere = False
+        lookup_ok = False  # ¿respondió AL MENOS una consulta?
         for cid in chats:
             try:
                 member = await context.bot.get_chat_member(chat_id=cid, user_id=uid)
+                lookup_ok = True
                 if member.status == ChatMemberStatus.BANNED:
                     kicked_anywhere = True
                     break
             except Exception as exc:  # noqa: BLE001
                 log.debug("reconcile get_chat_member fallo chat=%s uid=%s: %s",
                           cid, uid, exc)
+        # Solo revocamos ante un "ya no está baneado" CONFIRMADO. Si ninguna consulta
+        # respondió (red caída, 5xx de Telegram, flood-wait, o el bot perdió admin),
+        # "fallo" es indistinguible de "no baneado": revocar ahí borraría un ban real
+        # y dejaría de re-banear a ese spammer al reentrar (is_banned filtra por
+        # revoked_at IS NULL). Ante la duda, no se toca.
+        if not lookup_ok:
+            sin_respuesta += 1
+            continue
         if not kicked_anywhere:
             with db._cur() as c:
                 c.execute(
@@ -166,6 +184,9 @@ async def _reconcile_banned_users(context, db) -> None:
             revoked += 1
     if revoked > 0:
         log.info("reconcile_banned_users: %d users revocados (ya no kicked en Telegram)", revoked)
+    if sin_respuesta > 0:
+        log.warning("reconcile_banned_users: %d users sin respuesta de Telegram en ningún "
+                    "chat; NO se revocan (se reintenta en la próxima pasada)", sin_respuesta)
 
 
 async def aggressive_post_ban_cleanup(

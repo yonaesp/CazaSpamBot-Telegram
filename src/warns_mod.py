@@ -166,6 +166,7 @@ async def cmd_warn(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             if reason:
                 text += f"\n💬 Último motivo: {html.escape(reason)}"
         elif action == "kick":
+            sancion_ok = True
             try:
                 await context.bot.ban_chat_member(chat_id=msg.chat_id, user_id=target_id)
                 await asyncio.sleep(0.5)
@@ -173,10 +174,17 @@ async def cmd_warn(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                     chat_id=msg.chat_id, user_id=target_id, only_if_banned=True,
                 )
             except TelegramError as exc:
+                sancion_ok = False
                 log.warning("warn kick fallo: %s", exc)
-            text = f"👢 {mention} ha alcanzado el límite (<b>{n}/{limit}</b>). <b>Kick</b>."
+            text = (
+                f"👢 {mention} ha alcanzado el límite (<b>{n}/{limit}</b>). <b>Kick</b>."
+                if sancion_ok else
+                f"⚠️ {mention} ha alcanzado el límite (<b>{n}/{limit}</b>), pero <b>no he "
+                f"podido expulsarle</b> (¿me faltan permisos?). Los warns se mantienen."
+            )
         elif action == "mute":
             from telegram import ChatPermissions
+            sancion_ok = True
             try:
                 await context.bot.restrict_chat_member(
                     chat_id=msg.chat_id, user_id=target_id,
@@ -184,11 +192,21 @@ async def cmd_warn(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                     until_date=int(time.time()) + 86400,
                 )
             except TelegramError as exc:
+                sancion_ok = False
                 log.warning("warn mute fallo: %s", exc)
-            text = f"🤐 {mention} ha alcanzado el límite (<b>{n}/{limit}</b>). <b>Mute 24h</b>."
+            text = (
+                f"🤐 {mention} ha alcanzado el límite (<b>{n}/{limit}</b>). <b>Mute 24h</b>."
+                if sancion_ok else
+                f"⚠️ {mention} ha alcanzado el límite (<b>{n}/{limit}</b>), pero <b>no he "
+                f"podido silenciarle</b> (¿me faltan permisos?). Los warns se mantienen."
+            )
         else:
             text = f"⚠️ {mention} — Warn <b>{n}/{limit}</b>"
-        db.reset_warns(target_id, msg.chat_id)
+        # Solo se limpian los warns si la sanción se aplicó de verdad. Antes se
+        # reseteaban siempre: si el kick/mute fallaba (sin permisos, target owner),
+        # el grupo veía "Kick" y el contador volvía a 0 sin haber sancionado a nadie.
+        if sancion_ok:
+            db.reset_warns(target_id, msg.chat_id)
     else:
         text = f"⚠️ {mention} — Warn <b>{n}/{limit}</b>"
         if reason:

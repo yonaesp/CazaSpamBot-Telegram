@@ -38,11 +38,16 @@ CREATE TABLE IF NOT EXISTS seen_users (
     last_msg_id    INTEGER,
     last_msg_text  TEXT,
     last_msg_ts    REAL,
+    first_name     TEXT,
     PRIMARY KEY (chat_id, user_id)
 );
 -- total_msgs_user() suma msg_count por user_id en TODOS los chats (se llama en
 -- cada reacción). Sin este índice sería full-scan por la PK (chat_id, user_id).
 CREATE INDEX IF NOT EXISTS idx_seen_user ON seen_users(user_id);
+-- telethon_bridge busca por (chat_id, last_msg_id) una vez POR CADA mensaje borrado
+-- en lote. Sin este índice era un range-scan de todas las filas del chat: medido en
+-- 2,7 ms por lookup (271 ms de event loop bloqueado al limpiar 100 mensajes).
+CREATE INDEX IF NOT EXISTS idx_seen_lastmsg ON seen_users(chat_id, last_msg_id);
 
 CREATE TABLE IF NOT EXISTS banned_users (
     user_id        INTEGER PRIMARY KEY,
@@ -139,6 +144,7 @@ CREATE TABLE IF NOT EXISTS chat_settings (
     verification_kick_normal      INTEGER NOT NULL DEFAULT 1,   -- 1=kick al no verificar, 0=quedan muteados
     verification_review_suspicious INTEGER NOT NULL DEFAULT 1,  -- 1=en vez de verificar en grupo, aviso privado con botones
     cleanservice                  INTEGER NOT NULL DEFAULT 1,
+    topweekly_enabled             INTEGER NOT NULL DEFAULT 0,
     updated_at                    REAL NOT NULL DEFAULT 0
 );
 -- Migración blanda para bases ya creadas

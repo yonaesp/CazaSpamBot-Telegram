@@ -12,10 +12,18 @@ dispara (devuelve Hit.none()).
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Optional
 
 from . import Hit
+
+# Cota dura para las llamadas Telethon. Telethon trae flood_sleep_threshold=60 y
+# request_retries=5: ante un FloodWait puede DORMIR minutos dentro del await. Como
+# PTB procesa los updates de uno en uno (concurrent_updates=1), ese await congelaría
+# la moderación de TODOS los grupos mientras dura. Con la cota, se degrada a "sin
+# veredicto" en 5 s en vez de bloquear.
+_TELETHON_TIMEOUT_S = 5.0
 
 log = logging.getLogger(__name__)
 
@@ -40,11 +48,12 @@ async def check(
 
     entity = None
     try:
-        entity = await client.get_entity(user_id)
+        entity = await asyncio.wait_for(client.get_entity(user_id), _TELETHON_TIMEOUT_S)
     except Exception:
         if username:
             try:
-                entity = await client.get_entity(f"@{username.lstrip('@')}")
+                entity = await asyncio.wait_for(
+                    client.get_entity(f"@{username.lstrip('@')}"), _TELETHON_TIMEOUT_S)
             except Exception as exc:
                 log.debug("photos_batch get_entity(@%s) fallo: %s", username, exc)
         else:
@@ -54,7 +63,8 @@ async def check(
         return Hit.none()
 
     try:
-        photos = await client.get_profile_photos(entity, limit=5)
+        photos = await asyncio.wait_for(
+            client.get_profile_photos(entity, limit=5), _TELETHON_TIMEOUT_S)
     except Exception as exc:
         log.debug("photos_batch get_profile_photos user=%s fallo: %s", user_id, exc)
         return Hit.none()
@@ -62,7 +72,10 @@ async def check(
     if not photos or len(photos) < min_photos:
         return Hit.none()
 
-    timestamps = [p.date.timestamp() for p in photos]
+    # `date` puede faltar (PhotoEmpty u objeto inesperado): se ignoran esas fotos
+    timestamps = [p.date.timestamp() for p in photos if getattr(p, "date", None)]
+    if len(timestamps) < min_photos:
+        return Hit.none()
     span = max(timestamps) - min(timestamps)
     if span > span_seconds:
         return Hit.none()

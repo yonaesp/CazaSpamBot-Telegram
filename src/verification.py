@@ -731,7 +731,15 @@ async def on_join(
         display = html.escape(user.first_name or str(user.id))
         name = f'<a href="tg://user?id={user.id}">{display}</a>'
     chat_name = html.escape(chat.title or "el grupo")
-    text = welcome_text.format(name=name, chat=chat_name)
+    # CRÍTICO: el usuario YA está muteado (arriba). Si el welcome del admin trae una
+    # llave que no sea {name}/{chat} (p.ej. "{algo}", "{}", ":-{"), .format() lanza y
+    # la excepción escaparía de on_join SIN llegar a add_pending_verification: el
+    # usuario quedaría muteado para siempre y sin fila pendiente, invisible para
+    # cleanup_job (que se apoya en esa tabla). Mismo guard que _send_clean_welcome.
+    try:
+        text = welcome_text.format(name=name, chat=chat_name)
+    except (KeyError, IndexError, ValueError):
+        text = welcome_text  # texto con llaves raras: se manda tal cual, sin romper
     text += _verification_footer(settings, suspicious, susp_reasons)
 
     callback_data = f"{CALLBACK_PREFIX}:{chat.id}:{user.id}"

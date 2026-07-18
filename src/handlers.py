@@ -435,9 +435,17 @@ async def on_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         # NUEVO: fotos de perfil en ráfaga (≤2 min) → cuenta construida con
         # identidad robada. Caso real Javier (5 fotos en 18s). Ban directo.
         if client_pre is not None:
-            photos_hit = await photos_batch_det.check(
-                client_pre, user.id, username=user.username,
-            )
+            # Protegido como su vecino user_signals.fetch: el usuario YA tiene el mute
+            # provisional puesto arriba; si esto lanzara (foto sin date, respuesta rara
+            # de Telethon...), la excepción escaparía de on_chat_member y lo dejaría
+            # muteado para siempre y sin fila pendiente.
+            try:
+                photos_hit = await photos_batch_det.check(
+                    client_pre, user.id, username=user.username,
+                )
+            except Exception as exc:  # noqa: BLE001
+                log.debug("photos_batch check user=%s exc: %s", user.id, exc)
+                photos_hit = None
             if photos_hit:
                 log.info(
                     "photos_batch_upload user=%s span=%.0fs n=%d → ban directo",

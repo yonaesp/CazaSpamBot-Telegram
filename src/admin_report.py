@@ -288,7 +288,15 @@ async def on_reported_message_deleted(
     # vía un job en main_app. Por simplicidad: usar aiohttp con asyncio.sleep en background.
     if thanks_msg_id:
         import asyncio
-        asyncio.create_task(_delayed_delete(bot, chat_id, thanks_msg_id, THANKS_TTL_S))
+        # Guardamos la referencia: `asyncio.create_task` sin retenerla permite que
+        # CPython recolecte la tarea a medio vuelo (el borrado diferido no ocurriría).
+        task = asyncio.create_task(_delayed_delete(bot, chat_id, thanks_msg_id, THANKS_TTL_S))
+        _BG_TASKS.add(task)
+        task.add_done_callback(_BG_TASKS.discard)
+
+
+# Referencias vivas a tareas en segundo plano (ver comentario en el create_task).
+_BG_TASKS: set = set()
 
 
 async def _delayed_delete(bot, chat_id: int, msg_id: int, delay: int) -> None:
