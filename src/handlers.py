@@ -901,8 +901,9 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
                     sig_local, user.username, user.first_name, user.last_name,
                 )
             hits.append(media_det.check(
-                msg, is_first_msg=True,
-                is_suspicious=suspicious, suspicious_reasons=susp_reasons,
+                msg, is_first_msg=True, is_suspicious=suspicious,
+                # el detector solo los muestra: se le pasan ya traducidos
+                suspicious_reasons=verification.render_reason_list(susp_reasons),
             ))
         elif has_media and not bot_saw_join:
             log.info(

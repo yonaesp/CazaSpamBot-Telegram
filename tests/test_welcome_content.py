@@ -50,7 +50,7 @@ def test_verification_footer_tiempos():
     from src.verification import _verification_footer
     s = {"verification_suspicious_kick_minutes": 30, "verification_kick_normal": 1,
          "verification_reminder_hours": 3, "verification_kick_after_reminder_hours": 6}
-    assert "30 min" in _verification_footer(s, True, ["sin foto"])       # sospechoso
+    assert "30 min" in _verification_footer(s, True, [(v.REASON_NO_PHOTO, {})])  # sospechoso
     assert "9h" in _verification_footer(s, False, [])                     # normal kick: 3+6
     s2 = dict(s)
     s2["verification_kick_normal"] = 0

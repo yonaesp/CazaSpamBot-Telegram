@@ -32,7 +32,8 @@ def test_review_worthy_solo_sin_username_no_dispara():
 def test_review_worthy_nombre_no_latino_dispara():
     worthy, reasons = v._is_review_worthy(None, username="ivan", first_name="Иван", last_name=None)
     assert worthy is True
-    assert any("no-latino" in r for r in reasons)
+    # los motivos son CÓDIGOS estables (no texto): la lógica no depende del idioma
+    assert v.REASON_NON_LATIN_NAME in [code for code, _ in reasons]
 
 
 def test_review_worthy_sin_foto_dispara():
@@ -45,6 +46,23 @@ def test_review_worthy_dos_señales_debiles_dispara():
     """Dos indicios débiles acumulados sí (sin username + sin first_name)."""
     worthy, _ = v._is_review_worthy(None, username=None, first_name=None, last_name=None)
     assert worthy is True
+
+
+def test_decision_no_depende_del_idioma():
+    """Invariante del refactor a códigos: cambiar el idioma NO puede alterar la
+    decisión de avisar. Antes los motivos eran cadenas en español y _is_review_worthy
+    las comparaba literalmente, así que traducirlas habría roto la lógica en silencio.
+    """
+    from src import i18n
+    sig = SimpleNamespace(photo_count=0, account_age_days=500)
+    resultados = []
+    for lg in ("es", "en"):
+        i18n.set_lang(lg)
+        worthy, reasons = v._is_review_worthy(sig, username="ana", first_name="Ana")
+        resultados.append((worthy, sorted(code for code, _ in reasons)))
+    i18n.set_lang("es")
+    assert resultados[0] == resultados[1], "la decisión cambió con el idioma"
+    assert resultados[0][0] is True
 
 
 # --------------------------- on_join con el default limpio ---------------------------

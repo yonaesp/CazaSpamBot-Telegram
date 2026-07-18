@@ -61,7 +61,7 @@ def _verification_footer(settings, suspicious: bool, susp_reasons: list) -> str:
     solo informa de qué pasa si no verifica, siempre con la config real."""
     if suspicious:
         kick_minutes = settings["verification_suspicious_kick_minutes"] or 30
-        reasons_str = ", ".join(susp_reasons) if susp_reasons else t("review.reason_default")
+        reasons_str = render_reasons(susp_reasons)
         return t("verif.footer_susp", reasons=html.escape(reasons_str), mins=kick_minutes)
     if settings["verification_kick_normal"]:
         total_h = (settings["verification_reminder_hours"] or 3) + (settings["verification_kick_after_reminder_hours"] or 6)
@@ -256,6 +256,30 @@ def _is_very_legit_profile(
     return True, reasons
 
 
+# --- Motivos de sospecha: CÓDIGOS estables (los compara la lógica) + params ---
+# Antes eran cadenas en español y _is_review_worthy las comparaba literalmente, así que
+# traducirlas habría roto la decisión de avisar EN SILENCIO. Con códigos, la lógica es
+# independiente del idioma y el texto se traduce solo al mostrarlo (render_reasons).
+REASON_NO_USERNAME = "no_username"
+REASON_NO_FIRSTNAME = "no_firstname"
+REASON_NON_LATIN_NAME = "non_latin_name"
+REASON_NON_LATIN_USERNAME = "non_latin_username"
+REASON_NO_PHOTO = "no_photo"
+REASON_RECENT_ACCOUNT = "recent_account"
+
+
+def render_reason_list(reasons) -> list[str]:
+    """Códigos de motivo → textos traducidos al idioma activo."""
+    return [t(f"reason.{code}", **params) for code, params in reasons]
+
+
+def render_reasons(reasons) -> str:
+    """Motivos ya traducidos y unidos, listos para mostrar."""
+    if not reasons:
+        return t("review.reason_default")
+    return ", ".join(render_reason_list(reasons))
+
+
 def _is_suspicious_profile(
     sig: Optional[user_signals.UserSignals],
     username: Optional[str],
@@ -266,28 +290,30 @@ def _is_suspicious_profile(
 
     Devuelve (es_sospechoso, razones).
     """
-    reasons: list[str] = []
+    reasons: list[tuple[str, dict]] = []
     if not username:
-        reasons.append("sin username")
+        reasons.append((REASON_NO_USERNAME, {}))
     if not first_name:
-        reasons.append("sin first_name")
+        reasons.append((REASON_NO_FIRSTNAME, {}))
     # Nombre o username en script no-latino (cirílico, chino, árabe, etc.)
     if _name_in_non_latin_script(first_name) or _name_in_non_latin_script(last_name):
-        reasons.append("nombre en script no-latino")
+        reasons.append((REASON_NON_LATIN_NAME, {}))
     if _name_in_non_latin_script(username):
-        reasons.append("username en script no-latino")
+        reasons.append((REASON_NON_LATIN_USERNAME, {}))
     if sig is not None:
         if sig.photo_count == 0:
-            reasons.append("sin foto")
+            reasons.append((REASON_NO_PHOTO, {}))
         else:
             age = sig.account_age_days
             if age is not None and age < 90:
-                reasons.append(f"foto reciente ({age}d)")
+                reasons.append((REASON_RECENT_ACCOUNT, {"days": age}))
     return (bool(reasons), reasons)
 
 
 # Razones "fuertes": por sí solas justifican avisar al admin en el modo revisión.
-_STRONG_SUSP_REASONS = {"nombre en script no-latino", "username en script no-latino", "sin foto"}
+_STRONG_SUSP_REASONS = {
+    REASON_NON_LATIN_NAME, REASON_NON_LATIN_USERNAME, REASON_NO_PHOTO, REASON_RECENT_ACCOUNT,
+}
 
 
 def _is_review_worthy(
@@ -306,7 +332,7 @@ def _is_review_worthy(
     suspicious, reasons = _is_suspicious_profile(sig, username, first_name, last_name)
     if not suspicious:
         return (False, [])
-    strong = [r for r in reasons if r in _STRONG_SUSP_REASONS or r.startswith("foto reciente")]
+    strong = [code for code, _ in reasons if code in _STRONG_SUSP_REASONS]
     if strong or len(reasons) >= 2:
         return (True, reasons)
     return (False, reasons)
@@ -536,7 +562,7 @@ async def _send_suspicious_review(context, db, cfg, chat, user, reasons, sig) ->
     if not cfg.admin_notify_chat_id:
         return
     label = f"@{user.username}" if user.username else (user.first_name or str(user.id))
-    reasons_str = ", ".join(reasons) if reasons else t("review.reason_default")
+    reasons_str = render_reasons(reasons)
     extra = ""
     if sig is not None:
         try:

@@ -157,6 +157,14 @@ STRINGS = {
         "👇 Pulsa el botón para poder escribir."
     ),
 
+    # --- motivos de sospecha (códigos → texto; la lógica usa los códigos) ---
+    "reason.no_username": "sin username",
+    "reason.no_firstname": "sin nombre",
+    "reason.non_latin_name": "nombre en otro alfabeto",
+    "reason.non_latin_username": "username en otro alfabeto",
+    "reason.no_photo": "sin foto",
+    "reason.recent_account": "cuenta reciente ({days}d)",
+
     # --- panel /limpieza ---
     "clean.panel": "🧹 <b>Limpieza en grupos</b>\nPara mantener los grupos limpios: que los comandos del bot no salgan al teclear «/» y que no queden escritos en el chat.",
     "clean.b.hide": "🙈 Ocultar comandos en grupos: {state}",
