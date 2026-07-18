@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import time
 
+from ..i18n import t
 from . import Hit
 
 
@@ -33,9 +34,11 @@ def check(
     return Hit(
         rule="reaction_farming",
         score=100,
-        reason=(
-            f"Reaction-farming: {reactions_in_window} reacciones en {threshold_seconds}s "
-            f"sin mensajes previos (umbral {threshold_count})"
+        reason=t(
+            "reason.reaction_farming",
+            reactions=reactions_in_window,
+            seconds=threshold_seconds,
+            threshold=threshold_count,
         ),
         payload={"reactions": reactions_in_window, "window_s": threshold_seconds},
     )

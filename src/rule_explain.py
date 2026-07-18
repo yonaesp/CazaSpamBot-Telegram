@@ -1,49 +1,77 @@
 """Traduce los identificadores técnicos de regla (p.ej. `inline_buttons_from_user`)
-a una explicación breve y comprensible para los avisos al admin."""
+a una explicación breve y comprensible para los avisos al admin.
+
+El TEXTO vive en los paquetes de idioma (`src/locales/*.json`) bajo la clave
+`rule.<id_de_regla>`. Aquí solo queda el inventario de reglas que tienen explicación.
+"""
 from __future__ import annotations
 
-RULE_EXPLANATIONS: dict[str, str] = {
+from .i18n import t
+
+# Inventario canónico de reglas con explicación. Se mantiene aquí (y no derivado de
+# los JSON) a propósito: es la lista que audita el meta-test de tests/, y así añadir
+# un detector obliga a pasar por este archivo aunque el texto esté en otro sitio.
+KNOWN_RULES: frozenset[str] = frozenset({
     # --- Perfil / cuenta ---
-    "obvious_spam_profile": "Perfil con nombre o usuario en caracteres no latinos (patrón típico de cuenta spam).",
-    "bio_spam": "Su bio/descripción tenía spam (enlace de invitación + palabras o emojis sospechosos).",
-    "photos_batch_upload": "Subió varias fotos de perfil en segundos (identidad robada, típico de bots).",
-    "premium_new_link": "Cuenta Premium recién creada que compartía un enlace.",
-    "dormant_bot_mention": "Cuenta dormida más de un año que reapareció mencionando a un bot (probable cuenta hackeada).",
+    "obvious_spam_profile",
+    "bio_spam",
+    "photos_batch_upload",
+    "premium_new_link",
+    "dormant_bot_mention",
     # --- Contenido del mensaje ---
-    "commercial_ad": "Anuncio comercial o promoción (ofertas de dinero/empleo, enlaces, etc.).",
-    "inline_buttons_from_user": "Su mensaje llevaba botones (inline keyboard): algo que en la práctica solo hacen los bots.",
-    "external_mention_or_link": "Menciones a usuarios externos o enlaces a otros grupos en su primer mensaje.",
-    "url_blocklist": "Compartió un enlace acortador de la lista negra (bit.ly, tinyurl, etc.).",
-    "tg_deeplink": "Enlace tg:// de redirección o phishing.",
-    "non_allowed_script": "Escribió en un alfabeto no permitido (por ejemplo chino o cirílico) en su primer mensaje: patrón clásico de spam.",
-    "contact_spam": "Compartió una tarjeta de contacto cuyo nombre era el propio anuncio (alfabeto extranjero o con enlaces): truco para colar spam esquivando los filtros de texto.",
-    "external_quote_channel": "Citó un mensaje de un canal externo (el «quote» que al pulsar te lleva fuera) para promocionarlo en su primer mensaje: técnica típica de spam de señales/promos.",
-    "emoji_only_first_msg": "Su primer mensaje eran solo emojis (captación de atención típica de spam).",
-    "forward_first_msg": "Su primer mensaje fue un reenvío de un canal o bot (patrón de spam).",
-    "first_msg_media": "Su primer mensaje fue una foto o vídeo, con un perfil sospechoso.",
-    "via_bot_spam": "Mensaje enviado a través de otro bot con contenido de spam.",
-    "learned_similarity": "El mensaje se parecía mucho a spam que ya le marcaste antes al bot.",
+    "commercial_ad",
+    "inline_buttons_from_user",
+    "external_mention_or_link",
+    "url_blocklist",
+    "tg_deeplink",
+    "non_allowed_script",
+    "contact_spam",
+    "external_quote_channel",
+    "emoji_only_first_msg",
+    "forward_first_msg",
+    "first_msg_media",
+    "via_bot_spam",
+    "learned_similarity",
     # --- Comportamiento ---
-    "jfm_fast": "Escribió muy rápido tras entrar (comportamiento automatizado).",
-    "jfm_too_fast": "Escribió casi al instante de entrar (demasiado rápido para un humano: es un bot).",
-    "jfm_cron": "Entró y escribió con un patrón temporal exacto (bot programado).",
-    "reaction_farming": "Puso muchas reacciones en pocos segundos sin escribir (farmeo de reacciones).",
-    "antiflood": "Envió demasiados mensajes seguidos en pocos segundos (flood).",
-    "flood_confirmed_bot": "Flood confirmado como bot.",
+    "jfm_fast",
+    "jfm_too_fast",
+    "jfm_cron",
+    "reaction_farming",
+    "antiflood",
+    "flood_confirmed_bot",
     # --- Listas negras externas ---
-    "cas_match": "Aparece en la lista negra colaborativa CAS (spammer confirmado en varios grupos).",
-    "cas_low_offense": "Aparece en la lista CAS con pocas denuncias (se envió a revisión).",
-    "cas_match_trusted_review": "Aparece en CAS pero tiene historial en el grupo (se envió a revisión).",
-    "lols_match": "Aparece en la lista negra lols.bot (spammer conocido).",
-    "lols_match_trusted_review": "Aparece en lols.bot pero tiene historial (se envió a revisión).",
+    "cas_match",
+    "cas_low_offense",
+    "cas_match_trusted_review",
+    "lols_match",
+    "lols_match_trusted_review",
     # --- Federación / verificación / moderación ---
-    "federation_known_ban": "Ya estaba baneado en otro de tus grupos (ban sincronizado por federación).",
-    "verification_suspicious_timeout": "Cuenta sospechosa que no verificó a tiempo (no pulsó «Soy humano»).",
-    "verification_reminder_timeout": "No verificó que era humano ni siquiera tras el recordatorio.",
-    "warns_limit": "Alcanzó el límite de avisos (warns).",
-    "manual_admin_ban": "Ban manual hecho por el admin.",
-    "manual_review_ban": "Baneado por el admin al revisar un perfil sospechoso (modo revisión).",
-}
+    "federation_known_ban",
+    "verification_suspicious_timeout",
+    "verification_reminder_timeout",
+    "warns_limit",
+    "manual_admin_ban",
+    "manual_review_ban",
+})
+
+
+def _text(rule: str) -> str:
+    """Explicación traducida de UNA regla; '' si no hay ninguna disponible.
+
+    Doble guarda deliberada, porque quien llama encadena
+    `explain(...) or decision.reason or <genérico>` y necesita un valor FALSY:
+
+    1. La regla debe estar en `KNOWN_RULES` (inventario de este módulo).
+    2. `t()` devuelve LA PROPIA CLAVE cuando falta en los paquetes de idioma, y
+       «rule.loquesea» es una cadena no vacía → truthy → el admin vería el
+       identificador crudo en pantalla en vez del motivo de respaldo. Por eso se
+       compara el resultado con la clave pedida y se descarta si coinciden.
+    """
+    if rule not in KNOWN_RULES:
+        return ""
+    key = f"rule.{rule}"
+    txt = t(key)
+    return "" if txt == key else txt
 
 
 def explain(rule: str) -> str:
@@ -52,7 +80,7 @@ def explain(rule: str) -> str:
         return ""
     seen: list[str] = []
     for part in rule.split("+"):
-        exp = RULE_EXPLANATIONS.get(part.strip())
+        exp = _text(part.strip())
         if exp and exp not in seen:
             seen.append(exp)
     if not seen:

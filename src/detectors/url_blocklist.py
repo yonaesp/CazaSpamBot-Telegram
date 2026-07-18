@@ -5,6 +5,7 @@ from urllib.parse import urlparse
 
 from telegram import Message, MessageEntity
 
+from ..i18n import t
 from . import Hit
 
 
@@ -36,6 +37,6 @@ def check(msg: Message, blocklist: list[str], is_first_msg: bool) -> Hit:
     return Hit(
         rule="url_blocklist",
         score=score,
-        reason=f"URL en blocklist: {', '.join(bad)}",
+        reason=t("reason.url_blocklist", hosts=", ".join(bad)),
         payload={"hosts": bad},
     )

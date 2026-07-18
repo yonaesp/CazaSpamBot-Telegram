@@ -324,7 +324,7 @@ async def on_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             context, db, cfg, chat_id=cmu.chat.id, chat_title=cmu.chat.title,
             user_id=user.id, username=user.username, message_id=None,
             decision=Decision(action="ban", score=999, rule="federation_known_ban",
-                               reason="Usuario en lista federada intentó reentrar", payload={}),
+                               reason=t("reason.federation_rejoin"), payload={}),
             original_text=None, first_name=user.first_name,
         )
         return
@@ -610,7 +610,7 @@ async def _notify_manual_ban(
                 user_id=target.id, username=target.username,
                 action="manual_ban_external",
                 rule=f"manual_ban_by_admin_{actor.id}",
-                reason=f"Ban manual por admin {actor_label}",
+                reason=t("reason.manual_ban_by_admin", admin=actor_label),
                 score=0, original_text=last_msg_text, mode="active",
                 federation_results=None,
             )
@@ -1342,7 +1342,7 @@ async def on_pending_review_callback(update: Update, context: ContextTypes.DEFAU
     # Borrar msg original + ban federado
     decision = Decision(
         action="ban", score=200, rule="manual_admin_ban",
-        reason="Confirmado spam por admin tras revisión",
+        reason=t("reason.review_confirmed_spam"),
         payload={"via": "pending_review"},
     )
     await _apply_action(
@@ -1383,7 +1383,7 @@ async def _moderate_bot_message(context, db, cfg, msg, user) -> None:
              user.id, user.username, msg.chat_id, rule)
     decision = Decision(
         action="ban", score=score, rule=real[0].rule,
-        reason=f"Bot externo posteando spam: {rule}",
+        reason=t("reason.external_bot_spam", rules=rule),
         payload={"is_bot": True, "rules": [h.rule for h in real]},
     )
     await _apply_action(
@@ -1665,7 +1665,7 @@ async def on_flood_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             context, db, cfg, chat_id=chat_id, chat_title=None,
             user_id=user_id, username=None, message_id=None,
             decision=Decision(action="ban", score=200, rule="flood_confirmed_bot",
-                              reason="Flood confirmado como bot por el admin", payload={}),
+                              reason=t("reason.flood_confirmed_bot"), payload={}),
             original_text=None, first_name=None,
         )
         await query.answer("Baneado.")
@@ -1874,7 +1874,8 @@ async def _apply_action(
                 decision.action, user_id, chat_id, decision.rule,
             )
             decision = Decision(action="noop", score=decision.score,
-                                rule=decision.rule, reason="ADMIN INMUNE: " + decision.reason,
+                                rule=decision.rule,
+                                reason=t("reason.admin_immune_prefix") + " " + decision.reason,
                                 payload=decision.payload)
 
     action_id = db.log_action(

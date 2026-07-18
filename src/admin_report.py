@@ -29,7 +29,7 @@ from telegram.error import TelegramError
 from telegram.ext import ContextTypes
 
 from .db import DB
-from .i18n import t
+from .i18n import t, variant_keys
 
 log = logging.getLogger(__name__)
 
@@ -40,52 +40,12 @@ _ADMIN_RE = re.compile(r"(?<![A-Za-z0-9_])@(?:admin|admins|administrador|adminis
 CONFIRM_TTL_S = 60          # Auto-borra confirm tras 1 min
 THANKS_TTL_S = 5 * 60       # Auto-borra thanks tras 5 min
 
-_CONFIRM_TEMPLATES = [
-    "🙏 Un administrador revisará tu mensaje. Gracias por avisar.",
-    "👮 Aviso recibido. Un admin lo revisará en breve. Gracias.",
-    "📩 Reporte registrado. Un administrador lo revisará pronto.",
-    "✅ Aviso enviado a los admins. Gracias por colaborar.",
-    "🛎️ He notificado a los admins. Lo revisarán enseguida.",
-]
-
-_THANKS_WARN_TEMPLATES = [
-    "🎉 <b>{reporter}</b>, gracias por avisar. El usuario recibió un warning y el mensaje fue borrado. ¡Buen ojo!",
-    "👏 <b>{reporter}</b>, gracias por reportar. Avisamos al usuario y borramos el mensaje. Sigue así.",
-    "🙌 <b>{reporter}</b>, mensaje retirado y aviso al usuario. Gracias por contribuir a las normas del grupo.",
-    "✊ <b>{reporter}</b>, gracias por avisar. Warning entregado.",
-    "🛡️ <b>{reporter}</b>, gracias por mantener el orden. El usuario fue avisado.",
-    "📋 <b>{reporter}</b>, gracias por reportar. Mensaje fuera, warning al usuario.",
-    "🤝 <b>{reporter}</b>, gracias por la vigilancia. Aviso enviado al usuario.",
-    "🌱 <b>{reporter}</b>, gracias. Le hemos llamado la atención al usuario.",
-    "🎯 <b>{reporter}</b>, buen ojo. Avisado el usuario, mensaje borrado.",
-]
-
-
-_THANKS_TEMPLATES = [
-    "🎉 <b>{reporter}</b>, tu reporte fue revisado y ese usuario ha sido expulsado. Gracias por colaborar a mantener el grupo limpio 🧹",
-    "👏 <b>{reporter}</b>, gracias por avisar. Ese usuario ya está fuera. Un poquito de gentucilla menos.",
-    "🙌 <b>{reporter}</b>, reporte tramitado y usuario expulsado. Gracias por hacer del grupo un sitio mejor.",
-    "🤝 <b>{reporter}</b>, gracias por avisar a tiempo. Spammer al exterior. ¡Que tengas buen día!",
-    "🏆 <b>{reporter}</b>, vigilancia 10/10. Spammer expulsado por tu aviso.",
-    "✊ <b>{reporter}</b>, gracias. Ese ya no vuelve.",
-    "🧹 Reporte de <b>{reporter}</b> procesado. Un spammer menos en el grupo, gracias!",
-    "🛡️ <b>{reporter}</b>, gracias por estar atento. Limpieza realizada.",
-    "🫡 Misión cumplida gracias a <b>{reporter}</b>. Spammer expulsado.",
-    "🎯 Reporte de <b>{reporter}</b> en el blanco. Ese usuario al exterior.",
-    "🌍 <b>{reporter}</b>, gracias por contribuir a un mundo más limpio de spammers como ese. ¡Un saludo!",
-    "✨ Gracias <b>{reporter}</b>, un espécimen menos contaminando el grupo.",
-    "🚮 <b>{reporter}</b>, gracias por tirar la basura. Ese ya no vuelve.",
-    "💎 <b>{reporter}</b>, tu vigilancia hace el grupo mejor. Spammer fuera.",
-    "🦸 <b>{reporter}</b> al rescate. Spammer expulsado, grupo agradecido.",
-    "🌟 <b>{reporter}</b>, gracias por reportar. Una cuenta zombi menos en el mundo.",
-    "🏅 <b>{reporter}</b>, gracias por colaborar en la limpieza. Ese ya no nos molestará.",
-    "🎖️ Medalla al civismo para <b>{reporter}</b>. Spammer expulsado por tu aviso.",
-    "🌿 <b>{reporter}</b>, gracias por mantener el grupo libre de alimañas digitales.",
-    "🧼 Lavado y planchado gracias a <b>{reporter}</b>. Personaje malvado fuera.",
-    "🎬 <b>{reporter}</b>, gracias por avisar. Telón cerrado para ese personaje.",
-    "🌬️ Aire fresco gracias a <b>{reporter}</b>. Cuenta indeseable fuera del grupo.",
-    "🐦 Pajarito <b>{reporter}</b> cantó a tiempo. Spammer al exterior.",
-]
+# Frases alternativas (el bot elige una al azar para no sonar a robot). Viven en los
+# paquetes de idioma como claves numeradas `report.confirm.1`, `.2`, ... y cada idioma
+# puede aportar SU propio número de frases: ver `i18n.variant_keys`.
+_CONFIRM_PREFIX = "report.confirm"
+_THANKS_WARN_PREFIX = "report.thanks_warn"
+_THANKS_PREFIX = "report.thanks"
 
 
 def contains_admin_mention(msg: Message) -> bool:
@@ -145,7 +105,7 @@ async def handle_admin_mention(
         log.debug("set_message_reaction fallo: %s", exc)
 
     # Confirmar al reporter
-    confirm_text = random.choice(_CONFIRM_TEMPLATES)
+    confirm_text = t(random.choice(variant_keys(_CONFIRM_PREFIX)))
     bot_msg_id = None
     try:
         sent = await context.bot.send_message(
@@ -265,10 +225,10 @@ async def on_reported_message_deleted(
     except (KeyError, IndexError):
         action_taken = None
     if action_taken in ("warn", "delete"):
-        templates = _THANKS_WARN_TEMPLATES
+        claves = variant_keys(_THANKS_WARN_PREFIX)
     else:
-        templates = _THANKS_TEMPLATES
-    thanks_text = random.choice(templates).format(reporter=reporter_label)
+        claves = variant_keys(_THANKS_PREFIX)
+    thanks_text = t(random.choice(claves), reporter=reporter_label)
     thanks_msg_id = None
     try:
         sent = await bot.send_message(

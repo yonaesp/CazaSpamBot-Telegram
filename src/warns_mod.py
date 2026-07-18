@@ -152,7 +152,8 @@ async def cmd_warn(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if action == "ban":
             results = await federate_ban(
                 context.bot, db, user_id=target_id,
-                reason=f"Límite de warns alcanzado ({n}/{limit}). Último motivo: {reason or '(sin razón)'}",
+                reason=t("reason.warns_limit", n=n, limit=limit,
+                         last_reason=reason or t("reason.no_reason")),
                 rule="warns_limit",
                 triggered_in_chat=msg.chat_id, shadow=cfg.shadow,
             )

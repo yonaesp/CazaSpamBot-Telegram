@@ -19,6 +19,7 @@ import time
 
 from telegram import Message, MessageEntity
 
+from ..i18n import t
 from . import Hit
 
 DORMANT_DAYS = 365
@@ -78,9 +79,10 @@ def check(
     return Hit(
         rule="dormant_bot_mention",
         score=120,
-        reason=(
-            f"Cuenta dormida {int(dormant_days)}d reaparece mencionando @{bot_uname} "
-            f"(bot) sin responder a nadie — patrón de cuenta hackeada/vendida"
+        reason=t(
+            "reason.dormant_bot_mention",
+            days=int(dormant_days),
+            bot_username=bot_uname,
         ),
         payload={"dormant_days": int(dormant_days), "bot_mentioned": bot_uname},
     )

@@ -18,6 +18,7 @@ from zoneinfo import ZoneInfo
 from telegram.ext import ContextTypes
 
 from .db import DB
+from .i18n import t
 
 log = logging.getLogger(__name__)
 
@@ -93,14 +94,14 @@ async def weekly_top_job(context: ContextTypes.DEFAULT_TYPE) -> None:
 
         # Construir mensaje
         period = _format_period()
-        lines = [f"🏆 <b>Top semanal de actividad</b> ({period})", ""]
+        lines = [t("topweekly.title", period=period), ""]
         medals = ["🥇", "🥈", "🥉", "🏅", "🏅"]
         for i, r in enumerate(rows):
             medal = medals[i] if i < len(medals) else "•"
-            lines.append(f"{medal} {_format_user(r)} — <b>{r['cnt']}</b> mensajes")
+            lines.append(t("topweekly.row", medal=medal, user=_format_user(r), count=r["cnt"]))
         lines.append("")
-        lines.append("¡Gracias por mantener el grupo vivo! 👏")
-        lines.append("<i>Cuentan mensajes con contenido (texto ≥10 chars o media) sin saludos repetidos, cooldown 10s. Calidad &gt; cantidad.</i>")
+        lines.append(t("topweekly.thanks"))
+        lines.append(t("topweekly.note"))
         text = "\n".join(lines)
 
         try:
@@ -127,14 +128,11 @@ async def render_top(db: DB, chat_id: int) -> str:
     # /top manual sí muestra aunque haya pocos: el admin lo pide explícitamente
     rows = [r for r in rows if r["cnt"] >= MIN_PER_USER][:5]
     if not rows:
-        return (
-            "📊 <b>Top semanal</b>\n\n"
-            f"Sin actividad suficiente esta semana (mínimo {MIN_PER_USER} mensajes por usuario)."
-        )
+        return t("topweekly.empty", min_msgs=MIN_PER_USER)
     period = _format_period()
-    lines = [f"🏆 <b>Top semanal de actividad</b> ({period})", ""]
+    lines = [t("topweekly.title", period=period), ""]
     medals = ["🥇", "🥈", "🥉", "🏅", "🏅"]
     for i, r in enumerate(rows):
         medal = medals[i] if i < len(medals) else "•"
-        lines.append(f"{medal} {_format_user(r)} — <b>{r['cnt']}</b> mensajes")
+        lines.append(t("topweekly.row", medal=medal, user=_format_user(r), count=r["cnt"]))
     return "\n".join(lines)

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from telegram import Message
 
+from ..i18n import t
 from . import Hit
 
 # Rango amplio de emojis/pictogramas
@@ -43,6 +44,6 @@ def check(msg: Message, is_first_msg: bool = False) -> Hit:
     return Hit(
         rule="emoji_only_first_msg",
         score=score,
-        reason=f"Primer mensaje casi sin texto real ({n_emoji} emojis, {n_alpha} letras) — captación de atención",
+        reason=t("reason.emoji_only_first_msg", emojis=n_emoji, letters=n_alpha),
         payload={"n_emoji": n_emoji, "n_alpha": n_alpha},
     )

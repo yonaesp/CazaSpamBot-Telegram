@@ -11,6 +11,7 @@ import re
 
 from telegram import Message, MessageEntity
 
+from ..i18n import t
 from . import Hit
 
 _TG_DEEPLINK_RE = re.compile(
@@ -42,6 +43,6 @@ def check(msg: Message, is_first_msg: bool) -> Hit:
     return Hit(
         rule="tg_deeplink",
         score=score,
-        reason=f"tg:// deeplink sospechoso: {', '.join(set(hits))[:120]}",
+        reason=t("reason.tg_deeplink", links=", ".join(set(hits))[:120]),
         payload={"deeplinks": list(set(hits))},
     )

@@ -2,12 +2,13 @@
 
 # 🛡️ CazaSpamBot
 
-### Bot antispam para Telegram con bans sincronizados, aprendizaje y cero falsos positivos
+### Bot antispam y de moderación para Telegram, self-hosted y de código abierto: bans sincronizados entre grupos, multiidioma, aprendizaje activo y casi cero falsos positivos
 
 [![Python](https://img.shields.io/badge/Python-3.11-blue?logo=python&logoColor=white)](https://www.python.org/)
 [![python-telegram-bot](https://img.shields.io/badge/PTB-21.6-26A5E4?logo=telegram&logoColor=white)](https://python-telegram-bot.org/)
 [![Telethon](https://img.shields.io/badge/Telethon-1.36-blueviolet)](https://docs.telethon.dev/)
-[![Tests](https://img.shields.io/badge/tests-360%20passing-success)](#-tests)
+[![Idiomas](https://img.shields.io/badge/idiomas-es%20%7C%20en%20%7C%20a%C3%B1ade%20el%20tuyo-orange)](src/locales/README.md)
+[![Tests](https://img.shields.io/badge/tests-391%20passing-success)](#-tests)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 
 🌍 [**English**](README.md) · **Español**
@@ -27,9 +28,10 @@ CazaSpamBot vigila tus grupos de Telegram y elimina el spam **antes de que moles
 - 🤫 **Moderación silenciosa** — los bans automáticos no ensucian el chat.
 - 📚 **Aprendizaje activo** — aprende de tus `/spam` y `/legal` (Naive Bayes + similitud coseno).
 - 🛰️ **Reportes oficiales** a Telegram (Native Antispam) vía MTProto.
-- ⚙️ **Personalizable sin tocar código** — bienvenidas, listas negras e idiomas permitidos se configuran en archivos de texto y `.env`.
+- 🌍 **Multiidioma**: viene en español e inglés, y añadir otro idioma es un archivo JSON, sin tocar código.
+- ⚙️ **Personalizable sin tocar código** — bienvenidas, listas negras y alfabetos permitidos se configuran en archivos de texto y `.env`.
 
-Funciona con **cualquier número de grupos** (auto-descubre aquellos donde es admin, o limítalo con `MODERATED_CHAT_IDS`). Los textos del bot están en español, pero la detección es independiente del idioma del grupo: tú decides qué alfabetos son normales en tu comunidad.
+Funciona con **cualquier número de grupos** (auto-descubre aquellos donde es admin, o limítalo con `MODERATED_CHAT_IDS`). La detección es independiente del idioma del grupo: tú decides qué alfabetos son normales en tu comunidad.
 
 ---
 
@@ -45,8 +47,8 @@ Funciona con **cualquier número de grupos** (auto-descubre aquellos donde es ad
    · fotos subidas todas de golpe (identidad robada)
 ¿En listas globales (CAS / lols.bot)?  ──► ban (umbral configurable)
 ¿Es un bot añadido al grupo?           ──► kick + aviso al admin
-¿Perfil muy legítimo? (foto + >1 año + nombre normal)  ──► entra directo, saludo amistoso
-El resto  ──► bienvenida con botón "SOY HUMANO" (muteado hasta pulsar)
+¿Perfil muy legítimo? (foto + >1 año + nombre normal)  ──► entra directo
+El resto  ──► modo limpio por defecto (ver más abajo)
 ```
 
 > **Bans sincronizados ≠ listas globales.** La sincronización (la "federación" de Rose y otros bots) es interna: tus propios bans replicados entre tus grupos. **CAS** ([cas.chat](https://cas.chat), de Combot) y **lols.bot** son bases de datos colaborativas mundiales de spammers ya cazados en miles de grupos. Con CAS decides lo estricto con `CAS_AUTOBAN_MIN`: `2` (por defecto) banea solo si está confirmado en 2+ grupos y te manda a revisión los casos con 1; `1` banea con cualquier señal (más agresivo, más falsos positivos). Los usuarios de confianza alta nunca se banean por lista sin pasar antes por tu revisión.
@@ -97,6 +99,7 @@ Refuerzos: **NFKC + [confusable_homoglyphs](https://github.com/vhf/confusable_ho
 |---|---|---|
 | Saludos de bienvenida | `config/welcomes/` | Una frase por línea, `{name}` para el nombre. `generic.txt` para todos los grupos, `<chat_id>.txt` para frases temáticas de un grupo concreto. Desactivables con `FRIENDLY_WELCOMES_ENABLED=false`. |
 | Palabras/frases de la lista negra | `config/blacklist/` | Un patrón por línea (palabra o regex). Anuncios ilegales, keywords de bio, etc. Si borras un archivo, el bot usa los valores por defecto. |
+| Idioma del bot | `.env` → `BOT_LANG` | `es`, `en` o cualquier idioma que añadas. Vacío = se detecta del sistema. |
 | Alfabetos permitidos | `.env` → `ALLOWED_SCRIPTS` | CSV: `latin`, `cyrillic`, `arabic`, `han`, ... según el idioma de tu comunidad. |
 | Rigor con la lista CAS | `.env` → `CAS_AUTOBAN_MIN` | `2` = banear solo confirmados en 2+ grupos (recomendado); `1` = banear con cualquier señal. Por debajo del umbral, te lo manda a revisar. |
 | Acortadores bloqueados | `.env` → `URL_BLOCKLIST` | CSV de dominios. |
@@ -123,6 +126,18 @@ Es un atajo con la misma persistencia que los comandos sueltos de abajo; usa el 
 ### Sincronizar ajustes entre grupos (comando `/sync`, opción 🔗 en `/config`)
 
 **Activada por defecto.** Cuando la sincronización está **ON**, cualquier cambio de ajuste se aplica **a la vez a todos los grupos** donde el bot es admin (quedan idénticos), el texto de bienvenida es común (usa `{chat}` para el nombre del grupo y `{name}` para el usuario), y el panel `/config` **no pide elegir grupo** (configuras "para todos"). Ponla **OFF** (`/sync off` o el botón 🔗) para configurar cada grupo por separado, con selector de grupo. `/sync` sin argumentos muestra el estado.
+
+### Idioma del bot (comando `/idioma`)
+
+Todos los textos que ve el usuario viven en `src/locales/<código>.json`, un JSON plano por idioma. **Español e inglés vienen de serie**, y añadir un tercero no lleva ni una línea de código: dejas un `fr.json` al lado, reinicias y el bot ya lo ofrece. Lo que no traduzcas cae al español clave por clave, así que un idioma al 40 % ya sirve, y un archivo mal formado se ignora con un aviso en el log en vez de tumbar el arranque.
+
+Se cambia con `/idioma en` (alias `/language`, solo el admin del bot, y persiste entre reinicios). En una instalación nueva el idioma se detecta del entorno (`BOT_LANG`, o las habituales `LC_ALL` / `LC_MESSAGES` / `LANG` / `LANGUAGE`), y si no reconoce ninguno usa español.
+
+> 📖 **Para traducir:** [`src/locales/README.md`](src/locales/README.md) tiene la guía completa: las reglas que importan (no tocar las claves ni los `{placeholders}`, cerrar siempre las etiquetas HTML) y cómo comprobar tu trabajo con `pytest tests/test_locales.py`, que valida JSON, placeholders y HTML balanceado en todos los idiomas.
+
+### Mantener limpios los grupos (comando `/limpieza`)
+
+Oculta los comandos del bot en los grupos (no aparecen al teclear «/») y auto-borra los mensajes de comando escritos en el chat, para que nada ensucie el grupo ni los usuarios los pulsen por curiosidad. Ambas cosas **activadas por defecto**.
 
 ### Verificación humana (comando `/verificacion`)
 
@@ -237,6 +252,8 @@ Solo el **admin del bot** (`ADMIN_USER_ID`) puede ejecutar acciones; los **admin
 | `/stats` `/recent` `/top` `/topweekly` | Métricas y rankings |
 | `/config` (alias `/ajustes` `/panel`) | Panel de ajustes con botones (verificación, bienvenida, reglas, tiempos...) |
 | `/sync on\|off` (alias `/sincronizar`) | Sincronizar ajustes iguales en todos los grupos (ON por defecto) |
+| `/idioma <código>` (alias `/language`) | Idioma del bot (`es`, `en` o cualquier archivo de idioma que añadas). Persiste. |
+| `/verificacion` | Verificación humana por grupo (ver arriba) |
 | `/limpieza` | Ocultar los comandos del bot en grupos (no salen al teclear «/») y auto-borrar los comandos escritos en el chat (ambos ON por defecto) |
 | `/setwelcome` `/setrules` `/welcome` `/rules` `/cleanservice` | Configurar bienvenida, reglas y limpieza de mensajes de servicio |
 | `/scan` (alias `/analizar`) | Analiza un mensaje (responde a él): ¿lo detectaría? y qué estructura tiene |
@@ -252,10 +269,12 @@ Los miembros del grupo pueden reportar con **`@admin`** (reply a un mensaje); el
 ## 🧪 Tests
 
 ```bash
-.venv/bin/python -m pytest tests/ -q     # 360 tests
+.venv/bin/python -m pytest tests/ -q     # 391 tests
 ```
 
 Cada detector tiene tests de casos positivos **y negativos** (énfasis en anti-falsos-positivos). Filosofía: *un falso positivo es peor que un falso negativo.*
+
+Los paquetes de idioma tienen su propia red de seguridad (`tests/test_locales.py`): JSON válido, placeholders idénticos a los del español, HTML balanceado y paridad total entre los dos idiomas oficiales. Una traducción incompleta no hace fallar los tests, solo informa del porcentaje.
 
 ---
 
@@ -268,6 +287,11 @@ src/
 ├── verification.py      # bienvenida + botón SOY HUMANO + 3 tiers
 ├── federation.py        # ban federado cross-group
 ├── detectors/           # un módulo por detector
+├── locales/             # paquetes de idioma (es.json, en.json, + el tuyo)
+├── i18n.py              # función t() con fallback por clave
+├── config_panel.py      # panel de ajustes /config
+├── settings_sync.py     # sincronización de ajustes entre grupos
+├── group_clean.py       # ocultar/auto-borrar comandos en grupos
 ├── wordlists.py         # carga de listas negras editables
 ├── trust.py             # niveles 1-10 de confianza y spam
 ├── ban_announce.py      # consolidación de quips en ráfaga
@@ -278,7 +302,7 @@ config/
 ├── welcomes/            # saludos editables (genérico + por grupo)
 └── blacklist/           # palabras/regex antispam editables
 docs/                    # ARCHITECTURE, ROADMAP, ...
-tests/                   # 360 tests
+tests/                   # 391 tests
 ```
 
 ---
@@ -298,5 +322,5 @@ tests/                   # 360 tests
 ---
 
 <div align="center">
-<sub>Hecho con cariño y mucho café para mantener comunidades limpias.</sub>
+<sub>Hecho con cariño y mucho café para mantener comunidades limpias. · <a href="README.md">🇬🇧 English version</a></sub>
 </div>

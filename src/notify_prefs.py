@@ -8,13 +8,22 @@ from __future__ import annotations
 
 from telegram import InlineKeyboardButton
 
-# clave -> etiqueta legible. El valor por defecto (si nunca se tocó el botón) lo
-# aporta el llamador desde el .env/cfg; aquí solo mapeamos clave -> texto.
+from .i18n import t
+
+# clave -> clave i18n de su etiqueta legible. El valor por defecto (si nunca se tocó
+# el botón) lo aporta el llamador desde el .env/cfg; aquí solo mapeamos clave -> texto.
+# NO se traduce al importar: el idioma se resuelve al arrancar y se puede cambiar en
+# caliente con /idioma, así que la etiqueta se pide en cada uso (ver `label`).
 NOTIFY_TYPES: dict[str, str] = {
-    "self_delete": "Alguien borra su propio mensaje",
-    "manual_ban": "Otro admin banea o expulsa a alguien",
-    "bot_removed": "Me expulsan de un grupo",
+    "self_delete": "notify.self_delete",
+    "manual_ban": "notify.manual_ban",
+    "bot_removed": "notify.bot_removed",
 }
+
+
+def label(key: str) -> str:
+    """Etiqueta legible del aviso `key`, en el idioma actual."""
+    return t(NOTIFY_TYPES.get(key, key))
 
 
 def is_enabled(db, key: str, default: bool) -> bool:
@@ -26,7 +35,7 @@ def is_enabled(db, key: str, default: bool) -> bool:
 
 def mute_button(key: str) -> InlineKeyboardButton:
     """Botón '🔕 Silenciar' para adjuntar al aviso del tipo `key`."""
-    return InlineKeyboardButton("🔕 Silenciar estos avisos", callback_data=f"npref:off:{key}")
+    return InlineKeyboardButton(t("notify.mute_button"), callback_data=f"npref:off:{key}")
 
 
 def default_for(key: str, cfg=None) -> bool:

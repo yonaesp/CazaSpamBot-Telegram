@@ -214,13 +214,15 @@ async def _spam_combo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             reporter.enqueue(
                 chat_id=msg.chat_id, user_id=author.id,
                 message_id=target.message_id, reason="spam",
-                detail="[manual_admin_spam] reporte manual del admin (/spam)",
+                # El marcador [regla] va FUERA del i18n: es el formato técnico que
+                # usa el resto de reportes (handlers._apply_action), no texto a leer.
+                detail="[manual_admin_spam] " + t("reason.manual_admin_spam_report"),
             )
 
     # 3) Ban federado
     results = await federate_ban(
         context.bot, db, user_id=author.id,
-        reason="Spam confirmado manualmente por admin (/spam)",
+        reason=t("reason.manual_admin_spam"),
         rule="manual_admin_ban",
         triggered_in_chat=msg.chat_id, shadow=cfg.shadow,
     )
@@ -988,10 +990,11 @@ async def cmd_notspam(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 def _alertas_keyboard(db: DB, cfg: Config):
     from telegram import InlineKeyboardButton, InlineKeyboardMarkup
     rows = []
-    for key, label in notify_prefs.NOTIFY_TYPES.items():
+    for key in notify_prefs.NOTIFY_TYPES:
         on = notify_prefs.effective(db, key, cfg)
-        estado = "🔔 ACTIVADO " if on else "🔕 SILENCIADO"
-        rows.append([InlineKeyboardButton(f"{estado} · {label}", callback_data=f"npref:tog:{key}")])
+        estado = t("alerts.b.on") if on else t("alerts.b.off")
+        rows.append([InlineKeyboardButton(f"{estado} · {notify_prefs.label(key)}",
+                                          callback_data=f"npref:tog:{key}")])
     return InlineKeyboardMarkup(rows)
 
 
@@ -1140,7 +1143,7 @@ async def on_suspicious_review_callback(update: Update, context: ContextTypes.DE
     if action == "ban":
         res = await federate_ban(
             context.bot, db, user_id=user_id,
-            reason="Revisión manual: perfil sospechoso", rule="manual_review_ban",
+            reason=t("reason.manual_review_ban"), rule="manual_review_ban",
             triggered_in_chat=chat_id, shadow=cfg.shadow,
         )
         ok = sum(1 for v in (res or {}).values() if v == "ok")

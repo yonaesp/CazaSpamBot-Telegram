@@ -2,12 +2,13 @@
 
 # 🛡️ CazaSpamBot
 
-### Self-hosted anti-spam & moderation bot for Telegram — synchronized cross-group bans, active learning, and near-zero false positives
+### Self-hosted, open source anti-spam and moderation bot for Telegram: synchronized cross-group bans, multilingual, active learning, and near-zero false positives
 
 [![Python](https://img.shields.io/badge/Python-3.11-blue?logo=python&logoColor=white)](https://www.python.org/)
 [![python-telegram-bot](https://img.shields.io/badge/PTB-21.6-26A5E4?logo=telegram&logoColor=white)](https://python-telegram-bot.org/)
 [![Telethon](https://img.shields.io/badge/Telethon-1.36-blueviolet)](https://docs.telethon.dev/)
-[![Tests](https://img.shields.io/badge/tests-360%20passing-success)](#-tests)
+[![Languages](https://img.shields.io/badge/languages-es%20%7C%20en%20%7C%20add%20yours-orange)](src/locales/README.md)
+[![Tests](https://img.shields.io/badge/tests-391%20passing-success)](#-tests)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 
 🌍 **English** · [**Español**](README.es.md)
@@ -27,9 +28,10 @@ CazaSpamBot watches your Telegram groups and removes spam **before it becomes a 
 - 🤫 **Silent moderation** — automatic bans don't clutter the chat.
 - 📚 **Active learning** — learns from your `/spam` and `/legal` calls (Naive Bayes + cosine similarity).
 - 🛰️ **Official reports** to Telegram (Native Antispam) over MTProto.
+- 🌍 **Multilingual**: ships in Spanish and English, and a new language is one JSON file away (no code changes).
 - ⚙️ **Configure without touching code** — welcomes, blocklists, and allowed alphabets live in text files, `.env`, and visual `/config` panels.
 
-Works with **any number of groups** (auto-discovers the ones where it's an admin, or restrict it with `MODERATED_CHAT_IDS`). The bot's own text is currently in Spanish (an English/i18n layer is in progress), but detection is **language-agnostic**: you decide which alphabets are normal for your community.
+Works with **any number of groups** (auto-discovers the ones where it's an admin, or restrict it with `MODERATED_CHAT_IDS`). Detection itself is **language-agnostic**: you decide which alphabets are normal for your community.
 
 ---
 
@@ -112,15 +114,38 @@ The **recommended** way to configure each group without memorizing subcommands. 
 
 **On by default.** When sync is ON, any setting change applies **to all groups at once** (they stay identical), the welcome text is shared (use `{chat}` for the group name and `{name}` for the user), and `/config` doesn't ask which group. Turn it **OFF** to configure each group separately.
 
+### Bot language (`/idioma`)
+
+Every user-facing string lives in `src/locales/<code>.json`, one flat JSON per language. **Spanish and English ship in the box**, and adding a third takes no code at all: drop a `fr.json` next to them, restart, and the bot offers it. Anything you leave untranslated falls back to Spanish key by key, so a language at 40% is already usable, and a malformed file is skipped with a log warning instead of taking the bot down.
+
+Switch with `/idioma en` (alias `/language`, admin only, persists across restarts). On a fresh install the language is picked up from the environment (`BOT_LANG`, or the usual `LC_ALL` / `LC_MESSAGES` / `LANG` / `LANGUAGE`), defaulting to Spanish.
+
+> 📖 **Translators:** [`src/locales/README.md`](src/locales/README.md) has the full guide: the rules that matter (never touch keys or `{placeholders}`, always close HTML tags) and how to check your work with `pytest tests/test_locales.py`, which validates JSON, placeholders, and balanced HTML for every language.
+
 ### Keep groups clean (`/limpieza`)
 
 Hide the bot's commands in groups (they don't show up when typing `/`) and auto-delete command messages written in the chat, so nothing clutters the group and users don't tap them. Both **on by default**.
+
+### Human verification (`/verificacion`)
+
+Per group, from Telegram itself (bot admin only). Run `/verificacion` with no arguments to see the current state and the options:
+
+| Subcommand | What it does |
+|---|---|
+| `/verificacion on\|off` | Turns verification (SOY HUMANO button + mute on join) **and** the welcome message on or off at once. **OFF by default**, so newcomers walk straight in. |
+| `/verificacion revisar on\|off` | **Review mode** (**ON by default**). Instead of gating the group, a dubious profile triggers a **private** alert (your DM or the configured chat) with **✅ Allow** / **🔨 Ban** buttons. The user is **allowed by default**: do nothing and they stay. It only fires on real signals (name in another alphabet, no photo, brand-new account), not on every user without a @username. The alert carries a **⚙️ Group settings** button that expands quick toggles in place. |
+| `/verificacion avisos on\|off` | Whether to remind normal users before kicking them. |
+| `/verificacion accion kick\|mute` | What happens to a normal user who never verifies: **kick**, or **mute** (stays muted indefinitely, can verify whenever they want). |
+| `/verificacion tiempos <susp_min> <reminder_h> <kick_h>` | Timings: suspicious profiles are kicked after `susp_min` minutes; normal users get a reminder at `reminder_h` hours and are kicked `kick_h` hours later. E.g. `/verificacion tiempos 30 3 6`. |
+
+> Users with a **suspicious profile** are always kicked once their timer runs out (that's the safety layer); `avisos` and `accion` apply to **normal** users. Message moderation is independent and stays active even with verification off.
 
 ### Files & environment
 
 | What | Where | How |
 |---|---|---|
-| Welcome greetings | `config/welcomes/` | One phrase per line, `{name}` for the name. `generic.txt` for all groups, `<chat_id>.txt` for group-specific lines. |
+| Welcome greetings | `config/welcomes/` | One phrase per line, `{name}` for the name. `generic.txt` for all groups, `<chat_id>.txt` for group-specific lines. Turn them off with `FRIENDLY_WELCOMES_ENABLED=false`. |
+| Bot language | `.env` → `BOT_LANG` | `es`, `en`, or any language file you add. Empty = detect from the system. |
 | Blocklist words/phrases | `config/blacklist/` | One pattern per line (word or regex). Delete a file and defaults kick in. |
 | Allowed alphabets | `.env` → `ALLOWED_SCRIPTS` | CSV: `latin`, `cyrillic`, `arabic`, `han`, … per your community's language. |
 | CAS strictness | `.env` → `CAS_AUTOBAN_MIN` | `2` = ban only if confirmed in 2+ groups (recommended); `1` = ban on any signal. |
@@ -182,6 +207,17 @@ docker compose logs -f            # "Bot @... listo. Modo=shadow"
 
 The `.env.example` is commented step by step, and every variable ships a **fake example** of the format. Never commit your `.env` (it's already in `.gitignore`).
 
+**No folders to create by hand.** `data/` (database, session, heartbeat) is created on first run, and `config/` (welcomes and blocklists) already ships with sensible defaults. `data/` is the only writable volume.
+
+*(Optional, only if you enable Telethon)* the session is generated **inside the container**, once:
+
+```bash
+# 1) Telegram sends a code to the secondary account's app:
+docker compose exec antispam-bot python -m scripts.telethon_login request
+# 2) Confirm it with the code you received (append your 2FA password if you have one):
+docker compose exec antispam-bot python -m scripts.telethon_login confirm 12345
+```
+
 **Bot requirements on Telegram**: admin of the groups with *delete messages* and *ban users* permissions, and **Privacy Mode disabled** (BotFather → `/setprivacy` → Disable) so it sees every message.
 
 **Where do alerts go?** Two options (`ADMIN_NOTIFY_CHAT_ID` in `.env`): your **private DM** (leave it empty) or a **moderation group** (set its `chat_id`). If you pick the DM, **open your bot and press START once** — Telegram won't let a bot message you first.
@@ -204,6 +240,8 @@ Only the **bot admin** (`ADMIN_USER_ID`) can run actions; **group admins** can q
 | `/stats` `/recent` `/top` `/topweekly` | Metrics and rankings |
 | `/config` (aliases `/ajustes` `/panel`) | Visual settings panel (verification, welcome, rules, timings…) |
 | `/sync on\|off` (alias `/sincronizar`) | Sync identical settings across all groups (ON by default) |
+| `/idioma <code>` (alias `/language`) | Bot language (`es`, `en`, or any language file you drop in). Persists. |
+| `/verificacion` | Human verification per group (see above) |
 | `/limpieza` | Hide bot commands in groups and auto-delete command messages (both ON by default) |
 | `/setwelcome` `/setrules` `/welcome` `/rules` `/cleanservice` | Configure welcome, rules, and service-message cleanup |
 | `/scan` (alias `/analizar`) | Analyze a message (reply to it): would it be detected? and what structure does it have? |
@@ -219,10 +257,12 @@ Group members can report with **`@admin`** (reply to a message); the bot notifie
 ## 🧪 Tests
 
 ```bash
-.venv/bin/python -m pytest tests/ -q     # 360 tests
+.venv/bin/python -m pytest tests/ -q     # 391 tests
 ```
 
 Every detector has **positive and negative** test cases (emphasis on anti-false-positives). Philosophy: *a false positive is worse than a false negative.*
+
+Language packs get their own safety net (`tests/test_locales.py`): valid JSON, placeholders matching the Spanish reference, balanced HTML, and full parity between the two official languages. Incomplete coverage doesn't fail the suite, it just reports the percentage.
 
 ---
 
@@ -235,17 +275,22 @@ src/
 ├── verification.py      # welcome + SOY HUMANO button + 3 tiers
 ├── federation.py        # cross-group federated ban
 ├── detectors/           # one module per detector
+├── locales/             # language packs (es.json, en.json, + yours)
+├── i18n.py              # t() lookup with per-key fallback
 ├── config_panel.py      # /config visual settings panel
 ├── settings_sync.py     # cross-group settings sync
 ├── group_clean.py       # hide/auto-delete commands in groups
+├── wordlists.py         # loads the editable blocklists
 ├── trust.py             # 1-10 trust and spam levels
+├── ban_announce.py      # merges burst quips into one message
 ├── learning.py          # Naive Bayes + cosine
 ├── reporter.py          # official reports (Telethon)
 └── db.py                # SQLite + migrations
 config/
 ├── welcomes/            # editable greetings (generic + per group)
 └── blacklist/           # editable anti-spam words/regex
-tests/                   # 360 tests
+docs/                    # ARCHITECTURE, ROADMAP, ...
+tests/                   # 391 tests
 ```
 
 ---

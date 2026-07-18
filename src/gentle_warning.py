@@ -18,7 +18,7 @@ from telegram.error import TelegramError
 from telegram.ext import ContextTypes
 
 from .db import DB
-from .i18n import t
+from .i18n import t, variant_keys
 
 log = logging.getLogger(__name__)
 
@@ -29,11 +29,9 @@ TRUST_MIN_DAYS = 10
 GENTLE_DELETE_AFTER_S = 300  # 5 min
 
 
-_GENTLE_TEMPLATES = [
-    "👋 Hola {name}. Recuerda revisar las <b>normas del grupo</b> antes de compartir enlaces o mencionar a otros chats. Si lo que has puesto cumple las normas, ignora este mensaje.",
-    "ℹ️ {name}, el bot ha detectado un patrón borderline en tu mensaje. Echa un ojo a las <b>normas</b> por si acaso. (Este aviso desaparece solo en 5 min)",
-    "🤖 {name}, te he marcado pero como eres miembro habitual no actúo. Repasa las <b>normas</b> y, si está OK, todo bien.",
-]
+# Frases alternativas del aviso (una al azar). Claves numeradas `gentle.warn.1`, `.2`...
+# en los paquetes de idioma; cada idioma puede aportar las suyas (ver i18n.variant_keys).
+_GENTLE_PREFIX = "gentle.warn"
 
 
 def is_trusted(db: DB, chat_id: int, user_id: int,
@@ -69,8 +67,7 @@ async def send(
     user = msg.from_user
     if not user:
         return None
-    template = random.choice(_GENTLE_TEMPLATES)
-    text = template.format(name=_format_name(user))
+    text = t(random.choice(variant_keys(_GENTLE_PREFIX)), name=_format_name(user))
     if reason_hint:
         text += t("gentle.reason_line", reason=html.escape(reason_hint))
     try:

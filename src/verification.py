@@ -962,7 +962,7 @@ async def cleanup_job(context: ContextTypes.DEFAULT_TYPE) -> None:
             decision = Decision(
                 action="kick", score=80,
                 rule="verification_suspicious_timeout",
-                reason=f"No verificó en {kick_minutes} min siendo cuenta sospechosa",
+                reason=t("reason.verif_timeout_suspicious", mins=kick_minutes),
                 payload={},
             )
             try:
@@ -1007,10 +1007,11 @@ async def cleanup_job(context: ContextTypes.DEFAULT_TYPE) -> None:
         if kick_normal:
             if reminders_on:
                 rows = db.pending_kick_after_reminder(kick_after_reminder_h)
-                motivo = f"No verificó en {total_h}h ({reminder_hours}h + {kick_after_reminder_h}h tras recordatorio)"
+                motivo = t("reason.verif_timeout_reminder", total_h=total_h,
+                           reminder_h=reminder_hours, after_h=kick_after_reminder_h)
             else:
                 rows = db.pending_normal_past_hours(total_h)
-                motivo = f"No verificó en {total_h}h (recordatorios desactivados)"
+                motivo = t("reason.verif_timeout_no_reminder", total_h=total_h)
             for row in rows:
                 if row["chat_id"] != chat_id:
                     continue

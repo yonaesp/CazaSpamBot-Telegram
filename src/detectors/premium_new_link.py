@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from telegram import Message, MessageEntity
 
+from ..i18n import t
 from . import Hit
 
 
@@ -45,7 +46,7 @@ def check(
     return Hit(
         rule="premium_new_link",
         score=80,
-        reason="Premium + cuenta nueva + link en primer mensaje (patrón spam 2025)",
+        reason=t("reason.premium_new_link"),
         payload={
             "is_premium": True,
             "photo_count": user_signals_photo_count,

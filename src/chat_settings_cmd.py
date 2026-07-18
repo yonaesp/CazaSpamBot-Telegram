@@ -163,8 +163,8 @@ async def cmd_setwelcomebutton(update: Update, context: ContextTypes.DEFAULT_TYP
         url = "https://" + url
     bid = db.add_welcome_button(update.effective_chat.id, text, url, same_row=same)
     await update.effective_message.reply_text(
-        f"✅ Botón #{bid} añadido: <code>{html.escape(text)}</code> → {html.escape(url)}"
-        + (" (misma fila)" if same else ""),
+        t("welcomebtn.added", id=bid, text=html.escape(text), url=html.escape(url),
+          same=t("welcomebtn.same_row") if same else ""),
         parse_mode="HTML",
     )
 
@@ -209,7 +209,7 @@ async def cmd_rmwelcomebutton(update: Update, context: ContextTypes.DEFAULT_TYPE
         return
     db: DB = context.bot_data["db"]
     ok = db.delete_welcome_button(int(context.args[0]))
-    await update.effective_message.reply_text("✅ Botón eliminado." if ok else "No existe ese ID.")
+    await update.effective_message.reply_text(t("welcomebtn.removed") if ok else t("welcomebtn.not_found"))
 
 
 @_admin_only
@@ -246,7 +246,7 @@ async def _render_test_welcome(update: Update, context: ContextTypes.DEFAULT_TYP
     name = html.escape(user.first_name or user.username or str(user.id))
     text = welcome_text.format(name=name, chat=html.escape(chat_title))
     # Mostramos también el botón "Soy humano" (no funcional aquí)
-    rows = [[InlineKeyboardButton("✅ SOY HUMANO (PULSA PARA ENTRAR)", callback_data="verify:test:0")]]
+    rows = [[InlineKeyboardButton(t("verif.btn_human"), callback_data="verify:test:0")]]
     if btns:
         current_row = []
         for b in btns:
@@ -312,7 +312,7 @@ async def cmd_cleanservice(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     db.ensure_chat_settings(chat_id)
     if not context.args:
         s = db.get_chat_settings(chat_id)
-        state = "ON" if s["cleanservice"] else "OFF"
+        state = t("common.on") if s["cleanservice"] else t("common.off")
         await update.effective_message.reply_text(
             t("cleanservice.status", state=state),
             parse_mode="HTML",
@@ -346,26 +346,20 @@ async def cmd_verificacion(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     # --- Sin argumentos: estado completo + ayuda de subcomandos ---
     if not args:
         s = db.get_chat_settings(chat_id)
-        accion = "expulsar (kick)" if s["verification_kick_normal"] else "dejar MUTEADO para siempre"
+        # El bloque entero va en UNA clave: el HTML abre y cierra dentro del mismo texto,
+        # así que trocearlo por líneas dejaría etiquetas desbalanceadas al traducir y
+        # Telegram rechazaría el mensaje completo.
         await reply(
-            "🧩 <b>Verificación del chat</b>\n"
-            f"• Verificación + bienvenida: <b>{'ON' if s['verification_enabled'] else 'OFF'}</b>\n"
-            f"• Revisión privada de sospechosos: <b>{'ON' if s['verification_review_suspicious'] else 'OFF'}</b>\n"
-            f"• Recordatorios a los normales: <b>{'ON' if s['verification_reminders_enabled'] else 'OFF'}</b>\n"
-            f"• Al no verificar (normales): <b>{accion}</b>\n"
-            f"• Tiempos: sospechosos kick a <b>{s['verification_suspicious_kick_minutes']} min</b> · "
-            f"recordatorio a las <b>{s['verification_reminder_hours']} h</b> · "
-            f"kick <b>+{s['verification_kick_after_reminder_hours']} h</b> tras el recordatorio\n\n"
-            "<b>Ajustes</b> (solo en este grupo):\n"
-            "<code>/verificacion on|off</code> — activa/desactiva verificación Y bienvenida\n"
-            "<code>/verificacion revisar on|off</code> — sin verificar en grupo: aviso PRIVADO de "
-            "cada sospechoso con botones Permitir/Banear (entra permitido por defecto)\n"
-            "<code>/verificacion avisos on|off</code> — recordatorio antes de expulsar\n"
-            "<code>/verificacion accion kick|mute</code> — al no verificar: expulsar o quedar muteado\n"
-            "<code>/verificacion tiempos &lt;susp_min&gt; &lt;recordatorio_h&gt; &lt;kick_h&gt;</code>\n"
-            "   ej. <code>/verificacion tiempos 30 3 6</code> (sospechoso 30min, recordatorio 3h, kick +6h)\n\n"
-            "<i>Los sospechosos (perfil dudoso) siempre se expulsan al pasar su tiempo; el resto "
-            "de opciones aplican a los usuarios normales. La moderación de mensajes es aparte.</i>",
+            t(
+                "verifcfg.status",
+                verif=t("common.on") if s["verification_enabled"] else t("common.off"),
+                review=t("common.on") if s["verification_review_suspicious"] else t("common.off"),
+                reminders=t("common.on") if s["verification_reminders_enabled"] else t("common.off"),
+                action=t("verifcfg.action_kick") if s["verification_kick_normal"] else t("verifcfg.action_mute"),
+                susp_min=s["verification_suspicious_kick_minutes"],
+                rem_h=s["verification_reminder_hours"],
+                kick_h=s["verification_kick_after_reminder_hours"],
+            ),
             parse_mode="HTML",
         )
         return
@@ -376,52 +370,36 @@ async def cmd_verificacion(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     if sub in _ON or sub in _OFF:
         val = 1 if sub in _ON else 0
         settings_sync.apply_setting(db, chat_id, "verification_enabled", val)
-        if val:
-            await reply("✅ Verificación + bienvenida <b>ON</b>.", parse_mode="HTML")
-        else:
-            await reply(
-                "✅ Verificación + bienvenida <b>OFF</b>. Los nuevos entran directos, sin "
-                "verificación ni bienvenida. La moderación de mensajes sigue activa.",
-                parse_mode="HTML",
-            )
+        await reply(t("verifcfg.set_on") if val else t("verifcfg.set_off"), parse_mode="HTML")
         return
 
     # --- revisar (revisión privada de sospechosos) on/off ---
     if sub == "revisar" and len(args) >= 2:
         val = 1 if args[1] in _ON else 0
         settings_sync.apply_setting(db, chat_id, "verification_review_suspicious", val)
-        if val:
-            await reply(
-                "✅ Revisión privada de sospechosos <b>ON</b>. Los perfiles sospechosos entran "
-                "al grupo (sin verificación) y te llega un aviso privado con botones "
-                "<b>Permitir</b> / <b>Banear</b>. Por defecto quedan permitidos.\n"
-                "<i>Consejo: combínalo con <code>/verificacion off</code> si no quieres NINGUNA "
-                "verificación en el grupo.</i>", parse_mode="HTML",
-            )
-        else:
-            await reply("✅ Revisión privada de sospechosos <b>OFF</b>.", parse_mode="HTML")
+        await reply(t("verifcfg.review_on") if val else t("verifcfg.review_off"), parse_mode="HTML")
         return
 
     # --- avisos (recordatorios) on/off ---
     if sub == "avisos" and len(args) >= 2:
         val = 1 if args[1] in _ON else 0
         settings_sync.apply_setting(db, chat_id, "verification_reminders_enabled", val)
-        await reply(f"✅ Recordatorios a los normales: <b>{'ON' if val else 'OFF'}</b>.", parse_mode="HTML")
+        await reply(
+            t("verifcfg.reminders_set", state=t("common.on") if val else t("common.off")),
+            parse_mode="HTML",
+        )
         return
 
     # --- accion kick|mute ---
     if sub in ("accion", "acción") and len(args) >= 2:
         if args[1] == "kick":
             settings_sync.apply_setting(db, chat_id, "verification_kick_normal", 1)
-            await reply("✅ Al no verificar, los normales serán <b>expulsados</b> (kick).", parse_mode="HTML")
+            await reply(t("verifcfg.action_set_kick"), parse_mode="HTML")
         elif args[1] == "mute":
             settings_sync.apply_setting(db, chat_id, "verification_kick_normal", 0)
-            await reply(
-                "✅ Al no verificar, los normales quedarán <b>muteados para siempre</b> (sin kick, "
-                "sin recordatorio). Podrán verificar cuando quieran.", parse_mode="HTML",
-            )
+            await reply(t("verifcfg.action_set_mute"), parse_mode="HTML")
         else:
-            await reply("Uso: /verificacion accion kick|mute")
+            await reply(t("verifcfg.usage_action"))
         return
 
     # --- tiempos <susp_min> <recordatorio_h> <kick_h> ---
@@ -429,19 +407,18 @@ async def cmd_verificacion(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         try:
             susp, rem, kick = int(args[1]), int(args[2]), int(args[3])
         except ValueError:
-            await reply("Números inválidos. Ej: /verificacion tiempos 30 3 6")
+            await reply(t("verifcfg.times_invalid"))
             return
         if not (0 < susp <= 1440 and 0 < rem <= 168 and 0 < kick <= 168):
-            await reply("Fuera de rango. susp_min 1-1440, horas 1-168. Ej: /verificacion tiempos 30 3 6")
+            await reply(t("verifcfg.times_range"))
             return
         settings_sync.apply_setting(db, chat_id, "verification_suspicious_kick_minutes", susp)
         settings_sync.apply_setting(db, chat_id, "verification_reminder_hours", rem)
         settings_sync.apply_setting(db, chat_id, "verification_kick_after_reminder_hours", kick)
         await reply(
-            f"✅ Tiempos: sospechosos kick a <b>{susp} min</b> · recordatorio a las <b>{rem} h</b> · "
-            f"kick <b>+{kick} h</b> tras el recordatorio (total normales: {rem + kick} h).",
+            t("verifcfg.times_set", susp_min=susp, rem_h=rem, kick_h=kick, total_h=rem + kick),
             parse_mode="HTML",
         )
         return
 
-    await reply("Uso: /verificacion  (sin nada muestra el estado y las opciones)")
+    await reply(t("verifcfg.usage"))

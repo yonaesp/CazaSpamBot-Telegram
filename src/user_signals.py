@@ -13,6 +13,8 @@ import logging
 from dataclasses import dataclass
 from typing import Optional
 
+from .i18n import t
+
 log = logging.getLogger(__name__)
 
 
@@ -36,13 +38,13 @@ class UserSignals:
     def verdict(self) -> str:
         """Devuelve un veredicto heurístico basado en señales objetivas."""
         if self.photo_count == 0:
-            return "🔴 sin foto (probable bot)"
+            return t("signals.verdict_no_photo")
         age = self.account_age_days or 0
         if age > 365:
-            return f"🟢 cuenta con {age}d (probable real)"
+            return t("signals.verdict_old", days=age)
         if age > 90:
-            return f"🟡 cuenta con {age}d (revisar)"
-        return f"🟠 foto reciente ({age}d)"
+            return t("signals.verdict_mid", days=age)
+        return t("signals.verdict_new", days=age)
 
 
 async def _resolve_once(client, user_id: int, chat_id: Optional[int],
@@ -150,15 +152,15 @@ def render_markup(sig: Optional[UserSignals]) -> str:
     """Renderiza las señales como bloque HTML para incluir en notificación."""
     if sig is None:
         return ""
-    parts = [f"\n🔎 <b>Perfil:</b> {sig.verdict}"]
-    parts.append(f"📷 fotos: {sig.photo_count}")
+    parts = [t("signals.profile", verdict=sig.verdict)]
+    parts.append(t("signals.photos", count=sig.photo_count))
     if sig.oldest_photo:
-        parts.append(f"foto más antigua: <code>{sig.oldest_photo.strftime('%Y-%m-%d')}</code>")
+        parts.append(t("signals.oldest_photo", date=sig.oldest_photo.strftime("%Y-%m-%d")))
     if sig.newest_photo and sig.newest_photo != sig.oldest_photo:
-        parts.append(f"más reciente: <code>{sig.newest_photo.strftime('%Y-%m-%d')}</code>")
+        parts.append(t("signals.newest_photo", date=sig.newest_photo.strftime("%Y-%m-%d")))
     if sig.is_premium:
-        parts.append("⭐ premium")
+        parts.append(t("signals.premium"))
     if sig.bio:
         import html as _html
-        parts.append(f"\n📝 <b>Bio:</b> <i>{_html.escape(sig.bio)}</i>")
+        parts.append(t("signals.bio", bio=_html.escape(sig.bio)))
     return " · ".join(parts[:4]) + ("\n" + parts[4] if len(parts) > 4 else "")

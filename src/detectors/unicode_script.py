@@ -12,6 +12,7 @@ from __future__ import annotations
 import unicodedata
 from collections.abc import Iterable
 
+from ..i18n import t
 from . import Hit
 
 # Rangos Unicode (start, end, script_name). Solo los relevantes para detección.
@@ -114,6 +115,11 @@ def check(
     return Hit(
         rule="non_allowed_script",
         score=score,
-        reason=f"Script no permitido «{dominant}» (ratio={ratio:.0%}) en {'primer mensaje' if is_first_msgs else 'mensaje tardío'}",
+        reason=t(
+            "reason.non_allowed_script",
+            script=dominant,
+            ratio=f"{ratio:.0%}",
+            where=t("reason.script_where_first" if is_first_msgs else "reason.script_where_late"),
+        ),
         payload={"ratio": ratio, "dominant_script": dominant, "first_msg": is_first_msgs},
     )

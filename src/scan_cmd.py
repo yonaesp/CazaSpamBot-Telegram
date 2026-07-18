@@ -61,13 +61,14 @@ def _structure(msg) -> list[str]:
     if contact is not None:
         name = f"{getattr(contact, 'first_name', '') or ''} {getattr(contact, 'last_name', '') or ''}".strip()
         phone = getattr(contact, "phone_number", None) or "?"
-        out.append(f"📇 <b>Contacto compartido</b> · nombre: <code>{_h.escape(name)}</code> · tel: <code>{_h.escape(phone)}</code>")
+        out.append(t("scan.contact", name=_h.escape(name), phone=_h.escape(phone)))
     rm = getattr(msg, "reply_markup", None)
     kb = getattr(rm, "inline_keyboard", None) if rm else None
     if kb:
         n = sum(len(r) for r in kb)
         urls = [b.url for r in kb for b in r if getattr(b, "url", None)]
-        out.append(f"🔘 <b>{n} botón(es) inline</b>" + (f" → {len(urls)} URL" if urls else " (callback)"))
+        extra = t("scan.buttons_urls", n=len(urls)) if urls else t("scan.buttons_callback")
+        out.append(t("scan.buttons", n=n, extra=extra))
     # Cita a un mensaje de OTRO chat (external_reply): el "quote etiquetado" que al
     # pulsar lleva a un canal externo. Vector nuevo de spam.
     er = getattr(msg, "external_reply", None)
@@ -76,39 +77,41 @@ def _structure(msg) -> list[str]:
         dest = ""
         if erchat is not None:
             uname = getattr(erchat, "username", None)
-            dest = f" → {getattr(erchat, 'type', '?')} «{_h.escape(getattr(erchat, 'title', '') or '')}»"
+            dest = t("scan.er_dest", ctype=getattr(erchat, "type", "?"),
+                     title=_h.escape(getattr(erchat, "title", "") or ""))
             if uname:
-                dest += f" (@{_h.escape(uname)})"
-        out.append(f"🧷 <b>Cita a OTRO chat</b>{dest} — al pulsar te lleva ahí")
+                dest += t("scan.er_username", username=_h.escape(uname))
+        out.append(t("scan.external_reply", dest=dest))
     q = getattr(msg, "quote", None)
     if q is not None and getattr(q, "text", None):
-        out.append(f"❝ Cita seleccionada: <code>{_h.escape(q.text[:80])}</code>")
+        out.append(t("scan.quote", text=_h.escape(q.text[:80])))
     if _has_blockquote(msg):
-        out.append("▎ Lleva un <b>blockquote</b> (bloque citado con estilo)")
+        out.append(t("scan.blockquote"))
     via = getattr(msg, "via_bot", None)
     if via is not None:
-        out.append(f"⚙️ Publicado vía bot: @{_h.escape(getattr(via, 'username', '') or '?')}")
+        out.append(t("scan.via_bot", username=_h.escape(getattr(via, "username", "") or "?")))
     ent_urls = _entity_urls(msg)
     if ent_urls:
         shown = ", ".join(_h.escape(u) for u in ent_urls[:5])
-        out.append(f"🔗 <b>Enlaces en el texto</b>: {shown}")
+        out.append(t("scan.links", links=shown))
     origin = getattr(msg, "forward_origin", None)
     fwd_chat = getattr(msg, "forward_from_chat", None)
     if origin is not None or fwd_chat is not None:
         src = ""
         if fwd_chat is not None:
-            src = f" desde {getattr(fwd_chat, 'type', '?')} «{_h.escape(getattr(fwd_chat, 'title', '') or '')}»"
-        out.append(f"↪️ <b>Reenviado</b>{src}")
+            src = t("scan.fwd_src", ctype=getattr(fwd_chat, "type", "?"),
+                    title=_h.escape(getattr(fwd_chat, "title", "") or ""))
+        out.append(t("scan.forwarded", src=src))
     has_media = any(getattr(msg, a, None) for a in
                     ("photo", "video", "animation", "sticker", "document", "video_note", "voice", "audio"))
     if has_media:
-        out.append("🖼️ Lleva media (foto/vídeo/sticker/…)")
+        out.append(t("scan.media"))
     txt = getattr(msg, "text", None) or getattr(msg, "caption", None)
     if txt:
         prev = txt[:160].replace("\n", " ")
-        out.append(f"📝 Texto: <code>{_h.escape(prev)}</code>")
+        out.append(t("scan.text", text=_h.escape(prev)))
     if not out:
-        out.append("(mensaje sin texto, contacto, botones ni media reconocibles)")
+        out.append(t("scan.nothing"))
     return out
 
 
@@ -150,19 +153,18 @@ async def cmd_scan(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     ]
     real = [h for h in hits if h]
 
-    lines = ["🔎 <b>Resultado del scan</b>", ""]
+    lines = [t("scan.header"), ""]
     lines += _structure(target)
     lines.append("")
     if real:
         total = sum(h.score for h in real)
-        lines.append(f"✅ <b>SÍ se detectaría</b> — {len(real)} regla(s), score total {total}:")
+        lines.append(t("scan.detected", n=len(real), total=total))
         for h in sorted(real, key=lambda x: -x.score):
-            lines.append(f"  • <code>{h.rule}</code> (score {h.score}) — {_h.escape(h.reason)}")
+            lines.append(t("scan.hit", rule=h.rule, score=h.score, reason=_h.escape(h.reason)))
         lines.append("")
-        lines.append("<i>La acción real (ban/kick/aviso) depende además del trust del usuario.</i>")
+        lines.append(t("scan.trust_note"))
     else:
-        lines.append("❌ <b>NO dispararía ninguna regla de contenido.</b>")
-        lines.append("<i>Ojo: no cubre reglas por perfil/listas (CAS, lols, obvious_profile) "
-                     "que dependen de quién lo envía.</i>")
+        lines.append(t("scan.not_detected"))
+        lines.append(t("scan.profile_note"))
 
     await msg.reply_text("\n".join(lines), parse_mode="HTML", disable_web_page_preview=True)

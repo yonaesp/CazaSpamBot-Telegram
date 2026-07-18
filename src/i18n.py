@@ -55,6 +55,33 @@ def is_supported(lang: str | None) -> bool:
     return (lang or "").strip().lower()[:2] in SUPPORTED
 
 
+def variant_keys(prefix: str, _lang: str | None = None) -> list[str]:
+    """Claves de las frases alternativas numeradas `prefix.1`, `prefix.2`, ...
+
+    Los textos que el bot alterna al azar (acuses de recibo a quien reporta,
+    agradecimientos...) viven como claves numeradas para que CADA idioma pueda
+    tener su propio número de frases: se recorre desde 1 y se para en el primer
+    hueco. Se mira el paquete de idioma DIRECTAMENTE, sin el fallback de `t()`:
+    si no, un idioma con 3 frases donde el español tiene 9 acabaría colando
+    castellano en las 6 restantes.
+
+    Si el idioma no aporta ninguna, se devuelven las del idioma de referencia,
+    que `t()` resolverá con su propio fallback. Así la lista NUNCA queda vacía:
+    `random.choice([])` lanzaría IndexError y el usuario se quedaría sin mensaje.
+    """
+    lg = _lang or _current
+
+    def _claves(code: str) -> list[str]:
+        pack = STRINGS.get(code, {})
+        claves, i = [], 1
+        while f"{prefix}.{i}" in pack:
+            claves.append(f"{prefix}.{i}")
+            i += 1
+        return claves
+
+    return _claves(lg) or _claves(DEFAULT)
+
+
 def t(key: str, _lang: str | None = None, **fmt) -> str:
     """Texto traducido: idioma dado o el global; fallback ES y luego la propia clave.
 

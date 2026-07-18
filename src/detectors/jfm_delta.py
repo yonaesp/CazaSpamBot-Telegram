@@ -8,6 +8,7 @@ Solo aplica al PRIMER mensaje del user en el chat.
 """
 from __future__ import annotations
 
+from ..i18n import t
 from . import Hit
 
 
@@ -21,14 +22,14 @@ def check(
         return Hit(
             rule="jfm_too_fast",
             score=80,
-            reason=f"Primer mensaje a los {int(delta_seconds)}s del join (bot probable)",
+            reason=t("reason.jfm_too_fast", seconds=int(delta_seconds)),
             payload={"delta_s": int(delta_seconds)},
         )
     if delta_seconds < 30:
         return Hit(
             rule="jfm_fast",
             score=30,
-            reason=f"Primer mensaje a los {int(delta_seconds)}s del join (algo rápido)",
+            reason=t("reason.jfm_fast", seconds=int(delta_seconds)),
             payload={"delta_s": int(delta_seconds)},
         )
     # Detector de cron pattern: cerca de múltiplos exactos de 24h
@@ -38,7 +39,7 @@ def check(
         return Hit(
             rule="jfm_cron",
             score=60,
-            reason=f"Primer mensaje exactamente a las {round(hours/24)*24}h del join (patrón cron)",
+            reason=t("reason.jfm_cron", hours=round(hours / 24) * 24),
             payload={"delta_s": int(delta_seconds), "hours": hours},
         )
     return Hit.none()

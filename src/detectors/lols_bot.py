@@ -10,6 +10,7 @@ import logging
 
 import aiohttp
 
+from ..i18n import t
 from . import Hit
 
 log = logging.getLogger(__name__)
@@ -42,6 +43,6 @@ async def check(user_id: int, session: aiohttp.ClientSession) -> Hit:
         score=100,  # Ban tier: lols.bot es crowdsourced pero con filtrado serio.
         # Si falla, kick no aporta (el user puede seguir viendo el grupo desde fuera).
         # Falsos positivos se corrigen con /unban manual.
-        reason=f"lols.bot: usuario marcado (offenses={offenses})",
+        reason=t("reason.lols_marked", offenses=offenses),
         payload={"banned": banned, "offenses": offenses},
     )

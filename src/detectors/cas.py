@@ -6,6 +6,7 @@ from typing import Any
 
 import aiohttp
 
+from ..i18n import t
 from . import Hit
 
 log = logging.getLogger(__name__)
@@ -25,7 +26,7 @@ async def check(
             return Hit(
                 rule="cas_match",
                 score=100,
-                reason=f"CAS: usuario baneado globalmente (offenses={cached})",
+                reason=t("reason.cas_banned", offenses=cached),
                 payload={"offenses": cached, "cached": True},
             )
         return Hit.none()
@@ -43,7 +44,7 @@ async def check(
         return Hit(
             rule="cas_match",
             score=100,
-            reason=f"CAS: usuario baneado globalmente (offenses={offenses})",
+            reason=t("reason.cas_banned", offenses=offenses),
             payload={"offenses": offenses, "cached": False},
         )
     return Hit.none()

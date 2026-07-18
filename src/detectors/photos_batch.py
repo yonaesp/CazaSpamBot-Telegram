@@ -16,6 +16,7 @@ import asyncio
 import logging
 from typing import Optional
 
+from ..i18n import t
 from . import Hit
 
 # Cota dura para las llamadas Telethon. Telethon trae flood_sleep_threshold=60 y
@@ -96,10 +97,7 @@ async def check(
     return Hit(
         rule="photos_batch_upload",
         score=100,
-        reason=(
-            f"{len(photos)} fotos de perfil subidas en {span:.0f}s "
-            f"(humanos normales distribuyen fotos en días/meses, no segundos)"
-        ),
+        reason=t("reason.photos_batch", n_photos=len(photos), span=f"{span:.0f}"),
         payload={
             "n_photos": len(photos),
             "span_seconds": round(span, 1),
