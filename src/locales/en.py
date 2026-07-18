@@ -163,6 +163,52 @@ STRINGS = {
     "reason.non_latin_username": "username in another alphabet",
     "reason.no_photo": "no profile photo",
     "reason.recent_account": "recent account ({days}d)",
+    "reason.decorative": "{label} decorative (mixed alphabets, ignored)",
+    "reason.non_latin_field": "{label} {ratio} non-latin ({dominant})",
+    "reason.bypass_old_photo": "exception: old account with photo",
+    "reason.han_dominant": "name dominated by Chinese ideographs (Han)",
+    "reason.no_photo_new": "no photo + {days}d-old account",
+    "alert.obvious_spam": "Clearly a spammer profile: ",
+
+    # --- action alert (what you get every time the bot acts) ---
+    "alert.no_username": "(no username)",
+    "alert.fed": "\n🌐 <b>Federation:</b> {ok} ok · {shadow} shadow · {err} err ({total} chats)",
+    "alert.body": (
+        "{emoji} <b>{action}</b> · {mode}\n"
+        "📍 <b>Chat:</b> {chat} (<code>{chat_id}</code>)\n"
+        "👤 <b>User:</b> {user_link} (<code>{user_id}</code>)\n"
+        "📏 <b>Spam level:</b> {spam} <i>(internal score {score})</i>\n"
+        "🚨 <b>Rule:</b> <code>{rule}</code>\n"
+        "💬 <b>Reason:</b> {reason}{signals}{fed}\n"
+        "\n📝 <b>Message:</b>\n<pre>{preview}</pre>"
+    ),
+    "alert.btn_notspam": "❌ Not spam",
+    "alert.btn_confirm": "✅ Confirm",
+    "alert.btn_whitelist": "🛡️ Whitelist user",
+
+    # --- warns ---
+    "warn.usage": "Usage: <code>/warn [reason]</code> replying to a message, or <code>/warn @username [reason]</code>, or <code>/warn user_id [reason]</code>.",
+    "warn.is_admin": "⚠️ I can't warn a chat admin. If you need to, do it manually.",
+    "warn.counter": "⚠️ {mention} — Warn <b>{n}/{limit}</b>",
+    "warn.last_reason": "\n💬 Last reason: {reason}",
+    "warn.limit_ban": "🔨 {mention} reached the warning limit (<b>{n}/{limit}</b>).\n<b>Federated ban</b> in {ok} chats.",
+    "warn.limit_kick": "👢 {mention} reached the limit (<b>{n}/{limit}</b>). <b>Kick</b>.",
+    "warn.limit_kick_fail": "⚠️ {mention} reached the limit (<b>{n}/{limit}</b>), but I <b>couldn't remove them</b> (am I missing permissions?). The warnings are kept.",
+    "warn.limit_mute": "🤐 {mention} reached the limit (<b>{n}/{limit}</b>). <b>Mute 24h</b>.",
+    "warn.limit_mute_fail": "⚠️ {mention} reached the limit (<b>{n}/{limit}</b>), but I <b>couldn't mute them</b> (am I missing permissions?). The warnings are kept.",
+    "warns.reply_needed": "Reply to the user's message with /warns.",
+    "warns.none": "No active warnings for {name}.",
+    "rmwarn.reply_needed": "Reply to the user's message with /rmwarn.",
+    "rmwarn.done": "✅ Last warning removed.",
+    "rmwarn.none": "No warnings to remove.",
+    "resetwarns.reply_needed": "Reply to the user's message with /resetwarns.",
+    "resetwarns.done": "✅ {n} warning(s) removed.",
+    "warnlimit.current": "Current limit: <b>{limit}</b>",
+    "warnlimit.usage": "Usage: /warnlimit <N>",
+    "warnlimit.set": "✅ Warning limit = {n}",
+    "warnaction.current": "Current action: <b>{action}</b>",
+    "warnaction.usage": "Usage: /warnaction ban|kick|mute",
+    "warnaction.set": "✅ Warning action = {action}",
 
     # --- /limpieza panel ---
     "clean.panel": "🧹 <b>Group cleanup</b>\nTo keep groups clean: the bot's commands don't show when typing «/» and don't stay written in the chat.",

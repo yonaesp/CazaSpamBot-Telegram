@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+from src import verification as v
 from src.verification import _is_obvious_spam_profile, _is_decorative_mix, _han_dominant
 
 
@@ -102,7 +103,8 @@ def test_arabic_puro_sin_foto_cuenta_nueva_si_ban():
     sig = _sig(photo_count=0, account_age_days=5)
     legit, reasons = _is_obvious_spam_profile(sig, None, "أحمد سبام", None)
     assert legit is True
-    assert any("sin foto" in r for r in reasons)
+    # motivos = CÓDIGOS estables (no texto): así el payload en BD no depende del idioma
+    assert v.REASON_NO_PHOTO_NEW in [code for code, _ in reasons]
 
 
 def test_2_campos_non_latin_si_ban():

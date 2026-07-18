@@ -194,25 +194,26 @@ def _is_obvious_spam_profile(
         norm = unicodedata.normalize("NFKC", value)
         # 2) Si es mezcla decorativa (≥3 scripts), NO contar como non-latin
         if _is_decorative_mix(norm):
-            reasons.append(f"{label} decorativo (mezcla scripts, ignorado)")
+            reasons.append((REASON_DECORATIVE, {"label": label}))
             continue
         ratio, dominant = non_allowed_ratio(norm, ["latin"])
         if ratio > 0.3:
             non_latin_count += 1
-            reasons.append(f"{label} {ratio:.0%} non-latin ({dominant})")
+            reasons.append((REASON_NON_LATIN_FIELD,
+                            {"label": label, "ratio": f"{ratio:.0%}", "dominant": dominant}))
             if ratio >= 0.7:
                 high_ratio_single = True
     # BYPASS de seguridad: si Telethon dice cuenta ≥365d + con foto,
     # NUNCA ban directo por nombre. Es un user bilingüe probable.
     if sig is not None and sig.photo_count >= 1 and (sig.account_age_days or 0) >= 365:
-        return False, reasons + ["bypass: cuenta antigua + foto"]
+        return False, reasons + [(REASON_BYPASS_OLD, {})]
     # Chino REAL (ideogramas Han) en cualquier campo: señal muy fuerte de spam en
     # grupos hispanos. A diferencia del árabe/cirílico (con users legítimos) o el
     # katakana decorativo (ツ), un nombre dominado por ideogramas Han en un grupo
     # de habla hispana es casi siempre un bot de promo. Un solo campo basta. El
     # bypass de cuenta antigua + foto de arriba protege al chino-hablante real.
     if any(_han_dominant(v) for v in (first_name, last_name, username)):
-        return True, reasons + ["nombre dominado por ideogramas chinos (Han)"]
+        return True, reasons + [(REASON_HAN_DOMINANT, {})]
     # 2+ campos non-latín → señal fuerte, ban directo
     if non_latin_count >= 2:
         return True, reasons
@@ -220,7 +221,7 @@ def _is_obvious_spam_profile(
     # Sin las señales Telethon, NO ban (era el caso de FP con users bilingües)
     if (non_latin_count >= 1 or high_ratio_single) and sig is not None:
         if sig.photo_count == 0 and sig.account_age_days is not None and sig.account_age_days < 30:
-            reasons.append(f"sin foto + {sig.account_age_days}d cuenta")
+            reasons.append((REASON_NO_PHOTO_NEW, {"days": sig.account_age_days}))
             return True, reasons
     return False, reasons
 
@@ -266,6 +267,13 @@ REASON_NON_LATIN_NAME = "non_latin_name"
 REASON_NON_LATIN_USERNAME = "non_latin_username"
 REASON_NO_PHOTO = "no_photo"
 REASON_RECENT_ACCOUNT = "recent_account"
+# Motivos de "perfil evidentemente spammer" (solo diagnóstico, pero se PERSISTEN en el
+# payload de la acción: guardar códigos y no texto traducido mantiene la BD estable).
+REASON_DECORATIVE = "decorative"
+REASON_NON_LATIN_FIELD = "non_latin_field"
+REASON_BYPASS_OLD = "bypass_old_photo"
+REASON_HAN_DOMINANT = "han_dominant"
+REASON_NO_PHOTO_NEW = "no_photo_new"
 
 
 def render_reason_list(reasons) -> list[str]:

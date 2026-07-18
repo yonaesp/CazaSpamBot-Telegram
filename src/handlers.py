@@ -20,6 +20,7 @@ from . import admin_report, gentle_warning, greetings, learning, notify_prefs, q
 from .config import Config
 from .db import DB
 from .detectors import Hit
+from .i18n import t
 from .detectors import cas as cas_det
 from .detectors import external_mention as ext_det
 from .detectors import first_msg_media as media_det
@@ -411,7 +412,8 @@ async def on_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             )
             await _ban_join_direct(
                 context, db, cfg, cmu, user, score=200, rule="obvious_spam_profile",
-                reason="Perfil evidentemente spammer: " + " | ".join(obv_reasons[:3]),
+                reason=t("alert.obvious_spam") + " | ".join(
+                    verification.render_reason_list(obv_reasons)[:3]),
                 payload={"reasons": obv_reasons},
             )
             return

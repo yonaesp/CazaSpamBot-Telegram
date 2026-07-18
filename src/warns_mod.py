@@ -21,6 +21,7 @@ from telegram.ext import ContextTypes
 
 from .config import Config
 from .db import DB
+from .i18n import t
 from .federation import federate_ban
 
 log = logging.getLogger(__name__)
@@ -96,9 +97,7 @@ async def cmd_warn(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     if not target_id:
         await msg.reply_text(
-            "Uso: <code>/warn [razón]</code> respondiendo a un mensaje, "
-            "o <code>/warn @username [razón]</code>, o <code>/warn user_id [razón]</code>.",
-            parse_mode="HTML",
+            t("warn.usage"), parse_mode="HTML",
         )
         return
 
@@ -107,8 +106,7 @@ async def cmd_warn(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         member = await context.bot.get_chat_member(chat_id=msg.chat_id, user_id=target_id)
         if member.status in (ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER):
             await msg.reply_text(
-                "⚠️ No puedo warnear a un admin del chat. Si necesitas hacerlo, hazlo manualmente.",
-                parse_mode="HTML",
+                t("warn.is_admin"), parse_mode="HTML",
             )
             return
     except Exception as exc:  # noqa: BLE001
@@ -159,12 +157,9 @@ async def cmd_warn(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 triggered_in_chat=msg.chat_id, shadow=cfg.shadow,
             )
             ok = sum(1 for v in results.values() if v == "ok")
-            text = (
-                f"🔨 {mention} ha alcanzado el límite de warns (<b>{n}/{limit}</b>).\n"
-                f"<b>Ban federado</b> en {ok} chats."
-            )
+            text = t("warn.limit_ban", mention=mention, n=n, limit=limit, ok=ok)
             if reason:
-                text += f"\n💬 Último motivo: {html.escape(reason)}"
+                text += t("warn.last_reason", reason=html.escape(reason))
         elif action == "kick":
             sancion_ok = True
             try:
@@ -176,12 +171,8 @@ async def cmd_warn(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             except TelegramError as exc:
                 sancion_ok = False
                 log.warning("warn kick fallo: %s", exc)
-            text = (
-                f"👢 {mention} ha alcanzado el límite (<b>{n}/{limit}</b>). <b>Kick</b>."
-                if sancion_ok else
-                f"⚠️ {mention} ha alcanzado el límite (<b>{n}/{limit}</b>), pero <b>no he "
-                f"podido expulsarle</b> (¿me faltan permisos?). Los warns se mantienen."
-            )
+            text = t("warn.limit_kick" if sancion_ok else "warn.limit_kick_fail",
+                     mention=mention, n=n, limit=limit)
         elif action == "mute":
             from telegram import ChatPermissions
             sancion_ok = True
@@ -194,21 +185,17 @@ async def cmd_warn(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             except TelegramError as exc:
                 sancion_ok = False
                 log.warning("warn mute fallo: %s", exc)
-            text = (
-                f"🤐 {mention} ha alcanzado el límite (<b>{n}/{limit}</b>). <b>Mute 24h</b>."
-                if sancion_ok else
-                f"⚠️ {mention} ha alcanzado el límite (<b>{n}/{limit}</b>), pero <b>no he "
-                f"podido silenciarle</b> (¿me faltan permisos?). Los warns se mantienen."
-            )
+            text = t("warn.limit_mute" if sancion_ok else "warn.limit_mute_fail",
+                     mention=mention, n=n, limit=limit)
         else:
-            text = f"⚠️ {mention} — Warn <b>{n}/{limit}</b>"
+            text = t("warn.counter", mention=mention, n=n, limit=limit)
         # Solo se limpian los warns si la sanción se aplicó de verdad. Antes se
         # reseteaban siempre: si el kick/mute fallaba (sin permisos, target owner),
         # el grupo veía "Kick" y el contador volvía a 0 sin haber sancionado a nadie.
         if sancion_ok:
             db.reset_warns(target_id, msg.chat_id)
     else:
-        text = f"⚠️ {mention} — Warn <b>{n}/{limit}</b>"
+        text = t("warn.counter", mention=mention, n=n, limit=limit)
         if reason:
             text += f"\n💬 <b>Motivo:</b> {html.escape(reason)}"
 
@@ -246,12 +233,12 @@ async def cmd_warns(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     msg = update.effective_message
     target_id, target_name = _get_target(update)
     if not target_id:
-        await msg.reply_text("Responde al mensaje del usuario con /warns.")
+        await msg.reply_text(t("warns.reply_needed"))
         return
     db: DB = context.bot_data["db"]
     warns = db.list_warns(target_id, msg.chat_id)
     if not warns:
-        await msg.reply_text(f"Sin warns activos para {html.escape(target_name or str(target_id))}.")
+        await msg.reply_text(t("warns.none", name=html.escape(target_name or str(target_id))))
         return
     db.ensure_chat_settings(msg.chat_id)
     settings = db.get_chat_settings(msg.chat_id)
@@ -270,14 +257,14 @@ async def cmd_rmwarn(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     msg = update.effective_message
     target_id, _ = _get_target(update)
     if not target_id:
-        await msg.reply_text("Responde al mensaje del usuario con /rmwarn.")
+        await msg.reply_text(t("rmwarn.reply_needed"))
         return
     db: DB = context.bot_data["db"]
     ok = db.remove_last_warn(target_id, msg.chat_id)
     if ok:
-        await msg.reply_text("✅ Último warn eliminado.")
+        await msg.reply_text(t("rmwarn.done"))
     else:
-        await msg.reply_text("Sin warns para eliminar.")
+        await msg.reply_text(t("rmwarn.none"))
 
 
 @_admin_only
@@ -285,11 +272,11 @@ async def cmd_resetwarns(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     msg = update.effective_message
     target_id, _ = _get_target(update)
     if not target_id:
-        await msg.reply_text("Responde al mensaje del usuario con /resetwarns.")
+        await msg.reply_text(t("resetwarns.reply_needed"))
         return
     db: DB = context.bot_data["db"]
     n = db.reset_warns(target_id, msg.chat_id)
-    await msg.reply_text(f"✅ {n} warn(s) eliminados.")
+    await msg.reply_text(t("resetwarns.done", n=n))
 
 
 @_admin_only
@@ -299,14 +286,14 @@ async def cmd_warnlimit(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     db.ensure_chat_settings(chat_id)
     if not context.args:
         s = db.get_chat_settings(chat_id)
-        await update.effective_message.reply_text(f"Límite actual: <b>{s['warns_limit']}</b>", parse_mode="HTML")
+        await update.effective_message.reply_text(t("warnlimit.current", limit=s["warns_limit"]), parse_mode="HTML")
         return
     if not context.args[0].isdigit():
-        await update.effective_message.reply_text("Uso: /warnlimit <N>")
+        await update.effective_message.reply_text(t("warnlimit.usage"))
         return
     n = max(1, min(20, int(context.args[0])))
     db.update_chat_setting(chat_id, "warns_limit", n)
-    await update.effective_message.reply_text(f"✅ Límite warns = {n}")
+    await update.effective_message.reply_text(t("warnlimit.set", n=n))
 
 
 @_admin_only
@@ -316,11 +303,11 @@ async def cmd_warnaction(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     db.ensure_chat_settings(chat_id)
     if not context.args:
         s = db.get_chat_settings(chat_id)
-        await update.effective_message.reply_text(f"Acción actual: <b>{s['warns_action']}</b>", parse_mode="HTML")
+        await update.effective_message.reply_text(t("warnaction.current", action=s["warns_action"]), parse_mode="HTML")
         return
     action = context.args[0].lower()
     if action not in ("ban", "kick", "mute"):
-        await update.effective_message.reply_text("Uso: /warnaction ban|kick|mute")
+        await update.effective_message.reply_text(t("warnaction.usage"))
         return
     db.update_chat_setting(chat_id, "warns_action", action)
-    await update.effective_message.reply_text(f"✅ Acción warns = {action}")
+    await update.effective_message.reply_text(t("warnaction.set", action=action))

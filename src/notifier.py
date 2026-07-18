@@ -12,6 +12,7 @@ from dataclasses import dataclass
 import aiohttp
 
 from . import trust as _trust
+from .i18n import t
 
 log = logging.getLogger(__name__)
 
@@ -69,7 +70,7 @@ class Notifier:
             return False
 
         chat_title = chat_title or str(chat_id)
-        username_disp = f"@{username}" if username else "(sin username)"
+        username_disp = f"@{username}" if username else t("alert.no_username")
         text_preview = (original_text or "")[:300]
 
         fed_summary = ""
@@ -77,7 +78,8 @@ class Notifier:
             ok = sum(1 for v in federation_results.values() if v == "ok")
             shadow = sum(1 for v in federation_results.values() if v == "shadow")
             err = sum(1 for v in federation_results.values() if v.startswith("error"))
-            fed_summary = f"\n🌐 <b>Federación:</b> {ok} ok · {shadow} shadow · {err} err ({len(federation_results)} chats)"
+            fed_summary = t("alert.fed", ok=ok, shadow=shadow, err=err,
+                            total=len(federation_results))
 
         emoji = {"ban": "🔨", "kick": "👢", "mute": "🤐", "delete": "🗑️", "noop": "👁️"}.get(action, "ℹ️")
         mode_tag = "🌒 SHADOW" if mode == "shadow" else "🔴 ACTIVE"
@@ -85,26 +87,26 @@ class Notifier:
         # tg://user?id=X permite abrir perfil del user directamente en el cliente
         user_link = f"<a href=\"tg://user?id={user_id}\">{html.escape(username_disp)}</a>" if user_id else html.escape(username_disp)
 
-        msg = (
-            f"{emoji} <b>{action.upper()}</b> · {mode_tag}\n"
-            f"📍 <b>Chat:</b> {html.escape(chat_title)} (<code>{chat_id}</code>)\n"
-            f"👤 <b>User:</b> {user_link} (<code>{user_id or '?'}</code>)\n"
-            f"📏 <b>Nivel de spam:</b> {_trust.render_spam(score)} <i>(score interno {score})</i>\n"
-            f"🚨 <b>Regla:</b> <code>{html.escape(rule)}</code>\n"
-            f"💬 <b>Razón:</b> {html.escape(reason)}"
-            f"{user_signals_markup}"
-            f"{fed_summary}\n"
-            f"\n📝 <b>Mensaje:</b>\n<pre>{html.escape(text_preview)}</pre>"
+        # Los valores van como ARGUMENTOS: si el spam trae llaves, no se re-formatean.
+        msg = t(
+            "alert.body",
+            emoji=emoji, action=action.upper(), mode=mode_tag,
+            chat=html.escape(chat_title), chat_id=chat_id,
+            user_link=user_link, user_id=(user_id or "?"),
+            spam=_trust.render_spam(score), score=score,
+            rule=html.escape(rule), reason=html.escape(reason),
+            signals=user_signals_markup, fed=fed_summary,
+            preview=html.escape(text_preview),
         )
 
         keyboard = {
             "inline_keyboard": [
                 [
-                    {"text": "❌ No era spam", "callback_data": f"notspam:{action_id}"},
-                    {"text": "✅ Confirmar", "callback_data": f"confirm:{action_id}"},
+                    {"text": t("alert.btn_notspam"), "callback_data": f"notspam:{action_id}"},
+                    {"text": t("alert.btn_confirm"), "callback_data": f"confirm:{action_id}"},
                 ],
                 [
-                    {"text": "🛡️ Whitelist user", "callback_data": f"wl:{action_id}"},
+                    {"text": t("alert.btn_whitelist"), "callback_data": f"wl:{action_id}"},
                 ],
             ]
         }
