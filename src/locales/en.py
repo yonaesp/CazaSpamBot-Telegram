@@ -4,7 +4,6 @@ Quality translation of es.py. Any key missing here falls back to the Spanish str
 """
 STRINGS = {
     # --- common ---
-    "only_admin": "Only the bot admin can change this.",
     "on": "✅ ON",
     "off": "❌ OFF",
 

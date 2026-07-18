@@ -5,7 +5,6 @@ también en en.py con su traducción de calidad.
 """
 STRINGS = {
     # --- comunes ---
-    "only_admin": "Solo el admin del bot puede configurar.",
     "on": "✅ ON",
     "off": "❌ OFF",
 

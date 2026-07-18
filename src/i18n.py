@@ -53,9 +53,15 @@ def is_supported(lang: str | None) -> bool:
     return (lang or "").strip().lower()[:2] in SUPPORTED
 
 
-def t(key: str, lang: str | None = None, **fmt) -> str:
-    """Texto traducido: idioma dado o el global; fallback ES y luego la propia clave."""
-    lg = (lang or _current)
+def t(key: str, _lang: str | None = None, **fmt) -> str:
+    """Texto traducido: idioma dado o el global; fallback ES y luego la propia clave.
+
+    El selector de idioma se llama `_lang` (con guion bajo) A PROPÓSITO: así nunca
+    colisiona con un placeholder del texto. Con el nombre `lang`, una llamada como
+    `t("lang.set", lang=x)` enlazaba x al SELECTOR en vez de a `**fmt`, `.format()`
+    no llegaba a ejecutarse y el usuario veía «{lang}» literal (bug real, 2026-07-18).
+    """
+    lg = (_lang or _current)
     s = STRINGS.get(lg, {}).get(key)
     if s is None:
         s = STRINGS.get(DEFAULT, {}).get(key, key)

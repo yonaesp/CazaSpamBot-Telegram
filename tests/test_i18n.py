@@ -17,15 +17,26 @@ def test_t_espanol_por_defecto():
 
 
 def test_t_ingles():
-    assert "suspicious" in i18n.t("review.title", lang="en").lower()
+    assert "suspicious" in i18n.t("review.title", _lang="en").lower()
 
 
 def test_t_clave_inexistente_devuelve_clave():
     assert i18n.t("no.existe.esta.clave") == "no.existe.esta.clave"
 
 
+def test_kwarg_lang_no_colisiona_con_selector_de_idioma():
+    """Regresión (2026-07-18): el selector de idioma se llama `_lang` a propósito.
+
+    Cuando se llamaba `lang`, un kwarg `lang=` se enlazaba al SELECTOR en vez de a
+    `**fmt`: `.format()` no se ejecutaba y el usuario veía «{lang}» literal al usar
+    /idioma. Aquí comprobamos que un placeholder llamado {lang} sí se sustituye."""
+    out = i18n.t("lang.current", lang="es")
+    assert "{lang}" not in out, "el placeholder {lang} no se sustituyó (colisión con el selector)"
+    assert "es" in out
+
+
 def test_t_formatea_placeholders():
-    out = i18n.t("review.banned", lang="en", n=3)
+    out = i18n.t("review.banned", _lang="en", n=3)
     assert "3" in out
 
 
@@ -34,7 +45,7 @@ def test_t_fallback_a_es_si_falta_en(monkeypatch):
     STRINGS["es"]["solo_en_es"] = "valor español"
     try:
         # en.py no tiene la clave (None) → cae a español
-        assert i18n.t("solo_en_es", lang="en") == "valor español"
+        assert i18n.t("solo_en_es", _lang="en") == "valor español"
     finally:
         STRINGS["es"].pop("solo_en_es", None)
         STRINGS["en"].pop("solo_en_es", None)
