@@ -32,6 +32,11 @@ config/welcomes/*.txt
 !config/welcomes/generic.txt
 !config/welcomes/generic.*.txt
 
+# Terminos de spam que el admin anade desde Telegram: los gestiona el bot y son
+# propios de cada despliegue. Las listas del repo (config/blacklist/*.txt) SI se
+# versionan; estas no, para que un git pull nunca pise el trabajo del admin.
+config/blacklist/custom/
+
 # Notas y herramientas personales del despliegue original (no útiles a terceros)
 SETUP-INICIAL.txt
 scripts/rose_inspector.py

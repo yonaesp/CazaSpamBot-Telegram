@@ -768,6 +768,29 @@ class DB:
                 (action_id,),
             ).fetchone()
 
+    def recent_message_texts(
+        self, chat_id: int | None = None, limit: int = 300,
+    ) -> list[sqlite3.Row]:
+        """Últimos mensajes conocidos, para la vista previa de términos nuevos.
+
+        Ojo con lo que devuelve: `seen_users` guarda UN mensaje por usuario (el
+        último), no el historial del grupo. Es una muestra de conversación real
+        y reciente, que es justo lo que hace falta para estimar cuánta gente
+        legítima cazaría un término, pero no es un log completo.
+        """
+        sql = (
+            "SELECT chat_id, user_id, first_name, username, last_msg_text "
+            "FROM seen_users WHERE last_msg_text IS NOT NULL AND last_msg_text != ''"
+        )
+        params: list = []
+        if chat_id is not None:
+            sql += " AND chat_id=?"
+            params.append(chat_id)
+        sql += " ORDER BY last_msg_ts DESC LIMIT ?"
+        params.append(max(1, limit))
+        with self._cur() as c:
+            return c.execute(sql, params).fetchall()
+
     # ------------- learning_samples -------------
 
     def add_sample(
@@ -1299,6 +1322,21 @@ class DB:
                 (chat_id, pos, text, url, int(same_row)),
             )
             return c.execute("SELECT last_insert_rowid() AS id").fetchone()["id"]
+
+    def get_welcome_button(self, button_id: int) -> sqlite3.Row | None:
+        with self._cur() as c:
+            return c.execute(
+                "SELECT * FROM welcome_buttons WHERE id=?", (button_id,),
+            ).fetchone()
+
+    def delete_welcome_buttons_like(self, chat_id: int, text: str, url: str) -> int:
+        """Borra en `chat_id` los botones con ese mismo texto+URL. Devuelve cuántos."""
+        with self._cur() as c:
+            cur = c.execute(
+                "DELETE FROM welcome_buttons WHERE chat_id=? AND text=? AND url=?",
+                (chat_id, text, url),
+            )
+            return cur.rowcount
 
     def delete_welcome_button(self, button_id: int) -> bool:
         with self._cur() as c:

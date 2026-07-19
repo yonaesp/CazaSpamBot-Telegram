@@ -16,6 +16,8 @@ from __future__ import annotations
 
 import html
 import logging
+import re
+from urllib.parse import urlsplit
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.error import TelegramError
@@ -37,6 +39,7 @@ _TOGGLE_FIELDS = {
     "verification_reminders_enabled",
     "welcome_enabled",
     "cleanservice",
+    "topweekly_enabled",
 }
 
 # Presets de tiempos (dentro de los rangos que valida /verificacion).
@@ -48,6 +51,68 @@ _TIME_FIELDS = {
 
 # Textos libres capturables: code → columna.
 _EDIT_FIELDS = {"w": "welcome_text", "r": "rules_text"}
+
+# Autoborrado de la bienvenida, en segundos (0 = no se borra nunca).
+_WELCOME_TTL_PRESETS = [0, 300, 900, 3600]
+
+# Warns: presets del límite y acciones válidas (las mismas que acepta /warnaction).
+_WARN_LIMITS = [1, 3, 5, 10]
+_WARN_ACTIONS = ("ban", "kick", "mute")
+
+# Un botón de bienvenida con URL inválida hace que Telegram RECHACE el mensaje
+# entero: el grupo se queda sin bienvenida y en los logs solo aparece un BadRequest
+# que nadie relaciona con el botón. Por eso se valida ANTES de guardar, y solo se
+# admite lo que Telegram acepta con seguridad en un botón URL: http/https (y los
+# enlaces t.me, que son https). Cualquier otro esquema (tg://, javascript:, mailto:,
+# ftp:) se rechaza con un mensaje claro en vez de guardarse.
+_SCHEME_RE = re.compile(r"^[a-z][a-z0-9+.\-]*:", re.IGNORECASE)
+_HOST_RE = re.compile(r"^[A-Za-z0-9.\-]+(:\d+)?$")
+_MAX_BTN_TEXT = 64
+_MAX_BTN_URL = 512
+
+
+def validate_button_url(raw: str) -> tuple[str | None, str | None]:
+    """Valida (y normaliza) la URL de un botón de bienvenida.
+
+    Devuelve `(url, None)` si es válida o `(None, clave_de_error)` si no. A lo que
+    viene sin esquema (`t.me/normas`, `ejemplo.com/reglas`) se le antepone
+    `https://`; lo que trae un esquema distinto de http/https se rechaza.
+    """
+    url = (raw or "").strip()
+    if not url:
+        return None, "cfg.wb.err_empty"
+    if len(url) > _MAX_BTN_URL:
+        return None, "cfg.wb.err_long"
+    if any(ch.isspace() for ch in url):
+        return None, "cfg.wb.err_space"
+    if not url.lower().startswith(("http://", "https://")):
+        if _SCHEME_RE.match(url):
+            return None, "cfg.wb.err_scheme"
+        url = "https://" + url
+    parts = urlsplit(url)
+    host = parts.netloc.rsplit("@", 1)[-1]      # descarta el userinfo si lo hubiera
+    if not host or not _HOST_RE.match(host) or "." not in host.split(":", 1)[0]:
+        return None, "cfg.wb.err_host"
+    return url, None
+
+
+def parse_button_spec(raw: str) -> tuple[str | None, str | None, bool, str | None]:
+    """Parsea `Texto | https://url [same]` → (texto, url, misma_fila, error)."""
+    spec = (raw or "").strip()
+    same = False
+    if spec.lower().endswith(" same"):
+        same, spec = True, spec[:-5].rstrip()
+    if "|" not in spec:
+        return None, None, False, "cfg.wb.err_pipe"
+    text, url_raw = (p.strip() for p in spec.split("|", 1))
+    if not text:
+        return None, None, False, "cfg.wb.err_text"
+    if len(text) > _MAX_BTN_TEXT:
+        return None, None, False, "cfg.wb.err_text_long"
+    url, err = validate_button_url(url_raw)
+    if err:
+        return None, None, False, err
+    return text, url, same, None
 
 def _header(title: str) -> str:
     return t("cfg.header", title=title)
@@ -136,14 +201,17 @@ def build_panel_keyboard(
                               callback_data=f"{PREFIX}:accion:{cid}")],
         [InlineKeyboardButton(t("cfg.b.times", sk=sk, rh=rh, kh=kh),
                               callback_data=f"{PREFIX}:times:{cid}")],
-        [InlineKeyboardButton(t("cfg.b.welcome", state=_onoff(_b(s, "welcome_enabled"))),
-                              callback_data=f"{PREFIX}:tog:welcome_enabled:{cid}")],
-        [InlineKeyboardButton(t("cfg.b.edit_welcome"),
-                              callback_data=f"{PREFIX}:edit:w:{cid}")],
+        # La bienvenida entera (interruptor, texto, botones y autoborrado) vive en su
+        # submenú: son cuatro ajustes y el panel principal ya iba justo de filas.
+        [InlineKeyboardButton(t("cfg.b.welcome_menu", state=_onoff(_b(s, "welcome_enabled"))),
+                              callback_data=f"{PREFIX}:wsub:{cid}")],
         [InlineKeyboardButton(t("cfg.b.edit_rules"),
                               callback_data=f"{PREFIX}:edit:r:{cid}")],
         [InlineKeyboardButton(t("cfg.b.cleanservice", state=_onoff(_b(s, "cleanservice"))),
                               callback_data=f"{PREFIX}:tog:cleanservice:{cid}")],
+        [InlineKeyboardButton(t("cfg.b.warns"), callback_data=f"{PREFIX}:warns:{cid}"),
+         InlineKeyboardButton(t("cfg.b.topweekly", state=_onoff(_b(s, "topweekly_enabled"))),
+                              callback_data=f"{PREFIX}:tog:topweekly_enabled:{cid}")],
         [InlineKeyboardButton(t("cfg.b.quips", state=_onoff(quips_on)),
                               callback_data=f"{PREFIX}:quips:{cid}")],
         [InlineKeyboardButton(t("cfg.b.alerts"), callback_data=f"{PREFIX}:alertas:{cid}")],
@@ -166,6 +234,94 @@ def build_times_keyboard(chat_id: int, s) -> InlineKeyboardMarkup:
         rows.append(row)
     rows.append([InlineKeyboardButton(t("cfg.b.back"), callback_data=f"{PREFIX}:open:{cid}")])
     return InlineKeyboardMarkup(rows)
+
+
+def _ttl_label(secs: int) -> str:
+    """Etiqueta legible del autoborrado: nunca / N min / N h."""
+    if secs <= 0:
+        return t("cfg.wd.never")
+    if secs < 3600:
+        return t("cfg.wd.min", n=secs // 60)
+    return t("cfg.wd.hour", n=secs // 3600)
+
+
+def build_welcome_keyboard(chat_id: int, s, n_buttons: int) -> InlineKeyboardMarkup:
+    """Submenú de la bienvenida: interruptor, texto, botones y autoborrado.
+
+    El interruptor reutiliza el callback `tog` de siempre con un sufijo de vista, para
+    que al pulsarlo se vuelva a pintar ESTE submenú y no el panel principal.
+    """
+    cid = chat_id
+    ttl = _num(s, "welcome_delete_after_s", 900)
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton(t("cfg.b.welcome", state=_onoff(_b(s, "welcome_enabled"))),
+                              callback_data=f"{PREFIX}:tog:welcome_enabled:{cid}:w")],
+        [InlineKeyboardButton(t("cfg.b.edit_welcome"), callback_data=f"{PREFIX}:edit:w:{cid}")],
+        [InlineKeyboardButton(t("cfg.b.welcome_buttons", n=n_buttons),
+                              callback_data=f"{PREFIX}:wbtn:{cid}")],
+        [InlineKeyboardButton(t("cfg.b.welcome_ttl", value=_ttl_label(ttl)),
+                              callback_data=f"{PREFIX}:wdel:{cid}")],
+        [InlineKeyboardButton(t("cfg.b.back"), callback_data=f"{PREFIX}:open:{cid}")],
+    ])
+
+
+def build_welcome_ttl_keyboard(chat_id: int, s) -> InlineKeyboardMarkup:
+    """Presets del autoborrado de la bienvenida (el actual marcado con ✅)."""
+    cid = chat_id
+    cur = _num(s, "welcome_delete_after_s", 900)
+    row = [
+        InlineKeyboardButton(("✅ " if v == cur else "") + _ttl_label(v),
+                             callback_data=f"{PREFIX}:wdset:{v}:{cid}")
+        for v in _WELCOME_TTL_PRESETS
+    ]
+    return InlineKeyboardMarkup([
+        row,
+        [InlineKeyboardButton(t("cfg.b.back"), callback_data=f"{PREFIX}:wsub:{cid}")],
+    ])
+
+
+def build_welcome_buttons_keyboard(chat_id: int, buttons) -> InlineKeyboardMarkup:
+    """Lista de botones de la bienvenida: uno por fila para poder quitarlo, más añadir."""
+    cid = chat_id
+    rows = [
+        [InlineKeyboardButton(t("cfg.b.wb_remove", text=b["text"][:30]),
+                              callback_data=f"{PREFIX}:wbdel:{b['id']}:{cid}")]
+        for b in buttons
+    ]
+    rows.append([InlineKeyboardButton(t("cfg.b.wb_add"), callback_data=f"{PREFIX}:wbadd:{cid}")])
+    if buttons:
+        rows.append([InlineKeyboardButton(t("cfg.b.wb_clear"),
+                                          callback_data=f"{PREFIX}:wbclr:{cid}")])
+    rows.append([InlineKeyboardButton(t("cfg.b.back"), callback_data=f"{PREFIX}:wsub:{cid}")])
+    return InlineKeyboardMarkup(rows)
+
+
+def _warn_action(s) -> str:
+    try:
+        return (s["warns_action"] or "ban").lower()
+    except (KeyError, IndexError, TypeError):
+        return "ban"
+
+
+def build_warns_keyboard(chat_id: int, s) -> InlineKeyboardMarkup:
+    """Submenú de warns: fila de límites y fila de acción al alcanzarlo."""
+    cid = chat_id
+    limit = _num(s, "warns_limit", 3)
+    action = _warn_action(s)
+    limits = [
+        InlineKeyboardButton(("✅ " if v == limit else "") + str(v),
+                             callback_data=f"{PREFIX}:wlim:{v}:{cid}")
+        for v in _WARN_LIMITS
+    ]
+    actions = [
+        InlineKeyboardButton(("✅ " if a == action else "") + t(f"cfg.warns.{a}"),
+                             callback_data=f"{PREFIX}:wact:{a}:{cid}")
+        for a in _WARN_ACTIONS
+    ]
+    return InlineKeyboardMarkup([
+        limits, actions,
+        [InlineKeyboardButton(t("cfg.b.back"), callback_data=f"{PREFIX}:open:{cid}")],
+    ])
 
 
 def build_quips_keyboard(chat_id: int, state_on: bool) -> InlineKeyboardMarkup:
@@ -238,6 +394,63 @@ async def _show_panel(msg_edit, db: DB, chat_id: int, cfg=None) -> None:
         )
     except TelegramError as exc:
         log.debug("no se pudo renderizar panel: %s", exc)
+
+
+def _welcome_buttons(db: DB, chat_id: int):
+    """Botones de la bienvenida de un chat, migrando antes el botón único antiguo."""
+    db.migrate_legacy_welcome_button(chat_id)
+    return db.list_welcome_buttons(chat_id)
+
+
+async def _show_welcome(msg_edit, db: DB, chat_id: int) -> None:
+    """Renderiza el submenú de la bienvenida."""
+    db.ensure_chat_settings(chat_id)
+    s = db.get_chat_settings(chat_id)
+    buttons = _welcome_buttons(db, chat_id)
+    txt = t("cfg.welcome_text",
+            title=html.escape(_panel_title(db, chat_id)),
+            state=_onoff(_b(s, "welcome_enabled")),
+            n=len(buttons),
+            ttl=_ttl_label(_num(s, "welcome_delete_after_s", 900)))
+    try:
+        await msg_edit(txt, parse_mode="HTML",
+                       reply_markup=build_welcome_keyboard(chat_id, s, len(buttons)))
+    except TelegramError as exc:
+        log.debug("no se pudo renderizar el submenú de bienvenida: %s", exc)
+
+
+async def _show_welcome_buttons(msg_edit, db: DB, chat_id: int) -> None:
+    """Renderiza la lista de botones de la bienvenida."""
+    buttons = _welcome_buttons(db, chat_id)
+    if buttons:
+        lineas = [t("cfg.wb.list_header")]
+        lineas += [
+            t("cfg.wb.item", text=html.escape(b["text"]), url=html.escape(b["url"]))
+            for b in buttons
+        ]
+        txt = "\n".join(lineas)
+    else:
+        txt = t("cfg.wb.empty")
+    try:
+        await msg_edit(txt, parse_mode="HTML", disable_web_page_preview=True,
+                       reply_markup=build_welcome_buttons_keyboard(chat_id, buttons))
+    except TelegramError as exc:
+        log.debug("no se pudo renderizar la lista de botones: %s", exc)
+
+
+async def _show_warns(msg_edit, db: DB, chat_id: int) -> None:
+    """Renderiza el submenú de warns."""
+    db.ensure_chat_settings(chat_id)
+    s = db.get_chat_settings(chat_id)
+    accion = _warn_action(s)
+    txt = t("cfg.warns_text",
+            title=html.escape(_panel_title(db, chat_id)),
+            limit=_num(s, "warns_limit", 3),
+            action=t(f"cfg.warns.{accion}") if accion in _WARN_ACTIONS else accion)
+    try:
+        await msg_edit(txt, parse_mode="HTML", reply_markup=build_warns_keyboard(chat_id, s))
+    except TelegramError as exc:
+        log.debug("no se pudo renderizar el submenú de warns: %s", exc)
 
 
 async def _show_quips(msg_edit, db: DB, cfg, chat_id: int) -> None:
@@ -364,6 +577,9 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     if action == "tog":
         field = parts[2] if len(parts) > 2 else ""
         cid = _cid(3)
+        # 5º campo OPCIONAL: la vista desde la que se pulsó. Sin él (los botones ya
+        # enviados a los chats) se repinta el panel principal, como siempre.
+        view = parts[4] if len(parts) > 4 else ""
         if field not in _TOGGLE_FIELDS or cid is None:
             await q.answer(t("cfg.invalid_opt"))
             return
@@ -373,6 +589,9 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         n = settings_sync.apply_setting(db, cid, field, new_val)
         estado = t("cfg.act_on") if new_val else t("cfg.act_off")
         await q.answer(estado + t("cfg.in_n", n=n) if n > 1 else estado)
+        if view == "w":
+            await _show_welcome(q.edit_message_text, db, cid)
+            return
         s = db.get_chat_settings(cid)
         try:
             await q.edit_message_reply_markup(
@@ -523,6 +742,145 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             pass
         return
 
+    if action == "wsub":
+        cid = _cid(2)
+        if cid is None:
+            await q.answer(t("cfg.invalid_chat"))
+            return
+        await q.answer()
+        context.user_data.pop("cfg_await", None)
+        await _show_welcome(q.edit_message_text, db, cid)
+        return
+
+    if action == "wdel":
+        cid = _cid(2)
+        if cid is None:
+            await q.answer(t("cfg.invalid_chat"))
+            return
+        await q.answer()
+        db.ensure_chat_settings(cid)
+        s = db.get_chat_settings(cid)
+        try:
+            await q.edit_message_text(
+                t("cfg.wd.text", title=html.escape(_panel_title(db, cid)),
+                  value=_ttl_label(_num(s, "welcome_delete_after_s", 900))),
+                parse_mode="HTML", reply_markup=build_welcome_ttl_keyboard(cid, s))
+        except TelegramError:
+            pass
+        return
+
+    if action == "wdset":
+        cid = _cid(3)
+        try:
+            val = int(parts[2])
+        except (IndexError, ValueError):
+            await q.answer(t("cfg.invalid_val"))
+            return
+        if cid is None or val not in _WELCOME_TTL_PRESETS:
+            await q.answer(t("cfg.invalid_opt"))
+            return
+        db.ensure_chat_settings(cid)
+        n = settings_sync.apply_setting(db, cid, "welcome_delete_after_s", val)
+        etiqueta = f"✅ {_ttl_label(val)}"
+        await q.answer(etiqueta + (t("cfg.dot_n", n=n) if n > 1 else ""))
+        s = db.get_chat_settings(cid)
+        try:
+            await q.edit_message_text(
+                t("cfg.wd.text", title=html.escape(_panel_title(db, cid)),
+                  value=_ttl_label(_num(s, "welcome_delete_after_s", 900))),
+                parse_mode="HTML", reply_markup=build_welcome_ttl_keyboard(cid, s))
+        except TelegramError:
+            pass
+        return
+
+    if action == "wbtn":
+        cid = _cid(2)
+        if cid is None:
+            await q.answer(t("cfg.invalid_chat"))
+            return
+        await q.answer()
+        context.user_data.pop("cfg_await", None)
+        await _show_welcome_buttons(q.edit_message_text, db, cid)
+        return
+
+    if action == "wbadd":
+        cid = _cid(2)
+        if cid is None:
+            await q.answer(t("cfg.invalid_chat"))
+            return
+        await q.answer()
+        context.user_data["cfg_await"] = {"field": "welcome_button", "chat_id": cid}
+        kb = InlineKeyboardMarkup([[InlineKeyboardButton(
+            t("cfg.b.cancel"), callback_data=f"{PREFIX}:wbtn:{cid}")]])
+        try:
+            await q.edit_message_text(t("cfg.wb.prompt"), parse_mode="HTML", reply_markup=kb)
+        except TelegramError:
+            pass
+        return
+
+    if action == "wbdel":
+        cid = _cid(3)
+        try:
+            bid = int(parts[2])
+        except (IndexError, ValueError):
+            await q.answer(t("cfg.invalid_val"))
+            return
+        if cid is None:
+            await q.answer(t("cfg.invalid_chat"))
+            return
+        n = settings_sync.apply_welcome_button_delete(db, cid, bid)
+        await q.answer(t("cfg.wb.removed") if n else t("cfg.wb.not_found"))
+        await _show_welcome_buttons(q.edit_message_text, db, cid)
+        return
+
+    if action == "wbclr":
+        cid = _cid(2)
+        if cid is None:
+            await q.answer(t("cfg.invalid_chat"))
+            return
+        n = settings_sync.apply_welcome_buttons_clear(db, cid)
+        await q.answer(t("cfg.wb.cleared") + (t("cfg.dot_n", n=n) if n > 1 else ""))
+        await _show_welcome_buttons(q.edit_message_text, db, cid)
+        return
+
+    if action == "warns":
+        cid = _cid(2)
+        if cid is None:
+            await q.answer(t("cfg.invalid_chat"))
+            return
+        await q.answer()
+        await _show_warns(q.edit_message_text, db, cid)
+        return
+
+    if action == "wlim":
+        cid = _cid(3)
+        try:
+            val = int(parts[2])
+        except (IndexError, ValueError):
+            await q.answer(t("cfg.invalid_val"))
+            return
+        if cid is None or val not in _WARN_LIMITS:
+            await q.answer(t("cfg.invalid_opt"))
+            return
+        db.ensure_chat_settings(cid)
+        n = settings_sync.apply_setting(db, cid, "warns_limit", val)
+        await q.answer(f"✅ {val}" + (t("cfg.dot_n", n=n) if n > 1 else ""))
+        await _show_warns(q.edit_message_text, db, cid)
+        return
+
+    if action == "wact":
+        accion_warn = parts[2] if len(parts) > 2 else ""
+        cid = _cid(3)
+        if cid is None or accion_warn not in _WARN_ACTIONS:
+            await q.answer(t("cfg.invalid_opt"))
+            return
+        db.ensure_chat_settings(cid)
+        n = settings_sync.apply_setting(db, cid, "warns_action", accion_warn)
+        etiqueta = f"✅ {t('cfg.warns.' + accion_warn)}"
+        await q.answer(etiqueta + (t("cfg.dot_n", n=n) if n > 1 else ""))
+        await _show_warns(q.edit_message_text, db, cid)
+        return
+
     if action == "alertas":
         # Abre el panel de avisos como mensaje aparte (reutiliza /alertas), sin
         # perder el panel de config.
@@ -564,6 +922,23 @@ async def handle_capture(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     scope = pending.get("scope")        # 'all' | chat_id (str) | None (legacy)
     chat_id = pending.get("chat_id")    # legacy (sin scope elegido)
     context.user_data.pop("cfg_await", None)  # un solo uso (aunque falle luego)
+    if field == "welcome_button":
+        # Se valida ANTES de tocar la BD: una URL que Telegram no acepte tumbaría el
+        # mensaje de bienvenida entero del grupo (ver `validate_button_url`).
+        text, url, same, err = parse_button_spec(raw)
+        if chat_id is None:                       # sin grupo no hay dónde escribir
+            await msg.reply_text(t("cfg.invalid_chat"))
+            return True
+        if err:
+            await msg.reply_text(t(err), parse_mode="HTML", disable_web_page_preview=True)
+            return True
+        n = settings_sync.apply_welcome_button_add(db, chat_id, text, url, same_row=same)
+        ids = settings_sync.target_ids(db, chat_id)
+        await msg.reply_text(
+            t("cfg.wb.added", text=html.escape(text), url=html.escape(url),
+              scope=_scope_label(db, ids) if n > 1 else ""),
+            parse_mode="HTML", disable_web_page_preview=True)
+        return True
     if field == "welcome_text":
         from .chat_settings_cmd import _parse_rose_buttons
         clean, buttons = _parse_rose_buttons(raw)

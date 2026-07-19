@@ -54,6 +54,43 @@ def apply_welcome(db: DB, chat_id: int, clean_text, buttons) -> int:
     return len(_write_welcome(db, target_ids(db, chat_id), clean_text, buttons))
 
 
+def apply_welcome_button_add(db: DB, chat_id: int, text: str, url: str,
+                             same_row: bool = False) -> int:
+    """Añade un botón a la bienvenida respetando el modo sync. Devuelve nº de chats."""
+    ids = target_ids(db, chat_id)
+    for cid in ids:
+        db.migrate_legacy_welcome_button(cid)
+        db.add_welcome_button(cid, text, url, same_row=same_row)
+    return len(ids)
+
+
+def apply_welcome_button_delete(db: DB, chat_id: int, button_id: int) -> int:
+    """Borra un botón y, con sync ON, sus gemelos en los demás grupos.
+
+    Los ids son por chat: el «mismo» botón de otro grupo tiene otro id. Con la
+    sincronización activa los grupos van idénticos, así que se identifica al gemelo
+    por texto+URL, que es lo que el admin ve y lo que replicó `apply_welcome_button_add`.
+    """
+    row = db.get_welcome_button(button_id)
+    if row is None:
+        return 0
+    if not is_sync_on(db):
+        return 1 if db.delete_welcome_button(button_id) else 0
+    n = 0
+    for cid in target_ids(db, chat_id):
+        if db.delete_welcome_buttons_like(cid, row["text"], row["url"]):
+            n += 1
+    return n
+
+
+def apply_welcome_buttons_clear(db: DB, chat_id: int) -> int:
+    """Quita todos los botones de la bienvenida respetando el modo sync."""
+    ids = target_ids(db, chat_id)
+    for cid in ids:
+        db.clear_welcome_buttons(cid)
+    return len(ids)
+
+
 # --- Escritura con SCOPE explícito (el usuario elige 'all' o un grupo concreto,
 #     ignorando el modo sync global). Usado por el editor de bienvenida/reglas. ---
 

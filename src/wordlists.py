@@ -19,6 +19,20 @@ spam en Telegram). Se puede forzar otro conjunto con `BLACKLIST_LANGS=es,en,pt`.
 
 Una instalación sin subdirectorios se comporta EXACTAMENTE igual que antes.
 
+## Términos personalizados (`config/blacklist/custom/`)
+
+Encima de todo lo anterior se acumula `config/blacklist/custom/<archivo>`, la
+lista que gestiona el propio bot desde Telegram (ver `custom_terms.py`). Va en
+una carpeta aparte y fuera de git a propósito: así un `git pull` nunca pisa lo
+que ha añadido el admin ni genera conflictos.
+
+Sus líneas son **texto literal, nunca regex**: se escapan con `re.escape()` al
+cargarlas. El escapado se hace AQUÍ, al leer, y no al guardar, para que la
+garantía valga también si alguien edita el archivo a mano: da igual lo que
+escriba, `.*` es un punto y un asterisco, no un comodín.
+
+Sin archivos en `custom/` todo se comporta EXACTAMENTE igual que antes.
+
 ## Patrones inválidos
 
 Los patrones los escribe el usuario a mano. Uno mal formado NO puede tumbar el
@@ -43,6 +57,15 @@ _BLACKLIST_DIR = Path(__file__).resolve().parent.parent / "config" / "blacklist"
 _LINGUA_FRANCA = "en"
 
 _NEVER_MATCHES = r"(?!x)x"  # patrón imposible: no casa nunca
+
+# Subcarpeta de los términos que añade el admin desde Telegram. Fuera de git.
+_CUSTOM_SUBDIR = "custom"
+
+# Tope de líneas que se leen de un archivo personalizado. El límite "de verdad"
+# lo aplica `custom_terms.add_term`; este es el cinturón de seguridad por si el
+# archivo lo engorda un humano a mano: una lista gigante no puede dejar el bot
+# masticando una alternancia de miles de ramas en CADA mensaje.
+_CUSTOM_MAX_TERMS = 500
 
 # Cache de patrones ya compilados. La clave incluye el directorio y el idioma
 # activo para que un cambio de idioma en caliente (/idioma) recargue las listas
@@ -75,15 +98,50 @@ def clear_cache() -> None:
 
 
 def _read_terms_file(path: Path) -> list[str] | None:
-    """Términos útiles del archivo, o None si no se puede leer."""
+    """Términos útiles del archivo, o None si no se puede leer.
+
+    `errors="replace"` no es cosmético: sin él, un archivo guardado en latin-1
+    (o con un byte suelto de un copia y pega) lanzaba UnicodeDecodeError, que no
+    es OSError, y se llevaba por delante la carga entera del detector. Ahora se
+    pierde el carácter ilegible y el resto de la lista sigue protegiendo.
+    """
     try:
-        raw = path.read_text(encoding="utf-8")
-    except OSError:
+        raw = path.read_text(encoding="utf-8", errors="replace")
+    except (OSError, ValueError):
         return None
     return [
         ln.strip() for ln in raw.splitlines()
         if ln.strip() and not ln.lstrip().startswith("#")
     ]
+
+
+def custom_file(filename: str) -> Path:
+    """Ruta del archivo de términos personalizados de esa lista."""
+    return _BLACKLIST_DIR / _CUSTOM_SUBDIR / filename
+
+
+def read_custom_terms(filename: str) -> list[str]:
+    """Términos personalizados en crudo, tal cual los escribió el admin.
+
+    Sin escapar: es lo que se le enseña por pantalla y lo que compara
+    `custom_terms` para detectar duplicados. Para MATCHING no se usa nunca esta
+    función directamente, sino `load_terms`, que los escapa.
+    """
+    return (_read_terms_file(custom_file(filename)) or [])[:_CUSTOM_MAX_TERMS]
+
+
+def _custom_stamp(filename: str) -> tuple:
+    """Huella del archivo personalizado, para poder invalidar la caché.
+
+    Si cambia (lo tocó el bot o un humano con un editor), la clave de caché
+    cambia con ella y los patrones se recompilan solos. Un `stat()` cuesta
+    microsegundos, mucho menos que la propia búsqueda del regex.
+    """
+    try:
+        st = custom_file(filename).stat()
+    except OSError:
+        return ()
+    return (st.st_mtime_ns, st.st_size)
 
 
 def load_terms(
@@ -92,8 +150,13 @@ def load_terms(
     """Términos de config/blacklist/<filename> MÁS los de <lang>/<filename>.
 
     La base es el archivo genérico (o `defaults` si no existe o está vacío),
-    igual que siempre. Encima se acumulan las listas de los idiomas activos,
-    sin duplicados (comparando sin distinguir mayúsculas).
+    igual que siempre. Encima se acumulan las listas de los idiomas activos y,
+    por último, los términos personalizados de `custom/<filename>`, todos sin
+    duplicados (comparando sin distinguir mayúsculas).
+
+    Los personalizados se escapan con `re.escape()`: por esa vía es IMPOSIBLE
+    que entre un regex activo, venga del panel de Telegram o de un humano
+    editando el archivo a mano.
     """
     terms = _read_terms_file(_BLACKLIST_DIR / filename) or list(defaults)
     seen = {term.casefold() for term in terms}
@@ -102,6 +165,11 @@ def load_terms(
             if term.casefold() not in seen:
                 seen.add(term.casefold())
                 terms.append(term)
+    for raw in read_custom_terms(filename):
+        term = re.escape(raw)
+        if term.casefold() not in seen:
+            seen.add(term.casefold())
+            terms.append(term)
     return terms
 
 
@@ -162,14 +230,24 @@ def load_and_compile(
 ) -> re.Pattern:
     """Atajo: carga los términos del archivo (+ idiomas activos) y los compila.
 
-    El resultado se cachea por (archivo, directorio, idiomas), así que llamarlo
-    en cada mensaje sale gratis y a la vez respeta un cambio de idioma.
+    El resultado se cachea por (archivo, directorio, idiomas, huella del archivo
+    personalizado), así que llamarlo en cada mensaje sale gratis, respeta un
+    cambio de idioma y recoge al vuelo un término recién añadido o quitado: sin
+    la huella en la clave, el admin añadiría un término y el bot seguiría
+    ignorándolo hasta el siguiente reinicio.
     """
-    key = (filename, str(_BLACKLIST_DIR), boundaries, flags, tuple(active_langs()))
+    key = (
+        filename, str(_BLACKLIST_DIR), boundaries, flags,
+        tuple(active_langs()), _custom_stamp(filename),
+    )
     rx = _COMPILED.get(key)
     if rx is None:
         rx = compile_alternation(
             load_terms(filename, defaults), boundaries=boundaries, flags=flags,
         )
+        # Fuera la versión anterior de esta misma lista: si no, cada edición
+        # dejaría para siempre su patrón viejo ocupando memoria.
+        for old in [k for k in _COMPILED if k[:5] == key[:5]]:
+            del _COMPILED[old]
         _COMPILED[key] = rx
     return rx

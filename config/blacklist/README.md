@@ -129,6 +129,43 @@ ese mismo grupo y déjalo pegado a una cifra.
 Añade siempre un caso a `tests/test_money_regional.py`: uno de que tu moneda se
 reconoce, y otro de una frase legítima de tu idioma que **no** debe disparar.
 
+## `custom/`: los términos que añade el bot
+
+La carpeta `config/blacklist/custom/` **la gestiona el bot**. Ahí van los
+términos que el admin añade desde Telegram, sin entrar al servidor. Se cargan
+**sumándose** a la lista genérica y a las de idioma, con la misma mecánica.
+
+```
+config/blacklist/
+├── commercial_work.txt        ← del repo, se versiona
+├── en/commercial_work.txt     ← del repo, se versiona
+└── custom/commercial_work.txt ← lo escribe el bot, NO se versiona
+```
+
+Va **fuera de git** (está en `.gitignore`) por un motivo práctico: si
+estuviera versionada, cada `git pull` daría conflictos con los archivos del
+repo o directamente pisaría lo que haya añadido el admin.
+
+Diferencias con el resto de listas:
+
+- **Son texto literal, no regex.** Se escapan con `re.escape()` al cargarlas,
+  así que `oferta 100% garantizada` funciona tal cual: los `%`, `.`, `(` o `*`
+  valen como los símbolos que son, no como sintaxis de regex. Es imposible
+  colar un patrón activo por aquí, y eso vale **también si editas el archivo a
+  mano**: escribir `.*` en una línea busca un punto seguido de un asterisco.
+- Si quieres un regex de verdad, ponlo en la lista normal del repo.
+- El bot valida lo que entra: mínimo 4 caracteres (uno de 2 letras casaría con
+  media conversación), máximo 300 términos por lista, sin duplicados, y nada
+  que empiece o acabe en símbolo en las listas que usan `\b(?:...)\b`.
+- Antes de guardar, el bot enseña una **vista previa**: cuántos mensajes
+  recientes de verdad del grupo cazaría ese término. Si tu «oferta» pilla a 12
+  vecinos legítimos, lo ves antes de banear a nadie, no después.
+- **No hace falta reiniciar**: los cambios se aplican al instante.
+
+Puedes editar los archivos a mano si prefieres (uno por línea, UTF-8, `#` para
+comentar). Las líneas vacías, la basura y los caracteres raros se ignoran sin
+tumbar nada.
+
 ## Listas por idioma
 
 El spam llega en cualquier idioma, así que las listas **se acumulan**:
