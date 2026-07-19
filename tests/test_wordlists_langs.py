@@ -143,10 +143,18 @@ def test_patrones_del_repo_compilan_todos():
             re.compile(term, re.IGNORECASE)  # no debe lanzar
 
 
+# Listas que el detector carga con boundaries=False, es decir SIN envolver en
+# \b(?:...)\b. Son justo las que necesitan empezar por símbolo ($500, /day, R$)
+# y por eso quedan fuera de la comprobación de abajo.
+SIN_BOUNDARIES = {"commercial_money.txt", "commercial_money_periodic.txt"}
+
+
 def test_patrones_del_repo_no_empiezan_por_simbolo():
     """`compile_alternation` envuelve en \\b(?:...)\\b y \\b nunca casa delante de
     un símbolo: un patrón que empiece por $ o % estaría muerto en silencio."""
     for archivo in sorted(wordlists._BLACKLIST_DIR.rglob("*.txt")):
+        if archivo.name in SIN_BOUNDARIES:
+            continue
         for term in wordlists._read_terms_file(archivo) or []:
             primero = term.replace("(?:", "").replace("(", "").lstrip("\\")[:1]
             assert primero not in "$%+/.@", f"{archivo.name}: {term!r} no casaría nunca"

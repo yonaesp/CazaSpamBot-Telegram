@@ -1,0 +1,11 @@
+# Scam de trabajo domestico en INGLES (detector commercial_ad).
+# Se SUMAN a los del archivo generico ../commercial_domestic.txt.
+# Un patron por linea (regex). # = comentario. Usa (?:...) no (...).
+#
+# DESCARTADO a proposito (riesgo real de falso positivo):
+#   "take care of my dog", "look after my house" sueltos -> es lo que dice
+#   cualquiera que se va de viaje. Se exige el marco de CONTRATACION
+#   (needed / wanted / looking for a trustworthy...).
+(?:pet|house|baby|dog|child)\s*-?\s*sitt(?:er|ing)\s+(?:needed|wanted|required)
+(?:nanny|caregiver|care\s*giver|housekeeper|babysitter|maid)\s+(?:needed|wanted|required)
+looking\s+for\s+(?:a\s+)?(?:reliable|trustworthy|responsible|honest)\s+(?:person|nanny|caregiver|babysitter|housekeeper|pet\s*sitter|house\s*keeper)

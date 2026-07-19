@@ -17,6 +17,10 @@ reinicia el bot, y listo.
   El bot envuelve la lista en `\b(?:...)\b` y `\b` nunca casa junto a un símbolo:
   el patrón quedaría muerto sin avisar. En vez de `\$\d+\s*/\s*day`, ancla el
   patrón a una palabra: `(?:make|earn)\s+\$\s?\d+`.
+  **Excepción:** `commercial_money.txt` y `commercial_money_periodic.txt` se
+  cargan **sin** ese envoltorio, justo porque necesitan empezar por símbolo
+  (`$500`, `R$`, `/day`). A cambio, cada patrón de esos dos archivos tiene que
+  poner sus propios `\b` donde hagan falta (ver los comentarios de cabecera).
 - Un patrón **mal escrito no tumba el bot**: se descarta, se avisa en el log
   (`Patrón de lista negra inválido, se ignora: ...`) y el resto siguen activos.
 
@@ -35,10 +39,95 @@ inversi[oó]n\s+garantizada
 | `commercial_illegal_services.txt` | `commercial_ad` | servicios ilegales en anuncios (hacking, acceso a cuentas, recuperar dinero...) |
 | `commercial_cta.txt` | `commercial_ad` | llamadas a la acción publicitarias (postúlate, contáctanos, apply now...) |
 | `commercial_work.txt` | `commercial_ad` | vocabulario de oferta de empleo / dinero fácil (vacantes, sueldo, now hiring...) |
+| `commercial_money.txt` | `commercial_ad` **y** `bio_spam` | importes con moneda (500€, $500, R$ 2.000, 20000 ARS...). **Aquí añades tu moneda** |
+| `commercial_money_periodic.txt` | `commercial_ad` | periodicidad pegada al importe (al mes, /day, mensuales...). No lleva monedas: se combina con la lista de arriba |
+| `commercial_urgency.txt` | `commercial_ad` | urgencia gritada de scam (URGENTE, HOY MISMO, act now...) |
+| `commercial_domestic.txt` | `commercial_ad` | scam de trabajo doméstico ("busco persona responsable para cuidar mi casa") |
 | `bio_spam_keywords.txt` | `bio_spam` | spam adulto/cripto/casino/préstamo en la bio del perfil |
 | `bio_illegal_services.txt` | `bio_spam` | servicios de hacking/piratería declarados en la bio |
 | `bio_cta.txt` | `bio_spam` | llamadas a la acción promocionales en la bio (escríbeme, DM me...) |
 | `classifier_excluded_tokens.txt` | clasificador `/spam` `/legal` | (al revés: palabras NEUTRAS de tu temática que se ignoran para no ensuciar el aprendizaje) |
+
+## `classifier_excluded_tokens.txt`: el vocabulario de TU grupo
+
+Esta lista va **al revés** que las demás. En el resto pones lo que quieres
+cazar; aquí pones lo que quieres que el bot **ignore al aprender**.
+
+El bot aprende de lo que le marcas con `/spam` y `/legal`. El problema es que
+los spammers hablan del tema del grupo: en uno de fotografía venden cámaras, en
+uno de coches venden coches. Si marcas varios de esos anuncios con `/spam`, la
+palabra del tema (`cámara`, `coche`, `receta`) aparece en muchas muestras de
+spam y en ninguna de las legítimas, así que el clasificador aprende que huele a
+spam. A partir de ahí, quien entre al grupo y pregunte por su cámara empieza a
+sumar puntos hacia un mute.
+
+**Qué hacer:** abre el archivo, borra el vocabulario del autor (domótica y
+Windows) y escribe las 10-20 palabras que tu comunidad escribe a diario. Es un
+minuto de trabajo y es la protección más barata que tienes.
+
+**Si no lo haces**, el bot no se rompe. El clasificador lleva salvaguardas para
+que ninguna palabra suelta pueda decidir por sí sola:
+
+- ninguna palabra puede aportar más de un tope fijo de evidencia hacia spam, así
+  que hacen falta **varias** señales juntas (vender + barato + "escríbeme al
+  privado") para actuar;
+- una palabra que aparece **en las dos clases** (spam y legítimo) pesa la mitad,
+  porque no distingue nada;
+- una palabra vista **una sola vez** en todo el historial pesa un tercio: es
+  ruido, no evidencia;
+- el tope es **asimétrico**: limita lo que acusa, no lo que exculpa. Una palabra
+  claramente del vocabulario legítimo puede tirar la probabilidad abajo sin
+  límite. Es la regla número uno del proyecto: mejor dejar pasar spam que
+  castigar a un legítimo.
+
+Aun así, la lista sigue mereciendo la pena: las salvaguardas evitan el desastre,
+tu lista evita el ruido.
+
+Un detalle que conviene saber: **lo aprendido es común a todos los grupos** que
+modera una misma instalación del bot, no por grupo. Si moderas un grupo de
+cocina y otro de coches con el mismo bot, marca en la lista el vocabulario de
+los dos.
+
+## `commercial_money.txt`: tu moneda
+
+Un anuncio spam casi siempre promete dinero, así que el importe es una de las
+señales que más pesan. El bot trae de fábrica el euro, el dólar, la libra y las
+monedas de Latinoamérica y de buena parte de Europa (pesos, reales, soles,
+quetzales, bolívares, guaraníes, córdobas, złoty, coronas, francos...). Si la
+tuya no está, añádela **aquí** y funcionará también en `bio_spam` y en la
+detección de "tanto al mes", sin tocar nada más.
+
+Fíjate en cómo se escribe el importe en tu país: el símbolo puede ir delante
+(`$500`) o detrás (`500€`), y los miles se separan con punto, con coma, con
+apóstrofo (`1'500`) o con un espacio fino.
+
+### El peligro: monedas que son palabras corrientes
+
+Es la regla número uno del proyecto (**mejor dejar pasar spam que banear a un
+legítimo**) y aquí es especialmente fácil pegarse un tiro en el pie, porque
+media docena de monedas se llaman como cosas normales:
+
+> «el **peso** del paquete», «esto es **real**», «hace un **sol** increíble»,
+> «media **libra** de harina», «la **corona** del diente», «un **franco**
+> partidario de...»
+
+Si metes `peso` o `libra` como palabra suelta, el bot empieza a sumar puntos a
+gente que habla de recetas o de paquetería. Tres formas seguras de añadirlas:
+
+| ❌ No | ✅ Sí | Por qué |
+|---|---|---|
+| `peso` | `\b\d+\s*pesos\b` | pegada a una cifra: «20 pesos» es dinero, «el peso del paquete» no |
+| `libra` | `£`, `GBP`, `libras\s+esterlinas` | el símbolo y el código no son ambiguos; el nombre en compuesto tampoco |
+| `corona` | `coronas\s+(?:suecas\|noruegas\|danesas)` | el compuesto solo lo escribe quien habla de dinero |
+
+Y ojo también con los **códigos ISO**: en minúscula, `try`, `cup`, `cop`, `pen`,
+`bob` y `ron` son palabras normales en inglés o en español. Por eso en la lista
+van dentro de `(?-i:...)`, que **apaga el ignorar-mayúsculas solo en ese trozo**:
+«2 cup of flour» no dispara, «2 CUP» sí. Si añades un código nuevo, mételo en
+ese mismo grupo y déjalo pegado a una cifra.
+
+Añade siempre un caso a `tests/test_money_regional.py`: uno de que tu moneda se
+reconoce, y otro de una frase legítima de tu idioma que **no** debe disparar.
 
 ## Listas por idioma
 

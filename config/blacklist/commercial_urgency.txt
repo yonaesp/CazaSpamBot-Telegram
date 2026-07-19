@@ -1,0 +1,13 @@
+# Sentido de urgencia GRITADO, tipico del scam (detector commercial_ad).
+# Pesa poco por si solo (+10): es un acompañante, nunca banea nada por si mismo.
+#
+# Un patron por linea (palabra o regex). # = comentario. Usa (?:...) no (...).
+# Esta lista SI va envuelta en \b(?:...)\b (palabra completa), asi que NO
+# empieces ni acabes un patron con un simbolo (¡, !, $, %): \b no casa junto a
+# un simbolo y el patron quedaria muerto sin avisar.
+URGENTE
+INMEDIAT[OA]
+EMPEZAR\s+YA
+HOY\s+MISMO
+R[AÁ]PIDO
+YA\s*!

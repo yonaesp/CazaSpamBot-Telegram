@@ -1,0 +1,42 @@
+# Importes con moneda. Lo usan los detectores commercial_ad y bio_spam.
+#
+# ATENCION, ESTA LISTA VA SIN \b: casi todos los patrones empiezan o acaban en
+# un simbolo (€, $, R$, S/) y \b NUNCA casa junto a un simbolo, asi que el bot
+# compila esta lista sin envolverla (boundaries=False). Cada linea lleva sus
+# propios anclajes \b donde hacen falta. Si añades una linea que empieza por
+# letra o cifra, ponle tu el \b delante.
+#
+# Un patron por linea (regex). # = comentario. Usa (?:...) no (...).
+#
+# RIESGO DE FALSO POSITIVO (regla numero uno del proyecto: mejor dejar pasar
+# spam que banear a un legitimo). NO añadas el NOMBRE de una moneda que tambien
+# sea una palabra corriente: peso, real, sol, libra, corona, lei. "el peso del
+# paquete", "esto es real", "hace un sol", "media libra de harina", "la corona
+# del diente" son frases normales. Si la necesitas, exigele ir PEGADA A UNA
+# CIFRA (\b\d+\s*pesos) o usa solo el simbolo o el codigo ISO. Ver README.md.
+
+# --- simbolo DETRAS del importe: 500€, 2.000 €, 1'500 €, 12 345,67 € ---
+# Separadores de miles: punto (es), coma (en), apostrofe (ch) y espacio fino.
+\b\d[\d.,\u00a0\u202f']*\s*[€$£¥₽₴₹₺₩₪₦₱₲₵฿]
+
+# --- importe + moneda escrita con letras: 1500 USD, 3000 dolares, 20 euros ---
+\b\d+(?:[.,]\d+)*\s*(?:EUR|USD|USDT|USDC|d[oó]lares|euros)\b
+
+# --- simbolo DELANTE del importe: $500, €300, £250, $5k ---
+[€$£¥₽₴₹₺₩₪₦₱₲₵฿]\s*\d[\d.,]*(?:\s*[kK])?
+
+# --- codigos ISO, siempre pegados a una cifra y en MAYUSCULAS ---
+# (?-i:...) apaga el ignore-case SOLO en ese trozo. Es lo que hace seguros los
+# codigos que en minuscula son palabras normales: "10 try again", "2 cup of
+# flour", "20 cop" o "2 bob" no disparan; "10 TRY" o "2 CUP", si.
+\b\d+(?:[.,]\d+)*\s*(?-i:ARS|MXN|COP|CLP|UYU|PEN|BOB|PYG|VES|GTQ|HNL|NIO|CRC|DOP|CUP|BRL|CHF|GBP|CAD|AUD|PLN|CZK|SEK|NOK|DKK|HUF|RON|BGN|TRY|RUB|UAH|INR|JPY|CNY|KRW|ZAR)\b
+
+# --- simbolos regionales: R$ 500 (Brasil), S/ 500 (Peru), 500 zl, 500 Kc ---
+(?-i:R\$)\s*\d[\d.,]*
+(?-i:S/)\s*\d[\d.,]*
+\b\d[\d.,]*\s*(?:zł|Kč|kr\b|лв|грн)
+
+# --- nombres de moneda: SOLO pegados a una cifra, y en plural ---
+# Los ambiguos van en compuesto (libras ESTERLINAS, coronas SUECAS, francos
+# SUIZOS) porque "libras", "coronas" o "francos" sueltos son palabras normales.
+\b\d+(?:[.,]\d+)*\s*(?:pesos(?!\s+pesad)|reais|reales|soles|bol[ií]vares|guaran[ií]es|quetzales|lempiras|c[oó]rdobas|colones|z[lł]otys?|coronas\s+(?:suecas|noruegas|danesas|checas)|francos\s+suizos|libras\s+esterlinas|rupias|yenes|rublos|grivnas)\b

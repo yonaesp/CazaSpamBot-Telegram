@@ -1,0 +1,42 @@
+# Periodicidad pegada a un importe (detector commercial_ad).
+# "2.800 € al mes", "$500/day", "500 ARS semanales": el patron tipico de la
+# oferta de trabajo falsa. Pesa mas que un importe suelto.
+#
+# Esta lista NO contiene monedas: el bot busca <importe><periodicidad>
+# combinando este archivo con commercial_money.txt. Añade la moneda ALLI y
+# funcionara tambien aqui, no la repitas en esta lista.
+#
+# ATENCION, ESTA LISTA VA SIN \b (boundaries=False): varios patrones empiezan
+# por "/" ("/mes", "/day") y \b no casa junto a un simbolo. Cada linea lleva
+# sus propios anclajes.
+#
+# Un patron por linea (regex). # = comentario. Usa (?:...) no (...).
+
+# --- español ---
+al?\s+mes
+por\s+mes
+/?\s*mes(?:es)?
+mensual(?:es)?
+al?\s+semana
+por\s+semana
+/?\s*semana
+semanal(?:es)?
+al\s+a[ñn]o
+anual(?:es)?
+di[aá]rios?
+# «gana 5000 pesos POR DÍA» es el patron mas comun del spam laboral en
+# Latinoamerica. Solo cuenta pegado a un importe, nunca la expresion sola.
+al?\s+d[ií]a
+por\s+d[ií]a
+/?\s*d[ií]a
+
+# --- portugues (Brasil / Portugal) ---
+ao?\s+m[eê]s
+por\s+m[eê]s
+mensais
+semanais
+
+# --- ingles ---
+/\s*(?:day|d|week|wk|month|mo|year|yr|hour|hr)\b
+(?:per|a|an|each)\s+(?:day|week|month|year|hour)\b
+(?:daily|weekly|monthly|yearly|hourly)\b

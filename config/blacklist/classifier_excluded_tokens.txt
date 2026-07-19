@@ -1,8 +1,28 @@
-# Palabras NEUTRAS para el clasificador de aprendizaje (/spam y /legal).
-# Son palabras que aparecen tanto en spam como en mensajes normales de TUS
-# grupos (vocabulario temático), así que solo meten ruido al clasificador.
-# Adáptalas a la temática de tus comunidades. Una palabra por línea.
-# Las stop-words españolas comunes (que/de/la/...) ya se excluyen siempre.
+# EL VOCABULARIO DE TU GRUPO. Cámbialo: lo de abajo es el del autor.
+#
+# Aquí van las palabras del TEMA de tu comunidad, las que escribe a diario la
+# gente normal. El bot aprende de lo que le marcas con /spam y /legal, y sin
+# esta lista corre el riesgo de aprender tu propio vocabulario como señal de
+# spam: si en un grupo de fotografía varios spammers venden cámaras y los
+# marcas con /spam, "cámara" empieza a oler a spam, y quien pregunte por la
+# suya se acerca a comerse un mute.
+#
+# Una palabra por línea, sin acentos y con ellos si dudas (van por separado).
+# Las palabras funcionales del idioma (que, de, la, the, and...) ya se excluyen
+# siempre desde el código: aquí NO hace falta repetirlas.
+#
+# Ejemplos según la temática (descoméntalos o escribe los tuyos):
+#   Cocina:      receta recetas horno sartén masa harina cocinar plato
+#   Fotografía:  cámara cámaras objetivo lente foto fotos revelado trípode
+#   Coches:      coche coches motor ruedas taller itv matrícula
+#   Videojuegos: juego juegos partida consola mando servidor
+#
+# Si no pones nada, el bot sigue funcionando: las salvaguardas del clasificador
+# (tope de peso por palabra, palabras que salen en ambas clases, palabras vistas
+# una sola vez) evitan que una palabra suelta decida por sí sola. Esta lista es
+# la red de seguridad extra, y es la más barata de mantener.
+#
+# ---- Vocabulario del autor (domótica + Windows). BÓRRALO y pon el tuyo. ----
 alexa
 echo
 windows

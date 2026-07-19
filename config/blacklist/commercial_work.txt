@@ -17,3 +17,6 @@ estamos\s+contratando
 se\s+(?:busca|necesita[n]?)\s+(?:personal|empleados?|gente|colaboradores)
 trabajo\s+que\s+m[aá]s\s+te\s+interese
 si\s+est[aá]s\s+buscando\s+(?:trabajo|empleo)
+# Voseo: «ganá dinero», «trabajá desde casa».
+gan[aá]\s+(?:dinero|plata|hasta\s+\d)
+trabaj(?:a|á|ando)\s+desde\s+(?:casa|tu\s+(?:celular|m[oó]vil|casa))

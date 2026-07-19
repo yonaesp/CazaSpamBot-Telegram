@@ -105,26 +105,59 @@ _WORD_RE = re.compile(r"\w{2,}", re.UNICODE)
 # Por debajo de esto, devolvemos None (no entrenado lo bastante).
 BAYES_MIN_SAMPLES_PER_CLASS = 10
 
+# Tope al peso (log-odds) que puede aportar UN token suelto.
+#
+# Sin tope, una palabra que sale en 10 muestras de spam y en ninguna de ham
+# decide ella sola el veredicto del mensaje. Eso es venenoso en cuanto el
+# vocabulario del grupo se cuela en las muestras: en un grupo de fotografía
+# basta con que varios spammers vendan cámaras para que "cámara" pase a ser
+# señal de spam, y quien pregunte por la suya se lleve un mute. Con tope hacen
+# falta VARIAS palabras sospechosas para superar el umbral, que es justo lo que
+# distingue un anuncio de una pregunta normal.
+BAYES_MAX_TOKEN_LOGRATIO = 1.1  # ~3:1 de odds por token
 
-# Tokens NEUTROS: aparecen tanto en spam como en ham y ensucian el clasificador.
+# Un token que aparece en las DOS clases no separa nada: pesa la mitad.
+BAYES_SHARED_TOKEN_FACTOR = 0.5
+
+# Un token visto UNA sola vez en todo el corpus es ruido, no evidencia: pudo
+# entrar de rebote en una única muestra. No se descarta (con corpus pequeños
+# casi todo es hapax y el clasificador se quedaría mudo), pero pesa un tercio.
+BAYES_RARE_TOKEN_FACTOR = 0.34
+BAYES_RARE_TOKEN_MAX_FREQ = 1
+
+
+# Tokens NEUTROS: no distinguen spam de ham y solo ensucian el clasificador.
 # Se eliminan antes de contar para el Bayes. Dos fuentes:
-#   - stop-words españolas frecuentes (en código, abajo)
-#   - vocabulario temático de TUS grupos, editable en
-#     config/blacklist/classifier_excluded_tokens.txt (una palabra por línea)
+#   - palabras funcionales del idioma (en código, abajo): valen para cualquier
+#     comunidad, sea de cocina, fotografía o domótica.
+#   - vocabulario temático de TU grupo, editable en
+#     config/blacklist/classifier_excluded_tokens.txt (una palabra por línea).
+#     Ahí NO hay defaults en código a propósito: el vocabulario de un grupo solo
+#     lo conoce su admin, y meter el de otra comunidad no ayuda a nadie.
 _STOPWORDS_ES = frozenset({
     "que", "de", "la", "el", "en", "los", "las", "un", "una", "para", "por",
     "con", "no", "se", "su", "es", "lo", "le", "me", "mi", "te", "tu", "al",
     "del", "como", "mas", "más", "pero", "si", "ya", "muy", "este", "esta",
     "eso", "esto", "hay", "ser", "soy", "son", "tiene", "tengo", "todo",
     "bien", "hola", "gracias", "buenas", "buenos", "dias", "días",
+    "yo", "he", "ha", "han", "hace", "hacer", "sabe", "saber", "puede",
+    "poder", "quiero", "alguien", "algo", "nada", "cuando", "donde", "dónde",
+    "porque", "sobre", "desde", "hasta", "sin", "tambien", "también", "solo",
+    "sólo", "cual", "cuál", "quien", "quién", "otro", "otra", "aqui", "aquí",
+    "ahora", "siempre", "nunca", "asi", "así", "vez", "cosa", "favor",
 })
-# Defaults de fallback si el archivo no existe (vocabulario tech genérico).
-_DEFAULT_THEMATIC_TOKENS = [
-    "alexa", "echo", "windows", "win", "pc", "rutina", "rutinas", "dispositivo",
-    "dispositivos", "luz", "luces", "bombilla", "enchufe", "actualizacion",
-    "actualización", "driver", "drivers", "sistema", "ordenador", "movil",
-    "móvil", "app", "aplicacion", "aplicación", "configurar", "instalar",
-]
+_STOPWORDS_EN = frozenset({
+    "the", "and", "for", "you", "your", "with", "this", "that", "have", "has",
+    "are", "was", "were", "not", "but", "can", "could", "would", "should",
+    "from", "there", "here", "what", "when", "where", "who", "how", "why",
+    "all", "any", "some", "one", "two", "get", "got", "just", "like", "know",
+    "think", "want", "need", "make", "does", "did", "doing", "than", "then",
+    "them", "they", "their", "its", "it's", "about", "out", "into", "over",
+    "hello", "thanks", "thank", "please", "yes", "sorry",
+})
+# Sin defaults temáticos en código: si el archivo no existe, no se excluye nada
+# más allá de las palabras funcionales. Ver config/blacklist/README.md.
+_DEFAULT_THEMATIC_TOKENS: list[str] = []
 _EXCLUDED_CACHE: dict[tuple[str, ...], frozenset[str]] = {}
 
 
@@ -134,7 +167,7 @@ def _excluded_tokens() -> frozenset[str]:
     key = tuple(active_langs())
     cached = _EXCLUDED_CACHE.get(key)
     if cached is None:
-        cached = _STOPWORDS_ES | frozenset(
+        cached = _STOPWORDS_ES | _STOPWORDS_EN | frozenset(
             t.lower()
             for t in load_terms("classifier_excluded_tokens.txt", _DEFAULT_THEMATIC_TOKENS)
         )
@@ -175,9 +208,6 @@ def naive_bayes_spam_prob(
     n_spam = len(spam_samples)
     n_ham = len(ham_samples)
     prior_spam = n_spam / (n_spam + n_ham)
-    prior_ham = 1 - prior_spam
-    log_p_spam = math.log(prior_spam)
-    log_p_ham = math.log(prior_ham)
 
     vocab = set(spam_counts) | set(ham_counts)
     V = len(vocab)
@@ -186,21 +216,57 @@ def naive_bayes_spam_prob(
     if not tokens:
         return None
 
+    # Trabajamos con log-odds (log P(spam) - log P(ham)) en vez de acumular las
+    # dos probabilidades por separado: es lo mismo (el softmax de dos clases solo
+    # depende de la diferencia) y permite topar la aportación de cada token.
+    log_odds = math.log(prior_spam) - math.log(1 - prior_spam)
+
     for tok in tokens:
         # Laplace smoothing
-        p_t_given_spam = (spam_counts.get(tok, 0) + 1) / (total_spam + V)
-        p_t_given_ham = (ham_counts.get(tok, 0) + 1) / (total_ham + V)
-        log_p_spam += math.log(p_t_given_spam)
-        log_p_ham += math.log(p_t_given_ham)
+        n_tok_spam = spam_counts.get(tok, 0)
+        n_tok_ham = ham_counts.get(tok, 0)
+        p_t_given_spam = (n_tok_spam + 1) / (total_spam + V)
+        p_t_given_ham = (n_tok_ham + 1) / (total_ham + V)
+        weight = math.log(p_t_given_spam) - math.log(p_t_given_ham)
 
-    # Softmax para normalizar
-    max_log = max(log_p_spam, log_p_ham)
-    e_spam = math.exp(log_p_spam - max_log)
-    e_ham = math.exp(log_p_ham - max_log)
-    return e_spam / (e_spam + e_ham)
+        if weight <= 0:
+            # Evidencia que EXCULPA (el token tira hacia ham): pasa entera.
+            # El tope es asimétrico a propósito, por la regla número uno del
+            # proyecto: mejor dejar pasar spam que castigar a un legítimo. Para
+            # acusar exigimos varias señales; para absolver, con una basta.
+            log_odds += weight
+            continue
+        cap = BAYES_MAX_TOKEN_LOGRATIO
+        if n_tok_ham:
+            # Sale en spam Y en ham: no distingue, pesa la mitad.
+            cap *= BAYES_SHARED_TOKEN_FACTOR
+        elif n_tok_spam + n_tok_ham <= BAYES_RARE_TOKEN_MAX_FREQ:
+            # Visto una sola vez en todo el corpus: ruido, no evidencia.
+            cap *= BAYES_RARE_TOKEN_FACTOR
+        log_odds += min(cap, weight)
+
+    return _sigmoid(log_odds)
+
+
+def _sigmoid(x: float) -> float:
+    """Logística estable: la rama negativa evita el overflow de exp(-x)."""
+    if x >= 0:
+        return 1 / (1 + math.exp(-x))
+    e = math.exp(x)
+    return e / (1 + e)
 
 
 # ----------------- Detector combinado -----------------
+
+# Longitud mínima para fiarse de una similitud MEDIA (0.6-0.8).
+#
+# El coseno de char-ngrams se infla en textos cortos: comparten pocos ngramas en
+# total, así que unos pocos en común disparan el porcentaje. Medido con una sola
+# muestra de spam ("hola busco gente para trabajar desde casa escribeme"), el
+# mensaje inocente "hola busco gente para jugar escribeme" daba 0.67 y se llevaba
+# un mute. Por debajo de este umbral exigimos similitud ALTA (>0.8), que ya es
+# prácticamente calcar el mensaje.
+COSINE_MEDIUM_MIN_CHARS = 40
 
 
 def check_against_samples(
@@ -213,9 +279,9 @@ def check_against_samples(
     Resultados:
       - Cosine high (>0.8) Y Bayes high (>0.8) → 100 (ban casi seguro)
       - Cosine high (>0.8)                     → 80
-      - Bayes high (>0.85)                     → 60 (señal estadística)
-      - Cosine medio (>0.6)                    → 60
-      - Cosine ham high (>0.5) o Bayes ham (<0.2) → -30 (cancela score)
+      - Cosine medio (>0.6), texto largo       → 60
+      - Bayes high (>0.85)                     → 50 (señal estadística)
+      - Cosine ham high (>0.5) o Bayes ham (<0.2) → -30/-20 (cancela score)
 
     Devuelve (score, sample_match). sample_match es el texto del spam
     similar (si lo hay) o "bayes" si la señal viene del clasificador.
@@ -232,7 +298,7 @@ def check_against_samples(
         return 100, spam_match
     if spam_sim > 0.8:
         return 80, spam_match
-    if spam_sim > 0.6:
+    if spam_sim > 0.6 and len(norm_text) >= COSINE_MEDIUM_MIN_CHARS:
         return 60, spam_match
     if p_spam is not None and p_spam > 0.85:
         return 50, "bayes"

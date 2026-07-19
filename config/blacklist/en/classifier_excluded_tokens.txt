@@ -1,6 +1,11 @@
-# Palabras NEUTRAS en INGLES para el clasificador (/spam y /legal).
+# Vocabulario NEUTRO en INGLES para el clasificador (/spam y /legal).
 # Se SUMAN a las del archivo generico ../classifier_excluded_tokens.txt.
-# No son spam: son vocabulario tematico y muletillas que solo meten ruido.
+# No son spam: son el vocabulario tematico del grupo y solo meten ruido.
+#
+# Igual que en el archivo generico: lo de abajo es el tema del AUTOR (Windows,
+# informatica). Si tu grupo va de otra cosa, cambialo por sus palabras.
+# Las palabras funcionales del ingles (the, and, you...) ya se excluyen desde
+# el codigo, asi que no hace falta repetirlas aqui.
 the
 and
 you

@@ -12,3 +12,10 @@ escr[ií]benos
 interesados?\s+(?:escribir|contactar)
 m[aá]s\s+info(?:rmaci[oó]n)?\s+(?:por|en|v[ií]a)\s+(?:dm|md|privado|wsp|whatsapp)
 env[ií]ame?\s+(?:un\s+)?(?:mensaje|dm|md|privado)
+# Voseo rioplatense (Argentina, Uruguay, Paraguay): el imperativo cambia de
+# forma y sin esto el mismo spam pasaba limpio en medio continente.
+escribime
+contactame
+mandame\s+(?:un\s+)?(?:mensaje|dm|md|privado)
+sumate
+aprovech[aá]\s+(?:esta|la)\s+(?:oportunidad|promo(?:ci[oó]n)?)

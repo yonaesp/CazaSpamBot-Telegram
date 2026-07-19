@@ -1,0 +1,16 @@
+# Sentido de urgencia en INGLES (detector commercial_ad).
+# Se SUMAN a los del archivo generico ../commercial_urgency.txt.
+# Un patron por linea (palabra o regex). # = comentario. Usa (?:...) no (...).
+#
+# DESCARTADO a proposito (riesgo real de falso positivo):
+#   urgent / hurry / now / fast / asap sueltos -> "this is urgent", "I need it
+#   fast" son frases normales. Se exigen formas COMPUESTAS de anuncio.
+act\s+now
+limited\s+time(?:\s+offer)?
+last\s+chance
+hurry\s+up
+don'?t\s+miss\s+(?:out|this)
+offer\s+ends\s+(?:today|soon)
+only\s+today
+spots?\s+(?:are\s+)?limited
+limited\s+(?:spots?|slots?|places?)

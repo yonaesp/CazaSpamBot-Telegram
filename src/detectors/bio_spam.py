@@ -16,6 +16,10 @@ import re
 from ..i18n import t
 from ..wordlists import load_and_compile
 from . import Hit
+# Cifras monetarias: se reutiliza la lista de `commercial_ad` para que el admin
+# añada su moneda UNA vez (config/blacklist/commercial_money.txt) y valga para
+# los dos detectores.
+from .commercial_ad import money_re as _money_re
 
 # t.me/+ABC o t.me/joinchat/ → invite link a canal/grupo externo
 _TG_INVITE_RE = re.compile(
@@ -36,11 +40,6 @@ _SEXUAL_EMOJI_RE = re.compile(
 # Emojis "dinero / commerce"
 _MONEY_EMOJI_RE = re.compile(
     r'[\U0001F4B0\U0001F4B5\U0001F4B6\U0001F4B7\U0001F4B8\U0001F4B3\U0001F911]',
-)
-# Cifras monetarias (cualquier longitud + símbolo moneda)
-_MONEY_RE = re.compile(
-    r'\b\d{2,}(?:[.,]\d+)*\s*(?:€|\$|EUR|USD|euros|d[oó]lares)',
-    re.IGNORECASE,
 )
 # CTA promocional en la bio.
 # Editable en config/blacklist/bio_cta.txt (defaults de fallback abajo).
@@ -115,7 +114,7 @@ def check(bio: str | None) -> Hit:
     if _SEXUAL_EMOJI_RE.search(text):
         score += 20
         reasons.append(t("reason.bio_sexual_emoji"))
-    if _MONEY_EMOJI_RE.search(text) or _MONEY_RE.search(text):
+    if _MONEY_EMOJI_RE.search(text) or _money_re().search(text):
         score += 15
         reasons.append(t("reason.bio_money"))
     if _cta_re().search(text) or _FOREIGN_LANG_HINT_RE.search(text):

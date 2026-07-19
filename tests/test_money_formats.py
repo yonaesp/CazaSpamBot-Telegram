@@ -26,7 +26,7 @@ def _es_al_salir():
     "500€", "2.000 €", "300 EUR", "1500 USD",
 ])
 def test_importes_reconocidos_en_ambos_formatos(texto):
-    assert ca._MONEY_RE.search(texto), f"no reconoce el importe {texto!r}"
+    assert ca.money_re().search(texto), f"no reconoce el importe {texto!r}"
 
 
 @pytest.mark.parametrize("texto", [
@@ -35,7 +35,7 @@ def test_importes_reconocidos_en_ambos_formatos(texto):
     "2.800 € al mes", "500€ semanales", "3000 dólares por mes",
 ])
 def test_periodicidad_en_ambos_idiomas(texto):
-    assert ca._PERIODIC_MONEY_RE.search(texto), f"no reconoce la periodicidad en {texto!r}"
+    assert ca._periodic_money_re().search(texto), f"no reconoce la periodicidad en {texto!r}"
 
 
 def test_spam_ingles_con_importe_se_detecta():

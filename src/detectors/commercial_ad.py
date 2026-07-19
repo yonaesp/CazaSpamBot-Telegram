@@ -33,32 +33,51 @@ _EMOJI_LINE_RE = re.compile(
     r'^\s*[\U0001F300-\U0001FAFF☀-➿⬀-⯿\U0001F100-\U0001F2FF]',
     re.MULTILINE,
 )
-# Cifras con símbolo de moneda (cualquier importe)
+# Cifras con símbolo de moneda (cualquier importe).
 # El símbolo va DETRÁS en español (500€) y DELANTE en inglés ($500). Se aceptan
 # las dos formas: con solo la española, un "Earn $500/day" en un grupo en inglés
 # no sumaba señal de dinero y el anuncio se colaba.
-_MONEY_RE = re.compile(
-    r'\b\d{1,3}(?:[.,]\d{3})*(?:[.,]\d+)?\s*[€$]|'
-    r'\b\d{2,}\s*(?:€|EUR|USD|\$|d[oó]lares|euros)\b|'
-    r'[€$£]\s*\d[\d.,]*(?:\s*[kK])?',
-    re.IGNORECASE,
-)
-# Cifras con periodicidad temporal — patrón típico de oferta laboral spam
-# Ej: "2.800 € al mes", "500€ semanales", "3000 dólares por mes",
-#     "$500/day", "$2000 per month", "500 USD weekly"
-_PERIODIC_MONEY_RE = re.compile(
-    # importe con el símbolo detrás (es) o delante (en)
-    r'(?:\d{1,3}(?:[.,]\d{3})*(?:[.,]\d+)?\s*(?:€|\$|EUR|USD|euros|d[oó]lares)'
-    r'|[€$£]\s*\d[\d.,]*(?:\s*[kK])?)\s*'
-    r'(?:al?\s+mes|por\s+mes|/?\s*mes(?:es)?|mensual(?:es)?|'
-    r'al?\s+semana|por\s+semana|/?\s*semana|semanal(?:es)?|'
-    r'al\s+a[ñn]o|anual(?:es)?|'
+# Editable en config/blacklist/commercial_money.txt (defaults de fallback abajo)
+# para que un grupo argentino, brasileño o polaco pueda añadir SU moneda.
+#
+# boundaries=False: casi todos estos patrones empiezan o acaban en un símbolo
+# (€, $, R$, S/) y `\b` nunca casa junto a un símbolo, así que envolverlos en
+# `\b(?:...)\b` dejaría la lista entera muerta. Cada patrón lleva sus anclajes.
+_DEFAULT_MONEY = [
+    r"\b\d[\d.,\u00a0\u202f']*\s*[€$£¥₽₴₹₺₩₪₦₱₲₵฿]",
+    r"\b\d+(?:[.,]\d+)*\s*(?:EUR|USD|USDT|USDC|d[oó]lares|euros)\b",
+    r"[€$£¥₽₴₹₺₩₪₦₱₲₵฿]\s*\d[\d.,]*(?:\s*[kK])?",
+    # Códigos ISO en MAYÚSCULAS obligatorias — (?-i:...) apaga el ignore-case
+    # solo ahí: en minúscula muchos son palabras normales ("10 try again",
+    # "2 cup of flour"). Y siempre pegados a una cifra.
+    r"\b\d+(?:[.,]\d+)*\s*(?-i:ARS|MXN|COP|CLP|UYU|PEN|BOB|PYG|VES|GTQ|HNL|NIO"
+    r"|CRC|DOP|CUP|BRL|CHF|GBP|CAD|AUD|PLN|CZK|SEK|NOK|DKK|HUF|RON|BGN|TRY|RUB"
+    r"|UAH|INR|JPY|CNY|KRW|ZAR)\b",
+    r"(?-i:R\$)\s*\d[\d.,]*",
+    r"(?-i:S/)\s*\d[\d.,]*",
+    r"\b\d[\d.,]*\s*(?:zł|Kč|kr\b|лв|грн)",
+    # Nombres de moneda: SOLO pegados a una cifra, y los ambiguos en compuesto
+    # (libras ESTERLINAS, coronas SUECAS), nunca sueltos.
+    r"\b\d+(?:[.,]\d+)*\s*(?:pesos(?!\s+pesad)|reais|reales|soles|bol[ií]vares"
+    r"|guaran[ií]es|quetzales|lempiras|c[oó]rdobas|colones|z[lł]otys?"
+    r"|coronas\s+(?:suecas|noruegas|danesas|checas)|francos\s+suizos"
+    r"|libras\s+esterlinas|rupias|yenes|rublos|grivnas)\b",
+]
+# Periodicidad temporal, lo que convierte un importe en oferta laboral spam.
+# Ej: "2.800 € al mes", "500€ semanales", "$500/day", "500 ARS mensuales".
+# Editable en config/blacklist/commercial_money_periodic.txt. NO contiene
+# monedas: se combina con la lista de importes de arriba, así que añadir una
+# moneda allí la habilita también aquí. boundaries=False (empiezan por "/").
+_DEFAULT_MONEY_PERIODIC = [
+    r"al?\s+mes", r"por\s+mes", r"/?\s*mes(?:es)?", r"mensual(?:es)?",
+    r"al?\s+semana", r"por\s+semana", r"/?\s*semana", r"semanal(?:es)?",
+    r"al\s+a[ñn]o", r"anual(?:es)?", r"di[aá]rios?",
+    r"ao?\s+m[eê]s", r"por\s+m[eê]s", r"mensais", r"semanais",
     # periodicidad en inglés: /day, per day, a day, daily...
-    r'/\s*(?:day|d|week|wk|month|mo|year|yr|hour|hr)\b|'
-    r'(?:per|a|an|each)\s+(?:day|week|month|year|hour)\b|'
-    r'(?:daily|weekly|monthly|yearly|hourly)\b)',
-    re.IGNORECASE,
-)
+    r"/\s*(?:day|d|week|wk|month|mo|year|yr|hour|hr)\b",
+    r"(?:per|a|an|each)\s+(?:day|week|month|year|hour)\b",
+    r"(?:daily|weekly|monthly|yearly|hourly)\b",
+]
 # Call-to-action publicitario.
 # Editable en config/blacklist/commercial_cta.txt (defaults de fallback abajo).
 _DEFAULT_CTA = [
@@ -89,21 +108,23 @@ _DEFAULT_WORK = [
 ]
 # URL externa (http/https) que NO sea t.me — enlaces a webs de "empleo"/scam.
 _EXTERNAL_URL_RE = re.compile(r'https?://(?!t\.me/|telegram\.me/)\S+', re.IGNORECASE)
-# Trabajo doméstico / búsqueda de persona — patrón scam "cuidar casa/mascota/niños"
-_DOMESTIC_OFFER_RE = re.compile(
-    r'\b(cuidar|atender|alimentar|pasear|limpiar)\b[^.\n]{0,50}'
-    r'\b(casa|hogar|mascota|perro|gato|ni[ñn]o|familia|jardín|piso|apartamento)\b'
-    r'|'
-    r'\bbusc[ao]\s+(?:a\s+)?(?:una?\s+)?'
-    r'(persona|alguien|cuidador(?:a)?|ni[ñn]era|emplead[ao]|se[ñn]ora|'
-    r'chica|chico|joven)\s+(?:responsable|seria|de\s+confianza|para)\b',
-    re.IGNORECASE,
-)
-# Sentido de urgencia — palabras GRITADAS típicas de scam
-_URGENCY_RE = re.compile(
-    r'(?:¡\s*)?\b(URGENTE|INMEDIAT[OA]|EMPEZAR\s+YA|HOY\s+MISMO|R[AÁ]PIDO|YA\s*!)\b',
-    re.IGNORECASE,
-)
+# Trabajo doméstico / búsqueda de persona — patrón scam "cuidar casa/mascota/niños".
+# Editable en config/blacklist/commercial_domestic.txt (defaults de fallback abajo).
+# Cada patrón es de DOS piezas a propósito: un "cuidar" o un "busco a alguien"
+# sueltos son frases normales y no deben disparar nada.
+_DEFAULT_DOMESTIC = [
+    r"\b(?:cuidar|atender|alimentar|pasear|limpiar)\b[^.\n]{0,50}"
+    r"\b(?:casa|hogar|mascota|perro|gato|ni[ñn]o|familia|jardín|piso|apartamento)\b",
+    r"busc[ao]\s+(?:a\s+)?(?:una?\s+)?"
+    r"(?:persona|alguien|cuidador(?:a)?|ni[ñn]era|emplead[ao]|se[ñn]ora|"
+    r"chica|chico|joven)\s+(?:responsable|seria|de\s+confianza|para)\b",
+]
+# Sentido de urgencia — palabras GRITADAS típicas de scam.
+# Editable en config/blacklist/commercial_urgency.txt (defaults de fallback abajo).
+_DEFAULT_URGENCY = [
+    r"URGENTE", r"INMEDIAT[OA]", r"EMPEZAR\s+YA", r"HOY\s+MISMO",
+    r"R[AÁ]PIDO", r"YA\s*!",
+]
 # Servicios ILEGALES / scam: hacking, acceso a cuentas, espionaje, recuperación
 # de dinero. Caso real: "SERVICIOS PROFESIONALES DE HACKING".
 # Editable en config/blacklist/commercial_illegal_services.txt (estos son los
@@ -132,6 +153,41 @@ def _work_re() -> re.Pattern:
     return load_and_compile("commercial_work.txt", _DEFAULT_WORK)
 
 
+def money_re() -> re.Pattern:
+    """Importes con moneda. Pública: `bio_spam` usa la MISMA lista de monedas."""
+    return load_and_compile("commercial_money.txt", _DEFAULT_MONEY, boundaries=False)
+
+
+def _periodic_terms_re() -> re.Pattern:
+    return load_and_compile(
+        "commercial_money_periodic.txt", _DEFAULT_MONEY_PERIODIC, boundaries=False,
+    )
+
+
+# Cache del regex compuesto <importe><periodicidad>. La clave son los dos
+# patrones ya compilados, así que si cambia una lista (o el idioma activo)
+# cambia la clave y se recompone solo.
+_PERIODIC_CACHE: dict[tuple[str, str], re.Pattern] = {}
+
+
+def _periodic_money_re() -> re.Pattern:
+    """Importe pegado a una periodicidad: "2.800 € al mes", "$500/day"."""
+    money, periodic = money_re().pattern, _periodic_terms_re().pattern
+    key = (money, periodic)
+    rx = _PERIODIC_CACHE.get(key)
+    if rx is None:
+        rx = re.compile(rf"{money}\s*{periodic}", re.IGNORECASE)
+        _PERIODIC_CACHE[key] = rx
+    return rx
+
+
+def _domestic_re() -> re.Pattern:
+    return load_and_compile("commercial_domestic.txt", _DEFAULT_DOMESTIC)
+
+
+def _urgency_re() -> re.Pattern:
+    return load_and_compile("commercial_urgency.txt", _DEFAULT_URGENCY)
+
 
 def check(msg: Message, is_first_msg: bool = False) -> Hit:
     text = (msg.text or msg.caption or "").strip()
@@ -142,14 +198,14 @@ def check(msg: Message, is_first_msg: bool = False) -> Hit:
         return Hit.none()
 
     emoji_lines = len(_EMOJI_LINE_RE.findall(text))
-    has_periodic_money = bool(_PERIODIC_MONEY_RE.search(text))
-    has_money = bool(_MONEY_RE.search(text))
+    has_periodic_money = bool(_periodic_money_re().search(text))
+    has_money = bool(money_re().search(text))
     has_cta = bool(_cta_re().search(text))
     has_work = bool(_work_re().search(text))
     has_tg_link = "t.me/" in text.lower() or "telegram.me/" in text.lower()
     has_external_url = bool(_EXTERNAL_URL_RE.search(text))
-    has_domestic = bool(_DOMESTIC_OFFER_RE.search(text))
-    has_urgency = bool(_URGENCY_RE.search(text))
+    has_domestic = bool(_domestic_re().search(text))
+    has_urgency = bool(_urgency_re().search(text))
     illegal = _illegal_services_re().findall(text)
     n_illegal = len(set(m.lower() for m in illegal))
 

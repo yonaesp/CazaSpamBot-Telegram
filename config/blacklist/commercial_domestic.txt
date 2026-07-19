@@ -1,0 +1,15 @@
+# Scam de trabajo domestico: "busco persona responsable para cuidar mi casa /
+# mascota / niños, muy bien pagado, escribeme" (detector commercial_ad).
+#
+# Un patron por linea (regex). # = comentario. Usa (?:...) no (...).
+# Esta lista va envuelta en \b(?:...)\b: no empieces ni acabes con un simbolo.
+#
+# Son patrones de DOS PIEZAS a proposito (verbo + objeto, "busco" + tipo de
+# persona + cualidad). Un "cuidar" o un "busco a alguien" sueltos son frases
+# normales y no deben disparar nada.
+
+# verbo de cuidado + lo que se cuida, en la misma frase (max 50 caracteres)
+\b(?:cuidar|atender|alimentar|pasear|limpiar)\b[^.\n]{0,50}\b(?:casa|hogar|mascota|perro|gato|ni[ñn]o|familia|jardín|piso|apartamento)\b
+
+# "busco (a una) persona/niñera/señora responsable|seria|de confianza|para..."
+busc[ao]\s+(?:a\s+)?(?:una?\s+)?(?:persona|alguien|cuidador(?:a)?|ni[ñn]era|emplead[ao]|se[ñn]ora|chica|chico|joven)\s+(?:responsable|seria|de\s+confianza|para)\b
