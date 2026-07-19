@@ -1,6 +1,7 @@
 # CazaSpamBot — Bot Antispam Telegram
 
-Bot de moderación antispam **en producción 24/7**, multi-grupo y federado (textos del bot en español). ~9500 LOC, Docker, 360 tests.
+Bot de moderación antispam **en producción 24/7**, multi-grupo, federado y **bilingüe** (es/en).
+~14.400 LOC, Docker, **775 tests**, 19 detectores.
 
 > **Estado: PRODUCCIÓN.** No es un esqueleto. Cualquier cambio afecta grupos reales con miles de usuarios. **Investiga > Confirma > Actúa.**
 
@@ -20,8 +21,6 @@ Configúralos a partir de `.env.example`:
 
 Los chats que modera se configuran en `MODERATED_CHAT_IDS` (CSV de chat_ids) o,
 si se deja vacío, modera todos los grupos donde el bot sea admin (auto-discovery).
-Los welcomes temáticos por grupo viven en `config/welcomes/<chat_id>.txt` (gitignored)
-y las listas negras editables en `config/blacklist/` (ver READMEs de cada carpeta).
 
 **Federación**: ban en uno = ban en todos (`federation.py`). No hay primitiva
 nativa; se itera `banChatMember` sobre los chats donde el bot es admin.
@@ -34,6 +33,27 @@ nativa; se itera `banChatMember` sobre los chats donde el bot es admin.
 - `confusable-homoglyphs` (UTS#39) para detección de nombres decorativos
 - Docker (`docker compose`), contenedor `cazaspam-bot`
 
+## Idiomas (i18n)
+
+**Todo el texto que ve el usuario vive en `src/locales/<código>.json`.** Nada de textos en el código.
+
+- `es.json` / `en.json`, **889 claves** cada uno. Idioma GLOBAL de la instancia.
+- **Autodescubrimiento**: soltar un `fr.json` basta para que `/idioma fr` funcione. Cero cambios de código.
+- **Fallback por clave** al español: un idioma al 40 % ya es usable.
+- **A prueba de fallos**: un JSON roto se ignora con un log y el bot sigue. Por eso son JSON y no módulos `.py` (un `.py` se ejecuta al importarse: una comilla mal puesta tumbaba el arranque).
+- Se elige con `/idioma` (persiste) o se detecta de `BOT_LANG`/`LC_ALL`/`LANG` al arrancar.
+- Guía para traductores: `src/locales/README.md`.
+
+### Reglas al tocar i18n
+
+1. **Toda clave nueva va a `es.json` Y `en.json`** (test de paridad lo exige).
+2. `t(key, _lang=None, **fmt)`. El selector se llama **`_lang` con guion bajo a propósito**: con el nombre `lang` colisionaba con un placeholder llamado igual y el usuario veía `{lang}` literal (bug real).
+3. `t()` devuelve **la propia clave** si no existe. Nunca uses su resultado en un `or` sin comprobarlo antes: `explain(x) or respaldo` mostraba «rule.xxx» en pantalla. Ver la doble guarda de `rule_explain.explain()`.
+4. **HTML balanceado** en cada texto: Telegram rechaza el mensaje ENTERO si un `<b>` queda abierto, y un aviso de ban se pierde en silencio. Hay test.
+5. **Frases alternativas** (quips, acuses) son claves numeradas `.1`, `.2`… y cada idioma puede tener SU propio número (`i18n.variant_keys`, `quips._phrases`). Se leen del paquete directamente, sin fallback, para no mezclar idiomas dentro de una misma categoría.
+6. **NO se traducen**: logs y mensajes de arranque (los lee el operador y traducirlos impide buscarlos), ni los regex de detección.
+7. Nombres de comando traducibles vía `cmd.name.<default>`, validados contra `^[a-z0-9_]{1,32}$` antes de publicarlos: si no, `setMyCommands` falla y el bot se queda **sin menú**.
+
 ## Arquitectura del flujo
 
 **`on_chat_member` (join)** — orden de evaluación, cada uno con `return` al actuar:
@@ -44,68 +64,114 @@ nativa; se itera `banChatMember` sobre los chats donde el bot es admin.
 5. `photos_batch_upload` (≥3 fotos en ≤2min = identidad robada; bypass si cuenta >1 año)
 6. `lols.bot` lookup → ban (review humano si trust≥90)
 7. `cas` lookup → ban si offenses≥2 (review si =1 o trust≥90)
-8. `verification.on_join` — **default LIMPIO**: verificación/bienvenida OFF + revisión de sospechosos por privado ON (aviso al admin con Permitir/Banear solo si hay señal real; entra permitido). Si se activa `/verificacion on`: welcome con botón SOY HUMANO, o welcome amistoso si perfil legítimo (≥2 fotos + ≥365d + nombre latino). Todo por chat vía `/config` o `/verificacion`
+8. `verification.on_join` — **default LIMPIO**: verificación/bienvenida OFF + revisión de sospechosos por privado ON. Todo por chat vía `/config`.
 
-**`on_message`** — recolecta hits de detectores, `decide()`, luego trust score:
-- trust ≥70 → SKIP (excepto HARD_RULES: cas/lols/federation/reaction_farming)
+**`on_message`** — recolecta hits, `decide()`, luego trust score:
+- trust ≥70 → SKIP (excepto HARD_RULES: `cas_match`, `lols_match`, `federation_known_ban`, `reaction_farming`)
 - trust 40-69 + acción severa → review-with-buttons al admin DM (✅Legítimo/❌Spam, aprende)
 - trust 40-69 + acción leve → degrada/noop
 - antiflood per-user graduado por trust (5/8/12 msgs en 10s)
 
 ## Detectores (`src/detectors/` + `verification.py`)
 
-`obvious_spam_profile`, `bio_spam`, `photos_batch`, `commercial_ad`, `contact_spam` (contactos compartidos con reclamo), `forward_first_msg`, `first_msg_media`, `inline_buttons`, `external_mention`, `url_blocklist`, `tg_deeplink`, `non_allowed_script` (unicode_script), `reaction_farming`, `jfm_delta`, `premium_new_link`, `emoji_only`, `dormant_bot_mention`, `cas`, `lols_bot`, `learned_similarity` (Naive Bayes + cosine sobre samples). También banea spam publicado en nombre de un canal (`sender_chat` → `banChatSenderChat`) en grupos de comentarios. Listas negras de keywords editables en `config/blacklist/` (cargadas por `wordlists.py`).
+19 detectores: `obvious_spam_profile`, `bio_spam`, `photos_batch`, `commercial_ad`, `contact_spam`, `forward_first_msg`, `first_msg_media`, `inline_buttons`, `external_mention`, `external_reply`, `url_blocklist`, `tg_deeplink`, `non_allowed_script` (unicode_script), `reaction_farming`, `jfm_delta`, `premium_new_link`, `emoji_only`, `dormant_bot_mention`, `cas`, `lols_bot`, `learned_similarity`.
+También banea spam publicado en nombre de un canal (`sender_chat` → `banChatSenderChat`).
 
-## Comandos
+`rule_explain.py` traduce el id técnico de regla a la explicación que lee el admin. **Es el texto más visible del bot** y tiene prioridad sobre el `reason` del detector.
 
-- **Moderación** (bot_admin): `/ban` `/unban` (aceptan @username o reply), `/whitelist`, `/warn` `/warns` `/rmwarn` `/resetwarns` `/warnlimit` `/warnaction`
-- **Aprendizaje**: `/spam` `/legal` (alias `/ham`) — reply a un mensaje; borra el comando y confirma por DM
-- **Info** (chat_admin read-only): `/help` `/comandos` `/stats` `/chats` `/recent` `/samples` `/top` `/topweekly`
-- **Config chat**: `/config` (panel visual por botones) `/welcome` `/setwelcome` `/rules` `/setrules` `/cleanservice` `/setwelcomebutton` ...
-- **Sync de ajustes**: `/sync on|off` (ON por defecto) — cada cambio de ajuste se aplica a TODOS los grupos a la vez (via `settings_sync.apply_setting`/`apply_welcome`); con sync ON el panel no pide grupo. Bienvenida desacoplada de verificación (`welcome_enabled` independiente; welcome en modo limpio sin botón vía `verification._send_clean_welcome`).
-- **Greeters**: `/setgreeter` `/rmgreeter` `/listgreeters`
-- **Otros**: `/shadow`, `/notspam`, `/forget`
+### Listas negras (`config/blacklist/`)
+
+Tres capas que se **acumulan** (el spam llega en cualquier idioma):
+
+1. `config/blacklist/*.txt` — genéricas, versionadas (11 archivos).
+2. `config/blacklist/<lang>/*.txt` — por idioma (`en/` con 9). Se cargan según el idioma activo + `BLACKLIST_LANGS`.
+3. `config/blacklist/custom/*.txt` — **las que añade el admin desde Telegram**. Gitignored, para que un `git pull` no las pise.
+
+Cada línea es un **regex**, salvo en `custom/`, donde todo se escapa: es imposible colar un regex activo desde Telegram (`custom_terms.py`). Un patrón inválido se ignora con un log, nunca tumba el bot.
+
+**Añadir un término desde el panel pasa SIEMPRE por vista previa**: `custom_terms.preview_term()` dice con cuántos mensajes reales y recientes del grupo coincidiría, con ejemplos, antes de guardar. Un término como «oferta» caza 3 de cada 4 mensajes de un grupo de informática.
+
+### Anti falso positivo en los patrones
+
+- Las palabras de moneda que son palabras comunes (`peso`, `real`, `sol`, `libra`, `corona`) **solo cuentan pegadas a una cifra**. Hay tests con «el peso del paquete», «hace un sol», «media libra de harina» para que nadie las añada sueltas.
+- El importe se escribe distinto por región: `500€` (detrás) y `$500` (delante). Ambas formas soportadas, más `$2000` sin separador.
+- Cubierto el español de América: monedas locales, «por día» (patrón central del spam laboral latinoamericano) y voseo (`escribime`, `ganá`, `trabajá`).
+
+## Aprendizaje (`/spam`, `/legal`)
+
+Naive Bayes + coseno sobre las muestras marcadas por el admin. `BAYES_MIN_SAMPLES_PER_CLASS = 10` de **cada** clase: con 0 muestras ham el Bayes está dormido y solo actúa el coseno.
+
+Salvaguardas para que el bot no aprenda a castigar el vocabulario normal de su grupo:
+- Ningún token decide solo el veredicto (tope al log-odds).
+- El que aparece en spam Y en ham pesa la mitad: no separa nada.
+- El visto una sola vez pesa un tercio: es ruido, no evidencia.
+- `classifier_excluded_tokens.txt`: los defaults en código son palabras funcionales del idioma (valen para cualquier comunidad). **El vocabulario temático lo pone cada admin**: solo él conoce su grupo.
+
+`learned_similarity` **no** es HARD_RULE, así que el trust protege: con ≥70 se ignora, entre 40 y 69 va a revisión. El riesgo se concentra en usuarios nuevos.
+
+## Panel `/config` y comandos
+
+Todo ajuste por chat se toca **desde el panel visual y por comando en paralelo**. Con `/sync` ON (por defecto) cada cambio se aplica a TODOS los grupos y el panel no pide grupo.
+
+Panel: sincronización · verificación · revisión de sospechosos · recordatorios · acción al no verificar · tiempos · **Bienvenida ▸** (texto, botones, autoborrado) · reglas · limpiar servicio · **Warns ▸** · top semanal · **Palabras bloqueadas ▸** · **Frases al banear ▸** (con ejemplo real antes de activar) · avisos informativos.
+
+- **Moderación**: `/ban` `/unban` (aceptan @username o reply), `/whitelist`, `/warn` `/warns` `/rmwarn` `/resetwarns` `/warnlimit` `/warnaction`
+- **Aprendizaje**: `/spam` `/legal` (alias `/ham`)
+- **Info** (chat_admin read-only): `/help` `/comandos` `/stats` `/chats` `/recent` `/samples` `/top` `/topweekly` `/quips` `/scan`
+- **Config**: `/config` `/verificacion` `/welcome` `/setwelcome` `/rules` `/setrules` `/cleanservice` `/setwelcomebutton` `/limpieza` `/idioma` `/alertas` `/sync`
+- **Alias en inglés** (33 comandos en el menú): `/verification` `/language` `/alerts` `/cleanup` `/commands`. **Los nombres en español SIEMPRE deben seguir funcionando.**
+
+### Bienvenidas
+
+`config/welcomes/<chat_id>.txt` (privado) → `generic.<lang>.txt` → `generic.txt` → fallback traducido.
+El genérico por idioma va **antes** que `generic.txt` a propósito: `generic.txt` está en español y, como existe, ganaba al fallback traducido (un usuario inglés recibía bienvenidas en castellano).
+
+Cada línea del catálogo es el saludo COMPLETO (`📥 Bienvenido/a {name}. <gracia temática>`); la cabecera de verificación no saluda, para no duplicar el «Bienvenido/a». El pie fijo y los botones se añaden aparte.
 
 ## Jobs programados (`main.py`)
 
 - `_heartbeat_job` (30s) — healthcheck Docker
-- `verification.cleanup_job` (15min) — verificación 3 tiers: kick suspicious 30min, reminder normal 3h, kick post-reminder +6h
-- `maintenance.cleanup_nightly_job` (24h) — limpieza de tablas + **reconciliación banned_users↔Telegram**
-- `topweekly.weekly_top_job` (domingo 20:00 Madrid) — ranking semanal
+- `verification.cleanup_job` (15min) — 3 tiers: kick suspicious 30min, reminder normal 3h, kick post-reminder +6h
+- `maintenance.cleanup_nightly_job` (24h) — limpieza + **reconciliación banned_users↔Telegram**
+- `topweekly.weekly_top_job` (domingo 20:00 Madrid)
 
-## Reglas críticas de diseño (lecciones aprendidas en producción)
+## Reglas críticas de diseño (lecciones de producción)
 
-1. **NUNCA acciones masivas sin dry-run.** Sweep/bans bulk → lista previa + luz verde por id. `seen_users.msg_count` NO refleja historial previo al bot (los grupos suelen ser más viejos que él): para "nunca escribió" usar Telethon `iter_messages` **filtrando service messages** (`m.action is None`).
-2. **Falsos positivos > falsos negativos**: mejor dejar pasar spam que banear a un legítimo.
-3. **Anti-FP de nombres**: NFKC + `confusable_homoglyphs.is_dangerous`. Cherokee/Mathematical/Thai decorativos NO son spam. Bilingües (árabe/cirílico + username latino) tampoco. Bypass si cuenta >1 año con foto.
-4. **Telethon es último recurso**: solo reportes/bio/fotos/admin_log/histórico. No abusar. Usar `reporter.get_client()` o copiar la session a `/tmp`, nunca parar el contenedor para usarla.
-5. **Quips opacos**: no revelar el mecanismo de detección en mensajes públicos (los spammers estudian las pistas). No mencionar lols.bot/CAS por nombre en el grupo.
-6. **Sin links clicables a perfiles de spammers** en público: `nombre (id: N)`, nunca @username ni tg://user. Excepción: DM al admin + top semanal (recompensa).
-7. **Castellano correcto**: `Bienvenido/a`, nunca `@`/`x` inclusivo. Sin em dashes en textos visibles.
-8. **Welcomes**: frase corta graciosa + footer fijo separado. Humor de complicidad, sin condescender al usuario.
-9. **Reportes a Telegram con criterio**: whitelist de reglas + score alto + rate limit (ver `REPORTER_RATE_*`), solo bans. Protege la reputación de la cuenta secundaria.
-10. **Consentimiento explícito del admin** antes de anclar/editar anclados o cualquier acción pública no reversible.
+1. **NUNCA acciones masivas sin dry-run.** `seen_users.msg_count` NO refleja historial previo al bot: para "nunca escribió" usar Telethon `iter_messages` filtrando service messages (`m.action is None`).
+2. **Falsos positivos > falsos negativos**: mejor dejar pasar spam que banear a un legítimo. Ante la duda, no se añade el patrón.
+3. **Anti-FP de nombres**: NFKC + `confusable_homoglyphs.is_dangerous`. Cherokee/Thai decorativos NO son spam. Bilingües tampoco. Bypass si cuenta >1 año con foto.
+4. **Telethon es último recurso**: solo reportes/bio/fotos/admin_log/histórico. Usar `reporter.get_client()` o copiar la session a `/tmp`, nunca parar el contenedor.
+5. **Quips opacos**: no revelar el mecanismo de detección en público. No mencionar lols.bot/CAS por nombre en el grupo.
+6. **Sin links clicables a perfiles de spammers** en público: `nombre (id: N)`. Excepción: DM al admin y top semanal.
+7. **Castellano correcto**: `Bienvenido/a`, nunca `@`/`x` inclusivo. **Sin em dashes** en textos visibles.
+8. **Consentimiento explícito** antes de anclar/editar anclados o cualquier acción pública no reversible.
+9. **Reportes a Telegram con criterio**: whitelist de reglas + score alto + rate limit. Protege la reputación de la cuenta secundaria.
+10. **Ajustes nuevos que hereden del `.env`**: usar columna NULLable donde NULL = «hereda» (ver `quips.quips_on`). Con default `0`, quien lo tuviera activo por `.env` se queda sin ello al actualizar, en silencio.
 
 ## Convenciones de código
 
 - Type hints en funciones públicas. `async def` para todo lo que toque Telegram API.
-- Cada detector `check()` con tests (positivos + negativos, foco en anti-FP). `ruff check` limpio.
-- `seen` es `sqlite3.Row`, NO dict: usar `row["col"]` (la columna existe, `or` maneja NULL); `.get()` NO existe en Row.
-- Commits convencionales (`feat:`/`fix:`/`tweak:`...). Tests verde + restart Docker + push tras cada cambio.
-- Co-Author en commits: `Claude Opus`.
+- Cada detector `check()` con tests (positivos + negativos, **foco en anti-FP**). `ruff check` limpio.
+- `seen` es `sqlite3.Row`, NO dict: usar `row["col"]`; **`.get()` NO existe en Row** (causó un bug que impedía ejecutar bans). Hay meta-test.
+- `callback_data` tiene **64 BYTES** de tope: nunca metas texto del usuario dentro, usa un hash o índice.
+- Migraciones de BD: `ALTER TABLE` blando en `_migrate()`, y añadir el campo a `ALLOWED` de `update_chat_setting`.
+- Commits convencionales. Co-Author: `Claude Opus`.
 
 ## Flujo de trabajo típico
 
 ```bash
-# tras editar código:
-.venv/bin/python -m pytest tests/ -q          # 360 tests
-sudo -n docker compose restart                # o up -d --build si cambia requirements
+.venv/bin/python -m pytest tests/ -q          # 775 tests
+.venv/bin/ruff check src/ tests/
+sudo -n docker compose restart                # o up -d si cambia .env o requirements
 sudo -n docker logs cazaspam-bot --tail 5     # verificar "Bot ... listo"
 git add -A && git commit -m "..." && git push
 ```
 
+**`restart` recarga el código (src/ montado por volumen) pero NO el `.env`**: para eso hace falta `up -d`.
+
 ## Docs detalladas
 
-`docs/ARCHITECTURE.md`, `docs/ECOSYSTEM.md`, `docs/ROADMAP.md`, `docs/LEARNING.md` (actualizados 2026-05).
+`docs/ARCHITECTURE.md`, `docs/ECOSYSTEM.md`, `docs/ROADMAP.md`, `docs/LEARNING.md`.
+`src/locales/README.md` (traductores) · `config/blacklist/README.md` (listas) · `config/welcomes/README.md`.
 
-*Actualizado: 2026-07-15 — bot en producción, 19 detectores, 360 tests.*
+*Actualizado: 2026-07-19 — bilingüe es/en, 19 detectores, 775 tests, panel completo.*
