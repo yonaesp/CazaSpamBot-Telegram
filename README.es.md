@@ -24,7 +24,7 @@
 CazaSpamBot vigila tus grupos de Telegram y elimina el spam **antes de que moleste**, con una obsesión: **nunca banear a un usuario legítimo**. Prefiere dejar pasar un spam dudoso que expulsar a una persona real.
 
 - 🔗 **Bans sincronizados** — un ban en un grupo = ban en **todos** tus grupos (lo que otros bots llaman *federación*). Sin primitiva nativa: itera sobre los chats donde es admin.
-- 🧠 **19 detectores** combinados con un sistema de confianza graduado.
+- 🧠 **20 detectores** combinados con un sistema de confianza graduado.
 - 🤫 **Moderación silenciosa** — los bans automáticos no ensucian el chat.
 - 📚 **Aprendizaje activo** — aprende de tus `/spam` y `/legal` (Naive Bayes + similitud coseno).
 - 🛰️ **Reportes oficiales** a Telegram (Native Antispam) vía MTProto.
