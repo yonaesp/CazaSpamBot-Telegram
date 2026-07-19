@@ -8,7 +8,7 @@
 [![python-telegram-bot](https://img.shields.io/badge/PTB-21.6-26A5E4?logo=telegram&logoColor=white)](https://python-telegram-bot.org/)
 [![Telethon](https://img.shields.io/badge/Telethon-1.36-blueviolet)](https://docs.telethon.dev/)
 [![Idiomas](https://img.shields.io/badge/idiomas-es%20%7C%20en%20%7C%20a%C3%B1ade%20el%20tuyo-orange)](src/locales/README.md)
-[![Tests](https://img.shields.io/badge/tests-391%20passing-success)](#-tests)
+[![Tests](https://img.shields.io/badge/tests-798%20passing-success)](#-tests)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 
 🌍 [**English**](README.md) · **Español**
@@ -64,6 +64,7 @@ El resto  ──► modo limpio por defecto (ver más abajo)
 | `contact_spam` | Tarjeta de contacto compartida cuyo nombre es el anuncio (otro alfabeto o con enlaces) |
 | `external_reply` | Promoción de un canal externo mediante cita a otro chat (el "quote" que lleva fuera) |
 | `bio_spam` | Bio del perfil con promo porno/comercial/hacking |
+| `personal_channel_spam` | Canal enlazado en el perfil usado como escaparate de spam |
 | `forward_first_msg` | Forward de canal en el primer mensaje |
 | `first_msg_media` · `inline_buttons` | Foto/botones sospechosos al empezar |
 | `photos_batch_upload` | 3+ fotos de perfil subidas en segundos |
@@ -76,6 +77,8 @@ El resto  ──► modo limpio por defecto (ver más abajo)
 | `cas` · `lols_bot` | Spammers fichados en las listas globales CAS y lols.bot |
 | `learned_similarity` | Lo que aprendió de tus `/spam` |
 | `antiflood` | Inundación de mensajes por usuario |
+
+> **El canal enlazado en un perfil es un campo aparte de la bio** (Telegram lo añadió en 2024), y era un punto ciego: una cuenta con la bio vacía, sin foto y sin @username puede estar apuntando a un canal entero de spam. `personal_channel_spam` lee ese título vía Telethon. **Tener un canal personal es completamente legítimo** y por sí solo no dispara nada: lo que cuenta es la discordancia, un nombre escrito en el alfabeto que usa tu grupo junto a un canal titulado en otro, más vocabulario de spam en el título (editable en `config/blacklist/personal_channel_keywords.txt`) o un perfil sin nada más público que mirar. Ninguna señal suelta llega al umbral: hacen falta al menos dos.
 
 También banea el **spam publicado "en nombre de un canal"** (`sender_chat` → `banChatSenderChat`) en grupos de comentarios, cuando dispara una regla fuerte. Con **`/scan`** (responde a un mensaje reenviado) puedes comprobar de antemano si el bot detectaría cualquier mensaje y qué estructura tiene.
 
@@ -99,6 +102,7 @@ Refuerzos: **NFKC + [confusable_homoglyphs](https://github.com/vhf/confusable_ho
 |---|---|---|
 | Saludos de bienvenida | `config/welcomes/` | Una frase por línea, `{name}` para el nombre. `generic.txt` para todos los grupos, `<chat_id>.txt` para frases temáticas de un grupo concreto. Desactivables con `FRIENDLY_WELCOMES_ENABLED=false`. |
 | Palabras/frases de la lista negra | `config/blacklist/` | Un patrón por línea (palabra o regex). Anuncios ilegales, keywords de bio, etc. Si borras un archivo, el bot usa los valores por defecto. |
+| Idiomas de las listas negras | `.env` → `BLACKLIST_LANGS` | CSV de códigos de idioma. Por defecto el bot carga las listas genéricas más `config/blacklist/<lang>/` del **idioma activo y del inglés** (la lengua franca del spam en Telegram). Ponla (p. ej. `es,en,pt`) para sustituir esa elección en una comunidad multilingüe. |
 | Idioma del bot | `.env` → `BOT_LANG` | `es`, `en` o cualquier idioma que añadas. Vacío = se detecta del sistema. |
 | Alfabetos permitidos | `.env` → `ALLOWED_SCRIPTS` | CSV: `latin`, `cyrillic`, `arabic`, `han`, ... según el idioma de tu comunidad. |
 | Rigor con la lista CAS | `.env` → `CAS_AUTOBAN_MIN` | `2` = banear solo confirmados en 2+ grupos (recomendado); `1` = banear con cualquier señal. Por debajo del umbral, te lo manda a revisar. |
@@ -118,6 +122,9 @@ La forma **visual y recomendada** de configurar cada grupo, sin recordar subcoma
 - 🚪 **Al no verificar**: Expulsar / Silenciar · ⏱️ **Tiempos** (submenú con presets)
 - 👋 **Bienvenida** on/off · ✏️ **Editar bienvenida** · 📜 **Editar reglas** (al editar eliges **Todos los grupos** o **uno concreto**, y el bot te muestra un ejemplo para escribir el texto directamente)
 - 🧹 **Limpiar mensajes de servicio** on/off · 🔔 **Avisos informativos**
+- 🚫 **Palabras bloqueadas** (ver abajo)
+
+**Bloquear palabras sin entrar al servidor**: el botón 🚫 **Palabras bloqueadas** añade y quita términos de las listas negras desde el propio Telegram. Lo que escribes se trata como **texto literal**, nunca como regex, así que un `.*` de más no puede convertirse en un comodín que banee vecinos. Antes de guardar, el bot te dice **con cuántos mensajes reales y recientes de tu grupo habría coincidido ese término**, con ejemplos: la diferencia entre añadir «oferta» a ciegas y ver que arrasaría con 14 conversaciones normales. Tus términos se guardan en `config/blacklist/custom/`, fuera del repo, para que un `git pull` no los pise nunca.
 
 Es un atajo con la misma persistencia que los comandos sueltos de abajo; usa el que prefieras. Solo el admin del bot puede tocarlo.
 
@@ -168,7 +175,7 @@ Todo por grupo, desde el propio Telegram (solo el admin del bot). `/verificacion
 | Componente | Tecnología |
 |---|---|
 | Bot API (async polling) | `python-telegram-bot[ext]` 21.6 |
-| MTProto (bio, fotos, reportes oficiales) | `Telethon` 1.36 |
+| MTProto (bio, fotos, canal personal, reportes oficiales) | `Telethon` 1.36 |
 | Base de datos | SQLite (WAL) |
 | Clasificador | Naive Bayes + coseno (stdlib, sin sklearn) |
 | Homóglifos | `confusable-homoglyphs` (UTS#39) |
@@ -238,6 +245,24 @@ docker compose exec antispam-bot python -m scripts.telethon_login confirm 12345
 
 ---
 
+## 🔄 Actualizar una instalación existente
+
+```bash
+git pull
+docker compose restart
+```
+
+Ya está. El `docker-compose.yml` monta `./src`, `./config` y `./data` por volumen, así que el código nuevo, los paquetes de idioma y las listas negras se recogen **sin reconstruir la imagen**. `docker compose pull` aquí no sirve de nada: la imagen se construye en local (`build:`), no se descarga. Solo necesitas `docker compose up -d --build` cuando cambien `requirements.txt` o el `Dockerfile`.
+
+**No pierdes nada de lo que tengas configurado.** Tu `.env`, la base de datos (`data/`: idioma elegido, ajustes de cada grupo, baneos, muestras aprendidas) y tus bienvenidas propias viven fuera del control de versiones, y las columnas nuevas de la base de datos se crean solas al arrancar.
+
+Dos cosas que conviene saber antes de hacer el `git pull`:
+
+- Si editaste a mano `src/locales/es.py` o `en.py`, esos cambios se han perdido: esos archivos ya no existen. Los idiomas son ahora `es.json` / `en.json`.
+- Si editaste a mano una lista negra versionada como `config/blacklist/classifier_excluded_tokens.txt`, git puede darte un conflicto. Se resuelve con `git stash` → `git pull` → `git stash pop`. Los términos que añadiste desde el panel `/config` están a salvo: viven en `config/blacklist/custom/`, fuera del repo.
+
+---
+
 ## 💬 Comandos principales
 
 Solo el **admin del bot** (`ADMIN_USER_ID`) puede ejecutar acciones; los **admins de los grupos** pueden consultar información; al resto de usuarios el bot los ignora en silencio.
@@ -262,6 +287,8 @@ Solo el **admin del bot** (`ADMIN_USER_ID`) puede ejecutar acciones; los **admin
 | `/forget <id>` | Borra una muestra del clasificador |
 | `/shadow on/off` | Modo prueba (solo loggea) / activo |
 
+**Alias en inglés:** los comandos con nombre en español responden también a `/verification`, `/language`, `/alerts`, `/cleanup` y `/commands`. El menú «/» de Telegram muestra el nombre que corresponda al idioma activo, y los nombres en español siguen funcionando siempre, así que no se rompe nada si cambias de idioma sobre la marcha.
+
 Los miembros del grupo pueden reportar con **`@admin`** (reply a un mensaje); el bot avisa al admin y, si actúa, agradece al reporter.
 
 ---
@@ -269,7 +296,7 @@ Los miembros del grupo pueden reportar con **`@admin`** (reply a un mensaje); el
 ## 🧪 Tests
 
 ```bash
-.venv/bin/python -m pytest tests/ -q     # 391 tests
+.venv/bin/python -m pytest tests/ -q     # 798 tests
 ```
 
 Cada detector tiene tests de casos positivos **y negativos** (énfasis en anti-falsos-positivos). Filosofía: *un falso positivo es peor que un falso negativo.*
@@ -302,7 +329,7 @@ config/
 ├── welcomes/            # saludos editables (genérico + por grupo)
 └── blacklist/           # palabras/regex antispam editables
 docs/                    # ARCHITECTURE, ROADMAP, ...
-tests/                   # 391 tests
+tests/                   # 798 tests
 ```
 
 ---

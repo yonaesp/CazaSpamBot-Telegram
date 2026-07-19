@@ -8,7 +8,7 @@
 [![python-telegram-bot](https://img.shields.io/badge/PTB-21.6-26A5E4?logo=telegram&logoColor=white)](https://python-telegram-bot.org/)
 [![Telethon](https://img.shields.io/badge/Telethon-1.36-blueviolet)](https://docs.telethon.dev/)
 [![Languages](https://img.shields.io/badge/languages-es%20%7C%20en%20%7C%20add%20yours-orange)](src/locales/README.md)
-[![Tests](https://img.shields.io/badge/tests-391%20passing-success)](#-tests)
+[![Tests](https://img.shields.io/badge/tests-798%20passing-success)](#-tests)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 
 🌍 **English** · [**Español**](README.es.md)
@@ -64,6 +64,7 @@ Everyone else  ──► clean mode by default (see below)
 | `contact_spam` | Shared contact card whose name is the ad itself (foreign alphabet or with links) |
 | `external_reply` | Promoting an external channel via a cross-chat quote (the "quote" that leads off-site) |
 | `bio_spam` | Profile bio with porn/commercial/hacking promo |
+| `personal_channel_spam` | Channel linked on the profile used as a spam shopfront |
 | `forward_first_msg` | Channel forward as the very first message |
 | `first_msg_media` · `inline_buttons` | Suspicious photo/buttons right out of the gate |
 | `photos_batch_upload` | 3+ profile photos uploaded within seconds |
@@ -76,6 +77,8 @@ Everyone else  ──► clean mode by default (see below)
 | `cas` · `lols_bot` | Spammers flagged on the global CAS and lols.bot lists |
 | `learned_similarity` | Whatever it learned from your `/spam` calls |
 | `antiflood` | Per-user message flooding |
+
+> **The channel linked on a profile is a separate field from the bio** (Telegram added it in 2024), and it's a blind spot: an account with an empty bio, no photo and no @username can still be pointing at an entire spam channel. `personal_channel_spam` reads that title over Telethon. **Having a personal channel is perfectly legitimate** and never triggers anything on its own: what counts is the mismatch, a name written in the alphabet your group uses next to a channel titled in another one, plus spam vocabulary in the title (editable in `config/blacklist/personal_channel_keywords.txt`) or a profile with nothing else public to look at. No single signal reaches the threshold; at least two must line up.
 
 It also bans **spam posted "on behalf of a channel"** (`sender_chat` → `banChatSenderChat`) in comment groups when a strong rule fires. With **`/scan`** (reply to a forwarded message) you can check in advance whether the bot would detect any given message, and what structure it has.
 
@@ -105,6 +108,9 @@ The **recommended** way to configure each group without memorizing subcommands. 
 - 🚪 **On failed verification**: Kick / Mute · ⏱️ **Timings** (submenu with presets)
 - 👋 **Welcome** on/off · ✏️ **Edit welcome** · 📜 **Edit rules** (on edit you pick **All groups** or **just one**, with an example to type the text directly)
 - 🧹 **Clean service messages** on/off · 🔔 **Informational alerts**
+- 🚫 **Blocked words** (see below)
+
+**Block words without server access:** the 🚫 **Blocked words** button adds and removes terms from the blocklists straight from Telegram. Whatever you type is treated as **literal text**, never as a regex, so a stray `.*` can't turn into a wildcard that bans your neighbours. Before saving, the bot tells you **how many recent real messages in your group that term would have matched**, with examples: the difference between adding "offer" blindly and seeing it would sweep up 14 normal conversations. Your terms are stored in `config/blacklist/custom/`, outside the repo, so a `git pull` never overwrites them.
 
 **Clean mode by default:** verification and welcome start **OFF** (the group stays silent), while **private review of suspicious profiles is ON** — when a clearly dubious profile joins, you get a **private** alert (in your DM or the `ADMIN_NOTIFY_CHAT_ID` chat) with **✅ Allow** / **🔨 Ban** buttons; the user enters allowed by default. That alert also carries a **⚙️ gear** that expands quick toggles (verification, alerts, reminders, timings) editing the notification in place. Message moderation stays fully active regardless.
 
@@ -147,6 +153,7 @@ Per group, from Telegram itself (bot admin only). Run `/verificacion` with no ar
 | Welcome greetings | `config/welcomes/` | One phrase per line, `{name}` for the name. `generic.txt` for all groups, `<chat_id>.txt` for group-specific lines. Turn them off with `FRIENDLY_WELCOMES_ENABLED=false`. |
 | Bot language | `.env` → `BOT_LANG` | `es`, `en`, or any language file you add. Empty = detect from the system. |
 | Blocklist words/phrases | `config/blacklist/` | One pattern per line (word or regex). Delete a file and defaults kick in. |
+| Blocklist languages | `.env` → `BLACKLIST_LANGS` | CSV of language codes. By default the bot loads the generic lists plus `config/blacklist/<lang>/` for its **active language and English** (spam's lingua franca on Telegram). Set it (e.g. `es,en,pt`) to replace that choice in a multilingual community. |
 | Allowed alphabets | `.env` → `ALLOWED_SCRIPTS` | CSV: `latin`, `cyrillic`, `arabic`, `han`, … per your community's language. |
 | CAS strictness | `.env` → `CAS_AUTOBAN_MIN` | `2` = ban only if confirmed in 2+ groups (recommended); `1` = ban on any signal. |
 | Blocked shorteners | `.env` → `URL_BLOCKLIST` | CSV of domains. |
@@ -226,6 +233,24 @@ docker compose exec antispam-bot python -m scripts.telethon_login confirm 12345
 
 ---
 
+## 🔄 Updating an existing install
+
+```bash
+git pull
+docker compose restart
+```
+
+That's it. `docker-compose.yml` mounts `./src`, `./config` and `./data` as volumes, so new code, language packs and blocklists are picked up **without rebuilding the image**. `docker compose pull` does nothing here: the image is built locally (`build:`), never downloaded. You only need `docker compose up -d --build` when `requirements.txt` or the `Dockerfile` change.
+
+**Nothing you configured is lost.** Your `.env`, the database (`data/`: chosen language, each group's settings, bans, learned samples) and your own welcomes all live outside version control, and any new database columns are created on startup.
+
+Two things worth knowing before you pull:
+
+- If you hand-edited `src/locales/es.py` or `en.py`, those edits are gone: those files no longer exist. Languages are now `es.json` / `en.json`.
+- If you hand-edited a versioned blocklist such as `config/blacklist/classifier_excluded_tokens.txt`, git may report a conflict. Resolve it with `git stash` → `git pull` → `git stash pop`. Terms you added from the `/config` panel are safe: they live in `config/blacklist/custom/`, outside the repo.
+
+---
+
 ## 💬 Main commands
 
 Only the **bot admin** (`ADMIN_USER_ID`) can run actions; **group admins** can query info; everyone else is silently ignored.
@@ -250,6 +275,8 @@ Only the **bot admin** (`ADMIN_USER_ID`) can run actions; **group admins** can q
 | `/forget <id>` | Delete a classifier sample |
 | `/shadow on/off` | Test mode (log only) / active |
 
+**English aliases:** the commands with Spanish names also answer to `/verification`, `/language`, `/alerts`, `/cleanup` and `/commands`. Telegram's `/` menu shows whichever name matches the active language, and the Spanish names keep working either way, so nothing breaks if you switch languages mid-flight.
+
 Group members can report with **`@admin`** (reply to a message); the bot notifies the admin and, if it acts, thanks the reporter.
 
 ---
@@ -257,7 +284,7 @@ Group members can report with **`@admin`** (reply to a message); the bot notifie
 ## 🧪 Tests
 
 ```bash
-.venv/bin/python -m pytest tests/ -q     # 391 tests
+.venv/bin/python -m pytest tests/ -q     # 798 tests
 ```
 
 Every detector has **positive and negative** test cases (emphasis on anti-false-positives). Philosophy: *a false positive is worse than a false negative.*
@@ -290,7 +317,7 @@ config/
 ├── welcomes/            # editable greetings (generic + per group)
 └── blacklist/           # editable anti-spam words/regex
 docs/                    # ARCHITECTURE, ROADMAP, ...
-tests/                   # 391 tests
+tests/                   # 798 tests
 ```
 
 ---
