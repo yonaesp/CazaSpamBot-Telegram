@@ -180,6 +180,7 @@ git add -A && git commit -m "..." && git push
 ## Docs detalladas
 
 `docs/ARCHITECTURE.md`, `docs/ECOSYSTEM.md`, `docs/ROADMAP.md`, `docs/LEARNING.md`.
+`CHANGELOG.md` (hitos por fecha, lo más reciente arriba).
 `src/locales/README.md` (traductores) · `config/blacklist/README.md` (listas) · `config/welcomes/README.md`.
 
 *Actualizado: 2026-07-19 — bilingüe es/en, 20 detectores, 798 tests, panel completo.*
