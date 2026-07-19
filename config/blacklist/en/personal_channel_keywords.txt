@@ -1,0 +1,32 @@
+# Vocabulario ilicito en el TITULO del canal personal, en INGLES
+# (detector `personal_channel`). Se SUMAN a los del archivo generico
+# ../personal_channel_keywords.txt.
+#
+# OJO: esta lista se compila SIN el envoltorio \b(?:...)\b (ver el archivo
+# generico). Cada patron debe traer sus propios \b.
+#
+# Criterio: expresiones COMPUESTAS e inequivocas. Nada de palabras sueltas
+# comunes (money, free, trading, vip) que se llevarian por delante canales
+# personales legitimos.
+
+# --- fraude financiero / mulas ---
+\bdrop\s+(?:accounts?|banks?)\b
+\bmule\s+(?:accounts?|service)\b
+\bcarding\s+(?:shop|team|crew)\b
+\bfullz\s+(?:shop|store)\b
+\bclone\s+cards?\b
+\bwire\s+transfer\s+(?:hack|service)\b
+
+# --- inversion humo ---
+\bguaranteed\s+(?:profits?|returns?)\b
+\bdouble\s+your\s+(?:money|btc|usdt)\b
+\bpassive\s+income\s+(?:system|machine)\b
+
+# --- accesos robados ---
+\baccount\s+recovery\s+(?:expert|service)\b
+\bhacking\s+services?\b
+\bspy\s+(?:on\s+)?whatsapp\b
+
+# --- adulto de pago ---
+\bprivate\s+(?:nudes?|content)\b
+\bsexting\s+service\b

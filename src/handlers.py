@@ -31,6 +31,7 @@ from .detectors import contact_spam as contact_det
 from .detectors import external_reply as extreply_det
 from .detectors import photos_batch as photos_batch_det
 from .detectors import bio_spam as bio_spam_det
+from .detectors import personal_channel as personal_channel_det
 from .detectors import dormant_bot_mention as dormant_bot_det
 from .detectors import emoji_only as emoji_only_det
 from .detectors import jfm_delta as jfm_det
@@ -429,6 +430,36 @@ async def on_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 await _ban_join_direct(
                     context, db, cfg, cmu, user, score=bio_hit.score,
                     rule=bio_hit.rule, reason=bio_hit.reason, payload=bio_hit.payload,
+                )
+                return
+
+        # NUEVO: el canal enlazado en el perfil usado como escaparate de spam.
+        # Caso real: cuenta «Matthew», nombre latino, sin foto, sin username y con
+        # la bio VACÍA (por eso pasó los filtros anteriores), con un canal chino
+        # reclutando mulas de blanqueo. Aprovecha sig_pre: cero llamadas extra.
+        # Solo dispara cuando hay varias señales a la vez (ver MIN_SCORE).
+        if sig_pre is not None and sig_pre.personal_channel_title:
+            try:
+                pchan_hit = personal_channel_det.check(
+                    sig_pre.personal_channel_title,
+                    first_name=user.first_name, last_name=user.last_name,
+                    username=user.username, allowed_scripts=cfg.allowed_scripts,
+                    has_photo=sig_pre.photo_count > 0, has_bio=bool(sig_pre.bio),
+                )
+            except Exception as exc:  # noqa: BLE001
+                # Mismo motivo que sus vecinos: el usuario YA tiene el mute
+                # provisional puesto; una excepción aquí escaparía de
+                # on_chat_member y lo dejaría muteado para siempre.
+                log.debug("personal_channel check user=%s exc: %s", user.id, exc)
+                pchan_hit = None
+            if pchan_hit:
+                log.info(
+                    "personal_channel_spam user=%s score=%d canal=%r → ban directo",
+                    user.id, pchan_hit.score, sig_pre.personal_channel_title[:60],
+                )
+                await _ban_join_direct(
+                    context, db, cfg, cmu, user, score=pchan_hit.score,
+                    rule=pchan_hit.rule, reason=pchan_hit.reason, payload=pchan_hit.payload,
                 )
                 return
 

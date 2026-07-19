@@ -58,6 +58,7 @@ _RULES: tuple[str, ...] = (
     "commercial_ad",
     "dormant_bot_mention",
     "bio_spam",
+    "personal_channel_spam",
     "obvious_spam_profile",
     "forward_first_msg",
     "first_msg_media",

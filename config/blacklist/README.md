@@ -46,6 +46,7 @@ inversi[oó]n\s+garantizada
 | `bio_spam_keywords.txt` | `bio_spam` | spam adulto/cripto/casino/préstamo en la bio del perfil |
 | `bio_illegal_services.txt` | `bio_spam` | servicios de hacking/piratería declarados en la bio |
 | `bio_cta.txt` | `bio_spam` | llamadas a la acción promocionales en la bio (escríbeme, DM me...) |
+| `personal_channel_keywords.txt` | `personal_channel` | vocabulario ilícito en el **título del canal** enlazado en el perfil. **Se carga sin `\b(?:...)\b`** (el chino no separa palabras): pon tú los `\b` en los patrones latinos. No se gestiona desde el panel de Telegram |
 | `classifier_excluded_tokens.txt` | clasificador `/spam` `/legal` | (al revés: palabras NEUTRAS de tu temática que se ignoran para no ensuciar el aprendizaje) |
 
 ## `classifier_excluded_tokens.txt`: el vocabulario de TU grupo

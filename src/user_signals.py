@@ -26,6 +26,12 @@ class UserSignals:
     newest_photo: Optional[_dt.datetime] = None
     bio: Optional[str] = None
     is_premium: bool = False
+    # Canal personal enlazado en el perfil (Telegram 2024). Es un escaparate
+    # SEPARADO de la bio: un perfil con la bio vacía puede tener ahí un canal
+    # entero de spam, y hasta ahora no lo mirábamos. Caso real: cuenta llamada
+    # «Matthew», sin foto ni bio, con un canal chino de blanqueo de dinero.
+    personal_channel_title: Optional[str] = None
+    personal_channel_id: Optional[int] = None
 
     @property
     def account_age_days(self) -> Optional[int]:
@@ -139,6 +145,14 @@ async def fetch(client, user_id: int, chat_id: Optional[int] = None,
             from telethon.tl.functions.users import GetFullUserRequest
             full = await client(GetFullUserRequest(entity))
             sig.bio = (full.full_user.about or "").strip()[:300] or None
+            # El canal personal viene en full_user; su TÍTULO hay que buscarlo en
+            # full.chats, que trae las entidades relacionadas.
+            ch_id = getattr(full.full_user, "personal_channel_id", None)
+            if ch_id:
+                sig.personal_channel_id = ch_id
+                ch = next((c for c in (full.chats or []) if getattr(c, "id", None) == ch_id), None)
+                titulo = (getattr(ch, "title", "") or "").strip()
+                sig.personal_channel_title = titulo[:200] or None
         except Exception as exc:  # noqa: BLE001
             log.debug("GetFullUser %s fallo: %s", user_id, exc)
         sig.is_premium = bool(getattr(entity, "premium", False))

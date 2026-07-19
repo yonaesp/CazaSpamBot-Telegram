@@ -1,0 +1,39 @@
+# Vocabulario ilícito en el TÍTULO del canal personal enlazado en el perfil
+# (detector `personal_channel`).
+#
+# OJO: esta lista se compila SIN el envoltorio \b(?:...)\b, porque el chino y el
+# japonés no separan palabras con espacios y el \b dejaría muertos todos sus
+# patrones. Consecuencia: los patrones LATINOS deben traer sus propios \b, o
+# casarán dentro de otra palabra (`bet` casaría en «Roberto»).
+#
+# Criterio: solo expresiones INEQUÍVOCAS. Tener un canal personal es legítimo;
+# aquí solo va lo que ningún canal honesto pone en su título.
+# Un patrón por línea (palabra o regex). # = comentario. Usa (?:...) no (...).
+
+# --- CJK: blanqueo, mulas de dinero, juego, tarjetas robadas ---
+洗钱
+跑分
+承兑
+博彩
+赌场
+娱乐城
+卡商
+四件套
+
+# --- Cirílico: cobro en negro, apuestas, documentos falsos ---
+обнал
+ставк[аи]
+казино
+документы\s*под\s*ключ
+
+# --- Latino: expresiones compuestas, nunca palabras sueltas comunes ---
+\bmoney\s+laundering\b
+\bpump\s+and\s+dump\b
+\b(?:crypto|forex|binary)\s+signals?\b
+\bcasino\s+bonus\b
+\bfake\s+(?:documents?|passports?|ids?)\b
+\bhacked\s+accounts?\b
+\bcash\s?out\s+(?:team|crew|service)\b
+\bescort\s+service\b
+\bonlyfans\b
+\bblanqueo\s+de\s+(?:capitales|dinero)\b
