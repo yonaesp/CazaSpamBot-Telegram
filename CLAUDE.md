@@ -1,7 +1,7 @@
 # CazaSpamBot — Bot Antispam Telegram
 
 Bot de moderación antispam **en producción 24/7**, multi-grupo, federado y **bilingüe** (es/en).
-~14.400 LOC, Docker, **775 tests**, 19 detectores.
+~14.400 LOC, Docker, **798 tests**, 20 detectores.
 
 > **Estado: PRODUCCIÓN.** No es un esqueleto. Cualquier cambio afecta grupos reales con miles de usuarios. **Investiga > Confirma > Actúa.**
 
@@ -74,10 +74,18 @@ nativa; se itera `banChatMember` sobre los chats donde el bot es admin.
 
 ## Detectores (`src/detectors/` + `verification.py`)
 
-19 detectores: `obvious_spam_profile`, `bio_spam`, `photos_batch`, `commercial_ad`, `contact_spam`, `forward_first_msg`, `first_msg_media`, `inline_buttons`, `external_mention`, `external_reply`, `url_blocklist`, `tg_deeplink`, `non_allowed_script` (unicode_script), `reaction_farming`, `jfm_delta`, `premium_new_link`, `emoji_only`, `dormant_bot_mention`, `cas`, `lols_bot`, `learned_similarity`.
+20 detectores: `obvious_spam_profile`, `bio_spam`, `photos_batch`, `commercial_ad`, `contact_spam`, `forward_first_msg`, `first_msg_media`, `inline_buttons`, `external_mention`, `external_reply`, `url_blocklist`, `tg_deeplink`, `non_allowed_script` (unicode_script), `reaction_farming`, `jfm_delta`, `premium_new_link`, `emoji_only`, `dormant_bot_mention`, `cas`, `lols_bot`, `learned_similarity`, `personal_channel_spam`.
 También banea spam publicado en nombre de un canal (`sender_chat` → `banChatSenderChat`).
 
 `rule_explain.py` traduce el id técnico de regla a la explicación que lee el admin. **Es el texto más visible del bot** y tiene prioridad sobre el `reason` del detector.
+
+### Los que dependen de Telethon
+
+`bio_spam`, `photos_batch`, `obvious_spam_profile` (parcial) y `personal_channel_spam` leen el perfil vía MTProto. **Sin Telethon no se activan** y el bot sigue funcionando con el resto. Documentado en ambos README, porque quien instale sin cuenta secundaria no sabría qué se pierde.
+
+**El perfil tiene más de un escaparate.** Durante mucho tiempo solo leíamos `about` (la bio). El **canal personal** (Telegram 2024, `personal_channel_id`) es un campo SEPARADO: un perfil con la bio vacía puede tener ahí un canal entero de spam. Caso real que lo destapó: cuenta «Matthew», nombre latino, sin foto ni bio, con un canal chino reclutando mulas de blanqueo. Si aparece otro campo nuevo de perfil, mirarlo antes de fiarse de que el perfil está limpio.
+
+`personal_channel_spam` **no salta por tener canal**: eso es legítimo. La señal es la **discordancia** (nombre en alfabeto latino + canal en otro script), que es un disfraz deliberado. Ninguna señal suelta llega al umbral. Lección del caso: el bot ya cazaba a los de esta red que usaban nombre chino; los que se colaban eran los que se ponían nombre occidental.
 
 ### Listas negras (`config/blacklist/`)
 
@@ -160,7 +168,7 @@ Cada línea del catálogo es el saludo COMPLETO (`📥 Bienvenido/a {name}. <gra
 ## Flujo de trabajo típico
 
 ```bash
-.venv/bin/python -m pytest tests/ -q          # 775 tests
+.venv/bin/python -m pytest tests/ -q          # 798 tests
 .venv/bin/ruff check src/ tests/
 sudo -n docker compose restart                # o up -d si cambia .env o requirements
 sudo -n docker logs cazaspam-bot --tail 5     # verificar "Bot ... listo"
@@ -174,4 +182,4 @@ git add -A && git commit -m "..." && git push
 `docs/ARCHITECTURE.md`, `docs/ECOSYSTEM.md`, `docs/ROADMAP.md`, `docs/LEARNING.md`.
 `src/locales/README.md` (traductores) · `config/blacklist/README.md` (listas) · `config/welcomes/README.md`.
 
-*Actualizado: 2026-07-19 — bilingüe es/en, 19 detectores, 775 tests, panel completo.*
+*Actualizado: 2026-07-19 — bilingüe es/en, 20 detectores, 798 tests, panel completo.*
