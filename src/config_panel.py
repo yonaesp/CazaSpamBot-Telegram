@@ -14,6 +14,7 @@ de `chat_settings_cmd`, así que la persistencia es idéntica a los comandos sue
 """
 from __future__ import annotations
 
+import hashlib
 import html
 import logging
 import re
@@ -23,7 +24,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.error import TelegramError
 from telegram.ext import ContextTypes
 
-from . import quips, rule_explain, settings_sync
+from . import custom_terms, quips, rule_explain, settings_sync
 from .config import Config
 from .db import DB
 from .i18n import t
@@ -58,6 +59,39 @@ _WELCOME_TTL_PRESETS = [0, 300, 900, 3600]
 # Warns: presets del límite y acciones válidas (las mismas que acepta /warnaction).
 _WARN_LIMITS = [1, 3, 5, 10]
 _WARN_ACTIONS = ("ban", "kick", "mute")
+
+# --- Palabras bloqueadas (términos propios de las listas negras) ---
+#
+# Todo lo que viaja en un `callback_data` tiene 64 BYTES de tope, y aquí los datos
+# los escribe un humano: un término largo, con acentos o con emojis se pasa de
+# largo él solo. Así que el término NUNCA va dentro del callback:
+#   - la lista se identifica por su ÍNDICE en `custom_terms.MANAGEABLE_LISTS`;
+#   - el término, por un hash corto que se resuelve al recibirlo (`_term_by_hash`).
+# El porqué del hash y no de un índice está en `_term_hash`.
+_TERM_HASH_LEN = 8
+
+# Cuántas coincidencias en la vista previa se consideran ya un aviso a gritos. Con
+# 1 o 2 puede ser spam repetido; a partir de 3, lo normal es que el término esté
+# cazando conversación del grupo.
+_PREVIEW_LOUD = 3
+# Los ejemplos son mensajes de gente real: se enseña lo justo para reconocerlos.
+_PREVIEW_SNIPPET = 80
+
+# Códigos de `custom_terms.TermResult` → clave i18n que explica QUÉ pasa. Sin este
+# mapa el admin vería «corto» y tendría que adivinar el mínimo.
+_TERM_ERR_KEYS = {
+    custom_terms.ERR_UNKNOWN_LIST: "cfg.ct.err.lista",
+    custom_terms.ERR_EMPTY: "cfg.ct.err.vacio",
+    custom_terms.ERR_TOO_SHORT: "cfg.ct.err.corto",
+    custom_terms.ERR_TOO_LONG: "cfg.ct.err.largo",
+    custom_terms.ERR_NO_TEXT: "cfg.ct.err.sin_texto",
+    custom_terms.ERR_SYMBOL_EDGES: "cfg.ct.err.bordes",
+    custom_terms.ERR_DUPLICATE: "cfg.ct.err.duplicado",
+    custom_terms.ERR_ALREADY_COVERED: "cfg.ct.err.ya_cubierto",
+    custom_terms.ERR_LIST_FULL: "cfg.ct.err.llena",
+    custom_terms.ERR_NOT_FOUND: "cfg.ct.err.no_encontrado",
+    custom_terms.ERR_IO: "cfg.ct.err.escritura",
+}
 
 # Un botón de bienvenida con URL inválida hace que Telegram RECHACE el mensaje
 # entero: el grupo se queda sin bienvenida y en los logs solo aparece un BadRequest
@@ -214,7 +248,9 @@ def build_panel_keyboard(
                               callback_data=f"{PREFIX}:tog:topweekly_enabled:{cid}")],
         [InlineKeyboardButton(t("cfg.b.quips", state=_onoff(quips_on)),
                               callback_data=f"{PREFIX}:quips:{cid}")],
-        [InlineKeyboardButton(t("cfg.b.alerts"), callback_data=f"{PREFIX}:alertas:{cid}")],
+        # Comparten fila: las dos son submenús sin estado que enseñar en la etiqueta.
+        [InlineKeyboardButton(t("cfg.b.terms"), callback_data=f"{PREFIX}:ct:{cid}"),
+         InlineKeyboardButton(t("cfg.b.alerts"), callback_data=f"{PREFIX}:alertas:{cid}")],
         [InlineKeyboardButton(t("cfg.b.close"), callback_data=f"{PREFIX}:close:{cid}")],
     ]
     return InlineKeyboardMarkup(rows)
@@ -343,6 +379,178 @@ def _quips_text(state_on: bool, inherited: bool) -> str:
     muestras = quips.demo_samples(1)
     ejemplo = muestras[0][1] if muestras else t("quipcfg.no_example")
     return t("quipcfg.text", state=estado, example=ejemplo)
+
+
+# --------------------- palabras bloqueadas (términos propios) ---------------------
+
+def _list_code(filename: str) -> int | None:
+    """Índice de una lista gestionable, que es lo que viaja en el callback."""
+    try:
+        return custom_terms.MANAGEABLE_LISTS.index(filename)
+    except ValueError:
+        return None
+
+
+def _list_by_code(raw: str) -> str | None:
+    """Resuelve el índice recibido en un callback. None si no es una lista válida.
+
+    Es la ÚNICA puerta por la que un nombre de archivo entra desde Telegram: al ser
+    un índice sobre una tupla cerrada, no hay forma de colar una ruta arbitraria.
+    """
+    try:
+        idx = int(raw)
+    except (TypeError, ValueError):
+        return None
+    if not 0 <= idx < len(custom_terms.MANAGEABLE_LISTS):
+        return None
+    return custom_terms.MANAGEABLE_LISTS[idx]
+
+
+def _term_hash(term: str) -> str:
+    """Identificador corto y estable de un término, para el botón de quitar.
+
+    Se usa un hash y NO la posición en la lista porque los botones ya enviados
+    sobreviven a los cambios: si el admin quita el primer término y luego pulsa un
+    botón de un mensaje anterior, un índice apuntaría al término equivocado y
+    borraría el que no era. El hash o encuentra su término o no encuentra ninguno.
+    Se calcula sobre el término normalizado y en minúsculas, igual que compara
+    `custom_terms.remove_term`.
+    """
+    clean = custom_terms.normalize(term).casefold()
+    # No es un hash de seguridad: solo un identificador corto para el botón.
+    return hashlib.sha1(
+        clean.encode("utf-8"), usedforsecurity=False,
+    ).hexdigest()[:_TERM_HASH_LEN]
+
+
+def _term_by_hash(filename: str, h: str) -> str | None:
+    """Término de esa lista cuyo hash corto coincide. None si ya no está."""
+    return next((tm for tm in custom_terms.list_terms(filename) if _term_hash(tm) == h), None)
+
+
+def _list_label(filename: str) -> str:
+    """Nombre legible de una lista negra ('commercial_work.txt' → 'Ofertas de trabajo')."""
+    return t(f"cfg.ct.name.{filename.removesuffix('.txt')}")
+
+
+def _term_error_text(res: custom_terms.TermResult) -> str:
+    """Explica POR QUÉ se rechaza un término, con el número concreto cuando aplica."""
+    if res.code == custom_terms.ERR_TOO_SHORT:
+        return t("cfg.ct.err.corto", n=custom_terms.MIN_TERM_LEN)
+    if res.code == custom_terms.ERR_TOO_LONG:
+        return t("cfg.ct.err.largo", n=custom_terms.MAX_TERM_LEN)
+    if res.code == custom_terms.ERR_LIST_FULL:
+        return t("cfg.ct.err.llena", n=custom_terms.MAX_TERMS_PER_LIST)
+    return t(_TERM_ERR_KEYS.get(res.code, "cfg.ct.err.generico"))
+
+
+def build_term_lists_keyboard(chat_id: int) -> InlineKeyboardMarkup:
+    """Listas negras gestionables, con cuántos términos propios tiene cada una."""
+    rows = [
+        [InlineKeyboardButton(
+            t("cfg.ct.b.list", name=_list_label(fn), n=custom_terms.count_terms(fn)),
+            callback_data=f"{PREFIX}:ctl:{i}:{chat_id}")]
+        for i, fn in enumerate(custom_terms.MANAGEABLE_LISTS)
+    ]
+    rows.append([InlineKeyboardButton(t("cfg.b.back"), callback_data=f"{PREFIX}:open:{chat_id}")])
+    return InlineKeyboardMarkup(rows)
+
+
+def build_terms_keyboard(chat_id: int, filename: str, terms: list[str]) -> InlineKeyboardMarkup:
+    """Términos de una lista: uno por fila para poder quitarlo, más el de añadir."""
+    code = _list_code(filename)
+    rows = [
+        [InlineKeyboardButton(t("cfg.ct.b.remove", term=tm[:30]),
+                              callback_data=f"{PREFIX}:ctdel:{code}:{_term_hash(tm)}:{chat_id}")]
+        for tm in terms
+    ]
+    rows.append([InlineKeyboardButton(t("cfg.ct.b.add"),
+                                      callback_data=f"{PREFIX}:ctadd:{code}:{chat_id}")])
+    rows.append([InlineKeyboardButton(t("cfg.b.back"), callback_data=f"{PREFIX}:ct:{chat_id}")])
+    return InlineKeyboardMarkup(rows)
+
+
+def build_term_confirm_keyboard(chat_id: int, filename: str, risky: bool) -> InlineKeyboardMarkup:
+    """Confirmación del alta. El botón cambia de cara si la vista previa pinta mal.
+
+    Que un término que arrasa con el grupo se añada con un botón que pone «Añadir»
+    a secas es justo el descuido que hay que evitar: se etiqueta como lo que es.
+    """
+    code = _list_code(filename)
+    etiqueta = t("cfg.ct.b.add_anyway") if risky else t("cfg.ct.b.add_ok")
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton(etiqueta, callback_data=f"{PREFIX}:ctok:{code}:{chat_id}")],
+        [InlineKeyboardButton(t("cfg.b.cancel"), callback_data=f"{PREFIX}:ctl:{code}:{chat_id}")],
+    ])
+
+
+def build_term_del_keyboard(chat_id: int, filename: str, term: str) -> InlineKeyboardMarkup:
+    """Confirmación de la baja (el término se resuelve por hash, no viaja aquí)."""
+    code = _list_code(filename)
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton(t("cfg.ct.b.del_ok"),
+                              callback_data=f"{PREFIX}:ctdelok:{code}:{_term_hash(term)}:{chat_id}")],
+        [InlineKeyboardButton(t("cfg.b.cancel"), callback_data=f"{PREFIX}:ctl:{code}:{chat_id}")],
+    ])
+
+
+def _preview_text(filename: str, pv: custom_terms.PreviewResult) -> str:
+    """Mensaje de la vista previa: veredicto graduado + ejemplos reales recortados.
+
+    El orden es deliberado: primero lo que el admin tiene que decidir (esto cazaría
+    a X personas), y solo después los ejemplos. Si los ejemplos fueran antes, el
+    aviso quedaría empujado fuera de la primera pantalla del móvil.
+    """
+    cabecera = t("cfg.ct.pv.head",
+                 term=html.escape(pv.term), list=html.escape(_list_label(filename)))
+    if pv.ham_hits:
+        veredicto = t("cfg.ct.pv.ham", n=pv.ham_hits, matches=pv.matches, scanned=pv.scanned)
+    elif pv.matches >= _PREVIEW_LOUD:
+        veredicto = t("cfg.ct.pv.loud", matches=pv.matches, scanned=pv.scanned)
+    elif pv.matches:
+        veredicto = t("cfg.ct.pv.some", matches=pv.matches, scanned=pv.scanned)
+    else:
+        veredicto = t("cfg.ct.pv.clean", scanned=pv.scanned)
+    bloques = [cabecera, veredicto]
+    if pv.examples:
+        ejemplos = [t("cfg.ct.pv.examples")]
+        ejemplos += [t("cfg.ct.pv.example", text=html.escape(_cut(ex))) for ex in pv.examples]
+        bloques.append("\n".join(ejemplos))
+    return "\n\n".join(bloques)
+
+
+def _cut(text: str, width: int = _PREVIEW_SNIPPET) -> str:
+    """Recorta un mensaje ajeno a lo justo para reconocerlo."""
+    one = " ".join(str(text or "").split())
+    return one if len(one) <= width else f"{one[:width - 1]}…"
+
+
+async def _show_term_lists(msg_edit, chat_id: int) -> None:
+    """Renderiza la pantalla con las listas negras gestionables."""
+    total = sum(custom_terms.count_terms(fn) for fn in custom_terms.MANAGEABLE_LISTS)
+    try:
+        await msg_edit(t("cfg.ct.lists_text", n=total), parse_mode="HTML",
+                       reply_markup=build_term_lists_keyboard(chat_id))
+    except TelegramError as exc:
+        log.debug("no se pudo renderizar la lista de palabras bloqueadas: %s", exc)
+
+
+async def _show_terms(msg_edit, chat_id: int, filename: str) -> None:
+    """Renderiza los términos propios de una lista concreta."""
+    terms = custom_terms.list_terms(filename)
+    nombre = html.escape(_list_label(filename))
+    if terms:
+        lineas = [t("cfg.ct.list_text", name=nombre, n=len(terms),
+                    max=custom_terms.MAX_TERMS_PER_LIST)]
+        lineas += [t("cfg.ct.item", term=html.escape(tm)) for tm in terms]
+        txt = "\n".join(lineas)
+    else:
+        txt = t("cfg.ct.list_empty", name=nombre)
+    try:
+        await msg_edit(txt, parse_mode="HTML", disable_web_page_preview=True,
+                       reply_markup=build_terms_keyboard(chat_id, filename, terms))
+    except TelegramError as exc:
+        log.debug("no se pudo renderizar los términos de %s: %s", filename, exc)
 
 
 def _edit_scope_keyboard(db: DB, code: str, cid: int) -> InlineKeyboardMarkup:
@@ -881,6 +1089,118 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         await _show_warns(q.edit_message_text, db, cid)
         return
 
+    if action == "ct":
+        cid = _cid(2)
+        if cid is None:
+            await q.answer(t("cfg.invalid_chat"))
+            return
+        await q.answer()
+        context.user_data.pop("cfg_await", None)
+        context.user_data.pop("cfg_term", None)
+        await _show_term_lists(q.edit_message_text, cid)
+        return
+
+    if action == "ctl":
+        filename = _list_by_code(parts[2] if len(parts) > 2 else "")
+        cid = _cid(3)
+        if filename is None or cid is None:
+            await q.answer(t("cfg.invalid_opt"))
+            return
+        await q.answer()
+        context.user_data.pop("cfg_await", None)
+        context.user_data.pop("cfg_term", None)
+        await _show_terms(q.edit_message_text, cid, filename)
+        return
+
+    if action == "ctadd":
+        filename = _list_by_code(parts[2] if len(parts) > 2 else "")
+        cid = _cid(3)
+        if filename is None or cid is None:
+            await q.answer(t("cfg.invalid_opt"))
+            return
+        await q.answer()
+        # Solo se pide el texto: lo que llegue pasará SIEMPRE por la vista previa
+        # antes de tocar el archivo (ver `handle_capture`).
+        context.user_data["cfg_term"] = {"list": filename, "chat_id": cid}
+        context.user_data["cfg_await"] = {"field": "custom_term", "chat_id": cid}
+        kb = InlineKeyboardMarkup([[InlineKeyboardButton(
+            t("cfg.b.cancel"), callback_data=f"{PREFIX}:ctl:{_list_code(filename)}:{cid}")]])
+        try:
+            await q.edit_message_text(
+                t("cfg.ct.prompt", name=html.escape(_list_label(filename)),
+                  min=custom_terms.MIN_TERM_LEN),
+                parse_mode="HTML", reply_markup=kb)
+        except TelegramError:
+            pass
+        return
+
+    if action == "ctok":
+        # Confirmación del alta. El término NO viaja en el callback (no cabe): se
+        # recupera el que la vista previa dejó guardado, y si no está se rehace el
+        # flujo desde el principio en vez de guardar algo a ciegas.
+        filename = _list_by_code(parts[2] if len(parts) > 2 else "")
+        cid = _cid(3)
+        pending = context.user_data.get("cfg_term") or {}
+        term = pending.get("term")
+        if filename is None or cid is None:
+            await q.answer(t("cfg.invalid_opt"))
+            return
+        if not term or pending.get("list") != filename:
+            await q.answer(t("cfg.ct.expired"), show_alert=True)
+            await _show_terms(q.edit_message_text, cid, filename)
+            return
+        context.user_data.pop("cfg_term", None)
+        res = custom_terms.add_term(filename, term)
+        if not res.ok:
+            await q.answer(t("cfg.ct.not_added"), show_alert=True)
+            try:
+                await q.edit_message_text(_term_error_text(res), parse_mode="HTML")
+            except TelegramError:
+                pass
+            return
+        await q.answer(t("cfg.ct.added_toast"))
+        await _show_terms(q.edit_message_text, cid, filename)
+        return
+
+    if action == "ctdel":
+        filename = _list_by_code(parts[2] if len(parts) > 2 else "")
+        h = parts[3] if len(parts) > 3 else ""
+        cid = _cid(4)
+        if filename is None or cid is None or not h:
+            await q.answer(t("cfg.invalid_opt"))
+            return
+        term = _term_by_hash(filename, h)
+        if term is None:
+            await q.answer(t("cfg.ct.gone"))
+            await _show_terms(q.edit_message_text, cid, filename)
+            return
+        await q.answer()
+        try:
+            await q.edit_message_text(
+                t("cfg.ct.del_confirm", term=html.escape(term),
+                  name=html.escape(_list_label(filename))),
+                parse_mode="HTML",
+                reply_markup=build_term_del_keyboard(cid, filename, term))
+        except TelegramError:
+            pass
+        return
+
+    if action == "ctdelok":
+        filename = _list_by_code(parts[2] if len(parts) > 2 else "")
+        h = parts[3] if len(parts) > 3 else ""
+        cid = _cid(4)
+        if filename is None or cid is None or not h:
+            await q.answer(t("cfg.invalid_opt"))
+            return
+        term = _term_by_hash(filename, h)
+        if term is None:
+            await q.answer(t("cfg.ct.gone"))
+        else:
+            res = custom_terms.remove_term(filename, term)
+            await q.answer(t("cfg.ct.removed") if res.ok else _term_error_text(res))
+        await _show_terms(q.edit_message_text, cid, filename)
+        return
+
     if action == "alertas":
         # Abre el panel de avisos como mensaje aparte (reutiliza /alertas), sin
         # perder el panel de config.
@@ -938,6 +1258,34 @@ async def handle_capture(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             t("cfg.wb.added", text=html.escape(text), url=html.escape(url),
               scope=_scope_label(db, ids) if n > 1 else ""),
             parse_mode="HTML", disable_web_page_preview=True)
+        return True
+    if field == "custom_term":
+        # Paso 2 del alta: NO se guarda nada todavía. Se valida, se enseña lo que
+        # cazaría entre mensajes reales y se pide confirmar. Es la red de seguridad
+        # del sistema: aquí es donde el admin ve que su «oferta» se llevaría por
+        # delante media conversación del grupo.
+        pending_term = context.user_data.get("cfg_term") or {}
+        filename = pending_term.get("list")
+        cid_term = chat_id if chat_id is not None else pending_term.get("chat_id")
+        if not filename or not custom_terms.is_manageable(filename) or cid_term is None:
+            context.user_data.pop("cfg_term", None)
+            await msg.reply_text(t("cfg.ct.expired"))
+            return True
+        # La vista previa mira TODOS los grupos (chat_id=None) a propósito: las
+        # listas negras son globales, así que un término añadido desde el panel de
+        # un grupo actúa también en los demás.
+        pv = custom_terms.preview_term(db, filename, raw)
+        if not pv.valid.ok:
+            context.user_data.pop("cfg_term", None)
+            await msg.reply_text(_term_error_text(pv.valid), parse_mode="HTML",
+                                 disable_web_page_preview=True)
+            return True
+        context.user_data["cfg_term"] = {
+            "list": filename, "term": pv.term, "chat_id": cid_term,
+        }
+        await msg.reply_text(
+            _preview_text(filename, pv), parse_mode="HTML", disable_web_page_preview=True,
+            reply_markup=build_term_confirm_keyboard(cid_term, filename, pv.risky))
         return True
     if field == "welcome_text":
         from .chat_settings_cmd import _parse_rose_buttons
