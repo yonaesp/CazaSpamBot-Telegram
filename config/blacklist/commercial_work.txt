@@ -1,0 +1,19 @@
+# Vocabulario de OFERTA de empleo / reclutamiento (detector commercial_ad).
+# Es el lado del que OFRECE trabajo (patrón spam), no el de quien lo busca.
+# Un patrón por línea (palabra o regex). # = comentario. Usa (?:...) no (...).
+vacantes?
+puestos?\s+disponibles?
+sueldo
+salario
+contrato\s+(?:legal|estable|indefinido)
+trabajo\s+(?:estable|legal|garantizado)
+oportunidad(?:es)?\s+(?:laboral(?:es)?|de\s+(?:empleo|trabajo|negocio))
+ofertas?\s+de\s+(?:empleo|trabajo)
+empleos?\s+disponibles?
+(?:trabaja|trabajo|ingresos?|gana[rs]?|dinero)\s+desde\s+(?:casa|tu\s+m[oó]vil)
+gana[rs]?\s+(?:dinero|hasta\s+\d)
+ingresos?\s+(?:extra|adicionales|garantizados)
+estamos\s+contratando
+se\s+(?:busca|necesita[n]?)\s+(?:personal|empleados?|gente|colaboradores)
+trabajo\s+que\s+m[aá]s\s+te\s+interese
+si\s+est[aá]s\s+buscando\s+(?:trabajo|empleo)

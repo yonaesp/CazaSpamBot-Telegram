@@ -42,15 +42,16 @@ _MONEY_RE = re.compile(
     r'\b\d{2,}(?:[.,]\d+)*\s*(?:€|\$|EUR|USD|euros|d[oó]lares)',
     re.IGNORECASE,
 )
-# CTA promocional
-_CTA_RE = re.compile(
-    r'\b(?:dm\b|md\b|escr[ií]beme|cont[aá]ctame|cl[ií]ck|haz\s+click|'
-    r'aqu[ií]\s+est[oa]y|link\s+(?:en\s+)?(?:bio|perfil)|sigueme|join\s+now|'
-    r'follow\s+me|come\s+see\s+me|hier\s+geht|'
-    r'(?:consulta(?:r)?|visita(?:r)?|mira(?:r)?|ve[ra]?)\s+(?:el\s+|mi\s+|la\s+)?'
-    r'(?:sitio|web|p[aá]gina|perfil)|m[aá]s\s+info\s+en)',
-    re.IGNORECASE,
-)
+# CTA promocional en la bio.
+# Editable en config/blacklist/bio_cta.txt (defaults de fallback abajo).
+_DEFAULT_BIO_CTA = [
+    r"dm\b", r"md\b", r"escr[ií]beme", r"cont[aá]ctame", r"cl[ií]ck",
+    r"haz\s+click", r"aqu[ií]\s+est[oa]y", r"link\s+(?:en\s+)?(?:bio|perfil)",
+    r"sigueme", r"join\s+now", r"follow\s+me", r"come\s+see\s+me", r"hier\s+geht",
+    r"(?:consulta(?:r)?|visita(?:r)?|mira(?:r)?|ve[ra]?)\s+(?:el\s+|mi\s+|la\s+)?"
+    r"(?:sitio|web|p[aá]gina|perfil)",
+    r"m[aá]s\s+info\s+en",
+]
 # Servicios ilegales / hacking en bio (caso real: "experto en piratería informática").
 # Editable en config/blacklist/bio_illegal_services.txt (defaults de fallback abajo).
 _DEFAULT_BIO_ILLEGAL = [
@@ -59,7 +60,12 @@ _DEFAULT_BIO_ILLEGAL = [
     r"robo\s+de\s+(?:cuentas?|datos)", r"espionaje", r"spyware",
     r"recupera(?:r|ci[oó]n)\s+(?:cuentas?|contrase[ñn]as?|dinero)",
 ]
-_ILLEGAL_RE = load_and_compile("bio_illegal_services.txt", _DEFAULT_BIO_ILLEGAL)
+
+def _illegal_re() -> re.Pattern:
+    return load_and_compile("bio_illegal_services.txt", _DEFAULT_BIO_ILLEGAL)
+
+
+
 # Keywords spam adulto/cripto/casino/préstamo (multi-idioma).
 # Editable en config/blacklist/bio_spam_keywords.txt (defaults de fallback abajo).
 _DEFAULT_BIO_SPAM_KEYWORDS = [
@@ -69,7 +75,16 @@ _DEFAULT_BIO_SPAM_KEYWORDS = [
     r"sexy", r"hot\s+girl", r"teen", r"videos?\s+priv", r"fotos?\s+priv",
     r"contenido\s+exclusivo", r"18\+",
 ]
-_SPAM_KEYWORDS_RE = load_and_compile("bio_spam_keywords.txt", _DEFAULT_BIO_SPAM_KEYWORDS)
+
+
+def _spam_keywords_re() -> re.Pattern:
+    return load_and_compile("bio_spam_keywords.txt", _DEFAULT_BIO_SPAM_KEYWORDS)
+
+
+def _cta_re() -> re.Pattern:
+    return load_and_compile("bio_cta.txt", _DEFAULT_BIO_CTA)
+
+
 # Texto en idioma distinto al español: alemán, inglés, ruso típicos en bios spammer
 _FOREIGN_LANG_HINT_RE = re.compile(
     r'\b(?:hier|geht|zu\s+mir|hello|come|see|join|here|click|profile|'
@@ -103,13 +118,13 @@ def check(bio: str | None) -> Hit:
     if _MONEY_EMOJI_RE.search(text) or _MONEY_RE.search(text):
         score += 15
         reasons.append(t("reason.bio_money"))
-    if _CTA_RE.search(text) or _FOREIGN_LANG_HINT_RE.search(text):
+    if _cta_re().search(text) or _FOREIGN_LANG_HINT_RE.search(text):
         score += 15
         reasons.append(t("reason.bio_cta"))
-    if _SPAM_KEYWORDS_RE.search(text):
+    if _spam_keywords_re().search(text):
         score += 30
         reasons.append(t("reason.bio_keywords"))
-    if _ILLEGAL_RE.search(text):
+    if _illegal_re().search(text):
         score += 30
         reasons.append(t("reason.bio_illegal"))
 

@@ -1,0 +1,39 @@
+# Servicios ilegales / scam en ANUNCIOS, en INGLES (detector commercial_ad).
+# Se SUMAN a los del archivo generico ../commercial_illegal_services.txt.
+# Un patrón por línea (palabra o regex). # = comentario. Usa (?:...) no (...).
+# DESCARTADO a proposito: "dark web", "no time wasters", "credit repair".
+# Aparecen en conversacion y en ventas legitimas de segunda mano.
+
+# --- hackeo ofertado ---
+hack(?:ing)?\s+services?
+professional\s+hack(?:er|ing)
+(?:hack|access)\s+(?:any\s+)?(?:social\s+media|instagram|facebook|whatsapp|snapchat|tiktok|telegram|gmail)\s+accounts?
+change\s+(?:school\s+|university\s+)?grades?
+erase\s+(?:criminal\s+)?records?
+password\s+cracking
+
+# --- "recovery" scam ---
+recover(?:y|ing)?\s+(?:of\s+)?(?:lost|stolen)\s+(?:funds|crypto|bitcoin|wallets?|money)
+(?:lost|stolen)\s+(?:funds|crypto|bitcoin|wallet)\s+recovery
+crypto\s+recovery\s+(?:expert|specialist|service|agent)
+
+# --- espionaje / rastreo ---
+spy\s+on\s+(?:your\s+)?(?:partner|spouse|wife|husband|kids?|phone)
+track\s+(?:any|your)\s+(?:phone|cell\s?phone|device|location)
+phone\s+(?:spy|monitoring|tracking)\s+(?:app|service)
+catch\s+(?:a\s+)?cheating\s+(?:spouse|partner|husband|wife)
+clone\s+(?:whatsapp|sim\s+cards?|credit\s+cards?)
+
+# --- fraude ---
+carding
+fullz
+bank\s+logs?
+cvv\s+(?:shop|dumps?)
+fake\s+(?:ids?|passports?|documents?|diplomas?)
+stolen\s+(?:accounts?|cards?|data)
+(?:buy|sell(?:ing)?)\s+(?:followers?|likes?|views?|subscribers?)
+personal\s+(?:info|information|data)\s+of\s+(?:any(?:one|body)|someone)
+
+# --- marcadores de anuncio turbio ---
+anonymous\s+services?
+serious\s+(?:clients?|buyers?|inquiries)\s+only

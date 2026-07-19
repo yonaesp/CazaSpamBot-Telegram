@@ -1,0 +1,41 @@
+# Palabras NEUTRAS en INGLES para el clasificador (/spam y /legal).
+# Se SUMAN a las del archivo generico ../classifier_excluded_tokens.txt.
+# No son spam: son vocabulario tematico y muletillas que solo meten ruido.
+the
+and
+you
+for
+with
+that
+this
+have
+from
+your
+what
+when
+how
+can
+its
+was
+are
+but
+not
+all
+any
+one
+get
+just
+hello
+thanks
+please
+windows
+update
+driver
+device
+settings
+install
+system
+computer
+laptop
+phone
+app

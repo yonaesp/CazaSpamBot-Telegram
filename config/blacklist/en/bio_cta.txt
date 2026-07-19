@@ -1,0 +1,18 @@
+# Llamada a la accion promocional en la BIO, en INGLES (bio_spam).
+# Se SUMAN a los del archivo generico ../bio_cta.txt.
+# Un patrón por línea (palabra o regex). # = comentario. Usa (?:...) no (...).
+# OJO: esta señal vale poco (15 pts) y necesita acompañamiento para banear,
+# pero aun asi se evitan formulas de conversacion normal en ingles.
+dm\s+me
+pm\s+me
+hit\s+me\s+up
+text\s+me\s+on\s+(?:whatsapp|telegram|signal|wickr)
+contact\s+me\s+(?:on|via)\s+(?:whatsapp|telegram|signal|wickr)
+write\s+me\s+(?:privately|in\s+private)
+check\s+out\s+my\s+(?:profile|page|link)
+link\s+in\s+(?:my\s+)?bio
+click\s+(?:the\s+)?link\s+below
+tap\s+(?:the\s+)?link
+join\s+my\s+(?:vip\s+)?(?:channel|group)
+see\s+my\s+(?:private\s+)?(?:videos?|photos?|pics?|content)
+more\s+info\s+(?:in|via)\s+(?:dm|pm)

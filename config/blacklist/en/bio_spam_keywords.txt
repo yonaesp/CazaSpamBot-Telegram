@@ -1,0 +1,39 @@
+# Spam adulto / cripto / casino / prestamos en la BIO, en INGLES (bio_spam).
+# Se SUMAN a los del archivo generico ../bio_spam_keywords.txt.
+# Un patrón por línea (palabra o regex). # = comentario. Usa (?:...) no (...).
+# Criterio: expresiones COMPUESTAS. Nada de palabras sueltas comunes
+# (money, free, job, click, win) que banearian a gente legitima.
+
+# --- adulto ---
+only\s+fans
+fansly
+exclusive\s+content
+private\s+(?:videos?|photos?|pics?|content|album)
+spicy\s+content
+nudes?
+sexting
+hookups?
+webcam\s+(?:girl|model|show)
+adults?\s+only
+dm\s+(?:me\s+)?for\s+(?:prices?|rates?|menu|fun|content|videos?|pics?)
+link\s+in\s+(?:my\s+)?bio
+
+# --- inversion / cripto scam ---
+guaranteed\s+(?:profits?|returns?|income|payouts?)
+daily\s+(?:profits?|signals?|returns?|payouts?)
+binary\s+options?
+pump\s*(?:and|&)\s*dump
+forex\s+(?:signals?|mentor|expert|trader)
+investment\s+(?:opportunit(?:y|ies)|plan|scheme)
+
+# --- prestamos / apuestas ---
+(?:instant|quick|fast|easy)\s+loans?
+no\s+credit\s+check
+sports\s+bett?ing
+bett?ing\s+tips?
+fixed\s+matches?
+free\s+bets?
+
+# --- dinero facil ---
+make\s+money\s+(?:online|fast|from\s+home)
+start\s+earning\s+(?:today|now)

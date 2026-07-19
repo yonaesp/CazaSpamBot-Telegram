@@ -26,9 +26,11 @@ htmlcov/
 dist/
 build/
 
-# Welcomes personalizados por grupo (el genérico versionado SÍ se sube)
+# Welcomes personalizados por grupo (los genéricos versionados SÍ se suben:
+# generic.txt y los de cada idioma, generic.en.txt, generic.fr.txt...)
 config/welcomes/*.txt
 !config/welcomes/generic.txt
+!config/welcomes/generic.*.txt
 
 # Notas y herramientas personales del despliegue original (no útiles a terceros)
 SETUP-INICIAL.txt

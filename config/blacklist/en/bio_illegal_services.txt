@@ -1,0 +1,33 @@
+# Servicios ilegales / hacking declarados en la BIO, en INGLES (bio_spam).
+# Se SUMAN a los del archivo generico ../bio_illegal_services.txt.
+# Un patrón por línea (palabra o regex). # = comentario. Usa (?:...) no (...).
+# DESCARTADO a proposito: "certified ethical hacker", "pentester", "bug bounty",
+# "red team", "security researcher". Son perfiles LEGITIMOS en grupos tecnicos.
+
+# --- servicios de hackeo ofertados ---
+hack(?:ing)?\s+(?:services?|tools?|jobs?)
+professional\s+hack(?:er|ing)
+(?:instagram|facebook|whatsapp|snapchat|tiktok|telegram|gmail)\s+hack(?:ing|er)?
+password\s+(?:cracking|recovery\s+service)
+account\s+(?:recovery|retrieval)\s+(?:expert|specialist|service|agent)
+
+# --- "recovery" scam (cripto/fondos perdidos) ---
+recover(?:y|ing)?\s+(?:of\s+)?(?:lost|stolen)\s+(?:funds|crypto|bitcoin|wallets?|money)
+(?:lost|stolen)\s+(?:funds|crypto|bitcoin|wallet)\s+recovery
+crypto\s+recovery\s+(?:expert|specialist|service|agent)
+recovery\s+(?:expert|specialist|agent)
+
+# --- espionaje ---
+spy(?:ware)?\s+(?:app|service|tool)
+phone\s+(?:spy|monitoring|tracking)\s+(?:app|service)
+track\s+(?:any|your)\s+(?:phone|device|spouse|partner)
+catch\s+(?:a\s+)?cheating\s+(?:spouse|partner|husband|wife)
+
+# --- fraude ---
+carding
+fullz
+bank\s+logs?
+cvv\s+(?:shop|dumps?)
+fake\s+(?:ids?|passports?|documents?|diplomas?)
+stolen\s+(?:accounts?|cards?|data)
+(?:buy|sell(?:ing)?)\s+(?:followers?|likes?|views?|subscribers?)

@@ -34,45 +34,59 @@ _EMOJI_LINE_RE = re.compile(
     re.MULTILINE,
 )
 # Cifras con símbolo de moneda (cualquier importe)
+# El símbolo va DETRÁS en español (500€) y DELANTE en inglés ($500). Se aceptan
+# las dos formas: con solo la española, un "Earn $500/day" en un grupo en inglés
+# no sumaba señal de dinero y el anuncio se colaba.
 _MONEY_RE = re.compile(
     r'\b\d{1,3}(?:[.,]\d{3})*(?:[.,]\d+)?\s*[€$]|'
-    r'\b\d{2,}\s*(?:€|EUR|USD|\$|d[oó]lares|euros)\b',
+    r'\b\d{2,}\s*(?:€|EUR|USD|\$|d[oó]lares|euros)\b|'
+    r'[€$£]\s*\d[\d.,]*(?:\s*[kK])?',
     re.IGNORECASE,
 )
 # Cifras con periodicidad temporal — patrón típico de oferta laboral spam
-# Ej: "2.800 € al mes", "500€ semanales", "3000 dólares por mes"
+# Ej: "2.800 € al mes", "500€ semanales", "3000 dólares por mes",
+#     "$500/day", "$2000 per month", "500 USD weekly"
 _PERIODIC_MONEY_RE = re.compile(
-    r'\d{1,3}(?:[.,]\d{3})*(?:[.,]\d+)?\s*'
-    r'(?:€|\$|EUR|USD|euros|d[oó]lares)\s*'
+    # importe con el símbolo detrás (es) o delante (en)
+    r'(?:\d{1,3}(?:[.,]\d{3})*(?:[.,]\d+)?\s*(?:€|\$|EUR|USD|euros|d[oó]lares)'
+    r'|[€$£]\s*\d[\d.,]*(?:\s*[kK])?)\s*'
     r'(?:al?\s+mes|por\s+mes|/?\s*mes(?:es)?|mensual(?:es)?|'
     r'al?\s+semana|por\s+semana|/?\s*semana|semanal(?:es)?|'
-    r'al\s+a[ñn]o|anual(?:es)?)\b',
+    r'al\s+a[ñn]o|anual(?:es)?|'
+    # periodicidad en inglés: /day, per day, a day, daily...
+    r'/\s*(?:day|d|week|wk|month|mo|year|yr|hour|hr)\b|'
+    r'(?:per|a|an|each)\s+(?:day|week|month|year|hour)\b|'
+    r'(?:daily|weekly|monthly|yearly|hourly)\b)',
     re.IGNORECASE,
 )
-# Call-to-action publicitario
-_CTA_RE = re.compile(
-    r'\b(post[uú]late|cont[aá]ctan?os?|cont[aá]ctame|inscr[ií]bete|'
-    r'env[ií]a\s*(tu\s*)?(cv|curr[ií]culum|mensaje)|'
-    r'haz\s+click|click\s+(en|aqu[ií])|escr[ií]beme|escr[ií]benos|'
-    r'interesados?\s+(escribir|contactar)|'
-    r'm[aá]s\s+info(rmaci[oó]n)?\s+(por|en|v[ií]a)\s+(dm|md|privado|wsp|whatsapp)|'
-    r'env[ií]ame?\s+(un\s+)?(mensaje|dm|md|privado))',
-    re.IGNORECASE,
-)
+# Call-to-action publicitario.
+# Editable en config/blacklist/commercial_cta.txt (defaults de fallback abajo).
+_DEFAULT_CTA = [
+    r"post[uú]late", r"cont[aá]ctan?os?", r"cont[aá]ctame", r"inscr[ií]bete",
+    r"env[ií]a\s*(?:tu\s*)?(?:cv|curr[ií]culum|mensaje)",
+    r"haz\s+click", r"click\s+(?:en|aqu[ií])", r"escr[ií]beme", r"escr[ií]benos",
+    r"interesados?\s+(?:escribir|contactar)",
+    r"m[aá]s\s+info(?:rmaci[oó]n)?\s+(?:por|en|v[ií]a)\s+(?:dm|md|privado|wsp|whatsapp)",
+    r"env[ií]ame?\s+(?:un\s+)?(?:mensaje|dm|md|privado)",
+]
 # Vocabulario de oferta de trabajo / reclutamiento (lado del que OFRECE empleo,
 # que es el patrón spam; NO el de quien busca trabajo y pregunta sin enlace).
 # Caso real: "Si estás buscando trabajo... oportunidades de empleo disponibles".
-_WORK_RE = re.compile(
-    r'\b(vacantes?|puestos?\s+disponibles?|sueldo|salario|'
-    r'contrato\s+(legal|estable|indefinido)|trabajo\s+(estable|legal|garantizado)|'
-    r'oportunidad(?:es)?\s+(?:laboral(?:es)?|de\s+(?:empleo|trabajo|negocio))|'
-    r'ofertas?\s+de\s+(?:empleo|trabajo)|empleos?\s+disponibles?|'
-    r'(?:trabaja|trabajo|ingresos?|gana[rs]?|dinero)\s+desde\s+(?:casa|tu\s+m[oó]vil)|'
-    r'gana[rs]?\s+(?:dinero|hasta\s+\d)|ingresos?\s+(?:extra|adicionales|garantizados)|'
-    r'estamos\s+contratando|se\s+(?:busca|necesita[n]?)\s+(?:personal|empleados?|gente|colaboradores)|'
-    r'trabajo\s+que\s+m[aá]s\s+te\s+interese|si\s+est[aá]s\s+buscando\s+(?:trabajo|empleo))\b',
-    re.IGNORECASE,
-)
+# Editable en config/blacklist/commercial_work.txt (defaults de fallback abajo).
+_DEFAULT_WORK = [
+    r"vacantes?", r"puestos?\s+disponibles?", r"sueldo", r"salario",
+    r"contrato\s+(?:legal|estable|indefinido)",
+    r"trabajo\s+(?:estable|legal|garantizado)",
+    r"oportunidad(?:es)?\s+(?:laboral(?:es)?|de\s+(?:empleo|trabajo|negocio))",
+    r"ofertas?\s+de\s+(?:empleo|trabajo)", r"empleos?\s+disponibles?",
+    r"(?:trabaja|trabajo|ingresos?|gana[rs]?|dinero)\s+desde\s+(?:casa|tu\s+m[oó]vil)",
+    r"gana[rs]?\s+(?:dinero|hasta\s+\d)",
+    r"ingresos?\s+(?:extra|adicionales|garantizados)",
+    r"estamos\s+contratando",
+    r"se\s+(?:busca|necesita[n]?)\s+(?:personal|empleados?|gente|colaboradores)",
+    r"trabajo\s+que\s+m[aá]s\s+te\s+interese",
+    r"si\s+est[aá]s\s+buscando\s+(?:trabajo|empleo)",
+]
 # URL externa (http/https) que NO sea t.me — enlaces a webs de "empleo"/scam.
 _EXTERNAL_URL_RE = re.compile(r'https?://(?!t\.me/|telegram\.me/)\S+', re.IGNORECASE)
 # Trabajo doméstico / búsqueda de persona — patrón scam "cuidar casa/mascota/niños"
@@ -104,9 +118,19 @@ _DEFAULT_ILLEGAL_SERVICES = [
     r"clonar?\s+(?:whatsapp|tarjeta|sim)",
     r"informaci[oó]n\s+(?:personal|privada)\s+de",
 ]
-_ILLEGAL_SERVICES_RE = load_and_compile(
-    "commercial_illegal_services.txt", _DEFAULT_ILLEGAL_SERVICES,
-)
+
+
+def _illegal_services_re() -> re.Pattern:
+    return load_and_compile("commercial_illegal_services.txt", _DEFAULT_ILLEGAL_SERVICES)
+
+
+def _cta_re() -> re.Pattern:
+    return load_and_compile("commercial_cta.txt", _DEFAULT_CTA)
+
+
+def _work_re() -> re.Pattern:
+    return load_and_compile("commercial_work.txt", _DEFAULT_WORK)
+
 
 
 def check(msg: Message, is_first_msg: bool = False) -> Hit:
@@ -120,13 +144,13 @@ def check(msg: Message, is_first_msg: bool = False) -> Hit:
     emoji_lines = len(_EMOJI_LINE_RE.findall(text))
     has_periodic_money = bool(_PERIODIC_MONEY_RE.search(text))
     has_money = bool(_MONEY_RE.search(text))
-    has_cta = bool(_CTA_RE.search(text))
-    has_work = bool(_WORK_RE.search(text))
+    has_cta = bool(_cta_re().search(text))
+    has_work = bool(_work_re().search(text))
     has_tg_link = "t.me/" in text.lower() or "telegram.me/" in text.lower()
     has_external_url = bool(_EXTERNAL_URL_RE.search(text))
     has_domestic = bool(_DOMESTIC_OFFER_RE.search(text))
     has_urgency = bool(_URGENCY_RE.search(text))
-    illegal = _ILLEGAL_SERVICES_RE.findall(text)
+    illegal = _illegal_services_re().findall(text)
     n_illegal = len(set(m.lower() for m in illegal))
 
     score = 0

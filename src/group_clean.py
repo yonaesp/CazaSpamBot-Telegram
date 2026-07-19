@@ -12,6 +12,7 @@ También aloja el menú de comandos de Telegram y el panel visual `/limpieza`.
 from __future__ import annotations
 
 import logging
+import re
 
 from telegram import (
     BotCommand,
@@ -76,6 +77,46 @@ _PUBLIC_MENU = [
     ("comandos", "cmd.comandos"),
 ]
 
+# Telegram solo acepta nombres de comando `[a-z0-9_]{1,32}`: si una traducción trae
+# mayúsculas, acentos o espacios, `setMyCommands` falla ENTERO y el bot se queda sin
+# menú. Por eso el nombre traducido se valida y, si no cumple, se usa el de la tupla.
+_VALID_COMMAND = re.compile(r"^[a-z0-9_]{1,32}$")
+
+
+def _menu_name(default: str, lang: str | None = None) -> str:
+    """Nombre del comando en el idioma activo (`cmd.name.<default>`), o el de por
+    defecto si no hay traducción o la que hay no es válida para Telegram.
+
+    Solo los comandos con nombre traducible tienen clave (`/verificacion` →
+    `/verification`...); para el resto `t()` devuelve la clave cruda, que lleva puntos
+    y no pasa la validación, así que cae al nombre por defecto igualmente.
+    """
+    name = t(f"cmd.name.{default}", _lang=lang).strip()
+    if not _VALID_COMMAND.match(name):
+        if name != f"cmd.name.{default}":  # traducción presente pero inservible
+            log.warning("Nombre de comando inválido para Telegram (%r), se usa %r.",
+                        name, default)
+        return default
+    return name
+
+
+def _menu_commands(entries, lang: str | None = None) -> list[BotCommand]:
+    """Construye el menú traducido (nombre + descripción) sin nombres duplicados:
+    Telegram rechaza la lista entera si un nombre se repite."""
+    out: list[BotCommand] = []
+    vistos: set[str] = set()
+    for default, desc_key in entries:
+        name = _menu_name(default, lang)
+        if name in vistos:
+            log.warning("Nombre de comando duplicado en el menú (%r), se usa %r.",
+                        name, default)
+            name = default
+            if name in vistos:
+                continue
+        vistos.add(name)
+        out.append(BotCommand(name, t(desc_key, _lang=lang)))
+    return out
+
 
 def hide_on(db: DB) -> bool:
     v = db.get_pref(HIDE_PREF)
@@ -98,12 +139,12 @@ def set_clean(db: DB, on: bool) -> None:
 async def apply_command_menu(bot, cfg, db: DB) -> None:
     """Publica el menú de comandos: público (privados), admin (su DM) y grupos
     (ocultos o solo público según la preferencia). No debe impedir el arranque."""
-    pub = [BotCommand(c, t(k)) for c, k in _PUBLIC_MENU]
+    pub = _menu_commands(_PUBLIC_MENU)
     try:
         await bot.set_my_commands(pub, scope=BotCommandScopeDefault())
         if cfg.admin_user_id:
             await bot.set_my_commands(
-                [BotCommand(c, t(k)) for c, k in _ADMIN_MENU],
+                _menu_commands(_ADMIN_MENU),
                 scope=BotCommandScopeChat(chat_id=cfg.admin_user_id))
         if hide_on(db):
             await bot.set_my_commands([], scope=BotCommandScopeAllGroupChats())

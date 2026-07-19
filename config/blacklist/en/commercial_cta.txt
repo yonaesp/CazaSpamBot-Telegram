@@ -1,0 +1,14 @@
+# Llamada a la accion publicitaria en ANUNCIOS, en INGLES (commercial_ad).
+# Se SUMAN a los del archivo generico ../commercial_cta.txt.
+# Un patrón por línea (palabra o regex). # = comentario. Usa (?:...) no (...).
+# DESCARTADO a proposito: "register now" (anuncios legitimos de eventos y
+# webinars en grupos tecnicos) y "hit me up" (conversacion normal en ingles).
+apply\s+now
+apply\s+(?:here|today|via\s+the\s+link)
+send\s+(?:me\s+)?(?:your\s+)?(?:cv|resume)
+dm\s+(?:me\s+)?(?:for|to\s+get)\s+(?:details?|info(?:rmation)?|more)
+pm\s+(?:me\s+)?for\s+(?:details?|info(?:rmation)?)
+(?:message|write|contact)\s+(?:me|us)\s+(?:on|via)\s+(?:whatsapp|telegram|signal|wickr)
+interested\s+(?:persons?|candidates?|applicants?|parties)\s+(?:should|can|may)\s+(?:contact|dm|pm|message|write|apply)
+click\s+(?:the\s+)?link\s+(?:below|here)
+join\s+(?:the\s+)?(?:vip\s+)?(?:channel|group)\s+(?:below|here|now)

@@ -256,10 +256,12 @@ def main() -> int:
     app.add_handler(CommandHandler("help", admin.cmd_help))
     # /comandos: comando público accesible para CUALQUIER usuario (no solo admin)
     app.add_handler(CommandHandler("comandos", admin.cmd_comandos))
+    app.add_handler(CommandHandler("commands", admin.cmd_comandos))  # alias en inglés
     app.add_handler(CommandHandler("stats", admin.cmd_stats))
     app.add_handler(CommandHandler("chats", admin.cmd_chats))
     app.add_handler(CommandHandler("recent", admin.cmd_recent))
     app.add_handler(CommandHandler("alertas", admin.cmd_alertas))
+    app.add_handler(CommandHandler("alerts", admin.cmd_alertas))  # alias en inglés
     app.add_handler(CommandHandler("shadow", admin.cmd_shadow))
     app.add_handler(CommandHandler("ban", admin.cmd_ban))
     app.add_handler(CommandHandler("federban", admin.cmd_ban))  # alias retrocompatible
@@ -298,6 +300,7 @@ def main() -> int:
     app.add_handler(CommandHandler("sincronizar", config_panel.cmd_sync))  # alias
     app.add_handler(CommandHandler("limpieza", group_clean.cmd_limpieza))
     app.add_handler(CommandHandler("grouplean", group_clean.cmd_limpieza))  # alias
+    app.add_handler(CommandHandler("cleanup", group_clean.cmd_limpieza))  # alias en inglés
     app.add_handler(CommandHandler("idioma", lang_cmd.cmd_idioma))
     app.add_handler(CommandHandler("language", lang_cmd.cmd_idioma))  # alias
     app.add_handler(CommandHandler("setwelcomebutton", chat_settings_cmd.cmd_setwelcomebutton))

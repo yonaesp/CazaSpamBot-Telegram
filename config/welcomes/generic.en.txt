@@ -1,0 +1,11 @@
+# Generic welcome lines (example), used when the bot language is English.
+# - One line per phrase. Blank lines and lines starting with # are ignored.
+# - Use {name} where the member's name should appear.
+# - To customise a specific group, create config/welcomes/<chat_id>.txt
+#   (that file is NOT committed; this generic one is).
+# - To turn friendly welcomes off: FRIENDLY_WELCOMES_ENABLED=false in .env
+#
+# Keep them short and warm. The fixed footer about rules and the pinned
+# message is added automatically, so there is no need to repeat it here.
+👋 Welcome {name}. Take a look at the rules and the pinned message.
+🤝 Hi {name}! Glad to have you here.

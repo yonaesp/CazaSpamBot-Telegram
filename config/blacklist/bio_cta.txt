@@ -1,0 +1,17 @@
+# Llamada a la accion promocional en la BIO del perfil (detector bio_spam).
+# Un patrón por línea (palabra o regex). # = comentario. Usa (?:...) no (...).
+dm\b
+md\b
+escr[ií]beme
+cont[aá]ctame
+cl[ií]ck
+haz\s+click
+aqu[ií]\s+est[oa]y
+link\s+(?:en\s+)?(?:bio|perfil)
+sigueme
+join\s+now
+follow\s+me
+come\s+see\s+me
+hier\s+geht
+(?:consulta(?:r)?|visita(?:r)?|mira(?:r)?|ve[ra]?)\s+(?:el\s+|mi\s+|la\s+)?(?:sitio|web|p[aá]gina|perfil)
+m[aá]s\s+info\s+en

@@ -27,7 +27,7 @@ from telegram.ext import ContextTypes
 from . import user_signals
 from .db import DB
 from .detectors.unicode_script import non_allowed_ratio
-from .i18n import t
+from .i18n import current_lang, t
 
 log = logging.getLogger(__name__)
 
@@ -393,8 +393,17 @@ def _read_phrase_file(path: Path) -> list[str]:
 
 
 def _load_welcome_pack(chat_id: int) -> list[str]:
-    """Frases de bienvenida para un chat (archivo del grupo → genérico → fallback)."""
+    """Frases de bienvenida para un chat, por orden de preferencia:
+    archivo del grupo → genérico DEL IDIOMA → genérico → fallback traducido.
+
+    El genérico por idioma (`generic.en.txt`) va ANTES que `generic.txt` a
+    propósito: `generic.txt` viene en español en el repo, así que sin este paso
+    quien instalara el bot en inglés recibiría bienvenidas en español (el archivo
+    existe, luego gana al fallback traducido y nadie se explica por qué).
+    """
     pack = _read_phrase_file(_WELCOMES_DIR / f"{chat_id}.txt")
+    if not pack:
+        pack = _read_phrase_file(_WELCOMES_DIR / f"generic.{current_lang()}.txt")
     if not pack:
         pack = _read_phrase_file(_WELCOMES_DIR / "generic.txt")
     return pack or _default_welcomes()

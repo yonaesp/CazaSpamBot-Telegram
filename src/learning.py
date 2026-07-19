@@ -15,7 +15,7 @@ import unicodedata
 from collections import Counter
 from typing import Iterable
 
-from .wordlists import load_terms
+from .wordlists import active_langs, load_terms
 
 log = logging.getLogger(__name__)
 
@@ -125,15 +125,28 @@ _DEFAULT_THEMATIC_TOKENS = [
     "actualización", "driver", "drivers", "sistema", "ordenador", "movil",
     "móvil", "app", "aplicacion", "aplicación", "configurar", "instalar",
 ]
-_EXCLUDED_TOKENS = _STOPWORDS_ES | {
-    t.lower() for t in load_terms("classifier_excluded_tokens.txt", _DEFAULT_THEMATIC_TOKENS)
-}
+_EXCLUDED_CACHE: dict[tuple[str, ...], frozenset[str]] = {}
+
+
+def _excluded_tokens() -> frozenset[str]:
+    """Tokens neutros del idioma activo (se lee tarde: al importar este módulo
+    el bot todavía no ha resuelto su idioma)."""
+    key = tuple(active_langs())
+    cached = _EXCLUDED_CACHE.get(key)
+    if cached is None:
+        cached = _STOPWORDS_ES | frozenset(
+            t.lower()
+            for t in load_terms("classifier_excluded_tokens.txt", _DEFAULT_THEMATIC_TOKENS)
+        )
+        _EXCLUDED_CACHE[key] = cached
+    return cached
 
 
 def _tokenize(text: str) -> list[str]:
     """Tokeniza texto en palabras (mín 2 chars), eliminando tokens neutros que
     no aportan señal al clasificador (stop-words + vocabulario temático)."""
-    return [t for t in _WORD_RE.findall(text) if t.lower() not in _EXCLUDED_TOKENS]
+    excluded = _excluded_tokens()
+    return [t for t in _WORD_RE.findall(text) if t.lower() not in excluded]
 
 
 def naive_bayes_spam_prob(

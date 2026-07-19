@@ -1,0 +1,14 @@
+# Llamada a la accion publicitaria en ANUNCIOS (detector commercial_ad).
+# Un patrón por línea (palabra o regex). # = comentario. Usa (?:...) no (...).
+post[uú]late
+cont[aá]ctan?os?
+cont[aá]ctame
+inscr[ií]bete
+env[ií]a\s*(?:tu\s*)?(?:cv|curr[ií]culum|mensaje)
+haz\s+click
+click\s+(?:en|aqu[ií])
+escr[ií]beme
+escr[ií]benos
+interesados?\s+(?:escribir|contactar)
+m[aá]s\s+info(?:rmaci[oó]n)?\s+(?:por|en|v[ií]a)\s+(?:dm|md|privado|wsp|whatsapp)
+env[ií]ame?\s+(?:un\s+)?(?:mensaje|dm|md|privado)

@@ -1,0 +1,48 @@
+# Vocabulario de OFERTA de empleo / dinero facil, en INGLES (commercial_ad).
+# Se SUMAN a los del archivo generico ../commercial_work.txt.
+# Un patrón por línea (palabra o regex). # = comentario. Usa (?:...) no (...).
+#
+# DESCARTADO a proposito (riesgo real de falso positivo en grupos tecnicos):
+#   salary / pay / money / job / hiring sueltos  -> "what's the salary like?"
+#   "work from home" suelto                      -> mucha gente teletrabaja
+#   "remote job", "part-time job" sueltos        -> se habla de ellos a diario
+#   "giveaway", "limited time offer"             -> promos legitimas de tiendas
+# Se exigen formas de OFERTA (imperativo, cifras, "we are hiring"), no de
+# conversacion sobre trabajo.
+
+# --- oferta / reclutamiento ---
+job\s+(?:vacanc(?:y|ies)|openings?|offers?)
+vacanc(?:y|ies)
+positions?\s+available
+openings?\s+available
+now\s+hiring
+(?:we\s+are|we're)\s+hiring
+hiring\s+(?:now|immediately)
+looking\s+for\s+(?:serious\s+)?(?:workers?|candidates?|employees?|staff)
+if\s+you(?:'re|\s+are)\s+(?:looking\s+for|interested\s+in)\s+(?:a\s+)?(?:job|work|employment)
+no\s+experience\s+(?:needed|required)
+(?:remote|online|part[\s-]?time)\s+(?:job|work)\s+(?:opportunit(?:y|ies)|available|offers?)
+
+# --- cifras: el "make $500/day" clasico ---
+# OJO: los patrones NO pueden empezar por un simbolo ($, %...). El cargador
+# envuelve todo en \b(?:...)\b y \b jamas casa antes de un '$'. Por eso las
+# cifras van ancladas a un VERBO o a la moneda escrita con letras.
+# Solo verbos de OFERTA y con el simbolo/importe explicito. NO se admite
+# "paid 200 a month" ni "costs 500 dollars a month": son frases normales de
+# alguien contando lo que paga, y bastarian para banearle si comparte un enlace.
+(?:make|earn|earning)\s+\$\s?\d[\d.,]*\s*k?
+(?:make|earn|earning)\s+up\s+to\s+\$?\s?\d[\d.,]*\s*k?
+monthly\s+salary
+weekly\s+salary
+salary\s+(?:up\s+to|range|of)\s+\$?\s?\d
+\d+\s*%\s*(?:roi|profits?|returns?)\s+(?:daily|weekly|monthly|guaranteed)
+
+# --- dinero desde casa ---
+work\s+from\s+home\s+(?:job|opportunit(?:y|ies))
+earn\s+from\s+home
+start\s+earning\s+(?:today|now)
+(?:extra|passive|guaranteed)\s+income
+daily\s+payouts?
+weekly\s+payouts?
+crypto\s+(?:investment|trading)\s+(?:platform|opportunit(?:y|ies)|program)
+investment\s+(?:opportunit(?:y|ies)|plan|scheme)
