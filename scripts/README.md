@@ -11,6 +11,7 @@ mayoría requiere Telethon configurado (ver sección 3 de `.env.example`).
 | `analyze_members.py` | Barrido de miembros sospechosos de cada grupo (perfiles spam, dormidos, etc.). Por defecto **solo reporta**, no actúa. |
 | `analyze_user.py` | Informe completo de un usuario concreto (`python -m scripts.analyze_user @username`): perfil, historial, señales. |
 | `capture_rose_welcomes.py` | Migración desde el bot Rose: captura el welcome y las rules que tenías configurados en Rose y los importa a la base de datos del bot. Solo útil si vienes de Rose. |
+| `traffic_log.py` | Registra en local el tráfico del repo en GitHub (visitas y clones). GitHub solo guarda 14 días; este script los va acumulando en `traffic/history.json` (gitignored). Ejecútalo un par de veces al mes: `python -m scripts.traffic_log` (lee y fusiona) o `--show` (solo muestra lo guardado). Requiere `gh` autenticado. |
 
 > Ninguno de estos scripts ejecuta acciones de moderación por sí mismo: son de
 > diagnóstico/importación. Las acciones siempre pasan por el bot y su auditoría.

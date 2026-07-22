@@ -67,3 +67,7 @@ Thumbs.db
 # Claude Code (local-only state — la carpeta .claude/ SI se commitea, las settings.local.json NO)
 .claude/settings.local.json
 .claude/cache/
+
+# Histórico local del trafico del repo en GitHub (dato del despliegue, se acumula
+# con scripts/traffic_log.py). No es del codigo, no se versiona.
+traffic/
