@@ -183,4 +183,21 @@ git add -A && git commit -m "..." && git push
 `CHANGELOG.md` (hitos por fecha, lo más reciente arriba).
 `src/locales/README.md` (traductores) · `config/blacklist/README.md` (listas) · `config/welcomes/README.md`.
 
-*Actualizado: 2026-07-19 — bilingüe es/en, 20 detectores, 798 tests, panel completo.*
+## Tráfico del repo (visitas y clones)
+
+GitHub solo guarda **14 días** de tráfico y luego lo tira. `scripts/traffic_log.py`
+lee esa ventana vía `gh` y la **acumula** en `traffic/history.json`, para construir
+el histórico que GitHub no conserva. **Ejecutarlo un par de veces al mes** (dentro
+de esos 14 días) basta para no perder ningún día.
+
+```bash
+.venv/bin/python scripts/traffic_log.py          # lee vía gh y fusiona por fecha
+.venv/bin/python scripts/traffic_log.py --show    # muestra lo guardado sin llamar a la API
+```
+
+Idempotente: fusiona por fecha, así que ejecutarlo de más nunca infla las cifras.
+El histórico vive en `traffic/` (**gitignored**, no en `data/`, que es del contenedor
+Docker como root). Ojo al leer los números: los **clones** suelen ser bots que
+rastrean GitHub, no gente; la señal de interés real son los **visitantes web únicos**.
+
+*Actualizado: 2026-07-23 — bilingüe es/en, 20 detectores, 798 tests, panel completo, registro de tráfico local.*
