@@ -21,6 +21,7 @@ KNOWN_RULES: frozenset[str] = frozenset({
     "dormant_bot_mention",
     # --- Contenido del mensaje ---
     "commercial_ad",
+    "investment_scam",
     "inline_buttons_from_user",
     "external_mention_or_link",
     "url_blocklist",

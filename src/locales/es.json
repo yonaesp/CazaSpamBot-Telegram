@@ -901,5 +901,13 @@
   "cfg.ct.err.llena": "❌ Esta lista está llena ({n} palabras). Quita alguna antes de añadir otra.",
   "cfg.ct.err.no_encontrado": "❌ Esa palabra no está en la lista.",
   "cfg.ct.err.escritura": "❌ No he podido guardar el archivo. Revisa los permisos del disco; no se ha cambiado nada.",
-  "cfg.ct.err.generico": "❌ No se puede añadir esa palabra."
+  "cfg.ct.err.generico": "❌ No se puede añadir esa palabra.",
+  "reason.investment_scam": "Testimonio de estafa de inversión ({details})",
+  "reason.invscam_giveback": "estructura «di X y me devolvieron {mult}x»",
+  "reason.invscam_praise": "elogio a quien «te hace ganar»",
+  "reason.invscam_cta": "llama a contactar a esa persona",
+  "reason.invscam_vocab": "vocabulario de inversión/trading garantizado",
+  "reason.invscam_time": "promesa de retorno en X horas/días",
+  "reason.invscam_firstmsg": "en el primer mensaje",
+  "rule.investment_scam": "Publicó el testimonio típico de una estafa de inversión: «le di X dinero y me devolvió mucho más», elogiando y remitiendo a una cuenta para que la contactes."
 }

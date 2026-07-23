@@ -27,6 +27,7 @@ from .detectors import first_msg_media as media_det
 from .detectors import forward_first_msg as fwd_det
 from .detectors import inline_buttons as buttons_det
 from .detectors import commercial_ad as comad_det
+from .detectors import investment_scam as invscam_det
 from .detectors import contact_spam as contact_det
 from .detectors import external_reply as extreply_det
 from .detectors import photos_batch as photos_batch_det
@@ -891,6 +892,10 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     # 3d-quat) Estructura de anuncio comercial (señales acumuladas:
     # multilínea con emojis + cifras € + CTA + link).
     hits.append(comad_det.check(msg, is_first_msg=is_first))
+    # 3d-quat2) Testimonio de estafa de inversión ("di X, me devolvieron Y mayor")
+    # con elogio a la persona y llamada a contactarla. Sin esto se colaba cuando no
+    # ponían @usuario final (era lo único que lo cazaba, vía external_mention).
+    hits.append(invscam_det.check(msg, is_first_msg=is_first))
     # 3d-quint) Primer mensaje dominado por emojis sin texto real (captación
     # de atención típica de spam, ej. "🍭🍄🌟").
     hits.append(emoji_only_det.check(msg, is_first_msg=is_first))

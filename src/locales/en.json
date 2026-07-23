@@ -901,5 +901,13 @@
   "cfg.ct.err.llena": "❌ This list is full ({n} words). Remove one before adding another.",
   "cfg.ct.err.no_encontrado": "❌ That word is not in the list.",
   "cfg.ct.err.escritura": "❌ I could not save the file. Check the disk permissions; nothing was changed.",
-  "cfg.ct.err.generico": "❌ That word cannot be added."
+  "cfg.ct.err.generico": "❌ That word cannot be added.",
+  "reason.investment_scam": "Investment scam testimonial ({details})",
+  "reason.invscam_giveback": "«I gave X and got {mult}x back» structure",
+  "reason.invscam_praise": "praise for the person who «makes you money»",
+  "reason.invscam_cta": "calls to contact that person",
+  "reason.invscam_vocab": "guaranteed investment/trading vocabulary",
+  "reason.invscam_time": "promise of returns in X hours/days",
+  "reason.invscam_firstmsg": "in the first message",
+  "rule.investment_scam": "Posted the classic investment scam testimonial: «I gave X money and got much more back», praising and pointing you to an account to contact."
 }
