@@ -1,7 +1,7 @@
 # CazaSpamBot — Bot Antispam Telegram
 
 Bot de moderación antispam **en producción 24/7**, multi-grupo, federado y **bilingüe** (es/en).
-~14.400 LOC, Docker, **798 tests**, 20 detectores.
+~14.400 LOC, Docker, **810 tests**, 21 detectores.
 
 > **Estado: PRODUCCIÓN.** No es un esqueleto. Cualquier cambio afecta grupos reales con miles de usuarios. **Investiga > Confirma > Actúa.**
 
@@ -74,8 +74,10 @@ nativa; se itera `banChatMember` sobre los chats donde el bot es admin.
 
 ## Detectores (`src/detectors/` + `verification.py`)
 
-20 detectores: `obvious_spam_profile`, `bio_spam`, `photos_batch`, `commercial_ad`, `contact_spam`, `forward_first_msg`, `first_msg_media`, `inline_buttons`, `external_mention`, `external_reply`, `url_blocklist`, `tg_deeplink`, `non_allowed_script` (unicode_script), `reaction_farming`, `jfm_delta`, `premium_new_link`, `emoji_only`, `dormant_bot_mention`, `cas`, `lols_bot`, `learned_similarity`, `personal_channel_spam`.
+21 detectores: `obvious_spam_profile`, `bio_spam`, `photos_batch`, `commercial_ad`, `investment_scam`, `contact_spam`, `forward_first_msg`, `first_msg_media`, `inline_buttons`, `external_mention`, `external_reply`, `url_blocklist`, `tg_deeplink`, `non_allowed_script` (unicode_script), `reaction_farming`, `jfm_delta`, `premium_new_link`, `emoji_only`, `dormant_bot_mention`, `cas`, `lols_bot`, `learned_similarity`, `personal_channel_spam`.
 También banea spam publicado en nombre de un canal (`sender_chat` → `banChatSenderChat`).
+
+`investment_scam` caza el **testimonio de estafa de inversión** («le di X y me devolvió mucho más en N horas»), que antes solo caía por la @mención del final (`external_mention`). La firma no es la moneda ni el enlace, sino el RELATO: un verbo de entrega (invertí/di/deposité) **y** uno de retorno (me devolvió/gané/«gave me») como puerta obligatoria, y sobre eso la ganancia **direccional** (lo devuelto > lo entregado), el elogio a una «gestora»/experto, el plazo y la llamada a contactar. Acepta «Rs»/rupees/naira y cifras agrupadas (25,000) que `commercial_ad` no mira, y NO gatilla con «le di 50€ y me devolvió 5 de cambio» (sin ganancia).
 
 `rule_explain.py` traduce el id técnico de regla a la explicación que lee el admin. **Es el texto más visible del bot** y tiene prioridad sobre el `reason` del detector.
 
@@ -168,7 +170,7 @@ Cada línea del catálogo es el saludo COMPLETO (`📥 Bienvenido/a {name}. <gra
 ## Flujo de trabajo típico
 
 ```bash
-.venv/bin/python -m pytest tests/ -q          # 798 tests
+.venv/bin/python -m pytest tests/ -q          # 810 tests
 .venv/bin/ruff check src/ tests/
 sudo -n docker compose restart                # o up -d si cambia .env o requirements
 sudo -n docker logs cazaspam-bot --tail 5     # verificar "Bot ... listo"
@@ -183,4 +185,4 @@ git add -A && git commit -m "..." && git push
 `CHANGELOG.md` (hitos por fecha, lo más reciente arriba).
 `src/locales/README.md` (traductores) · `config/blacklist/README.md` (listas) · `config/welcomes/README.md`.
 
-*Actualizado: 2026-07-19 — bilingüe es/en, 20 detectores, 798 tests, panel completo.*
+*Actualizado: 2026-07-23 — bilingüe es/en, 21 detectores (nuevo `investment_scam`), 810 tests, panel completo.*

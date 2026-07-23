@@ -4,6 +4,25 @@ Cambios relevantes de CazaSpamBot, lo más reciente arriba. Se anotan hitos, no
 cada commit: para el detalle está el historial de git. Sin números de versión
 porque el bot es un servicio en producción continua, no un paquete que se libera.
 
+## 2026-07-23 · Detector de testimonios de estafa de inversión
+
+Nuevo detector **`investment_scam`**. Nace de un caso real que solo caía por la
+@mención del final: *«Mrs X has been so good to me. I gave her 25,000 Rs, and
+after 12 hours, she gave me 318,000Rs. 👇 @X»*. Sin la mención se colaba
+(`commercial_ad` no mira «Rs» ni las cifras agrupadas, y no hay enlace ni
+estructura de anuncio).
+
+- **Puerta obligatoria**: el mensaje debe tener a la vez un verbo de **entrega**
+  (invertí/di/deposité/«I gave/invested») y uno de **retorno** (me devolvió/gané/
+  «gave me/withdrew»). Sin las dos mitades del relato no se evalúa nada.
+- Sobre esa base suma señales: **ganancia direccional** (lo devuelto supera a lo
+  entregado, la firma del timo), dos cifras, elogio a una «gestora»/experto,
+  plazo de rentabilidad y llamada a contactar. Bonus de primer mensaje.
+- Bilingüe es/en, con `rule.`, `reason.*` y 8 quips en ambos idiomas.
+- Anti-FP: «le di 50€ y me devolvió 5 de cambio» no dispara (sin ganancia); el
+  empresario legítimo con cifras reales cae en la red del trust (revisión humana
+  en trust medio, ignorado en trust alto). +12 tests.
+
 ## 2026-07 · Bilingüe y configurable desde el móvil
 
 Salto grande: el bot deja de ser una herramienta de un solo grupo en español y

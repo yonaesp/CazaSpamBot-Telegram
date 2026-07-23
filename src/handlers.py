@@ -27,6 +27,7 @@ from .detectors import first_msg_media as media_det
 from .detectors import forward_first_msg as fwd_det
 from .detectors import inline_buttons as buttons_det
 from .detectors import commercial_ad as comad_det
+from .detectors import investment_scam as invest_det
 from .detectors import contact_spam as contact_det
 from .detectors import external_reply as extreply_det
 from .detectors import photos_batch as photos_batch_det
@@ -891,6 +892,10 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     # 3d-quat) Estructura de anuncio comercial (señales acumuladas:
     # multilínea con emojis + cifras € + CTA + link).
     hits.append(comad_det.check(msg, is_first_msg=is_first))
+    # 3d-quat2) Testimonio de estafa de inversión ("le di X y me devolvió mucho
+    # más en N horas"): relato entrega→retorno + ganancia direccional + elogio a
+    # un "gestor". Caza el patrón aunque NO haya mención (que ya coge ext_det).
+    hits.append(invest_det.check(msg, is_first_msg=is_first))
     # 3d-quint) Primer mensaje dominado por emojis sin texto real (captación
     # de atención típica de spam, ej. "🍭🍄🌟").
     hits.append(emoji_only_det.check(msg, is_first_msg=is_first))
@@ -1211,6 +1216,7 @@ _REPORTABLE_RULES = frozenset({
     "inline_buttons_from_user",   # users normales no pueden enviar reply_markup
     "photos_batch_upload",        # fotos de perfil subidas en ráfaga = identidad robada
     "commercial_ad",              # anuncio comercial estructurado (multi-señal)
+    "investment_scam",            # testimonio de estafa de inversión (relato entrega→retorno)
 })
 
 # Score mínimo combinado para que un ban genere reporte oficial. Evita
