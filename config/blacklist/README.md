@@ -32,6 +32,42 @@ chiringuito financiero
 inversi[oó]n\s+garantizada
 ```
 
+## Cómo escribir un patrón
+
+Cada línea es un **regex de Python** que se compila **ignorando mayúsculas y
+minúsculas** (`re.IGNORECASE`), así que no repitas variantes por el caso: `oferta`
+ya caza `OFERTA` y `Oferta`.
+
+Reglas:
+
+- **Agrupa con `(?:...)`, nunca con `(...)`.** Los grupos capturantes rompen el
+  conteo interno de coincidencias del detector. `(?:diario|mensual)` sí, `(diario|mensual)` no.
+- **La lista se envuelve en `\b(?:...)\b`** (palabra completa), salvo en los
+  archivos marcados en la tabla como "sin `\b`" (`commercial_money.txt`,
+  `commercial_money_periodic.txt`, `investment_cta.txt` y sus versiones en `en/`),
+  donde cada patrón pone sus propios `\b`. Por eso, en las listas normales, **no
+  empieces ni termines un patrón con un símbolo** (`$`, `%`, `/`, `@`): `\b` no
+  casa junto a un símbolo y el patrón quedaría muerto en silencio.
+- **Un patrón mal escrito no tumba el bot:** se descarta, se anota en el log
+  (`Patrón de lista negra inválido, se ignora: ...`) y el resto siguen activos.
+
+### El peligro: un patrón demasiado amplio banea gente legítima
+
+Es la **regla número uno del proyecto: un falso positivo es peor que un falso
+negativo.** Mejor dejar pasar un spam que expulsar a un usuario real. Un patrón
+corto o genérico caza conversación normal. Antes de añadir uno, piensa qué
+mensaje **legítimo** podría dispararlo; ante la duda, no lo pongas.
+
+| | Patrón | Por qué |
+|---|---|---|
+| ✅ | `inversi[oó]n\s+garantizada` | frase compuesta que solo escribe un estafador |
+| ✅ | `\b\d+\s*pesos\b` | pegado a una cifra: "20 pesos" es dinero, "el peso del paquete" no |
+| ✅ | `(?:make\|earn)\s+\$\s?\d` | verbo + importe: construcción de anuncio, no de charla |
+| ❌ | `dinero` | palabra suelta y corriente: cualquiera que hable de dinero suma puntos |
+
+Un patrón compuesto (dos o tres piezas que solo aparecen juntas en un anuncio)
+es casi siempre más seguro que una palabra suelta.
+
 ## Archivos
 
 | Archivo | Lo usa | Qué detecta |
@@ -43,6 +79,9 @@ inversi[oó]n\s+garantizada
 | `commercial_money_periodic.txt` | `commercial_ad` | periodicidad pegada al importe (al mes, /day, mensuales...). No lleva monedas: se combina con la lista de arriba |
 | `commercial_urgency.txt` | `commercial_ad` | urgencia gritada de scam (URGENTE, HOY MISMO, act now...) |
 | `commercial_domestic.txt` | `commercial_ad` | scam de trabajo doméstico ("busco persona responsable para cuidar mi casa") |
+| `investment_praise.txt` | `investment_scam` | elogio a "quien te hace ganar" en el testimonio de estafa ("es de confianza", "changed my life") |
+| `investment_cta.txt` | `investment_scam` | llamada a contactar a esa persona ("contáctala", "DM her now", 👇👉📲). **Se carga sin `\b(?:...)\b`** (lleva emojis): pon tú los `\b` en los patrones de texto |
+| `investment_vocab.txt` | `investment_scam` | vocabulario de reclutamiento del timo ("inversión garantizada", "guaranteed profit", "passive income") |
 | `bio_spam_keywords.txt` | `bio_spam` | spam adulto/cripto/casino/préstamo en la bio del perfil |
 | `bio_illegal_services.txt` | `bio_spam` | servicios de hacking/piratería declarados en la bio |
 | `bio_cta.txt` | `bio_spam` | llamadas a la acción promocionales en la bio (escríbeme, DM me...) |

@@ -909,5 +909,10 @@
   "reason.invscam_vocab": "vocabulario de inversión/trading garantizado",
   "reason.invscam_time": "promesa de retorno en X horas/días",
   "reason.invscam_firstmsg": "en el primer mensaje",
-  "rule.investment_scam": "Publicó el testimonio típico de una estafa de inversión: «le di X dinero y me devolvió mucho más», elogiando y remitiendo a una cuenta para que la contactes."
+  "rule.investment_scam": "Publicó el testimonio típico de una estafa de inversión: «le di X dinero y me devolvió mucho más», elogiando y remitiendo a una cuenta para que la contactes.",
+  "cfg.b.money": "🛡️ Rigor trabajo/dinero: {mode} ▸",
+  "cfg.money.normal": "Normal",
+  "cfg.money.soft": "Suave",
+  "cfg.money.off": "Desactivado",
+  "cfg.money_text": "🛡️ <b>Rigor con mensajes de trabajo y dinero</b> — {title}\n\nControla lo estricto que es el bot con anuncios de empleo y testimonios de inversión, sobre todo en el primer mensaje.\n\n• <b>Normal</b>: caza los casos claros y los dudosos (por defecto).\n• <b>Suave</b>: solo los casos MUY evidentes; los mensajes borderline de trabajo/dinero pasan.\n• <b>Desactivado</b>: no actúa por estos motivos (otros detectores siguen).\n\nActual: <b>{mode}</b>"
 }

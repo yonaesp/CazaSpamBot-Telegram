@@ -909,5 +909,10 @@
   "reason.invscam_vocab": "guaranteed investment/trading vocabulary",
   "reason.invscam_time": "promise of returns in X hours/days",
   "reason.invscam_firstmsg": "in the first message",
-  "rule.investment_scam": "Posted the classic investment scam testimonial: «I gave X money and got much more back», praising and pointing you to an account to contact."
+  "rule.investment_scam": "Posted the classic investment scam testimonial: «I gave X money and got much more back», praising and pointing you to an account to contact.",
+  "cfg.b.money": "🛡️ Work/money strictness: {mode} ▸",
+  "cfg.money.normal": "Normal",
+  "cfg.money.soft": "Soft",
+  "cfg.money.off": "Off",
+  "cfg.money_text": "🛡️ <b>Strictness with work and money messages</b> — {title}\n\nControls how strict the bot is with job ads and investment testimonials, especially in the first message.\n\n• <b>Normal</b>: catches clear and borderline cases (default).\n• <b>Soft</b>: only very obvious cases; borderline work/money messages get through.\n• <b>Off</b>: does not act on these grounds (other detectors still run).\n\nCurrent: <b>{mode}</b>"
 }

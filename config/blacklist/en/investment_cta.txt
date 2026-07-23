@@ -1,0 +1,12 @@
+# Llamada a contactar a la persona del testimonio, en INGLES (investment_scam):
+# "DM her now", "join today", "link in bio". Se SUMAN a ../investment_cta.txt.
+#
+# ATENCION, ESTA LISTA VA SIN \b (boundaries=False, ver ../investment_cta.txt):
+# cada patron lleva sus propios \b. Si añades una linea que empieza o acaba en
+# letra, ponle tu el \b delante y detras.
+#
+# Un patron por linea (regex, case-insensitive). # = comentario.
+# Usa grupos NO capturantes (?:...), nunca (...).
+\b(?:dm|pm|message|contact|write|reach\s+out\s+to|inbox)\s+(?:her|him|mrs|mr|ms|now|@)\b
+\b(?:join|start|invest)\s+(?:now|with|today)\b
+\blink\s+in\s+bio\b

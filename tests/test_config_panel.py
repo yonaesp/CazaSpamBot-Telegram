@@ -353,9 +353,11 @@ def test_panel_warns_y_topweekly_comparten_fila():
 
 
 def test_panel_no_crece_mas_de_una_fila():
-    """Regresión de usabilidad: 4 ajustes nuevos sin inflar el panel principal."""
+    """Regresión de usabilidad: el panel principal no debe inflarse sin querer.
+    Tope subido a 14 al añadir 'Rigor trabajo/dinero' (money_guard), en su propia
+    fila por legibilidad en móvil. Si crece más, replantear agrupando en submenús."""
     kb = cp.build_panel_keyboard(CID, _settings())
-    assert len(kb.inline_keyboard) <= 13
+    assert len(kb.inline_keyboard) <= 14
 
 
 # ------------------------------ submenú bienvenida ------------------------------

@@ -1,0 +1,8 @@
+# Vocabulario de reclutamiento del timo (detector investment_scam): plataforma o
+# programa de "inversion garantizada". Se SUMA a ../en/investment_vocab.txt.
+#
+# Un patron por linea (palabra o regex, case-insensitive). # = comentario.
+# Usa grupos NO capturantes (?:...), nunca (...). Se envuelve en \b(?:...)\b.
+se[ñn]ales\s+de\s+trading
+inversi[oó]n\s+garantizada
+duplica\s+tu\s+(?:dinero|inversi[oó]n)

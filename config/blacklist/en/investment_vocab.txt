@@ -1,0 +1,17 @@
+# Vocabulario de reclutamiento del timo, en INGLES (detector investment_scam):
+# "binary option", "guaranteed profit", "passive income". Se SUMAN a
+# ../investment_vocab.txt.
+#
+# Un patron por linea (palabra o regex, case-insensitive). # = comentario.
+# Usa grupos NO capturantes (?:...), nunca (...). Se envuelve en \b(?:...)\b.
+binary\s+option
+forex
+crypto\s+(?:trad|invest|mining)
+trading\s+(?:signal|platform|expert|account)
+account\s+manager
+expert\s+trader
+investment\s+(?:platform|plan|program|opportunity)
+double\s+your\s+(?:money|investment|capital)
+guaranteed\s+(?:profit|return|income)
+passive\s+income
+withdraw(?:al)?\s+(?:proof|instant)

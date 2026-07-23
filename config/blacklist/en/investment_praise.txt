@@ -1,0 +1,13 @@
+# Elogio a la persona que "te hace ganar", en INGLES (detector investment_scam).
+# Se SUMAN a los del archivo generico ../investment_praise.txt.
+#
+# Un patron por linea (palabra o regex, case-insensitive). # = comentario.
+# Usa grupos NO capturantes (?:...), nunca (...). Se envuelve en \b(?:...)\b.
+has\s+been\s+(?:so\s+)?(?:good|kind|honest|amazing|wonderful)\s+to\s+me
+changed\s+my\s+life
+(?:she|he|she's|he's|shes|hes)\s+(?:is\s+)?(?:so\s+)?(?:legit|real|honest|trustworthy|genuine|the\s+best)
+trust(?:ed)?\s+(?:her|him|mrs|mr|ms|madam|sir)
+thanks?\s+to\s+(?:her|him|mrs|mr|ms|madam|sir|god)
+god\s+bless\s+(?:her|him|you)
+i\s+(?:highly\s+)?recommend\s+(?:her|him|mrs|mr|ms)
+forever\s+grateful

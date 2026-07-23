@@ -48,6 +48,35 @@ from .scoring import Decision, decide
 
 log = logging.getLogger(__name__)
 
+# Con money_guard='soft' un hit de dinero/trabajo solo sobrevive si es MUY claro.
+# El umbral de los detectores es 60; aquí exigimos bastante más para que solo caigan
+# los casos evidentes y los borderline (trabajo/dinero legítimo dudoso) pasen.
+_MONEY_SOFT_MIN_SCORE = 100
+
+
+def _chat_money_guard(db: DB, chat_id: int) -> str:
+    """Modo money_guard del chat: 'normal' | 'soft' | 'off'. A prueba de fallos."""
+    try:
+        s = db.get_chat_settings(chat_id)
+        return (s["money_guard"] if s is not None else None) or "normal"
+    except Exception:  # noqa: BLE001 — chat sin settings, columna vieja, BD ocupada
+        return "normal"
+
+
+def _apply_money_guard(hit: Hit, mode: str) -> Hit:
+    """Modula un hit de commercial_ad/investment_scam según el ajuste del chat.
+
+    'normal' lo deja igual; 'off' lo anula; 'soft' solo lo conserva si el score es
+    muy alto (caso claro), dejando pasar los borderline. Nunca sube la agresividad.
+    """
+    if not hit or mode == "normal":
+        return hit
+    if mode == "off":
+        return Hit.none()
+    if mode == "soft" and hit.score < _MONEY_SOFT_MIN_SCORE:
+        return Hit.none()
+    return hit
+
 
 def _can_restrict(member) -> bool:
     if member.status == ChatMemberStatus.OWNER:
@@ -889,13 +918,16 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     # 3d-ter2) Promoción de canal externo mediante cita a otro chat (external_reply):
     # el reclamo va en la cita y el texto visible es un CTA mínimo ("Please Join").
     hits.append(extreply_det.check(msg, is_first_msg=is_first, is_moderated_chat=cfg.is_moderated))
-    # 3d-quat) Estructura de anuncio comercial (señales acumuladas:
-    # multilínea con emojis + cifras € + CTA + link).
-    hits.append(comad_det.check(msg, is_first_msg=is_first))
-    # 3d-quat2) Testimonio de estafa de inversión ("di X, me devolvieron Y mayor")
-    # con elogio a la persona y llamada a contactarla. Sin esto se colaba cuando no
-    # ponían @usuario final (era lo único que lo cazaba, vía external_mention).
-    hits.append(invscam_det.check(msg, is_first_msg=is_first))
+    # 3d-quat) Detectores de dinero/trabajo (anuncio comercial + testimonio de
+    # estafa de inversión). Su agresividad la modula el ajuste money_guard del chat:
+    # 'normal' (defecto), 'soft' (solo casos muy claros) u 'off'. Es lo que pediste
+    # para poder relajar los bans por mensajes de trabajo/dinero en el primer mensaje.
+    _money_guard = (_chat_money_guard(db, chat_id))
+    hits.append(_apply_money_guard(comad_det.check(msg, is_first_msg=is_first), _money_guard))
+    # Testimonio "di X, me devolvieron Y mayor" con elogio y llamada a contactar.
+    # Sin este detector se colaba cuando no ponían @usuario final (lo único que lo
+    # cazaba era external_mention).
+    hits.append(_apply_money_guard(invscam_det.check(msg, is_first_msg=is_first), _money_guard))
     # 3d-quint) Primer mensaje dominado por emojis sin texto real (captación
     # de atención típica de spam, ej. "🍭🍄🌟").
     hits.append(emoji_only_det.check(msg, is_first_msg=is_first))

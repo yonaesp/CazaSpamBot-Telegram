@@ -8,7 +8,7 @@
 [![python-telegram-bot](https://img.shields.io/badge/PTB-21.6-26A5E4?logo=telegram&logoColor=white)](https://python-telegram-bot.org/)
 [![Telethon](https://img.shields.io/badge/Telethon-1.36-blueviolet)](https://docs.telethon.dev/)
 [![Idiomas](https://img.shields.io/badge/idiomas-es%20%7C%20en%20%7C%20a%C3%B1ade%20el%20tuyo-orange)](src/locales/README.md)
-[![Tests](https://img.shields.io/badge/tests-798%20passing-success)](#-tests)
+[![Tests](https://img.shields.io/badge/tests-831%20passing-success)](#-tests)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 
 🌍 [**English**](README.md) · **Español**
@@ -24,7 +24,7 @@
 CazaSpamBot vigila tus grupos de Telegram y elimina el spam **antes de que moleste**, con una obsesión: **nunca banear a un usuario legítimo**. Prefiere dejar pasar un spam dudoso que expulsar a una persona real.
 
 - 🔗 **Bans sincronizados** — un ban en un grupo = ban en **todos** tus grupos (lo que otros bots llaman *federación*). Sin primitiva nativa: itera sobre los chats donde es admin.
-- 🧠 **20 detectores** combinados con un sistema de confianza graduado.
+- 🧠 **21 detectores** combinados con un sistema de confianza graduado.
 - 🤫 **Moderación silenciosa** — los bans automáticos no ensucian el chat.
 - 📚 **Aprendizaje activo** — aprende de tus `/spam` y `/legal` (Naive Bayes + similitud coseno).
 - 🛰️ **Reportes oficiales** a Telegram (Native Antispam) vía MTProto.
@@ -61,6 +61,7 @@ El resto  ──► modo limpio por defecto (ver más abajo)
 | `external_mention` | Menciones/enlaces a otros grupos |
 | `url_blocklist` · `tg_deeplink` | Acortadores y deep-links de phishing |
 | `commercial_ad` | Anuncios (sueldos, "trabaja desde casa", cripto, servicios ilegales) |
+| `investment_scam` | Testimonios «le di X y me devolvió Y» que elogian a quien «te hace ganar», incluso sin @mención |
 | `contact_spam` | Tarjeta de contacto compartida cuyo nombre es el anuncio (otro alfabeto o con enlaces) |
 | `external_reply` | Promoción de un canal externo mediante cita a otro chat (el "quote" que lleva fuera) |
 | `bio_spam` | Bio del perfil con promo porno/comercial/hacking |
@@ -122,7 +123,9 @@ La forma **visual y recomendada** de configurar cada grupo, sin recordar subcoma
 - 🚪 **Al no verificar**: Expulsar / Silenciar · ⏱️ **Tiempos** (submenú con presets)
 - 👋 **Bienvenida** on/off · ✏️ **Editar bienvenida** · 📜 **Editar reglas** (al editar eliges **Todos los grupos** o **uno concreto**, y el bot te muestra un ejemplo para escribir el texto directamente)
 - 🧹 **Limpiar mensajes de servicio** on/off · 🔔 **Avisos informativos**
-- 🚫 **Palabras bloqueadas** (ver abajo)
+- 🛡️ **Rigor trabajo/dinero** (submenú, ver abajo) · 🚫 **Palabras bloqueadas** (ver abajo)
+
+**Ajustar cuánto aprieta con mensajes de trabajo y dinero**: el botón 🛡️ **Rigor trabajo/dinero** controla los dos detectores que marcan anuncios de empleo y testimonios de inversión (la estafa del «le di X y me devolvió Y»), sobre todo en el primer mensaje. Tres modos: **Normal** (por defecto, caza los casos claros y los dudosos), **Suave** (solo los muy evidentes; los mensajes borderline de trabajo/dinero pasan) y **Desactivado** (esos dos detectores no actúan, el resto sigue). Útil si en tu comunidad se habla mucho de dinero de forma legítima y quieres menos bans dudosos.
 
 **Bloquear palabras sin entrar al servidor**: el botón 🚫 **Palabras bloqueadas** añade y quita términos de las listas negras desde el propio Telegram. Lo que escribes se trata como **texto literal**, nunca como regex, así que un `.*` de más no puede convertirse en un comodín que banee vecinos. Antes de guardar, el bot te dice **con cuántos mensajes reales y recientes de tu grupo habría coincidido ese término**, con ejemplos: la diferencia entre añadir «oferta» a ciegas y ver que arrasaría con 14 conversaciones normales. Tus términos se guardan en `config/blacklist/custom/`, fuera del repo, para que un `git pull` no los pise nunca.
 

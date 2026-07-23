@@ -25,6 +25,7 @@ import re
 from telegram import Message
 
 from ..i18n import t
+from ..wordlists import load_and_compile
 from . import Hit
 
 # --- Ancla: "di X ... me devolvieron Y" con Y > X ---------------------------
@@ -49,50 +50,81 @@ _GIVE_BACK_RE = re.compile(
 )
 
 # --- Señales propias de la estafa (una es obligatoria además del ancla) ------
+# Las tres listas de vocabulario que siguen son EDITABLES por el admin desde
+# config/blacklist/ (genéricas + por idioma + custom), igual que las de
+# commercial_ad. Los defaults de abajo son el juego COMPLETO (español E inglés)
+# a propósito: esta estafa circula sobre todo en inglés, así que sin la carpeta
+# config/ el bot debe seguir cazándola idéntico a como lo hacía hardcodeado. El
+# reparto español = archivo genérico / inglés = en/ es solo para poder editar
+# cada idioma por separado; NO afecta al comportamiento con los archivos puestos.
+#
+# NO se toca el ancla (_GIVE_BACK_RE / _give_back_multiplier) ni _TIME_RE: son
+# lógica estructural del núcleo del detector, no vocabulario, y no deben editarse.
+
 # Elogio a la persona que "te hace ganar". No es un "gracias" cualquiera: es la
 # fórmula del testimonio. Por eso pide "thanks TO" (con to) + persona, no "thanks John".
-_PRAISE_RE = re.compile(
-    r"\b(?:"
-    r"has\s+been\s+(?:so\s+)?(?:good|kind|honest|amazing|wonderful)\s+to\s+me|"
-    r"changed\s+my\s+life|"
-    r"(?:she|he|she's|he's|shes|hes)\s+(?:is\s+)?(?:so\s+)?(?:legit|real|honest|trustworthy|genuine|the\s+best)|"
-    r"trust(?:ed)?\s+(?:her|him|mrs|mr|ms|madam|sir)|"
-    r"thanks?\s+to\s+(?:her|him|mrs|mr|ms|madam|sir|god)|"
-    r"god\s+bless\s+(?:her|him|you)|"
-    r"i\s+(?:highly\s+)?recommend\s+(?:her|him|mrs|mr|ms)|"
-    r"forever\s+grateful|"
-    r"gracias\s+a\s+(?:ella|el|él|la\s+se[ñn]ora|don|do[ñn]a)|"
-    r"me\s+cambi[oó]\s+la\s+vida|"
-    r"es\s+(?:muy\s+)?(?:legal|honesta?|de\s+confianza|real)"
-    r")\b",
-    re.IGNORECASE,
-)
+# boundaries=True: cada alternativa empieza y acaba en palabra, así que el
+# envoltorio \b(?:...)\b reproduce EXACTAMENTE el regex original.
+_DEFAULT_PRAISE = [
+    r"has\s+been\s+(?:so\s+)?(?:good|kind|honest|amazing|wonderful)\s+to\s+me",
+    r"changed\s+my\s+life",
+    r"(?:she|he|she's|he's|shes|hes)\s+(?:is\s+)?(?:so\s+)?(?:legit|real|honest|trustworthy|genuine|the\s+best)",
+    r"trust(?:ed)?\s+(?:her|him|mrs|mr|ms|madam|sir)",
+    r"thanks?\s+to\s+(?:her|him|mrs|mr|ms|madam|sir|god)",
+    r"god\s+bless\s+(?:her|him|you)",
+    r"i\s+(?:highly\s+)?recommend\s+(?:her|him|mrs|mr|ms)",
+    r"forever\s+grateful",
+    r"gracias\s+a\s+(?:ella|el|él|la\s+se[ñn]ora|don|do[ñn]a)",
+    r"me\s+cambi[oó]\s+la\s+vida",
+    r"es\s+(?:muy\s+)?(?:legal|honesta?|de\s+confianza|real)",
+]
 
 # Llamada a contactar a esa persona (el destino del testimonio).
-_CTA_RE = re.compile(
-    r"\b(?:"
-    r"(?:dm|pm|message|contact|write|reach\s+out\s+to|inbox)\s+(?:her|him|mrs|mr|ms|now|@)|"
-    r"(?:join|start|invest)\s+(?:now|with|today)|"
-    r"link\s+in\s+bio|"
-    r"escr[ií]be(?:le|nos)?|"
-    r"cont[aá]cta(?:la|lo|le)?|"
-    r"[uú]nete\s+(?:ya|ahora|hoy)"
-    r")\b"
-    r"|👇|👉|📲",
-    re.IGNORECASE,
-)
+# boundaries=False: los emojis (👇👉📲) van FUERA de cualquier \b (junto a un
+# emoji, \b nunca casaría), así que cada patrón de texto lleva su propio \b y los
+# emojis quedan sueltos. Reproduce el original \b(?:...)\b|👇|👉|📲.
+_DEFAULT_CTA = [
+    r"\b(?:dm|pm|message|contact|write|reach\s+out\s+to|inbox)\s+(?:her|him|mrs|mr|ms|now|@)\b",
+    r"\b(?:join|start|invest)\s+(?:now|with|today)\b",
+    r"\blink\s+in\s+bio\b",
+    r"\bescr[ií]be(?:le|nos)?\b",
+    r"\bcont[aá]cta(?:la|lo|le)?\b",
+    r"\b[uú]nete\s+(?:ya|ahora|hoy)\b",
+    r"👇",
+    r"👉",
+    r"📲",
+]
 
 # Vocabulario de reclutamiento (plataforma/programa de "inversión garantizada").
-_VOCAB_RE = re.compile(
-    r"\b(?:"
-    r"binary\s+option|forex|crypto\s+(?:trad|invest|mining)|trading\s+(?:signal|platform|expert|account)|"
-    r"account\s+manager|expert\s+trader|investment\s+(?:platform|plan|program|opportunity)|"
-    r"double\s+your\s+(?:money|investment|capital)|guaranteed\s+(?:profit|return|income)|"
-    r"passive\s+income|withdraw(?:al)?\s+(?:proof|instant)|"
-    r"se[ñn]ales\s+de\s+trading|inversi[oó]n\s+garantizada|duplica\s+tu\s+(?:dinero|inversi[oó]n)"
-    r")\b",
-    re.IGNORECASE,
-)
+# boundaries=True: mismo caso que _DEFAULT_PRAISE.
+_DEFAULT_VOCAB = [
+    r"binary\s+option",
+    r"forex",
+    r"crypto\s+(?:trad|invest|mining)",
+    r"trading\s+(?:signal|platform|expert|account)",
+    r"account\s+manager",
+    r"expert\s+trader",
+    r"investment\s+(?:platform|plan|program|opportunity)",
+    r"double\s+your\s+(?:money|investment|capital)",
+    r"guaranteed\s+(?:profit|return|income)",
+    r"passive\s+income",
+    r"withdraw(?:al)?\s+(?:proof|instant)",
+    r"se[ñn]ales\s+de\s+trading",
+    r"inversi[oó]n\s+garantizada",
+    r"duplica\s+tu\s+(?:dinero|inversi[oó]n)",
+]
+
+
+def _praise_re() -> re.Pattern:
+    return load_and_compile("investment_praise.txt", _DEFAULT_PRAISE)
+
+
+def _cta_re() -> re.Pattern:
+    return load_and_compile("investment_cta.txt", _DEFAULT_CTA, boundaries=False)
+
+
+def _vocab_re() -> re.Pattern:
+    return load_and_compile("investment_vocab.txt", _DEFAULT_VOCAB)
 
 # Elemento temporal: "after 12 hours", "within 24h", "in 2 days". Refuerza, no decide.
 _TIME_RE = re.compile(
@@ -134,9 +166,9 @@ def check(msg: Message, is_first_msg: bool = False) -> Hit:
         score += 45
         reasons.append(t("reason.invscam_giveback", mult=f"{mult:.0f}"))
 
-    tiene_praise = bool(_PRAISE_RE.search(text))
-    tiene_cta = bool(_CTA_RE.search(text))
-    tiene_vocab = bool(_VOCAB_RE.search(text))
+    tiene_praise = bool(_praise_re().search(text))
+    tiene_cta = bool(_cta_re().search(text))
+    tiene_vocab = bool(_vocab_re().search(text))
 
     if tiene_praise:
         score += 30

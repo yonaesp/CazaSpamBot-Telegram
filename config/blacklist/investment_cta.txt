@@ -1,0 +1,17 @@
+# Llamada a contactar a la persona del testimonio (detector investment_scam):
+# "contactala", "unete ya", o un emoji que apunta al @usuario (👇 👉 📲).
+# Se SUMA a los patrones en ingles de ../en/investment_cta.txt.
+#
+# ATENCION, ESTA LISTA VA SIN \b: incluye emojis (👇👉📲) y junto a un emoji \b
+# NUNCA casa, asi que el bot compila esta lista sin envolverla (boundaries=False).
+# Cada patron de TEXTO lleva sus propios \b; los emojis van sueltos. Si añades una
+# linea de texto que empieza o acaba en letra, ponle tu el \b delante y detras.
+#
+# Un patron por linea (regex, case-insensitive). # = comentario.
+# Usa grupos NO capturantes (?:...), nunca (...).
+\bescr[ií]be(?:le|nos)?\b
+\bcont[aá]cta(?:la|lo|le)?\b
+\b[uú]nete\s+(?:ya|ahora|hoy)\b
+👇
+👉
+📲

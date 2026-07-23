@@ -59,6 +59,16 @@ _WELCOME_TTL_PRESETS = [0, 300, 900, 3600]
 # Warns: presets del límite y acciones válidas (las mismas que acepta /warnaction).
 _WARN_LIMITS = [1, 3, 5, 10]
 _WARN_ACTIONS = ("ban", "kick", "mute")
+# Rigor de los detectores de dinero/trabajo (commercial_ad, investment_scam).
+_MONEY_MODES = ("normal", "soft", "off")
+
+
+def _money_guard(s) -> str:
+    try:
+        v = (s["money_guard"] or "normal").lower()
+    except (KeyError, IndexError, TypeError):
+        return "normal"
+    return v if v in _MONEY_MODES else "normal"
 
 # --- Palabras bloqueadas (términos propios de las listas negras) ---
 #
@@ -248,6 +258,8 @@ def build_panel_keyboard(
                               callback_data=f"{PREFIX}:tog:topweekly_enabled:{cid}")],
         [InlineKeyboardButton(t("cfg.b.quips", state=_onoff(quips_on)),
                               callback_data=f"{PREFIX}:quips:{cid}")],
+        [InlineKeyboardButton(t("cfg.b.money", mode=t(f"cfg.money.{_money_guard(s)}")),
+                              callback_data=f"{PREFIX}:mg:{cid}")],
         # Comparten fila: las dos son submenús sin estado que enseñar en la etiqueta.
         [InlineKeyboardButton(t("cfg.b.terms"), callback_data=f"{PREFIX}:ct:{cid}"),
          InlineKeyboardButton(t("cfg.b.alerts"), callback_data=f"{PREFIX}:alertas:{cid}")],
@@ -356,6 +368,21 @@ def build_warns_keyboard(chat_id: int, s) -> InlineKeyboardMarkup:
     ]
     return InlineKeyboardMarkup([
         limits, actions,
+        [InlineKeyboardButton(t("cfg.b.back"), callback_data=f"{PREFIX}:open:{cid}")],
+    ])
+
+
+def build_money_keyboard(chat_id: int, s) -> InlineKeyboardMarkup:
+    """Submenú del rigor con mensajes de dinero/trabajo: 3 modos + volver."""
+    cid = chat_id
+    actual = _money_guard(s)
+    fila = [
+        InlineKeyboardButton(("✅ " if m == actual else "") + t(f"cfg.money.{m}"),
+                             callback_data=f"{PREFIX}:mgset:{m}:{cid}")
+        for m in _MONEY_MODES
+    ]
+    return InlineKeyboardMarkup([
+        fila,
         [InlineKeyboardButton(t("cfg.b.back"), callback_data=f"{PREFIX}:open:{cid}")],
     ])
 
@@ -644,6 +671,19 @@ async def _show_welcome_buttons(msg_edit, db: DB, chat_id: int) -> None:
                        reply_markup=build_welcome_buttons_keyboard(chat_id, buttons))
     except TelegramError as exc:
         log.debug("no se pudo renderizar la lista de botones: %s", exc)
+
+
+async def _show_money(msg_edit, db: DB, chat_id: int) -> None:
+    """Renderiza el submenú del rigor con mensajes de dinero/trabajo."""
+    db.ensure_chat_settings(chat_id)
+    s = db.get_chat_settings(chat_id)
+    txt = t("cfg.money_text",
+            title=html.escape(_panel_title(db, chat_id)),
+            mode=t(f"cfg.money.{_money_guard(s)}"))
+    try:
+        await msg_edit(txt, parse_mode="HTML", reply_markup=build_money_keyboard(chat_id, s))
+    except TelegramError as exc:
+        log.debug("no se pudo renderizar el submenú de money_guard: %s", exc)
 
 
 async def _show_warns(msg_edit, db: DB, chat_id: int) -> None:
@@ -1087,6 +1127,27 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         etiqueta = f"✅ {t('cfg.warns.' + accion_warn)}"
         await q.answer(etiqueta + (t("cfg.dot_n", n=n) if n > 1 else ""))
         await _show_warns(q.edit_message_text, db, cid)
+        return
+
+    if action == "mg":
+        cid = _cid(2)
+        if cid is None:
+            await q.answer(t("cfg.invalid_chat"))
+            return
+        await q.answer()
+        await _show_money(q.edit_message_text, db, cid)
+        return
+
+    if action == "mgset":
+        modo = parts[2] if len(parts) > 2 else ""
+        cid = _cid(3)
+        if cid is None or modo not in _MONEY_MODES:
+            await q.answer(t("cfg.invalid_opt"))
+            return
+        db.ensure_chat_settings(cid)
+        n = settings_sync.apply_setting(db, cid, "money_guard", modo)
+        await q.answer(f"✅ {t('cfg.money.' + modo)}" + (t("cfg.dot_n", n=n) if n > 1 else ""))
+        await _show_money(q.edit_message_text, db, cid)
         return
 
     if action == "ct":

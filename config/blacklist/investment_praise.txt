@@ -1,0 +1,10 @@
+# Elogio a la persona que "te hace ganar", en el testimonio de estafa de
+# multiplicacion de dinero (detector investment_scam). NO es un "gracias"
+# cualquiera: es la formula del timo ("es de confianza", "me cambio la vida").
+# Se SUMA a los patrones en ingles de ../en/investment_praise.txt.
+#
+# Un patron por linea (palabra o regex, case-insensitive). # = comentario.
+# Usa grupos NO capturantes (?:...), nunca (...). Se envuelve en \b(?:...)\b.
+gracias\s+a\s+(?:ella|el|él|la\s+se[ñn]ora|don|do[ñn]a)
+me\s+cambi[oó]\s+la\s+vida
+es\s+(?:muy\s+)?(?:legal|honesta?|de\s+confianza|real)

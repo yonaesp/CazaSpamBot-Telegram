@@ -1,7 +1,7 @@
 # CazaSpamBot — Bot Antispam Telegram
 
 Bot de moderación antispam **en producción 24/7**, multi-grupo, federado y **bilingüe** (es/en).
-~14.400 LOC, Docker, **798 tests**, 20 detectores.
+~14.400 LOC, Docker, **831 tests**, 21 detectores.
 
 > **Estado: PRODUCCIÓN.** No es un esqueleto. Cualquier cambio afecta grupos reales con miles de usuarios. **Investiga > Confirma > Actúa.**
 
@@ -74,7 +74,7 @@ nativa; se itera `banChatMember` sobre los chats donde el bot es admin.
 
 ## Detectores (`src/detectors/` + `verification.py`)
 
-20 detectores: `obvious_spam_profile`, `bio_spam`, `photos_batch`, `commercial_ad`, `contact_spam`, `forward_first_msg`, `first_msg_media`, `inline_buttons`, `external_mention`, `external_reply`, `url_blocklist`, `tg_deeplink`, `non_allowed_script` (unicode_script), `reaction_farming`, `jfm_delta`, `premium_new_link`, `emoji_only`, `dormant_bot_mention`, `cas`, `lols_bot`, `learned_similarity`, `personal_channel_spam`.
+21 detectores: `obvious_spam_profile`, `bio_spam`, `photos_batch`, `commercial_ad`, `investment_scam`, `contact_spam`, `forward_first_msg`, `first_msg_media`, `inline_buttons`, `external_mention`, `external_reply`, `url_blocklist`, `tg_deeplink`, `non_allowed_script` (unicode_script), `reaction_farming`, `jfm_delta`, `premium_new_link`, `emoji_only`, `dormant_bot_mention`, `cas`, `lols_bot`, `learned_similarity`, `personal_channel_spam`.
 También banea spam publicado en nombre de un canal (`sender_chat` → `banChatSenderChat`).
 
 `rule_explain.py` traduce el id técnico de regla a la explicación que lee el admin. **Es el texto más visible del bot** y tiene prioridad sobre el `reason` del detector.
@@ -105,6 +105,29 @@ Cada línea es un **regex**, salvo en `custom/`, donde todo se escapa: es imposi
 - El importe se escribe distinto por región: `500€` (detrás) y `$500` (delante). Ambas formas soportadas, más `$2000` sin separador.
 - Cubierto el español de América: monedas locales, «por día» (patrón central del spam laboral latinoamericano) y voseo (`escribime`, `ganá`, `trabajá`).
 
+### `investment_scam`: cómo detectar sin falsos positivos (patrón a seguir)
+
+Caza el testimonio «di X y me devolvieron Y (mucho mayor)» (caso real: «I gave her 25,000 Rs … she gave me 318,000 Rs 👇 @X»). Sin él se colaba cuando no ponían `@usuario` final. Su diseño es el molde para cualquier detector de contenido nuevo:
+
+- **La señal fuerte no es el tema, es la discordancia.** «Dinero» lo dice todo el mundo; lo raro es «di X y recibí mucho más». El **ancla** es esa estructura numérica (`_GIVE_BACK_RE`, retorno ≥1.5× la entrega), calculada comparando importes, no una palabra suelta.
+- **Ninguna señal decide sola** (`señales_estafa < 2 → none()`). Con ancla basta una señal de apoyo; sin ancla hacen falta dos. Así «invertí 1000 y ahora vale 1500» (solo ancla, y `worth` está **fuera** de los verbos de retorno a propósito) no cae, ni «gracias John» (un elogio suelto) tampoco.
+- **Refuerzos que nunca deciden**: tiempo («after 12 hours»), primer mensaje. Solo suman si ya hay estructura.
+
+### Convenciones al escribir/editar patrones de detección
+
+- Cada línea de `config/blacklist/**.txt` es un **regex Python** (case-insensitive), acumulativo entre capas. Grupos **NO capturantes** `(?:...)`, nunca `(...)`: rompen el conteo de coincidencias en `compile_alternation`. Un patrón inválido se ignora con un log, no tumba el bot.
+- Las listas de vocabulario de `commercial_ad` e `investment_scam` (`*_cta.txt`, `*_work.txt`, `investment_*.txt`) son **editables**; el ancla estructural NO se externaliza (es el núcleo). Documentado en `config/blacklist/README.md`.
+- **Nunca un término genérico**: «money», «job», «oferta» solo cazan pegados a estructura. Ante la duda, no se añade. FP > FN.
+
+### Ajuste `money_guard` por chat (`/config`)
+
+Modula la agresividad de **`commercial_ad` + `investment_scam`** (los de trabajo/dinero). Columna `chat_settings.money_guard` (`'normal'` | `'soft'` | `'off'`), filtro en `_apply_money_guard()` de `handlers.py`:
+- `normal` (defecto): caza claros y borderline.
+- `soft`: solo score ≥ `_MONEY_SOFT_MIN_SCORE` (100); el borderline de trabajo/dinero pasa. **No** sube la agresividad, solo la baja.
+- `off`: esos dos detectores no actúan (el resto sigue).
+
+El filtro vive en el handler, no en los detectores: siguen puros. Botón en el panel principal y por `/config`, respeta `/sync`.
+
 ## Aprendizaje (`/spam`, `/legal`)
 
 Naive Bayes + coseno sobre las muestras marcadas por el admin. `BAYES_MIN_SAMPLES_PER_CLASS = 10` de **cada** clase: con 0 muestras ham el Bayes está dormido y solo actúa el coseno.
@@ -121,7 +144,7 @@ Salvaguardas para que el bot no aprenda a castigar el vocabulario normal de su g
 
 Todo ajuste por chat se toca **desde el panel visual y por comando en paralelo**. Con `/sync` ON (por defecto) cada cambio se aplica a TODOS los grupos y el panel no pide grupo.
 
-Panel: sincronización · verificación · revisión de sospechosos · recordatorios · acción al no verificar · tiempos · **Bienvenida ▸** (texto, botones, autoborrado) · reglas · limpiar servicio · **Warns ▸** · top semanal · **Palabras bloqueadas ▸** · **Frases al banear ▸** (con ejemplo real antes de activar) · avisos informativos.
+Panel: sincronización · verificación · revisión de sospechosos · recordatorios · acción al no verificar · tiempos · **Bienvenida ▸** (texto, botones, autoborrado) · reglas · limpiar servicio · **Warns ▸** · top semanal · **Rigor trabajo/dinero ▸** (`money_guard`) · **Palabras bloqueadas ▸** · **Frases al banear ▸** (con ejemplo real antes de activar) · avisos informativos.
 
 - **Moderación**: `/ban` `/unban` (aceptan @username o reply), `/whitelist`, `/warn` `/warns` `/rmwarn` `/resetwarns` `/warnlimit` `/warnaction`
 - **Aprendizaje**: `/spam` `/legal` (alias `/ham`)
@@ -200,4 +223,4 @@ El histórico vive en `traffic/` (**gitignored**, no en `data/`, que es del cont
 Docker como root). Ojo al leer los números: los **clones** suelen ser bots que
 rastrean GitHub, no gente; la señal de interés real son los **visitantes web únicos**.
 
-*Actualizado: 2026-07-23 — bilingüe es/en, 20 detectores, 798 tests, panel completo, registro de tráfico local.*
+*Actualizado: 2026-07-23 — bilingüe es/en, 21 detectores (+investment_scam), 831 tests, panel completo, ajuste money_guard, registro de tráfico local.*

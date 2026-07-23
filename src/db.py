@@ -147,6 +147,10 @@ CREATE TABLE IF NOT EXISTS chat_settings (
     topweekly_enabled             INTEGER NOT NULL DEFAULT 0,
     -- NULL = hereda de PUBLIC_QUIP_ENABLED (.env). Ver quips_on() en quips.py.
     quips_enabled                 INTEGER DEFAULT NULL,
+    -- Agresividad de los detectores de dinero/trabajo (commercial_ad, investment_scam)
+    -- en el primer mensaje. 'normal' (defecto) | 'soft' (solo casos muy claros) |
+    -- 'off' (no actúan). Ver _apply_money_guard() en handlers.py.
+    money_guard                   TEXT NOT NULL DEFAULT 'normal',
     updated_at                    REAL NOT NULL DEFAULT 0
 );
 -- Migración blanda para bases ya creadas
@@ -332,6 +336,10 @@ class DB:
             # sin ellos al actualizar, en silencio y sin que nadie lo pidiera.
             self._conn.execute(
                 "ALTER TABLE chat_settings ADD COLUMN quips_enabled INTEGER DEFAULT NULL"
+            )
+        if "money_guard" not in cs_cols:
+            self._conn.execute(
+                "ALTER TABLE chat_settings ADD COLUMN money_guard TEXT NOT NULL DEFAULT 'normal'"
             )
         su_cols2 = {r[1] for r in self._conn.execute("PRAGMA table_info(seen_users)").fetchall()}
         if "first_name" not in su_cols2:
@@ -879,7 +887,7 @@ class DB:
             "verification_reminder_hours", "verification_kick_after_reminder_hours",
             "verification_reminders_enabled", "verification_kick_normal",
             "verification_review_suspicious", "cleanservice",
-            "topweekly_enabled", "quips_enabled",
+            "topweekly_enabled", "quips_enabled", "money_guard",
         }
         if field not in ALLOWED:
             raise ValueError(f"campo no permitido: {field}")
