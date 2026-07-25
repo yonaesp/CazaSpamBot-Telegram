@@ -28,12 +28,9 @@ from typing import Optional
 import aiohttp
 from dotenv import load_dotenv
 from telethon import TelegramClient
-from telethon.tl.functions.channels import GetParticipantsRequest
 from telethon.tl.types import (
-    Channel,
     ChannelParticipantsAdmins,
     ChannelParticipantsRecent,
-    ChannelParticipantsSearch,
     User,
     UserStatusEmpty,
     UserStatusLastMonth,
@@ -247,7 +244,6 @@ async def _send_review_candidates(
     """
     import datetime as _dt
     import html as _html
-    import json as _json
 
     blocks: list[str] = []
     blocks.append(

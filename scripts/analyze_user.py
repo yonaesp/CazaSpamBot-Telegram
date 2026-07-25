@@ -45,7 +45,7 @@ async def main() -> int:
         print(f"No se pudo resolver {target}: {exc}")
         return 1
 
-    print(f"=== USUARIO ===")
+    print("=== USUARIO ===")
     print(f"id={ent.id}  @{ent.username}  first={ent.first_name}  last={ent.last_name}")
     print(f"is_bot={ent.bot}  premium={getattr(ent,'premium',False)}  has_photo={ent.photo is not None}")
     try:
