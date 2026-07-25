@@ -127,7 +127,7 @@ La forma **visual y recomendada** de configurar cada grupo, sin recordar subcoma
 
 **Ajustar cuánto aprieta con mensajes de trabajo y dinero**: el botón 🛡️ **Rigor trabajo/dinero** controla los dos detectores que marcan anuncios de empleo y testimonios de inversión (la estafa del «le di X y me devolvió Y»), sobre todo en el primer mensaje. Tres modos: **Normal** (por defecto, caza los casos claros y los dudosos), **Suave** (solo los muy evidentes; los mensajes borderline de trabajo/dinero pasan) y **Desactivado** (esos dos detectores no actúan, el resto sigue). Útil si en tu comunidad se habla mucho de dinero de forma legítima y quieres menos bans dudosos.
 
-**Bloquear palabras sin entrar al servidor**: el botón 🚫 **Palabras bloqueadas** añade y quita términos de las listas negras desde el propio Telegram. Lo que escribes se trata como **texto literal**, nunca como regex, así que un `.*` de más no puede convertirse en un comodín que banee vecinos. Antes de guardar, el bot te dice **con cuántos mensajes reales y recientes de tu grupo habría coincidido ese término**, con ejemplos: la diferencia entre añadir «oferta» a ciegas y ver que arrasaría con 14 conversaciones normales. Tus términos se guardan en `config/blacklist/custom/`, fuera del repo, para que un `git pull` no los pise nunca.
+**Bloquear palabras sin entrar al servidor**: el botón 🚫 **Palabras bloqueadas** añade y quita términos de las listas negras desde el propio Telegram. Lo que escribes se trata como **texto literal**, nunca como regex, así que un `.*` de más no puede convertirse en un comodín que banee vecinos. Antes de guardar, el bot te dice **con cuántos mensajes reales y recientes de tu grupo habría coincidido ese término**, con ejemplos: la diferencia entre añadir «oferta» a ciegas y ver que arrasaría con 14 conversaciones normales. Tus términos se guardan aparte, en `config/blacklist/custom/`, así que **no se pierden al actualizar el bot**.
 
 Es un atajo con la misma persistencia que los comandos sueltos de abajo; usa el que prefieras. Solo el admin del bot puede tocarlo.
 
@@ -229,7 +229,7 @@ El `.env.example` está comentado paso a paso y cada variable trae un **ejemplo 
 
 > ⚠️ Los valores de ejemplo son **falsos**: reemplázalos siempre por los tuyos. Nunca subas tu `.env` a git (ya está en `.gitignore`).
 
-**No tienes que crear ninguna carpeta a mano.** La carpeta `data/` (base de datos, sesión, heartbeat) se crea sola al levantar el contenedor, y `config/` (bienvenidas y listas negras) ya viene en el repo con valores por defecto. Solo escribes en `data/`, que es el único volumen con permiso de escritura.
+**No tienes que crear ninguna carpeta a mano.** La carpeta `data/` (base de datos, sesión, heartbeat) se crea sola al levantar el contenedor, y `config/` (bienvenidas y listas negras) ya viene incluida con valores por defecto. Solo escribes en `data/`, que es el único volumen con permiso de escritura.
 
 *(Opcional, solo si activas Telethon)* la sesión se genera **dentro del contenedor**, una única vez:
 
