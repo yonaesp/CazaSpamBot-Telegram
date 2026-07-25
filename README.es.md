@@ -8,7 +8,7 @@
 [![python-telegram-bot](https://img.shields.io/badge/PTB-21.6-26A5E4?logo=telegram&logoColor=white)](https://python-telegram-bot.org/)
 [![Telethon](https://img.shields.io/badge/Telethon-1.36-blueviolet)](https://docs.telethon.dev/)
 [![Idiomas](https://img.shields.io/badge/idiomas-es%20%7C%20en%20%7C%20a%C3%B1ade%20el%20tuyo-orange)](src/locales/README.md)
-[![Tests](https://img.shields.io/badge/tests-843%20passing-success)](#-tests)
+[![Tests](https://img.shields.io/badge/tests-870%20passing-success)](#-tests)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 
 🌍 [**English**](README.md) · **Español**
@@ -105,7 +105,7 @@ Refuerzos: **NFKC + [confusable_homoglyphs](https://github.com/vhf/confusable_ho
 | Palabras/frases de la lista negra | `config/blacklist/` | Un patrón por línea (palabra o regex). Anuncios ilegales, keywords de bio, etc. Si borras un archivo, el bot usa los valores por defecto. |
 | Idiomas de las listas negras | `.env` → `BLACKLIST_LANGS` | CSV de códigos de idioma. Por defecto el bot carga las listas genéricas más `config/blacklist/<lang>/` del **idioma activo y del inglés** (la lengua franca del spam en Telegram). Ponla (p. ej. `es,en,pt`) para sustituir esa elección en una comunidad multilingüe. |
 | Idioma del bot | `.env` → `BOT_LANG` | `es`, `en` o cualquier idioma que añadas. Vacío = se detecta del sistema. |
-| Alfabetos permitidos | `.env` → `ALLOWED_SCRIPTS` | CSV: `latin`, `cyrillic`, `arabic`, `han`, ... según el idioma de tu comunidad. |
+| Alfabetos permitidos | Panel `/config` ▸ **Alfabetos permitidos**, o `.env` → `ALLOWED_SCRIPTS` | Qué alfabetos son normales en tu comunidad. **Si tu grupo no escribe en alfabeto latino, esto es lo primero que debes ajustar** (ver aviso abajo). El panel te enseña qué alfabetos aparecen de verdad en tu grupo. |
 | Rigor con la lista CAS | `.env` → `CAS_AUTOBAN_MIN` | `2` = banear solo confirmados en 2+ grupos (recomendado); `1` = banear con cualquier señal. Por debajo del umbral, te lo manda a revisar. |
 | Acortadores bloqueados | `.env` → `URL_BLOCKLIST` | CSV de dominios. |
 | Umbrales y acciones | `.env` | Scores de ban/kick/mute, acción ante primer mensaje sospechoso, etc. |
@@ -123,7 +123,14 @@ La forma **visual y recomendada** de configurar cada grupo, sin recordar subcoma
 - 🚪 **Al no verificar**: Expulsar / Silenciar · ⏱️ **Tiempos** (submenú con presets)
 - 👋 **Bienvenida** on/off · ✏️ **Editar bienvenida** · 📜 **Editar reglas** (al editar eliges **Todos los grupos** o **uno concreto**, y el bot te muestra un ejemplo para escribir el texto directamente)
 - 🧹 **Limpiar mensajes de servicio** on/off · 🔔 **Avisos informativos**
+- 🔤 **Alfabetos permitidos** (submenú, ver abajo)
 - 🛡️ **Rigor trabajo/dinero** (submenú, ver abajo) · 🚫 **Palabras bloqueadas** (ver abajo)
+
+> ### ⚠️ Si tu comunidad no escribe en alfabeto latino, lee esto primero
+>
+> Por defecto el bot solo considera normal el **alfabeto latino**, y marca como sospechoso el primer mensaje escrito en otro. Es lo correcto para un grupo en español o inglés, pero significa que **en un grupo árabe, ruso, griego o hindi el bot marcaría a tus propios miembros**.
+>
+> Se arregla en dos toques: `/config` ▸ 🔤 **Alfabetos permitidos** y activa el tuyo. Esa pantalla te enseña **qué alfabetos se están escribiendo de verdad en tu grupo** y te avisa de cuáles causarían falsos positivos, así no tienes que adivinar. También puedes dejarlo fijo para todas tus instalaciones con `ALLOWED_SCRIPTS` en el `.env`.
 
 **Ajustar cuánto aprieta con mensajes de trabajo y dinero**: el botón 🛡️ **Rigor trabajo/dinero** controla los dos detectores que marcan anuncios de empleo y testimonios de inversión (la estafa del «le di X y me devolvió Y»), sobre todo en el primer mensaje. Tres modos: **Normal** (por defecto, caza los casos claros y los dudosos), **Suave** (solo los muy evidentes; los mensajes borderline de trabajo/dinero pasan) y **Desactivado** (esos dos detectores no actúan, el resto sigue). Útil si en tu comunidad se habla mucho de dinero de forma legítima y quieres menos bans dudosos.
 

@@ -151,6 +151,11 @@ CREATE TABLE IF NOT EXISTS chat_settings (
     -- en el primer mensaje. 'normal' (defecto) | 'soft' (solo casos muy claros) |
     -- 'off' (no actúan). Ver _apply_money_guard() en handlers.py.
     money_guard                   TEXT NOT NULL DEFAULT 'normal',
+    -- Alfabetos permitidos en ESTE chat (CSV: 'latin,cyrillic'). NULL = hereda
+    -- ALLOWED_SCRIPTS del .env. Imprescindible para comunidades que no escriben en
+    -- latino: sin esto el bot marcaría a sus usuarios normales. Ver
+    -- _chat_allowed_scripts() en handlers.py.
+    allowed_scripts               TEXT DEFAULT NULL,
     updated_at                    REAL NOT NULL DEFAULT 0
 );
 -- Migración blanda para bases ya creadas
@@ -340,6 +345,13 @@ class DB:
         if "money_guard" not in cs_cols:
             self._conn.execute(
                 "ALTER TABLE chat_settings ADD COLUMN money_guard TEXT NOT NULL DEFAULT 'normal'"
+            )
+        if "allowed_scripts" not in cs_cols:
+            # NULLable a propósito: NULL = «hereda ALLOWED_SCRIPTS del .env». Si la
+            # columna naciera con 'latin', una instalación que hoy permite cirílico
+            # por .env empezaría a marcar a sus usuarios normales tras actualizar.
+            self._conn.execute(
+                "ALTER TABLE chat_settings ADD COLUMN allowed_scripts TEXT DEFAULT NULL"
             )
         su_cols2 = {r[1] for r in self._conn.execute("PRAGMA table_info(seen_users)").fetchall()}
         if "first_name" not in su_cols2:
@@ -887,7 +899,7 @@ class DB:
             "verification_reminder_hours", "verification_kick_after_reminder_hours",
             "verification_reminders_enabled", "verification_kick_normal",
             "verification_review_suspicious", "cleanservice",
-            "topweekly_enabled", "quips_enabled", "money_guard",
+            "topweekly_enabled", "quips_enabled", "money_guard", "allowed_scripts",
         }
         if field not in ALLOWED:
             raise ValueError(f"campo no permitido: {field}")

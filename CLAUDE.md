@@ -1,7 +1,7 @@
 # CazaSpamBot — Bot Antispam Telegram
 
 Bot de moderación antispam **en producción 24/7**, multi-grupo, federado y **bilingüe** (es/en).
-~14.400 LOC, Docker, **843 tests**, 21 detectores.
+~14.400 LOC, Docker, **870 tests**, 21 detectores.
 
 > **Estado: PRODUCCIÓN.** No es un esqueleto. Cualquier cambio afecta grupos reales con miles de usuarios. **Investiga > Confirma > Actúa.**
 
@@ -119,6 +119,16 @@ Caza el testimonio «di X y me devolvieron Y (mucho mayor)» (caso real: «I gav
 - Las listas de vocabulario de `commercial_ad` e `investment_scam` (`*_cta.txt`, `*_work.txt`, `investment_*.txt`) son **editables**; el ancla estructural NO se externaliza (es el núcleo). Documentado en `config/blacklist/README.md`.
 - **Nunca un término genérico**: «money», «job», «oferta» solo cazan pegados a estructura. Ante la duda, no se añade. FP > FN.
 
+### Alfabetos permitidos por chat (`/config`)
+
+`ALLOWED_SCRIPTS` del `.env` era **global y sin interfaz**: quien instalara el bot en una comunidad árabe, rusa o griega tenía al bot marcando a sus usuarios normales (medido: un saludo en árabe puntúa 100 con el default `latin`). Ahora hay columna `chat_settings.allowed_scripts` (CSV) donde **NULL = hereda el `.env`**, resuelta por `_chat_allowed_scripts()` en `handlers.py`.
+
+Dos guardas que no se deben quitar:
+- **Nunca lista vacía**: sin ningún alfabeto permitido el bot marcaría TODOS los mensajes. El helper cae al `.env` y el panel rechaza quitar el último.
+- **NULL = hereda**: con default `'latin'`, una instalación que ya permitía cirílico habría empezado a marcar a los suyos al actualizar.
+
+El panel enseña **qué alfabetos se escriben de verdad en el grupo** (sobre `seen_users.last_msg_text`) y avisa de cuáles causarían falsos positivos: mismo patrón de «ver antes de decidir» que la vista previa de palabras bloqueadas.
+
 ### Ajuste `money_guard` por chat (`/config`)
 
 Modula la agresividad de **`commercial_ad` + `investment_scam`** (los de trabajo/dinero). Columna `chat_settings.money_guard` (`'normal'` | `'soft'` | `'off'`), filtro en `_apply_money_guard()` de `handlers.py`:
@@ -144,7 +154,7 @@ Salvaguardas para que el bot no aprenda a castigar el vocabulario normal de su g
 
 Todo ajuste por chat se toca **desde el panel visual y por comando en paralelo**. Con `/sync` ON (por defecto) cada cambio se aplica a TODOS los grupos y el panel no pide grupo.
 
-Panel: sincronización · verificación · revisión de sospechosos · recordatorios · acción al no verificar · tiempos · **Bienvenida ▸** (texto, botones, autoborrado) · reglas · limpiar servicio · **Warns ▸** · top semanal · **Rigor trabajo/dinero ▸** (`money_guard`) · **Palabras bloqueadas ▸** · **Frases al banear ▸** (con ejemplo real antes de activar) · avisos informativos.
+Panel: sincronización · verificación · revisión de sospechosos · recordatorios · acción al no verificar · tiempos · **Bienvenida ▸** (texto, botones, autoborrado) · reglas · limpiar servicio · **Warns ▸** · top semanal · **Alfabetos permitidos ▸** · **Rigor trabajo/dinero ▸** (`money_guard`) · **Palabras bloqueadas ▸** · **Frases al banear ▸** (con ejemplo real antes de activar) · avisos informativos.
 
 - **Moderación**: `/ban` `/unban` (aceptan @username o reply), `/whitelist`, `/warn` `/warns` `/rmwarn` `/resetwarns` `/warnlimit` `/warnaction`
 - **Aprendizaje**: `/spam` `/legal` (alias `/ham`)

@@ -8,7 +8,7 @@
 [![python-telegram-bot](https://img.shields.io/badge/PTB-21.6-26A5E4?logo=telegram&logoColor=white)](https://python-telegram-bot.org/)
 [![Telethon](https://img.shields.io/badge/Telethon-1.36-blueviolet)](https://docs.telethon.dev/)
 [![Languages](https://img.shields.io/badge/languages-es%20%7C%20en%20%7C%20add%20yours-orange)](src/locales/README.md)
-[![Tests](https://img.shields.io/badge/tests-843%20passing-success)](#-tests)
+[![Tests](https://img.shields.io/badge/tests-870%20passing-success)](#-tests)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 
 🌍 **English** · [**Español**](README.es.md)
@@ -109,7 +109,14 @@ The **recommended** way to configure each group without memorizing subcommands. 
 - 🚪 **On failed verification**: Kick / Mute · ⏱️ **Timings** (submenu with presets)
 - 👋 **Welcome** on/off · ✏️ **Edit welcome** · 📜 **Edit rules** (on edit you pick **All groups** or **just one**, with an example to type the text directly)
 - 🧹 **Clean service messages** on/off · 🔔 **Informational alerts**
+- 🔤 **Allowed alphabets** (submenu, see below)
 - 🛡️ **Work/money strictness** (submenu, see below) · 🚫 **Blocked words** (see below)
+
+> ### ⚠️ If your community doesn't write in the Latin alphabet, read this first
+>
+> Out of the box the bot treats only the **Latin alphabet** as normal, and flags a first message written in anything else. That's right for a Spanish or English group, but it means **in an Arabic, Russian, Greek or Hindi group the bot would flag your own members**.
+>
+> Two taps to fix: `/config` ▸ 🔤 **Allowed alphabets**, and switch yours on. That screen shows you **which alphabets are actually being written in your group** and warns which ones would cause false positives, so you don't have to guess. You can also set it once for every install with `ALLOWED_SCRIPTS` in `.env`.
 
 **Tune how strict it is with work and money messages:** the 🛡️ **Work/money strictness** button controls the two detectors that flag job ads and investment testimonials (the "I gave her X and got Y back" scam), especially in a first message. Three modes: **Normal** (default, catches clear and borderline cases), **Soft** (only very obvious cases; borderline work/money messages get through), and **Off** (those two detectors stand down, the rest keep working). Handy if your community legitimately talks money a lot and you want fewer borderline bans.
 

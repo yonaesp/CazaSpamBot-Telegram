@@ -54,6 +54,26 @@ log = logging.getLogger(__name__)
 _MONEY_SOFT_MIN_SCORE = 100
 
 
+def _chat_allowed_scripts(db: DB, chat_id: int, cfg) -> list[str]:
+    """Alfabetos permitidos en este chat, cayendo a ALLOWED_SCRIPTS del .env.
+
+    `chat_settings.allowed_scripts` guarda un CSV ('latin,cyrillic') y su NULL
+    significa «no se ha decidido aquí» → manda el .env. Esa herencia es lo que
+    permite que una instalación que ya permitía cirílico no empiece a marcar a sus
+    usuarios al actualizar.
+
+    Ante cualquier problema de lectura se cae al .env: quedarse sin lista sería
+    peor que usar la global, porque una lista vacía marca CUALQUIER alfabeto.
+    """
+    try:
+        s = db.get_chat_settings(chat_id)
+        crudo = (s["allowed_scripts"] if s is not None else None) or ""
+    except Exception:  # noqa: BLE001 — chat sin settings, columna vieja, BD ocupada
+        return list(cfg.allowed_scripts)
+    propios = [x.strip().lower() for x in crudo.split(",") if x.strip()]
+    return propios or list(cfg.allowed_scripts)
+
+
 def _chat_money_guard(db: DB, chat_id: int) -> str:
     """Modo money_guard del chat: 'normal' | 'soft' | 'off'. A prueba de fallos."""
     try:
@@ -473,7 +493,7 @@ async def on_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 pchan_hit = personal_channel_det.check(
                     sig_pre.personal_channel_title,
                     first_name=user.first_name, last_name=user.last_name,
-                    username=user.username, allowed_scripts=cfg.allowed_scripts,
+                    username=user.username, allowed_scripts=_chat_allowed_scripts(db, cmu.chat.id, cfg),
                     has_photo=sig_pre.photo_count > 0, has_bio=bool(sig_pre.bio),
                 )
             except Exception as exc:  # noqa: BLE001
@@ -869,7 +889,7 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     # 1) Unicode script (sobre texto normalizado)
     hits.append(script_det.check(
         normalized_text or text, is_first_msgs=is_first,
-        allowed_scripts=cfg.allowed_scripts,
+        allowed_scripts=_chat_allowed_scripts(db, chat_id, cfg),
         threshold=cfg.non_latin_ratio_threshold,
     ))
     # 2) External mentions / t.me links (con username del propio chat para
@@ -913,7 +933,7 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     # 3d-ter) Contacto compartido cuyo nombre/vCard es el reclamo de spam (el texto
     # va en msg.contact, no en msg.text, así que el resto de detectores no lo ven).
     hits.append(contact_det.check(
-        msg, cfg.allowed_scripts, cfg.non_latin_ratio_threshold, is_first_msg=is_first,
+        msg, _chat_allowed_scripts(db, chat_id, cfg), cfg.non_latin_ratio_threshold, is_first_msg=is_first,
     ))
     # 3d-ter2) Promoción de canal externo mediante cita a otro chat (external_reply):
     # el reclamo va en la cita y el texto visible es un CTA mínimo ("Please Join").
@@ -1490,7 +1510,8 @@ async def _moderate_channel_message(context, db, cfg, msg) -> None:
         buttons_det.check(msg),
         url_det.check(msg, cfg.url_blocklist, is_first_msg=True),
         comad_det.check(msg, is_first_msg=True),
-        contact_det.check(msg, cfg.allowed_scripts, cfg.non_latin_ratio_threshold),
+        contact_det.check(msg, _chat_allowed_scripts(db, msg.chat_id, cfg),
+                              cfg.non_latin_ratio_threshold),
     ]
     real = [h for h in hits if h]
     if not real:

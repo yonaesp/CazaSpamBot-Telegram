@@ -27,6 +27,7 @@ from telegram.ext import ContextTypes
 from . import custom_terms, quips, rule_explain, settings_sync
 from .config import Config
 from .db import DB
+from .detectors import unicode_script
 from .i18n import t
 
 log = logging.getLogger(__name__)
@@ -69,6 +70,170 @@ def _money_guard(s) -> str:
     except (KeyError, IndexError, TypeError):
         return "normal"
     return v if v in _MONEY_MODES else "normal"
+
+
+# --- Alfabetos permitidos (script Unicode de los mensajes) ---
+#
+# Las opciones NO se escriben a mano: son los alfabetos que el detector sabe
+# reconocer (`unicode_script._SCRIPT_RANGES`), en su mismo orden. Si mañana el
+# detector aprende otro, aparece aquí solo y no hay dos listas que puedan discrepar.
+_SCRIPT_CHOICES: tuple[str, ...] = (
+    *dict.fromkeys(name for _, _, name in unicode_script._SCRIPT_RANGES),
+    # `script_of()` etiqueta como "other" cualquier letra fuera de esos rangos
+    # (tailandés, armenio, georgiano...). Sin este botón, una comunidad que escriba
+    # en uno de ellos no tendría forma de permitirlo y el bot marcaría a todo el mundo.
+    "other",
+)
+
+# Mensajes que se miran para la pista de alfabetos del grupo. `seen_users` guarda
+# UNO por usuario, así que 200 filas son 200 personas distintas: de sobra para saber
+# en qué escribe la comunidad, y barato (una consulta con LIMIT).
+_SCRIPT_SCAN_LIMIT = 200
+# Un acento suelto o un «ok» no convierten un mensaje en ruso. Un alfabeto cuenta
+# cuando ocupa al menos esta parte de las letras del mensaje.
+_SCRIPT_MIN_SHARE = 0.2
+
+
+def _script_label(name: str) -> str:
+    """Nombre legible de un alfabeto ('cyrillic' → 'Cirílico').
+
+    Doble guarda: `t()` devuelve la propia clave cuando no existe, así que un
+    alfabeto nuevo en el detector saldría en pantalla como «cfg.sc.name.thai». Ante
+    eso se enseña el nombre técnico, que al menos se entiende.
+    """
+    key = f"cfg.sc.name.{name}"
+    label = t(key)
+    return name.capitalize() if label == key else label
+
+
+def _sorted_scripts(names) -> list[str]:
+    """Sin duplicados y en el orden del detector, para que el CSV guardado no baile.
+
+    Lo que no reconoce el detector (un `ALLOWED_SCRIPTS` con un nombre inventado) va
+    al final por orden alfabético, nunca se pierde.
+    """
+    orden = {n: i for i, n in enumerate(_SCRIPT_CHOICES)}
+    return sorted(dict.fromkeys(names), key=lambda n: (orden.get(n, len(orden)), n))
+
+
+def _allowed_scripts(db: DB, cfg, chat_id: int) -> list[str]:
+    """Alfabetos permitidos AHORA en ese chat, con la herencia del .env ya resuelta.
+
+    Se reutiliza el helper que usan los detectores (import diferido: `handlers` es
+    pesado y no hace falta para dibujar el resto del panel) para que la pantalla
+    enseñe exactamente lo que el bot aplica y no una segunda lectura de la columna.
+    """
+    from .handlers import _chat_allowed_scripts
+    crudos = _chat_allowed_scripts(db, chat_id, cfg) or []
+    return _sorted_scripts(s.strip().lower() for s in crudos if s and s.strip())
+
+
+def _scripts_inherited(s) -> bool:
+    """True si el chat no ha decidido nada y va con ALLOWED_SCRIPTS del .env."""
+    try:
+        return not (s["allowed_scripts"] or "").strip()
+    except (KeyError, IndexError, TypeError):
+        return True
+
+
+def scripts_seen(db: DB, chat_id: int, limit: int = _SCRIPT_SCAN_LIMIT) -> tuple[dict[str, int], int]:
+    """En cuántos mensajes recientes del grupo aparece cada alfabeto.
+
+    Responde a la única pregunta que se hace el admin al abrir esta pantalla:
+    «¿cuáles activo?». Mismo principio que la vista previa de las palabras
+    bloqueadas: decidir mirando mensajes REALES del grupo, no de memoria.
+
+    Un alfabeto cuenta cuando ocupa al menos `_SCRIPT_MIN_SHARE` de las letras del
+    mensaje. Cifras, emojis y signos no cuentan para nada (`script_of` los da por
+    neutros), así que un «👍» no aparece como alfabeto ninguno.
+
+    Devuelve `({alfabeto: nº de mensajes}, mensajes_examinados)`.
+    """
+    counts: dict[str, int] = {}
+    scanned = 0
+    for row in _safe_recent(db, chat_id, limit):
+        try:
+            text = row["last_msg_text"] if "last_msg_text" in row.keys() else None
+        except (TypeError, AttributeError):
+            text = None
+        if not text:
+            continue
+        scanned += 1
+        dist = unicode_script.script_distribution(text)
+        total = sum(dist.values())
+        if not total:
+            continue                       # solo emojis, cifras o signos
+        for name, n in dist.items():
+            if n / total >= _SCRIPT_MIN_SHARE:
+                counts[name] = counts.get(name, 0) + 1
+    return counts, scanned
+
+
+def _safe_recent(db: DB, chat_id: int, limit: int) -> list:
+    """La pista es informativa: si la consulta falla, la pantalla sale igual."""
+    try:
+        return db.recent_message_texts(chat_id=chat_id, limit=limit) or []
+    except Exception as exc:  # noqa: BLE001 - nunca debe tumbar el panel
+        log.warning("Pista de alfabetos: no se pudieron leer los mensajes (%s)", exc)
+        return []
+
+
+def build_scripts_keyboard(chat_id: int, active) -> InlineKeyboardMarkup:
+    """Submenú de alfabetos: un toggle por alfabeto, dos por fila.
+
+    En el `callback_data` viaja el NOMBRE del alfabeto y no un índice, para que los
+    botones ya enviados sigan valiendo aunque cambie el orden de la lista. Aun así el
+    peor caso cabe de sobra: 'cfg:scset:devanagari:-1001234567890' son 35 bytes de
+    los 64, y aguanta chat_ids bastante más largos que los de hoy.
+    """
+    activos = {s.lower() for s in active}
+    rows, fila = [], []
+    for name in _sorted_scripts([*_SCRIPT_CHOICES, *activos]):
+        fila.append(InlineKeyboardButton(
+            ("✅ " if name in activos else "▫️ ") + _script_label(name),
+            callback_data=f"{PREFIX}:scset:{name}:{chat_id}"))
+        if len(fila) == 2:
+            rows.append(fila)
+            fila = []
+    if fila:
+        rows.append(fila)
+    rows.append([InlineKeyboardButton(t("cfg.b.back"), callback_data=f"{PREFIX}:open:{chat_id}")])
+    return InlineKeyboardMarkup(rows)
+
+
+def _scripts_text(db: DB, chat_id: int, active: list[str], inherited: bool) -> str:
+    """Pantalla de alfabetos: estado primero, pista del grupo después.
+
+    El orden es deliberado y el mismo que en la vista previa de términos: arriba lo
+    que hay que decidir, y justo debajo los alfabetos que el grupo usa DE VERDAD,
+    con los no permitidos señalados, que son los que le van a dar falsos positivos.
+    """
+    permitidos = ", ".join(_script_label(s) for s in active)
+    bloques = [t("cfg.sc.text",
+                 title=html.escape(_panel_title(db, chat_id)),
+                 allowed=html.escape(permitidos),
+                 source=t("cfg.sc.src_inherited" if inherited else "cfg.sc.src_own"))]
+    vistos, scanned = scripts_seen(db, chat_id)
+    if not scanned:
+        bloques.append(t("cfg.sc.seen_none"))
+        bloques.append(t("cfg.sc.other_note"))
+        return "\n\n".join(bloques)
+    activos = {s.lower() for s in active}
+    lineas = [t("cfg.sc.seen_head", scanned=scanned)]
+    faltan: list[str] = []
+    for name, n in sorted(vistos.items(), key=lambda kv: (-kv[1], kv[0])):
+        etiqueta = _script_label(name)
+        if name in activos:
+            lineas.append(t("cfg.sc.seen_ok", name=html.escape(etiqueta), n=n))
+        else:
+            lineas.append(t("cfg.sc.seen_bad", name=html.escape(etiqueta), n=n))
+            faltan.append(etiqueta)
+    bloques.append("\n".join(lineas))
+    if faltan:
+        bloques.append(t("cfg.sc.seen_warn", names=html.escape(", ".join(faltan))))
+    bloques.append(t("cfg.sc.other_note"))
+    return "\n\n".join(bloques)
+
 
 # --- Palabras bloqueadas (términos propios de las listas negras) ---
 #
@@ -256,13 +421,20 @@ def build_panel_keyboard(
         [InlineKeyboardButton(t("cfg.b.warns"), callback_data=f"{PREFIX}:warns:{cid}"),
          InlineKeyboardButton(t("cfg.b.topweekly", state=_onoff(_b(s, "topweekly_enabled"))),
                               callback_data=f"{PREFIX}:tog:topweekly_enabled:{cid}")],
+        # Las dos de lo que el bot DICE: la frase pública al banear y los avisos.
         [InlineKeyboardButton(t("cfg.b.quips", state=_onoff(quips_on)),
-                              callback_data=f"{PREFIX}:quips:{cid}")],
+                              callback_data=f"{PREFIX}:quips:{cid}"),
+         InlineKeyboardButton(t("cfg.b.alerts"), callback_data=f"{PREFIX}:alertas:{cid}")],
         [InlineKeyboardButton(t("cfg.b.money", mode=t(f"cfg.money.{_money_guard(s)}")),
                               callback_data=f"{PREFIX}:mg:{cid}")],
-        # Comparten fila: las dos son submenús sin estado que enseñar en la etiqueta.
+        # Y las dos de QUÉ contenido se marca (palabras y alfabetos): submenús sin
+        # estado en la etiqueta y del mismo ancho, así que la fila compartida se lee
+        # bien en móvil y el panel no gana filas. Los alfabetos NO llevan estado en el
+        # botón a propósito: pueden venir heredados del .env y aquí solo se tiene la
+        # fila de la BD, así que enseñaría OFF a quien los tiene activos (el mismo
+        # descuido que documenta `_quips_state`). El estado real va dentro.
         [InlineKeyboardButton(t("cfg.b.terms"), callback_data=f"{PREFIX}:ct:{cid}"),
-         InlineKeyboardButton(t("cfg.b.alerts"), callback_data=f"{PREFIX}:alertas:{cid}")],
+         InlineKeyboardButton(t("cfg.b.scripts"), callback_data=f"{PREFIX}:sc:{cid}")],
         [InlineKeyboardButton(t("cfg.b.close"), callback_data=f"{PREFIX}:close:{cid}")],
     ]
     return InlineKeyboardMarkup(rows)
@@ -684,6 +856,21 @@ async def _show_money(msg_edit, db: DB, chat_id: int) -> None:
         await msg_edit(txt, parse_mode="HTML", reply_markup=build_money_keyboard(chat_id, s))
     except TelegramError as exc:
         log.debug("no se pudo renderizar el submenú de money_guard: %s", exc)
+
+
+async def _show_scripts(msg_edit, db: DB, cfg, chat_id: int) -> None:
+    """Renderiza el submenú de alfabetos permitidos (estado + pista del grupo)."""
+    db.ensure_chat_settings(chat_id)
+    s = db.get_chat_settings(chat_id)
+    activos = _allowed_scripts(db, cfg, chat_id)
+    try:
+        await msg_edit(
+            _scripts_text(db, chat_id, activos, _scripts_inherited(s)),
+            parse_mode="HTML", disable_web_page_preview=True,
+            reply_markup=build_scripts_keyboard(chat_id, activos),
+        )
+    except TelegramError as exc:
+        log.debug("no se pudo renderizar el submenú de alfabetos: %s", exc)
 
 
 async def _show_warns(msg_edit, db: DB, chat_id: int) -> None:
@@ -1148,6 +1335,40 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         n = settings_sync.apply_setting(db, cid, "money_guard", modo)
         await q.answer(f"✅ {t('cfg.money.' + modo)}" + (t("cfg.dot_n", n=n) if n > 1 else ""))
         await _show_money(q.edit_message_text, db, cid)
+        return
+
+    if action == "sc":
+        cid = _cid(2)
+        if cid is None:
+            await q.answer(t("cfg.invalid_chat"))
+            return
+        await q.answer()
+        await _show_scripts(q.edit_message_text, db, cfg, cid)
+        return
+
+    if action == "scset":
+        script = parts[2] if len(parts) > 2 else ""
+        cid = _cid(3)
+        # El nombre llega de un botón, así que se acepta solo si ya estaba en la
+        # pantalla: los que el detector reconoce o los que el chat ya permitía.
+        activos = _allowed_scripts(db, cfg, cid) if cid is not None else []
+        if cid is None or not script or script not in {*_SCRIPT_CHOICES, *activos}:
+            await q.answer(t("cfg.invalid_opt"))
+            return
+        db.ensure_chat_settings(cid)
+        quitar = script in activos
+        # GUARDA: la lista NO puede quedarse vacía. `non_allowed_ratio` compara contra
+        # los permitidos, así que sin ninguno CUALQUIER letra sería «no permitida» y el
+        # grupo entero acabaría marcado. Se avisa con alerta y no se toca nada.
+        if quitar and len(activos) <= 1:
+            await q.answer(t("cfg.sc.min_one"), show_alert=True)
+            return
+        nuevos = [s for s in activos if s != script] if quitar else [*activos, script]
+        n = settings_sync.apply_setting(
+            db, cid, "allowed_scripts", ",".join(_sorted_scripts(nuevos)))
+        etiqueta = t("cfg.sc.off" if quitar else "cfg.sc.on", name=_script_label(script))
+        await q.answer(etiqueta + (t("cfg.dot_n", n=n) if n > 1 else ""))
+        await _show_scripts(q.edit_message_text, db, cfg, cid)
         return
 
     if action == "ct":
