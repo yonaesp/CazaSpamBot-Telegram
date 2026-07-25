@@ -14,7 +14,10 @@ También aggressive cleanup post-ban si ban_recent_messages está activo.
 from __future__ import annotations
 
 import logging
+import sqlite3
 import time
+from datetime import datetime, timezone
+from pathlib import Path
 
 from telegram.ext import ContextTypes
 
@@ -23,11 +26,73 @@ from .db import DB
 log = logging.getLogger(__name__)
 
 
+# Copias de seguridad de la BD: cuántas se conservan (una por noche).
+BACKUP_KEEP = 7
+BACKUP_DIRNAME = "backups"
+
+
+def backup_database(db_path: str | Path, keep: int = BACKUP_KEEP) -> Path | None:
+    """Copia CONSISTENTE de la BD en `<data>/backups/antispam-YYYYMMDD.db`.
+
+    Usa `VACUUM INTO`, que escribe una base íntegra aunque el bot esté escribiendo
+    a la vez. Copiar el fichero a pelo NO vale: en modo WAL el `.db` puede llevar
+    días sin recibir un checkpoint y la copia sale vieja (medido: 5 baneos y 20
+    registros de auditoría de menos), y copiarlo mientras se escribe puede además
+    dar una foto inconsistente.
+
+    Rota dejando las `keep` más recientes. Devuelve la ruta creada, o None si falla:
+    esto es mantenimiento, y nunca debe abortar el resto del job.
+    """
+    origen = Path(db_path)
+    # Sin esta guarda, `sqlite3.connect` CREARÍA la base vacía y acabaríamos
+    # guardando una copia de cero filas que además rotaría fuera a las buenas.
+    if not origen.is_file():
+        log.warning("backup: la base %s no existe, no se copia nada", origen)
+        return None
+    destino_dir = origen.parent / BACKUP_DIRNAME
+    fecha = datetime.now(timezone.utc).strftime("%Y%m%d")
+    destino = destino_dir / f"antispam-{fecha}.db"
+    try:
+        destino_dir.mkdir(parents=True, exist_ok=True)
+        # VACUUM INTO falla si el destino ya existe: al reejecutar el mismo día se
+        # rehace la copia (queda la más reciente del día, que es lo que interesa).
+        destino.unlink(missing_ok=True)
+        # Conexión propia y de solo lectura lógica: no interfiere con la del bot.
+        con = sqlite3.connect(str(origen), timeout=30)
+        try:
+            con.execute("VACUUM INTO ?", (str(destino),))
+        finally:
+            con.close()
+    except Exception as exc:  # noqa: BLE001 — sin copia se sigue; se avisa y se reintenta mañana
+        log.warning("backup: no se pudo crear la copia (%s); se reintenta mañana", exc)
+        return None
+
+    # Rotación: deja las `keep` más recientes por nombre (el nombre lleva la fecha).
+    try:
+        copias = sorted(destino_dir.glob("antispam-*.db"))
+        for vieja in copias[:-keep] if keep > 0 else []:
+            vieja.unlink(missing_ok=True)
+            log.debug("backup: rotada %s", vieja.name)
+    except Exception as exc:  # noqa: BLE001 — que falle la rotación no invalida la copia
+        log.warning("backup: rotación fallida (%s)", exc)
+
+    log.info("backup: copia consistente en %s (%.1f KB)",
+             destino.name, destino.stat().st_size / 1024)
+    return destino
+
+
 async def cleanup_nightly_job(context: ContextTypes.DEFAULT_TYPE) -> None:
     """Cleanup de tablas viejas. Corre cada 24h."""
     db: DB = context.bot_data["db"]
     stats = {}
     now = time.time()
+
+    # Copia de seguridad ANTES de limpiar y compactar: si algo saliera mal en el
+    # borrado o en el VACUUM, la copia de la noche refleja el estado previo.
+    try:
+        backup_database(db.path)
+    except Exception as exc:  # noqa: BLE001 — jamás debe abortar el mantenimiento
+        log.warning("backup: error inesperado (%s)", exc)
 
     with db._cur() as c:
         # reaction_events > 30 días

@@ -1,7 +1,7 @@
 # CazaSpamBot — Bot Antispam Telegram
 
 Bot de moderación antispam **en producción 24/7**, multi-grupo, federado y **bilingüe** (es/en).
-~14.400 LOC, Docker, **831 tests**, 21 detectores.
+~14.400 LOC, Docker, **843 tests**, 21 detectores.
 
 > **Estado: PRODUCCIÓN.** No es un esqueleto. Cualquier cambio afecta grupos reales con miles de usuarios. **Investiga > Confirma > Actúa.**
 
@@ -163,8 +163,18 @@ Cada línea del catálogo es el saludo COMPLETO (`📥 Bienvenido/a {name}. <gra
 
 - `_heartbeat_job` (30s) — healthcheck Docker
 - `verification.cleanup_job` (15min) — 3 tiers: kick suspicious 30min, reminder normal 3h, kick post-reminder +6h
-- `maintenance.cleanup_nightly_job` (24h) — limpieza + **reconciliación banned_users↔Telegram**
+- `maintenance.cleanup_nightly_job` (24h) — **copia de seguridad** + limpieza + **reconciliación banned_users↔Telegram**
 - `topweekly.weekly_top_job` (domingo 20:00 Madrid)
+
+### Copia de seguridad de la BD
+
+`maintenance.backup_database()` corre al principio del job nocturno (antes de limpiar y compactar, para que la copia refleje el estado previo por si el borrado sale mal). Deja `data/backups/antispam-YYYYMMDD.db`, rotando **7 días**.
+
+Usa **`VACUUM INTO`, no una copia del fichero**, por dos motivos medidos en producción:
+1. En modo WAL el `.db` puede llevar **días sin checkpoint**: copiarlo a pelo perdía 5 baneos y 20 registros de auditoría.
+2. Copiarlo mientras el bot escribe puede dar una foto **inconsistente**; `VACUUM INTO` es íntegra aunque haya escrituras a la vez (probado con 266 concurrentes).
+
+`data/` es gitignored, así que las copias nunca llegan al repo, pero **sí van al N6005** en el rsync semanal (ese bloque no excluye nada). Si la copia falla, se avisa en el log y el mantenimiento continúa: nunca aborta el job.
 
 ## Reglas críticas de diseño (lecciones de producción)
 
