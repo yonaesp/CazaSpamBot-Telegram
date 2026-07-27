@@ -1,7 +1,7 @@
 # CazaSpamBot — Bot Antispam Telegram
 
 Bot de moderación antispam **en producción 24/7**, multi-grupo, federado y **bilingüe** (es/en).
-~14.400 LOC, Docker, **882 tests**, 21 detectores.
+~14.400 LOC, Docker, **903 tests**, 21 detectores.
 
 > **Estado: PRODUCCIÓN.** No es un esqueleto. Cualquier cambio afecta grupos reales con miles de usuarios. **Investiga > Confirma > Actúa.**
 
@@ -84,6 +84,8 @@ También banea spam publicado en nombre de un canal (`sender_chat` → `banChatS
 `bio_spam`, `photos_batch`, `obvious_spam_profile` (parcial) y `personal_channel_spam` leen el perfil vía MTProto. **Sin Telethon no se activan** y el bot sigue funcionando con el resto. Documentado en ambos README, porque quien instale sin cuenta secundaria no sabría qué se pierde.
 
 **El perfil tiene más de un escaparate.** Durante mucho tiempo solo leíamos `about` (la bio). El **canal personal** (Telegram 2024, `personal_channel_id`, disponible desde Telethon 1.36) es un campo SEPARADO: un perfil con la bio vacía puede tener ahí un canal entero de spam. Caso real que lo destapó: cuenta «Matthew», nombre latino, sin foto ni bio, con un canal chino reclutando mulas de blanqueo. Si aparece otro campo nuevo de perfil, mirarlo antes de fiarse de que el perfil está limpio.
+
+El detector tuvo que ampliarse cuando la misma red volvió con el **nombre también en chino**: sin discordancia se quedaba en 40 de 100 y se colaba. Se sumaron los compuestos de la red (`结账通知`, `飞机加群`, nunca palabras sueltas como `结账`, que es corriente) y una señal de **cadenas generadas a máquina** en bio/usuario (`bhLQZZXwkU2M`): una bio de ruido informativamente es no tener bio. Esa señal mira **rachas de mayúsculas intercaladas**, no vocales, porque medir vocales marcaba a usuarios checos y polacos legítimos (`wchrzszcz`).
 
 `personal_channel_spam` **no salta por tener canal**: eso es legítimo. La señal es la **discordancia** (nombre en alfabeto latino + canal en otro script), que es un disfraz deliberado. Ninguna señal suelta llega al umbral. Lección del caso: el bot ya cazaba a los de esta red que usaban nombre chino; los que se colaban eran los que se ponían nombre occidental.
 

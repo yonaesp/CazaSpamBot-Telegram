@@ -251,3 +251,64 @@ def test_lista_editable_del_repo_caza_el_caso_real():
     """La lista versionada en config/blacklist/ debe cubrir el término del caso
     real; si alguien la vacía, este test avisa."""
     assert pc._keywords_re().search(CANAL_REAL)
+
+
+# --- Caso real 2026-07-27: la red 财天下 con NOMBRE tambien en chino -----------
+# El detector nacio contra «Matthew» (nombre latino + canal chino = discordancia).
+# Esta variante lleva el nombre TAMBIEN en chino, asi que no hay discordancia y se
+# colaba con 40 puntos de 100. Lo que la delata es el vocabulario del titulo y que
+# bio y usuario son cadenas generadas a maquina ("bhLQZZXwkU2M").
+
+def test_red_caitianxia_con_nombre_chino_se_caza():
+    h = pc.check("财天下集团飞机加群结账通知频道", first_name="属棋却仁",
+                 username="znhlOOWcZYYS", bio="bhLQZZXwkU2M",
+                 has_photo=True, has_bio=True, allowed_scripts=("latin",))
+    assert h.score >= 100, f"se cuela con score={h.score}"
+    assert h.rule == "personal_channel_spam"
+
+
+@pytest.mark.parametrize("texto,esperado", [
+    ("bhLQZZXwkU2M", True),      # bio del caso real
+    ("znhlOOWcZYYS", True),      # usuario del caso real
+    ("UjgVpcyOVlbLyy", True),    # otra cuenta de la misma red
+    # Legitimos: incluidos idiomas con rachas largas de consonantes, que son el
+    # falso positivo obvio de esta heuristica.
+    ("carlosmartinez", False),
+    ("Krzysztof_Brzeczyszczykiewicz", False),
+    ("wchrzszcz", False),        # polaco SIN VOCALES: el falso positivo obvio
+    ("MariaGARCIA", False),      # apellido en mayúsculas al final
+    ("JohnDOE", False),
+    ("NASA", False),             # acrónimo
+    ("sergeybazhenovvv", False),
+    ("maria_lopez", False),
+    ("CarLogistEsp", False),
+    ("xd", False),               # demasiado corto para decidir
+])
+def test_deteccion_de_cadenas_generadas(texto, esperado):
+    assert pc._parece_generada(texto) is esperado
+
+
+def test_cadena_generada_sola_no_banea():
+    """Es senial de APOYO: sin canal sospechoso no debe disparar nada, o marcaria
+    a cualquiera con un usuario raro."""
+    h = pc.check(None, first_name="Ana", username="xK9mPzQwRtY",
+                 has_photo=False, has_bio=False, allowed_scripts=("latin",))
+    assert h.score == 0
+
+
+@pytest.mark.parametrize("titulo", [
+    "我的摄影频道",              # "mi canal de fotografia"
+    "北京美食推荐",              # "recomendaciones de comida de Pekin"
+    "结账系统更新公告",          # lleva 结账 SUELTO: no debe bastar
+])
+def test_titulos_chinos_legitimos_no_disparan_por_keyword(titulo):
+    assert not pc._keywords_re().search(titulo)
+
+
+@pytest.mark.parametrize("titulo", [
+    "财天下集团飞机加群结账通知频道",
+    "恒泰集团招洗钱车队结账通知频道",
+    "财哥【财赢天下】加群带走600",
+])
+def test_titulos_de_la_red_si_disparan(titulo):
+    assert pc._keywords_re().search(titulo)

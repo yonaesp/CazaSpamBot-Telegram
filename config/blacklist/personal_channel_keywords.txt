@@ -37,3 +37,13 @@
 \bescort\s+service\b
 \bonlyfans\b
 \bblanqueo\s+de\s+(?:capitales|dinero)\b
+
+# --- Red 财天下 / 恒泰 (blanqueo y captacion de mulas, vista en produccion) ---
+# COMPUESTOS a proposito, no palabras sueltas: 结账 (facturar), 加群 (entrar al
+# grupo) o 飞机 (avion, jerga de Telegram) son corrientes por separado y en un
+# grupo chino legitimo causarian falsos positivos. Juntas ya no son casualidad.
+结账通知
+飞机加群
+加群带走
+车队结账
+

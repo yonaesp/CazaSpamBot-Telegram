@@ -28,6 +28,7 @@ no hay título de canal que analizar y el detector simplemente no aplica.
 """
 from __future__ import annotations
 
+import re
 from collections.abc import Iterable
 
 from ..i18n import t
@@ -95,6 +96,33 @@ def _name_fully_allowed(
     return all(script in allowed for script in counts)
 
 
+
+# Cadenas generadas a maquina: bio y usuario tipo "bhLQZZXwkU2M" / "znhlOOWcZYYS".
+# Un perfil cuyo unico "contenido" es ruido informativamente NO tiene contenido, y
+# eso es justo lo que mide SCORE_HIDDEN_PROFILE.
+#
+# La firma es una RACHA DE MAYUSCULAS intercalada entre minusculas ("bh-LQZZX-wk").
+# Se descarto medir vocales: el checo y el polaco tienen palabras sin vocales
+# ("wchrzszcz") y marcaban a usuarios reales. Con las rachas quedan a salvo, y
+# tambien el CamelCase legitimo ("CarLogistEsp") y los apellidos en mayusculas
+# ("MariaGARCIA"), porque ahi la mayuscula no va rodeada de minusculas por ambos lados.
+#
+# Aun asi solo suma como APOYO, nunca decide: con MIN_SCORE=100 y 25 puntos jamas basta.
+_GENERADA_RE = re.compile(r"[a-z][A-Z]{2,}[a-z]")
+
+
+def _parece_generada(texto: str | None) -> bool:
+    """True si la cadena parece salida de un generador, no elegida por alguien."""
+    if not texto:
+        return False
+    letras = re.sub(r"[\W\d_]+", "", texto, flags=re.UNICODE)
+    if len(letras) < 8:                       # corta: demasiado ruido para decidir
+        return False
+    if letras.islower() or letras.isupper():  # un solo caso: nombre o acronimo normal
+        return False
+    return bool(_GENERADA_RE.search(letras))
+
+
 def check(
     channel_title: str | None,
     *,
@@ -104,6 +132,7 @@ def check(
     allowed_scripts: Iterable[str] = ("latin",),
     has_photo: bool = True,
     has_bio: bool = True,
+    bio: str | None = None,
     ratio_threshold: float = TITLE_FOREIGN_RATIO,
 ) -> Hit:
     """Analiza el título del canal personal. Sin canal (o sin Telethon) no dispara."""
@@ -134,10 +163,14 @@ def check(
         reasons.append(t("reason.personal_channel_keywords"))
         payload["keywords"] = True
 
-    if not has_photo and not has_bio:
+    # Una bio de ruido generado equivale a no tener bio: no dice nada de la persona.
+    bio_real = has_bio and not _parece_generada(bio)
+    user_generado = _parece_generada(username)
+    if (not has_photo and not bio_real) or user_generado:
         score += SCORE_HIDDEN_PROFILE
         reasons.append(t("reason.personal_channel_hidden"))
         payload["hidden_profile"] = True
+        payload["generated_strings"] = bool(user_generado or (has_bio and not bio_real))
 
     if score < MIN_SCORE:
         return Hit.none()

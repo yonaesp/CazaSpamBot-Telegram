@@ -495,6 +495,7 @@ async def on_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                     first_name=user.first_name, last_name=user.last_name,
                     username=user.username, allowed_scripts=_chat_allowed_scripts(db, cmu.chat.id, cfg),
                     has_photo=sig_pre.photo_count > 0, has_bio=bool(sig_pre.bio),
+                    bio=sig_pre.bio,
                 )
             except Exception as exc:  # noqa: BLE001
                 # Mismo motivo que sus vecinos: el usuario YA tiene el mute
