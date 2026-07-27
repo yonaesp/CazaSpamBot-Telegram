@@ -156,6 +156,10 @@ CREATE TABLE IF NOT EXISTS chat_settings (
     -- latino: sin esto el bot marcaría a sus usuarios normales. Ver
     -- _chat_allowed_scripts() en handlers.py.
     allowed_scripts               TEXT DEFAULT NULL,
+    -- Cuánto dura el mensaje de «verificación correcta» (el prompt EDITADO) antes
+    -- de borrarse. NULL = hereda VERIFIED_WELCOME_DELETE_AFTER_S del .env.
+    -- 0 = no se borra nunca. Ver _verified_ttl() en verification.py.
+    verified_ttl_s                INTEGER DEFAULT NULL,
     updated_at                    REAL NOT NULL DEFAULT 0
 );
 -- Migración blanda para bases ya creadas
@@ -352,6 +356,12 @@ class DB:
             # por .env empezaría a marcar a sus usuarios normales tras actualizar.
             self._conn.execute(
                 "ALTER TABLE chat_settings ADD COLUMN allowed_scripts TEXT DEFAULT NULL"
+            )
+        if "verified_ttl_s" not in cs_cols:
+            # NULLable: NULL = hereda el .env. 0 es un valor VÁLIDO (no borrar nunca),
+            # por eso no se puede usar 0 como "sin definir".
+            self._conn.execute(
+                "ALTER TABLE chat_settings ADD COLUMN verified_ttl_s INTEGER DEFAULT NULL"
             )
         su_cols2 = {r[1] for r in self._conn.execute("PRAGMA table_info(seen_users)").fetchall()}
         if "first_name" not in su_cols2:
@@ -899,7 +909,7 @@ class DB:
             "verification_reminder_hours", "verification_kick_after_reminder_hours",
             "verification_reminders_enabled", "verification_kick_normal",
             "verification_review_suspicious", "cleanservice",
-            "topweekly_enabled", "quips_enabled", "money_guard", "allowed_scripts",
+            "topweekly_enabled", "quips_enabled", "money_guard", "allowed_scripts", "verified_ttl_s",
         }
         if field not in ALLOWED:
             raise ValueError(f"campo no permitido: {field}")
@@ -1030,7 +1040,9 @@ class DB:
         now = time.time()
         with self._cur() as c:
             return c.execute(
-                "SELECT chat_id, user_id, welcome_msg_id FROM pending_verifications "
+                # verified_at se devuelve para que quien barre pueda distinguir el
+                # prompt del mensaje ya verificado (que puede tener TTL «nunca»).
+                "SELECT chat_id, user_id, welcome_msg_id, verified_at FROM pending_verifications "
                 "WHERE welcome_msg_id IS NOT NULL AND ("
                 "  (verified_at IS NULL AND joined_at <= ?) "
                 "  OR (verified_at IS NOT NULL AND verified_at <= ?)"

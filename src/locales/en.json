@@ -938,5 +938,7 @@
   "cfg.sc.name.hiragana": "Hiragana",
   "cfg.sc.name.katakana": "Katakana",
   "cfg.sc.name.hangul": "Hangul",
-  "cfg.sc.name.other": "Other alphabets"
+  "cfg.sc.name.other": "Other alphabets",
+  "cfg.b.verified_ttl": "⏳ Verified message lasts: {value} ▸",
+  "cfg.vd.text": "⏳ <b>How long the verified message stays</b> · {title}\n\nWhen someone taps I'M HUMAN, the verification message <b>is edited in place</b> (no second message) and becomes the welcome. Here you choose how long it stays before deleting itself.\n\n<b>Never</b> keeps it in the chat for good.\n\nCurrent: <b>{value}</b>"
 }

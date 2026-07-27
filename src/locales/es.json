@@ -938,5 +938,7 @@
   "cfg.sc.name.hiragana": "Hiragana",
   "cfg.sc.name.katakana": "Katakana",
   "cfg.sc.name.hangul": "Hangul",
-  "cfg.sc.name.other": "Otros alfabetos"
+  "cfg.sc.name.other": "Otros alfabetos",
+  "cfg.b.verified_ttl": "⏳ Verificación correcta dura: {value} ▸",
+  "cfg.vd.text": "⏳ <b>Duración del mensaje de verificación correcta</b> · {title}\n\nAl pulsar SOY HUMANO, el mensaje de verificación <b>se edita</b> (no se crea otro) y pasa a ser el saludo de bienvenida. Aquí decides cuánto se queda antes de borrarse solo.\n\n<b>Nunca</b> lo deja fijo en el chat.\n\nActual: <b>{value}</b>"
 }

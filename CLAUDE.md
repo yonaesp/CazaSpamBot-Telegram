@@ -1,7 +1,7 @@
 # CazaSpamBot — Bot Antispam Telegram
 
 Bot de moderación antispam **en producción 24/7**, multi-grupo, federado y **bilingüe** (es/en).
-~14.400 LOC, Docker, **870 tests**, 21 detectores.
+~14.400 LOC, Docker, **882 tests**, 21 detectores.
 
 > **Estado: PRODUCCIÓN.** No es un esqueleto. Cualquier cambio afecta grupos reales con miles de usuarios. **Investiga > Confirma > Actúa.**
 
@@ -166,6 +166,12 @@ Panel: sincronización · verificación · revisión de sospechosos · recordato
 
 `config/welcomes/<chat_id>.txt` (privado) → `generic.<lang>.txt` → `generic.txt` → fallback traducido.
 El genérico por idioma va **antes** que `generic.txt` a propósito: `generic.txt` está en español y, como existe, ganaba al fallback traducido (un usuario inglés recibía bienvenidas en castellano).
+
+El mensaje de verificación **se EDITA** al de «verificación correcta» (no se envía uno nuevo, para no dejar dos mensajes en el chat). Cuánto dura ese mensaje editado lo decide `chat_settings.verified_ttl_s` (**NULL = hereda `VERIFIED_WELCOME_DELETE_AFTER_S`**, defecto 5 min; **0 = no se borra nunca**), resuelto por `_verified_ttl()`.
+
+Dos trampas de ese ajuste:
+- **0 es un valor VÁLIDO**, así que no se puede resolver con un `or` (se comería el «nunca» y devolvería el default).
+- Se borra en **dos sitios**: el `jq.run_once` al verificar y el **barrido por BD** del `cleanup_job` (que existe porque los jobs en memoria se pierden al reiniciar). Los dos respetan el 0; sin la guarda del barrido, el mensaje «permanente» sobrevivía hasta el siguiente reinicio y luego desaparecía.
 
 Cada línea del catálogo es el saludo COMPLETO (`📥 Bienvenido/a {name}. <gracia temática>`); la cabecera de verificación no saluda, para no duplicar el «Bienvenido/a». El pie fijo y los botones se añaden aparte.
 

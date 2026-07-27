@@ -360,9 +360,29 @@ def _int_env(name: str, default: int) -> int:
 # 15 min por defecto. Configurable en .env.
 FRIENDLY_WELCOME_DELETE_AFTER_S = _int_env("FRIENDLY_WELCOME_DELETE_AFTER_S", 900)
 # Duración del mensaje de "verificación correcta + welcome" tras pulsar SOY HUMANO.
-# Generoso (20 min) para que al recién llegado le dé tiempo a leer el welcome, las
-# normas y pulsar el botón del anclado. Configurable en .env.
-VERIFIED_WELCOME_DELETE_AFTER_S = _int_env("VERIFIED_WELCOME_DELETE_AFTER_S", 1200)
+# 5 min: suficiente para leer el saludo y pulsar el botón del anclado sin dejar el
+# chat lleno de bienvenidas viejas. Es el DEFECTO GLOBAL: cada chat puede cambiarlo
+# desde /config (columna verified_ttl_s), y 0 significa no borrarlo nunca.
+VERIFIED_WELCOME_DELETE_AFTER_S = _int_env("VERIFIED_WELCOME_DELETE_AFTER_S", 300)
+
+
+def _verified_ttl(settings) -> int:
+    """Segundos que dura el mensaje de «verificación correcta» en este chat.
+
+    `chat_settings.verified_ttl_s` manda; su NULL significa «no se ha decidido
+    aquí» y hereda el .env. OJO: 0 es un valor VÁLIDO (no borrar nunca), así que
+    no se puede tratar como «sin definir» con un `or`, que es el error fácil aquí.
+    """
+    try:
+        v = settings["verified_ttl_s"] if settings is not None else None
+    except (KeyError, IndexError, TypeError):
+        return VERIFIED_WELCOME_DELETE_AFTER_S
+    if v is None:
+        return VERIFIED_WELCOME_DELETE_AFTER_S
+    try:
+        return max(0, int(v))
+    except (TypeError, ValueError):
+        return VERIFIED_WELCOME_DELETE_AFTER_S
 
 
 # Welcomes graciosos para perfiles legítimos. Se cargan de archivos editables
@@ -898,10 +918,12 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                 text=text, parse_mode="HTML", reply_markup=keyboard,
                 disable_web_page_preview=True,
             )
-            # Borrado más largo, contado desde AHORA (no desde el envío del prompt).
-            if jq is not None:
+            # Borrado contado desde AHORA (no desde el envío del prompt). El TTL es
+            # el del chat, y 0 significa dejarlo para siempre: no se programa nada.
+            ttl = _verified_ttl(db.get_chat_settings(chat_id))
+            if jq is not None and ttl > 0:
                 jq.run_once(
-                    _delete_friendly_welcome_job, when=VERIFIED_WELCOME_DELETE_AFTER_S,
+                    _delete_friendly_welcome_job, when=ttl,
                     data={"chat_id": chat_id, "message_id": welcome_msg_id, "user_id": target_user_id},
                     name=f"del_verified_welcome_{chat_id}_{welcome_msg_id}",
                 )
@@ -947,12 +969,21 @@ async def cleanup_job(context: ContextTypes.DEFAULT_TYPE) -> None:
 
         # 0) Barrido de welcomes vencidos (robusto ante reinicios del bot, que
         # pierden los jobs jq.run_once en memoria). DB-driven. Los ya verificados
-        # (welcome editado / amistoso) usan su TTL largo desde verified_at, no el
+        # (welcome editado / amistoso) usan su TTL propio desde verified_at, no el
         # del prompt desde joined_at (si no, se borraban antes de tiempo).
-        verified_ttl = max(FRIENDLY_WELCOME_DELETE_AFTER_S, VERIFIED_WELCOME_DELETE_AFTER_S)
+        #
+        # Si el chat pidió «no borrar nunca» (0), este barrido DEBE respetarlo: es
+        # el otro sitio donde se borra, y sin esta guarda el mensaje sobrevivía
+        # hasta el siguiente reinicio y luego desaparecía sin que nadie entendiera
+        # por qué.
+        ttl_verificado = _verified_ttl(settings)
+        sweep_verified = ttl_verificado > 0
+        verified_ttl = max(FRIENDLY_WELCOME_DELETE_AFTER_S, ttl_verificado)
         for row in db.pending_welcomes_past_ttl(welcome_ttl, verified_ttl):
             if row["chat_id"] != chat_id:
                 continue
+            if row["verified_at"] is not None and not sweep_verified:
+                continue  # este chat quiere el mensaje de verificación para siempre
             try:
                 await context.bot.delete_message(chat_id=chat_id, message_id=row["welcome_msg_id"])
                 log.info("welcome vencido borrado (barrido DB) user=%s chat=%s", row["user_id"], chat_id)

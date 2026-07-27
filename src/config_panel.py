@@ -481,7 +481,33 @@ def build_welcome_keyboard(chat_id: int, s, n_buttons: int) -> InlineKeyboardMar
                               callback_data=f"{PREFIX}:wbtn:{cid}")],
         [InlineKeyboardButton(t("cfg.b.welcome_ttl", value=_ttl_label(ttl)),
                               callback_data=f"{PREFIX}:wdel:{cid}")],
+        [InlineKeyboardButton(t("cfg.b.verified_ttl", value=_ttl_label(_verified_ttl_value(s))),
+                              callback_data=f"{PREFIX}:vdel:{cid}")],
         [InlineKeyboardButton(t("cfg.b.back"), callback_data=f"{PREFIX}:open:{cid}")],
+    ])
+
+
+def _verified_ttl_value(s) -> int:
+    """TTL efectivo del mensaje de «verificación correcta» en este chat.
+
+    Se delega en verification._verified_ttl para no duplicar la herencia del .env
+    (y porque 0 es un valor válido que un `or` se comería)."""
+    from . import verification
+    return verification._verified_ttl(s)
+
+
+def build_verified_ttl_keyboard(chat_id: int, s) -> InlineKeyboardMarkup:
+    """Presets de cuánto dura el mensaje de «verificación correcta»."""
+    cid = chat_id
+    cur = _verified_ttl_value(s)
+    fila = [
+        InlineKeyboardButton(("✅ " if v == cur else "") + _ttl_label(v),
+                             callback_data=f"{PREFIX}:vdset:{v}:{cid}")
+        for v in _WELCOME_TTL_PRESETS
+    ]
+    return InlineKeyboardMarkup([
+        fila,
+        [InlineKeyboardButton(t("cfg.b.back"), callback_data=f"{PREFIX}:wsub:{cid}")],
     ])
 
 
@@ -1200,6 +1226,46 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                 t("cfg.wd.text", title=html.escape(_panel_title(db, cid)),
                   value=_ttl_label(_num(s, "welcome_delete_after_s", 900))),
                 parse_mode="HTML", reply_markup=build_welcome_ttl_keyboard(cid, s))
+        except TelegramError:
+            pass
+        return
+
+    if action == "vdel":
+        cid = _cid(2)
+        if cid is None:
+            await q.answer(t("cfg.invalid_chat"))
+            return
+        await q.answer()
+        db.ensure_chat_settings(cid)
+        s = db.get_chat_settings(cid)
+        try:
+            await q.edit_message_text(
+                t("cfg.vd.text", title=html.escape(_panel_title(db, cid)),
+                  value=_ttl_label(_verified_ttl_value(s))),
+                parse_mode="HTML", reply_markup=build_verified_ttl_keyboard(cid, s))
+        except TelegramError:
+            pass
+        return
+
+    if action == "vdset":
+        cid = _cid(3)
+        try:
+            val = int(parts[2])
+        except (IndexError, ValueError):
+            await q.answer(t("cfg.invalid_val"))
+            return
+        if cid is None or val not in _WELCOME_TTL_PRESETS:
+            await q.answer(t("cfg.invalid_opt"))
+            return
+        db.ensure_chat_settings(cid)
+        n = settings_sync.apply_setting(db, cid, "verified_ttl_s", val)
+        await q.answer(f"✅ {_ttl_label(val)}" + (t("cfg.dot_n", n=n) if n > 1 else ""))
+        s = db.get_chat_settings(cid)
+        try:
+            await q.edit_message_text(
+                t("cfg.vd.text", title=html.escape(_panel_title(db, cid)),
+                  value=_ttl_label(_verified_ttl_value(s))),
+                parse_mode="HTML", reply_markup=build_verified_ttl_keyboard(cid, s))
         except TelegramError:
             pass
         return

@@ -41,9 +41,16 @@ def test_incluye_botones_configurados_del_chat():
     assert kb.inline_keyboard[0][0].text == "📌 Anclado"
 
 
-def test_duracion_configurable_por_defecto_generosa():
-    """El welcome verificado dura más que el prompt (para dar tiempo a leer)."""
-    assert v.VERIFIED_WELCOME_DELETE_AFTER_S >= 600
+def test_duracion_del_welcome_verificado():
+    """Defecto de 5 min: suficiente para leer el saludo y pulsar el botón del
+    anclado, sin dejar el chat lleno de bienvenidas viejas.
+
+    (Antes eran 20 min y este test exigía >=600s. El requisito cambió a
+    peticion del admin; lo que se conserva es que dé tiempo a leerlo y que
+    siga siendo configurable, incluido «no borrar nunca».)"""
+    assert v.VERIFIED_WELCOME_DELETE_AFTER_S == 300
+    assert v._verified_ttl({"verified_ttl_s": 0}) == 0        # nunca
+    assert v._verified_ttl({"verified_ttl_s": None}) == 300   # hereda
 
 
 def test_verification_footer_tiempos():
