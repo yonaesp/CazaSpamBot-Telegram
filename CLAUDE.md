@@ -1,7 +1,7 @@
 # CazaSpamBot — Bot Antispam Telegram
 
 Bot de moderación antispam **en producción 24/7**, multi-grupo, federado y **bilingüe** (es/en).
-~14.400 LOC, Docker, **903 tests**, 21 detectores.
+~14.400 LOC, Docker, **927 tests**, 21 detectores.
 
 > **Estado: PRODUCCIÓN.** No es un esqueleto. Cualquier cambio afecta grupos reales con miles de usuarios. **Investiga > Confirma > Actúa.**
 
@@ -183,6 +183,14 @@ Cada línea del catálogo es el saludo COMPLETO (`📥 Bienvenido/a {name}. <gra
 - `verification.cleanup_job` (15min) — 3 tiers: kick suspicious 30min, reminder normal 3h, kick post-reminder +6h
 - `maintenance.cleanup_nightly_job` (24h) — **copia de seguridad** + limpieza + **reconciliación banned_users↔Telegram**
 - `topweekly.weekly_top_job` (domingo 20:00 Madrid)
+
+### Bots de otros admins en el grupo
+
+Un bot con botones inline **no es sospechoso**: es su forma normal de trabajar. El detector `inline_buttons` es solo para HUMANOS (que no pueden crearlos). Aplicarlo a bots expulsó a `@MissRose_bot` de los 4 grupos por publicar su aviso de warn, tras 685 mensajes legítimos. En la ruta de bots solo cuentan señales de spam REAL (URL en lista negra, anuncio comercial).
+
+A un bot que es **admin** Telegram no permite banearlo, así que ahí no hay nada que hacer salvo avisar: `maintenance.notify_bot_overlap` manda **un solo aviso por pareja chat+bot** (dedupe en `bot_prefs`, prefijo `botoverlap_`) contando que puede haber solape en bienvenida, verificación y warns. No afirma qué hace el otro bot, porque no se puede saber. Silenciable desde `/alertas` (tipo `bot_overlap`).
+
+**Los warns NO salen en `/recent`**: viven en `user_warns` y `/recent` solo lee `moderation_log`. Se consultan con `/warns` respondiendo al usuario.
 
 ### Copia de seguridad de la BD
 

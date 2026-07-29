@@ -18,6 +18,7 @@ NOTIFY_TYPES: dict[str, str] = {
     "self_delete": "notify.self_delete",
     "manual_ban": "notify.manual_ban",
     "bot_removed": "notify.bot_removed",
+    "bot_overlap": "notify.bot_overlap",
 }
 
 

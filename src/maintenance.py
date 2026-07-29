@@ -13,15 +13,20 @@ También aggressive cleanup post-ban si ban_recent_messages está activo.
 """
 from __future__ import annotations
 
+import html as _h
 import logging
 import sqlite3
 import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.error import TelegramError
 from telegram.ext import ContextTypes
 
+from . import notify_prefs
 from .db import DB
+from .i18n import t
 
 log = logging.getLogger(__name__)
 
@@ -184,6 +189,12 @@ async def cleanup_nightly_job(context: ContextTypes.DEFAULT_TYPE) -> None:
     # por unbans manuales en Telegram que el bot no ve.
     await _reconcile_banned_users(context, db)
 
+    # Aviso (una sola vez por pareja chat+bot) de otro bot admin en el grupo.
+    try:
+        await notify_bot_overlap(context)
+    except Exception as exc:  # noqa: BLE001 — es informativo: nunca aborta el mantenimiento
+        log.warning("bot_overlap: error inesperado (%s)", exc)
+
 
 async def _reconcile_banned_users(context, db) -> None:
     """Marca como revoked en banned_users a los users que ya no están kicked
@@ -252,6 +263,97 @@ async def _reconcile_banned_users(context, db) -> None:
     if sin_respuesta > 0:
         log.warning("reconcile_banned_users: %d users sin respuesta de Telegram en ningún "
                     "chat; NO se revocan (se reintenta en la próxima pasada)", sin_respuesta)
+
+
+# ===== Aviso: otro bot admin en el grupo (posible solape de funciones) =====
+
+def _overlap_key(chat_id: int, bot_id: int) -> str:
+    """Clave de la marca «ya avisé de este bot en este chat».
+
+    Vive en `bot_prefs` (get_pref/set_pref) porque lo que se guarda es exactamente
+    un booleano «ya avisado»: no hace falta tabla nueva ni migración, y son cuatro
+    filas contadas (una por pareja). El prefijo es distinto de `notify_` para que
+    nunca se cruce con las preferencias de /alertas.
+    """
+    return f"botoverlap_{chat_id}_{bot_id}"
+
+
+def _overlap_keyboard(chat_id: int):
+    """Botones del aviso: abrir los ajustes de ESE grupo, y silenciar el aviso."""
+    from .config_panel import PREFIX as CFG  # local: mantiene maintenance ligero
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton(t("maint.bot_overlap.b.config"),
+                              callback_data=f"{CFG}:open:{chat_id}")],
+        [notify_prefs.mute_button("bot_overlap")],
+    ])
+
+
+async def notify_bot_overlap(context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Avisa al admin de que en un grupo moderado hay OTRO bot con permisos de admin.
+
+    No se puede saber qué hace ese bot (no hay forma de introspeccionarlo), así que el
+    aviso dice que PUEDE solaparse, no que lo haga. Se manda **una sola vez por pareja
+    chat+bot**: repetirlo cada noche solo consigue que el admin lo silencie por hartazgo.
+
+    Devuelve cuántos avisos se enviaron. Best-effort: cualquier fallo se registra y se
+    sigue con el resto de grupos.
+    """
+    db: DB = context.bot_data["db"]
+    cfg = context.bot_data.get("cfg")
+    if cfg is None:
+        return 0
+    if not notify_prefs.effective(db, "bot_overlap", cfg):
+        return 0
+    # Mismo destino que el resto de avisos: el chat de notificaciones si está
+    # configurado, y si no el DM del admin.
+    destino = getattr(cfg, "admin_notify_chat_id", 0) or getattr(cfg, "admin_user_id", 0)
+    if not destino:
+        return 0
+    try:
+        chats = [c for c in db.all_chats() if c["am_admin"]]
+    except Exception as exc:  # noqa: BLE001
+        log.warning("bot_overlap: no se pudieron listar los grupos (%s)", exc)
+        return 0
+    yo = getattr(context.bot, "id", None)
+    enviados = 0
+    for c in chats:
+        cid = c["chat_id"]
+        try:
+            admins = await context.bot.get_chat_administrators(chat_id=cid)
+        except Exception as exc:  # noqa: BLE001 — un chat que falla no frena a los demás
+            log.debug("bot_overlap: get_chat_administrators falló chat=%s: %s", cid, exc)
+            continue
+        for miembro in admins or []:
+            otro = getattr(miembro, "user", None)
+            if otro is None or not getattr(otro, "is_bot", False):
+                continue
+            if yo is not None and otro.id == yo:
+                continue  # yo mismo no cuento
+            clave = _overlap_key(cid, otro.id)
+            if db.get_pref(clave):
+                continue  # ya avisado de esta pareja
+            texto = t(
+                "maint.bot_overlap",
+                chat=_h.escape(c["title"] or str(cid)),
+                chat_id=cid,
+                bot=_h.escape(otro.first_name or otro.username or str(otro.id)),
+                bot_user=(f" (@{_h.escape(otro.username)})" if otro.username else ""),
+            )
+            try:
+                await context.bot.send_message(
+                    chat_id=destino, text=texto, parse_mode="HTML",
+                    reply_markup=_overlap_keyboard(cid),
+                )
+            except TelegramError as exc:
+                # Sin marca: se reintenta en la siguiente pasada. Marcar aquí dejaría
+                # al admin sin enterarse nunca de ese solape.
+                log.debug("bot_overlap: aviso no enviado chat=%s bot=%s: %s", cid, otro.id, exc)
+                continue
+            db.set_pref(clave, True)
+            enviados += 1
+            log.info("bot_overlap: avisado de %s (%s) admin en chat=%s",
+                     otro.username or otro.first_name, otro.id, cid)
+    return enviados
 
 
 async def aggressive_post_ban_cleanup(

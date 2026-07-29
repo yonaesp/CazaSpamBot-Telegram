@@ -424,6 +424,7 @@
   "notify.self_delete": "Alguien borra su propio mensaje",
   "notify.manual_ban": "Otro admin banea o expulsa a alguien",
   "notify.bot_removed": "Me expulsan de un grupo",
+  "notify.bot_overlap": "Hay otro bot admin que puede solaparse",
   "notify.mute_button": "🔕 Silenciar estos avisos",
   "welcomebtn.added": "✅ Botón #{id} añadido: <code>{text}</code> → {url}{same}",
   "welcomebtn.removed": "✅ Botón eliminado.",
@@ -940,5 +941,7 @@
   "cfg.sc.name.hangul": "Hangul",
   "cfg.sc.name.other": "Otros alfabetos",
   "cfg.b.verified_ttl": "⏳ Verificación correcta dura: {value} ▸",
-  "cfg.vd.text": "⏳ <b>Duración del mensaje de verificación correcta</b> · {title}\n\nAl pulsar SOY HUMANO, el mensaje de verificación <b>se edita</b> (no se crea otro) y pasa a ser el saludo de bienvenida. Aquí decides cuánto se queda antes de borrarse solo.\n\n<b>Nunca</b> lo deja fijo en el chat.\n\nActual: <b>{value}</b>"
+  "cfg.vd.text": "⏳ <b>Duración del mensaje de verificación correcta</b> · {title}\n\nAl pulsar SOY HUMANO, el mensaje de verificación <b>se edita</b> (no se crea otro) y pasa a ser el saludo de bienvenida. Aquí decides cuánto se queda antes de borrarse solo.\n\n<b>Nunca</b> lo deja fijo en el chat.\n\nActual: <b>{value}</b>",
+  "maint.bot_overlap": "🤖 <b>Hay otro bot admin en el grupo</b>\n\nEn <b>{chat}</b> (<code>{chat_id}</code>) también es administrador <b>{bot}</b>{bot_user}.\n\nNo puedo saber qué hace ese bot, así que esto no es una queja: es un aviso de que <b>puede</b> solaparse conmigo. Lo mío que más suele coincidir es la <b>bienvenida</b>, la <b>verificación de los nuevos</b> y los <b>warns</b>. Si prefieres que de eso se encargue él, apaga lo que quieras en /config; si te vale con los dos activos, no hace falta tocar nada.\n\n<i>Por si te lo preguntas: a un bot que es administrador no puedo banearlo (Telegram no lo permite), y a los bots que no son admin ya no los marco por publicar mensajes con botones.</i>",
+  "maint.bot_overlap.b.config": "⚙️ Ajustes de ese grupo"
 }
