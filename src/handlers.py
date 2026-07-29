@@ -1237,9 +1237,15 @@ async def _is_admin_of_chat(context: ContextTypes.DEFAULT_TYPE, chat_id: int, us
         member = await context.bot.get_chat_member(chat_id=chat_id, user_id=user_id)
         is_admin = member.status in (ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER)
     except Exception as exc:  # noqa: BLE001
-        log.debug("is_admin_of_chat get_chat_member fallo chat=%s user=%s: %s",
-                  chat_id, user_id, exc)
-        is_admin = False
+        # FALLA DEL LADO SEGURO: si no se puede comprobar, se asume que SÍ es admin
+        # y no se actúa. Antes devolvía False y un fallo transitorio de red bastaba
+        # para que la guarda dejara de proteger y se baneara a un admin. La regla
+        # del proyecto es que un falso positivo es peor que un falso negativo: el
+        # spammer se cazará en su siguiente mensaje, pero un admin baneado no se
+        # arregla solo. NO se cachea el resultado, para reintentar la próxima vez.
+        log.warning("is_admin_of_chat: no se pudo comprobar chat=%s user=%s (%s); "
+                    "se asume admin y NO se actúa", chat_id, user_id, exc)
+        return True
     # Bound: si el cache supera el máximo, purga expiradas y, si sigue lleno, descarta la mitad más vieja
     if len(cache) >= _ADMIN_CACHE_MAX:
         expired = [k for k, (_, exp) in cache.items() if exp <= now]
@@ -1462,7 +1468,12 @@ async def _moderate_bot_message(context, db, cfg, msg, user) -> None:
     inline (spam típico) o URL en blocklist → ban federado del bot + delete.
     Silencioso (auto-ban). Los bots legítimos sin spam no disparan nada."""
     hits = []
-    hits.append(buttons_det.check(msg))
+    # OJO: NO se usa buttons_det aquí. Los botones inline son señal de spam cuando
+    # los manda un HUMANO (no puede crearlos: implica forward de canal promocional),
+    # pero en un BOT son su forma normal de trabajar. Aplicarlo a bots baneaba a
+    # bots de moderación legítimos: caso real, @MissRose_bot expulsada de 4 grupos
+    # por publicar su aviso de warn, que lleva un botón, tras 685 mensajes buenos.
+    # Para un bot solo cuentan señales de spam REAL:
     hits.append(url_det.check(msg, cfg.url_blocklist, is_first_msg=True))
     hits.append(comad_det.check(msg, is_first_msg=True))
     real = [h for h in hits if h]
