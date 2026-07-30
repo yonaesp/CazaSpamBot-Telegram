@@ -694,14 +694,6 @@ async def _post_ban_quip_to_chats(
         )
 
 
-async def _delete_msg_job(context: ContextTypes.DEFAULT_TYPE) -> None:
-    data = context.job.data
-    try:
-        await context.bot.delete_message(chat_id=data["chat_id"], message_id=data["message_id"])
-    except TelegramError:
-        pass
-
-
 @_only_admin
 async def cmd_unban(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     cfg: Config = context.bot_data["cfg"]

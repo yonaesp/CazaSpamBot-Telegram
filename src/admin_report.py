@@ -56,13 +56,6 @@ def contains_admin_mention(msg: Message) -> bool:
     return bool(_ADMIN_RE.search(text))
 
 
-def _format_reporter(user) -> str:
-    """Identifica al reporter sin link clicable. first_name (id: N)."""
-    nombre = (user.first_name or "user").strip()[:40]
-    nombre = html.escape(nombre)
-    return f"{nombre} (id: <code>{user.id}</code>)"
-
-
 async def handle_admin_mention(
     context: ContextTypes.DEFAULT_TYPE,
     db: DB,

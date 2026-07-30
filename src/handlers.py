@@ -2215,30 +2215,6 @@ async def _apply_action(
         )
 
 
-async def _post_quip_and_schedule_delete(
-    context: ContextTypes.DEFAULT_TYPE,
-    chat_id: int,
-    text: str,
-    delete_after: int,
-) -> None:
-    """Publica un mensaje sarcástico en el chat y programa su borrado."""
-    try:
-        sent = await context.bot.send_message(
-            chat_id=chat_id, text=text, parse_mode="HTML", disable_notification=True,
-        )
-    except TelegramError as exc:
-        log.warning("Quip send falló: %s", exc)
-        return
-    jq = context.application.job_queue
-    if jq is None or delete_after <= 0:
-        return
-    jq.run_once(
-        _delete_quip_job, when=delete_after,
-        data={"chat_id": chat_id, "message_id": sent.message_id},
-        name=f"del_quip_{chat_id}_{sent.message_id}",
-    )
-
-
 async def _delete_quip_job(context: ContextTypes.DEFAULT_TYPE) -> None:
     data = context.job.data
     try:
