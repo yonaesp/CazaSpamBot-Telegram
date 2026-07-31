@@ -61,7 +61,6 @@ async def cmd_warn(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     msg = update.effective_message
     db: DB = context.bot_data["db"]
-    cfg: Config = context.bot_data["cfg"]
 
     # Resolver target: reply || arg @username || arg user_id
     target_id: int | None = None
@@ -114,60 +113,95 @@ async def cmd_warn(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                   msg.chat_id, target_id, exc)
 
     reason = " ".join(reason_parts) if reason_parts else None
-    db.ensure_chat_settings(msg.chat_id)
-    settings = db.get_chat_settings(msg.chat_id)
 
-    n = db.add_warn(target_id, msg.chat_id, update.effective_user.id, reason)
-    limit = settings["warns_limit"] or 3
-    action = settings["warns_action"] or "ban"
-
-    # Marcar admin_report si existía → cascade usará template warn-específico
-    if target_msg:
-        db.mark_admin_report_action(msg.chat_id, target_msg.message_id, "warn")
-
-    # Mención clicable al user warneado
-    if target_user and target_user.username:
-        mention = f"@{target_user.username}"
-    elif target_user:
-        display = html.escape(target_user.first_name or str(target_user.id))
-        mention = f'<a href="tg://user?id={target_user.id}">{display}</a>'
-    else:
-        mention = f'<a href="tg://user?id={target_id}">user</a>'
-
-    # 1) Borrar el comando /warn del admin
+    # Borrar el comando /warn del admin (esto sí es propio del comando)
     try:
         await context.bot.delete_message(chat_id=msg.chat_id, message_id=msg.message_id)
     except TelegramError:
         pass
-    # 2) Borrar el mensaje warneado SOLO si había reply (es el msg infractor)
-    if target_msg:
+
+    await aplicar_warn(
+        context, chat_id=msg.chat_id, target_id=target_id, target_user=target_user,
+        by_admin=update.effective_user.id, reason=reason,
+        target_msg_id=(target_msg.message_id if target_msg else None),
+    )
+
+
+async def aplicar_warn(
+    context: ContextTypes.DEFAULT_TYPE,
+    chat_id: int,
+    target_id: int,
+    target_user,
+    by_admin: int,
+    reason: str | None,
+    target_msg_id: int | None = None,
+) -> int:
+    """Pone un warn y hace TODO lo que conlleva: contar, borrar el mensaje
+    infractor, publicarlo en el grupo y ejecutar la acción configurada al llegar
+    al límite. Devuelve el número de warns que tiene ya el usuario.
+
+    Está extraído de `cmd_warn` para que cualquier otra vía (por ejemplo el botón
+    «⚠️ Avisar» del aviso de usuario de confianza) haga EXACTAMENTE lo mismo. Antes
+    ese botón solo llamaba a `db.add_warn`: el usuario no se enteraba de nada y no
+    se comprobaba el límite, así que su tercer warn de tres no ejecutaba la sanción
+    configurada y el contador seguía subiendo.
+    """
+    from telegram.error import TelegramError
+
+    db: DB = context.bot_data["db"]
+    cfg: Config = context.bot_data["cfg"]
+    db.ensure_chat_settings(chat_id)
+    settings = db.get_chat_settings(chat_id)
+
+    n = db.add_warn(target_id, chat_id, by_admin, reason)
+    limit = settings["warns_limit"] or 3
+    action = settings["warns_action"] or "ban"
+
+    # Marcar admin_report si existía → cascade usará template warn-específico
+    if target_msg_id:
+        db.mark_admin_report_action(chat_id, target_msg_id, "warn")
+
+    # Mención clicable al user warneado
+    if target_user and getattr(target_user, "username", None):
+        mention = f"@{target_user.username}"
+    elif target_user:
+        display = html.escape(getattr(target_user, "first_name", None) or str(target_id))
+        mention = f'<a href="tg://user?id={target_id}">{display}</a>'
+    else:
+        mention = f'<a href="tg://user?id={target_id}">user</a>'
+
+    # Borrar el mensaje infractor, si se sabe cuál es
+    if target_msg_id:
         try:
-            await context.bot.delete_message(chat_id=msg.chat_id, message_id=target_msg.message_id)
+            await context.bot.delete_message(chat_id=chat_id, message_id=target_msg_id)
         except TelegramError:
             pass
 
-    # 3) Publicar mensaje visible en el chat
+    # `sancion_ok` se inicializa AQUÍ y no dentro de cada rama. Antes solo lo hacían
+    # kick y mute, así que con la acción por defecto (ban) la lectura de más abajo
+    # lanzaba NameError: el ban se ejecutaba, pero el contador no se reseteaba, el
+    # grupo no veía el aviso y al admin le llegaba un «error interno del bot».
+    sancion_ok = True
+
     if n >= limit:
-        # Llegó al límite → ejecutar acción
         if action == "ban":
             results = await federate_ban(
                 context.bot, db, user_id=target_id,
                 reason=t("reason.warns_limit", n=n, limit=limit,
                          last_reason=reason or t("reason.no_reason")),
-                rule="warns_limit",
-                triggered_in_chat=msg.chat_id, shadow=cfg.shadow,
+                rule="warns_limit", triggered_in_chat=chat_id, shadow=cfg.shadow,
             )
             ok = sum(1 for v in results.values() if v == "ok")
+            sancion_ok = ok > 0
             text = t("warn.limit_ban", mention=mention, n=n, limit=limit, ok=ok)
             if reason:
                 text += t("warn.last_reason", reason=html.escape(reason))
         elif action == "kick":
-            sancion_ok = True
             try:
-                await context.bot.ban_chat_member(chat_id=msg.chat_id, user_id=target_id)
+                await context.bot.ban_chat_member(chat_id=chat_id, user_id=target_id)
                 await asyncio.sleep(0.5)
                 await context.bot.unban_chat_member(
-                    chat_id=msg.chat_id, user_id=target_id, only_if_banned=True,
+                    chat_id=chat_id, user_id=target_id, only_if_banned=True,
                 )
             except TelegramError as exc:
                 sancion_ok = False
@@ -176,10 +210,9 @@ async def cmd_warn(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                      mention=mention, n=n, limit=limit)
         elif action == "mute":
             from telegram import ChatPermissions
-            sancion_ok = True
             try:
                 await context.bot.restrict_chat_member(
-                    chat_id=msg.chat_id, user_id=target_id,
+                    chat_id=chat_id, user_id=target_id,
                     permissions=ChatPermissions(can_send_messages=False),
                     until_date=int(time.time()) + 86400,
                 )
@@ -190,11 +223,10 @@ async def cmd_warn(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                      mention=mention, n=n, limit=limit)
         else:
             text = t("warn.counter", mention=mention, n=n, limit=limit)
-        # Solo se limpian los warns si la sanción se aplicó de verdad. Antes se
-        # reseteaban siempre: si el kick/mute fallaba (sin permisos, target owner),
-        # el grupo veía "Kick" y el contador volvía a 0 sin haber sancionado a nadie.
+        # Solo se limpian los warns si la sanción se aplicó de verdad. Si no, el
+        # grupo veía «Kick» y el contador volvía a 0 sin haber sancionado a nadie.
         if sancion_ok:
-            db.reset_warns(target_id, msg.chat_id)
+            db.reset_warns(target_id, chat_id)
     else:
         text = t("warn.counter", mention=mention, n=n, limit=limit)
         if reason:
@@ -202,23 +234,21 @@ async def cmd_warn(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     try:
         sent = await context.bot.send_message(
-            chat_id=msg.chat_id, text=text, parse_mode="HTML",
-            disable_notification=False,
+            chat_id=chat_id, text=text, parse_mode="HTML", disable_notification=False,
         )
     except TelegramError as exc:
         log.warning("warn publish fallo: %s", exc)
-        return
-    # Auto-borrar el mensaje a las N segundos (mismo PUBLIC_QUIP_DELETE_AFTER_S
-    # que los quips de ban/kick) para no ensuciar el chat con histórico.
-    cfg = context.bot_data.get("cfg")
+        return n
+    # Auto-borrado, para no ensuciar el chat con el histórico de warns.
     delete_after = getattr(cfg, "public_quip_delete_after_s", 10800) if cfg else 10800
     jq = context.application.job_queue
     if jq is not None and delete_after > 0:
         jq.run_once(
             _delete_warn_msg_job, when=delete_after,
-            data={"chat_id": msg.chat_id, "message_id": sent.message_id},
-            name=f"del_warn_{msg.chat_id}_{sent.message_id}",
+            data={"chat_id": chat_id, "message_id": sent.message_id},
+            name=f"del_warn_{chat_id}_{sent.message_id}",
         )
+    return n
 
 
 async def _delete_warn_msg_job(context: ContextTypes.DEFAULT_TYPE) -> None:

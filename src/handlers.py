@@ -1456,8 +1456,26 @@ async def on_trust_notice_callback(update: Update, context: ContextTypes.DEFAULT
         return
 
     if verdicto == "warn":
-        n = db.add_warn(user_id, chat_id, by_admin=cfg.admin_user_id,
-                        reason=t("hdl.tn_warn_reason"))
+        # Misma vía que /warn: publica en el grupo, borra el mensaje y ejecuta la
+        # acción configurada si se llega al límite. Antes solo apuntaba el warn en
+        # la BD: el usuario no se enteraba y su tercer aviso de tres no sancionaba.
+        from . import warns_mod
+        objetivo = None
+        try:
+            miembro = await context.bot.get_chat_member(chat_id=chat_id, user_id=user_id)
+            objetivo = miembro.user
+        except TelegramError as exc:
+            log.debug("trust notice warn: no se pudo leer el miembro %s: %s", user_id, exc)
+        n = await warns_mod.aplicar_warn(
+            context, chat_id=chat_id, target_id=user_id, target_user=objetivo,
+            by_admin=cfg.admin_user_id, reason=t("hdl.tn_warn_reason"),
+            target_msg_id=msg_id,
+        )
+        db.log_action(
+            chat_id=chat_id, user_id=user_id, username=None, message_id=msg_id,
+            rule="admin_trust_notice", action="warn", score=0,
+            mode=("shadow" if cfg.shadow else "active"), payload={"via": "trust_notice", "n": n},
+        )
         await q.answer(t("hdl.tn_ack_warn", n=n))
         await _quitar_botones(q)
         return
