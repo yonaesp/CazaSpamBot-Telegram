@@ -16,7 +16,7 @@ from telegram.constants import ChatMemberStatus
 from telegram.error import TelegramError
 from telegram.ext import ContextTypes
 
-from . import admin_report, gentle_warning, greetings, learning, notify_prefs, quips, rule_explain, trust as _trust, user_signals, verification
+from . import admin_report, gentle_warning, greetings, learning, notify_prefs, quips, rule_explain, story_reader, trust as _trust, user_signals, verification
 from .config import Config
 from .db import DB
 from .detectors import Hit
@@ -833,6 +833,17 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         return
 
     text_or_caption = msg.text or msg.caption
+    # HISTORIA (story): la Bot API la entrega vacía (solo chat+id), así que el
+    # mensaje llegaría aquí sin nada que analizar y el spam pasaría limpio. Se pide
+    # el texto real por MTProto y se sigue el flujo NORMAL con él: mismos
+    # detectores, mismos umbrales. La evidencia es el texto de verdad, así que esto
+    # no sube el riesgo de falso positivo. Si no se puede leer, todo queda como antes.
+    if text_or_caption is None and getattr(msg, "story", None) is not None:
+        _leido = await story_reader.leer_caption(context, msg.story)
+        if _leido is not None:
+            _cap, _ents = _leido
+            msg = story_reader.MensajeConTextoDeHistoria(msg, _cap, _ents)
+            text_or_caption = _cap
     # Una EDICIÓN re-escaneada (via on_edited_message) NO es un mensaje nuevo: no
     # debe contar para msg_count, antiflood ni topweekly (si no, editar varias veces
     # inflaría trust o dispararía un flood falso). Solo corremos los detectores sobre
