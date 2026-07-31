@@ -460,6 +460,8 @@
   "scan.forwarded": "↪️ <b>Forwarded</b>{src}",
   "scan.fwd_src": " from {ctype} «{title}»",
   "scan.media": "🖼️ Contains media (photo/video/sticker/…)",
+  "scan.story": "📖 <b>Forwarded story</b>",
+  "scan.story_blind": "⚠️ <b>I cannot analyse this.</b> Telegram does not give bots the content of a story: only its id and the source chat. The text and image you see on screen never reach me.\nThis does <b>not</b> mean the message is clean, it means I have not read it.\n<i>To really analyse it: copy the text and paste it to me as a normal message.</i>",
   "scan.text": "📝 Text: <code>{text}</code>",
   "scan.nothing": "(message with no recognizable text, contact, buttons or media)",
   "scan.detected": "✅ <b>It WOULD be detected</b>. Rules triggered: {n} · total score: {total}",

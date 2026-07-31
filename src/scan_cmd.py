@@ -107,6 +107,10 @@ def _structure(msg) -> list[str]:
                     ("photo", "video", "animation", "sticker", "document", "video_note", "voice", "audio"))
     if has_media:
         out.append(t("scan.media"))
+    # Historia (story). Telegram entrega a los bots SOLO `chat` e `id`: ni el texto ni
+    # la imagen. Hay que decirlo, porque por fuera parece un mensaje normal y lleno.
+    if getattr(msg, "story", None) is not None:
+        out.append(t("scan.story"))
     txt = getattr(msg, "text", None) or getattr(msg, "caption", None)
     if txt:
         prev = txt[:160].replace("\n", " ")
@@ -189,6 +193,7 @@ async def _responder_scan(msg, target, cfg: Config, db: DB) -> None:
         fwd_det.check(target, is_first_msg=True, seconds_since_first_seen=0.0),
     ]
     real = [h for h in hits if h]
+    es_historia = getattr(target, "story", None) is not None
 
     lines = [t("scan.header"), ""]
     lines += _structure(target)
@@ -200,8 +205,15 @@ async def _responder_scan(msg, target, cfg: Config, db: DB) -> None:
             lines.append(t("scan.hit", rule=h.rule, score=h.score, reason=_h.escape(h.reason)))
         lines.append("")
         lines.append(t("scan.trust_note"))
-    else:
+    elif not es_historia:
         lines.append(t("scan.not_detected"))
         lines.append(t("scan.profile_note"))
+    if es_historia:
+        # Va SIEMPRE, dispare o no alguna regla: el veredicto se ha emitido sin haber
+        # leído el contenido. Decir «no dispararía ninguna regla» a secas sería
+        # engañoso, porque el admin sí ve el texto en su pantalla y daría por bueno
+        # un análisis que el bot no ha podido hacer.
+        lines.append("")
+        lines.append(t("scan.story_blind"))
 
     await msg.reply_text("\n".join(lines), parse_mode="HTML", disable_web_page_preview=True)

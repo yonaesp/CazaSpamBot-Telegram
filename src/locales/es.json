@@ -460,6 +460,8 @@
   "scan.forwarded": "↪️ <b>Reenviado</b>{src}",
   "scan.fwd_src": " desde {ctype} «{title}»",
   "scan.media": "🖼️ Lleva media (foto/vídeo/sticker/…)",
+  "scan.story": "📖 <b>Historia reenviada</b> (story)",
+  "scan.story_blind": "⚠️ <b>No puedo analizarla.</b> Telegram no entrega a los bots el contenido de una historia: solo el identificador y el canal de origen. El texto y la imagen que tú ves en pantalla NO me llegan.\nEsto <b>no</b> significa que el mensaje sea limpio, significa que no lo he leído.\n<i>Para analizarlo de verdad: copia el texto y pégamelo como mensaje normal.</i>",
   "scan.text": "📝 Texto: <code>{text}</code>",
   "scan.nothing": "(mensaje sin texto, contacto, botones ni media reconocibles)",
   "scan.detected": "✅ <b>SÍ se detectaría</b>. Reglas disparadas: {n} · score total: {total}",
