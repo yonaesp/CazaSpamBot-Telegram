@@ -1,7 +1,7 @@
 # CazaSpamBot — Bot Antispam Telegram
 
 Bot de moderación antispam **en producción 24/7**, multi-grupo, federado y **bilingüe** (es/en).
-~14.400 LOC, Docker, **927 tests**, 21 detectores.
+~14.400 LOC, Docker, **934 tests**, 21 detectores.
 
 > **Estado: PRODUCCIÓN.** No es un esqueleto. Cualquier cambio afecta grupos reales con miles de usuarios. **Investiga > Confirma > Actúa.**
 
@@ -27,8 +27,8 @@ nativa; se itera `banChatMember` sobre los chats donde el bot es admin.
 
 ## Stack
 
-- Python 3.11 + `python-telegram-bot[ext]` 21.6 (async polling)
-- Telethon 1.36 (MTProto) — **solo** para lo que Bot API no puede: reportes oficiales (`channels.reportSpam`), leer bio/fotos de perfil, admin_log, iter_messages histórico
+- Python 3.11 + `python-telegram-bot[ext]` 22.8 (async polling, Bot API 10.0)
+- Telethon 1.44 (MTProto) — **solo** para lo que Bot API no puede: reportes oficiales (`channels.reportSpam`), leer bio/fotos de perfil, admin_log, iter_messages histórico
 - SQLite WAL (`data/antispam.db`)
 - `confusable-homoglyphs` (UTS#39) para detección de nombres decorativos
 - Docker (`docker compose`), contenedor `cazaspam-bot`
