@@ -24,6 +24,7 @@ from .i18n import t
 from .detectors import cas as cas_det
 from .detectors import external_mention as ext_det
 from .detectors import first_msg_media as media_det
+from .detectors import story_share as story_det
 from .detectors import forward_first_msg as fwd_det
 from .detectors import inline_buttons as buttons_det
 from .detectors import commercial_ad as comad_det
@@ -975,6 +976,22 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     hits.append(fwd_det.check(
         msg, is_first_msg=is_first, seconds_since_first_seen=secs_since_first,
     ))
+    # 3d bis) HISTORIA compartida recién entrado. Va aquí, y NO dentro del bloque de
+    # `is_first`, porque también cubre al que ya habló una vez. Solo Bot API: es la
+    # única defensa de quien instale el bot sin Telethon, que no puede leer el
+    # contenido. Si Telethon sí está y pudo leerlo, los detectores de contenido ya
+    # habrán aportado su score y ambos se suman.
+    if getattr(msg, "story", None) is not None:
+        _seen_st = db.get_seen(chat_id, user.id)
+        _join_ts = _seen_st["join_ts"] if _seen_st is not None else None
+        hits.append(story_det.check(
+            msg,
+            user_id=user.id,
+            is_first_msg=is_first,
+            bot_saw_join=_join_ts is not None,
+            seconds_since_join=(time.time() - _join_ts) if _join_ts else None,
+        ))
+
     # 3e) Primer mensaje es media + cuenta sospechosa (patrón spam 2025).
     # GUARD anti-falso-positivo: solo aplicar si el bot presenció el JOIN del user.
     # Si join_ts IS NULL, el user ya estaba en el grupo antes que el bot → NO sabemos
