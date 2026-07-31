@@ -83,6 +83,13 @@ También banea spam publicado en nombre de un canal (`sender_chat` → `banChatS
 
 `bio_spam`, `photos_batch`, `obvious_spam_profile` (parcial) y `personal_channel_spam` leen el perfil vía MTProto. **Sin Telethon no se activan** y el bot sigue funcionando con el resto. Documentado en ambos README, porque quien instale sin cuenta secundaria no sabría qué se pierde.
 
+También depende de Telethon la lectura de **historias** (`story_reader.py`). La Bot API entrega una historia compartida con **solo `chat` e `id`**: sin texto, sin imagen, sin entidades y **sin marca de reenvío**, así que `forward_first_msg` tampoco salta. Para el bot es un mensaje vacío y el spam pasa limpio (caso real: publicidad de cripto con enlace de invitación). Se pide el contenido con `stories.getStoriesByID` y se sigue el flujo normal con ese texto: mismos detectores, mismos umbrales, porque la evidencia es el texto real.
+
+Tres cosas que no se deben olvidar al tocarlo:
+- **Las entidades hay que traducirlas** de MTProto a la Bot API. Los detectores de enlaces y menciones **no miran el texto plano, solo las entidades**: sin traducir se lee la publicidad pero se pierde el enlace, que es la prueba. Hay test que lo fija.
+- **No delata la cuenta**: `getStoriesByID` no cuenta como visualización (eso es `incrementStoryViews`), así que la cuenta secundaria no aparece en la lista de espectadores. Era la condición para hacerlo.
+- **Caducan entre 6 y 48 h.** Para moderar en vivo sobra; para analizar a posteriori un mensaje viejo ya no hay nada que leer, y `/scan` lo dice en vez de fingir un veredicto.
+
 **El perfil tiene más de un escaparate.** Durante mucho tiempo solo leíamos `about` (la bio). El **canal personal** (Telegram 2024, `personal_channel_id`, disponible desde Telethon 1.36) es un campo SEPARADO: un perfil con la bio vacía puede tener ahí un canal entero de spam. Caso real que lo destapó: cuenta «Matthew», nombre latino, sin foto ni bio, con un canal chino reclutando mulas de blanqueo. Si aparece otro campo nuevo de perfil, mirarlo antes de fiarse de que el perfil está limpio.
 
 El detector tuvo que ampliarse cuando la misma red volvió con el **nombre también en chino**: sin discordancia se quedaba en 40 de 100 y se colaba. Se sumaron los compuestos de la red (`结账通知`, `飞机加群`, nunca palabras sueltas como `结账`, que es corriente) y una señal de **cadenas generadas a máquina** en bio/usuario (`bhLQZZXwkU2M`): una bio de ruido informativamente es no tener bio. Esa señal mira **rachas de mayúsculas intercaladas**, no vocales, porque medir vocales marcaba a usuarios checos y polacos legítimos (`wchrzszcz`).
