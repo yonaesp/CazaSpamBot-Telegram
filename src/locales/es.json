@@ -949,5 +949,19 @@
   "cfg.b.verified_ttl": "⏳ Verificación correcta dura: {value} ▸",
   "cfg.vd.text": "⏳ <b>Duración del mensaje de verificación correcta</b> · {title}\n\nAl pulsar SOY HUMANO, el mensaje de verificación <b>se edita</b> (no se crea otro) y pasa a ser el saludo de bienvenida. Aquí decides cuánto se queda antes de borrarse solo.\n\n<b>Nunca</b> lo deja fijo en el chat.\n\nActual: <b>{value}</b>",
   "maint.bot_overlap": "🤖 <b>Hay otro bot admin en el grupo</b>\n\nEn <b>{chat}</b> (<code>{chat_id}</code>) también es administrador <b>{bot}</b>{bot_user}.\n\nNo puedo saber qué hace ese bot, así que esto no es una queja: es un aviso de que <b>puede</b> solaparse conmigo. Lo mío que más suele coincidir es la <b>bienvenida</b>, la <b>verificación de los nuevos</b> y los <b>warns</b>. Si prefieres que de eso se encargue él, apaga lo que quieras en /config; si te vale con los dos activos, no hace falta tocar nada.\n\n<i>Por si te lo preguntas: a un bot que es administrador no puedo banearlo (Telegram no lo permite), y a los bots que no son admin ya no los marco por publicar mensajes con botones.</i>",
-  "maint.bot_overlap.b.config": "⚙️ Ajustes de ese grupo"
+  "maint.bot_overlap.b.config": "⚙️ Ajustes de ese grupo",
+  "reason.story_source": "el canal «{source}» tiene nombre de spam",
+  "reason.story_source_quiet": "el canal «{source}» tiene nombre de spam, y apenas escribe en el grupo ({n} mensajes)",
+  "notify.trust_skip": "Sospechas sobre usuarios de confianza",
+  "hdl.no_text": "(sin texto)",
+  "hdl.trust_notice_dm": "🤔 <b>Algo raro de alguien de confianza</b>\n\n<b>Usuario:</b> {name} (id: {uid})\n<b>Confianza:</b> {trust}\n<b>Grupo:</b> {chat}\n\n<b>Habría saltado:</b> {rules} → <b>{action}</b>\n<b>Motivo:</b> {reason}\n\n<b>Mensaje:</b>\n<code>{text}</code>\n\n<i>No he hecho nada: su historial le avala. Pero una cuenta de confianza puede estar robada, o su dueño puede haber compartido esto sin mirarlo. Tú decides.</i>",
+  "hdl.btn.tn_nothing": "👌 Nada",
+  "hdl.btn.tn_warn": "⚠️ Avisar",
+  "hdl.btn.tn_ban": "🔨 Banear",
+  "hdl.tn_ack_nothing": "Vale, lo dejo estar.",
+  "hdl.tn_ack_warn": "Aviso puesto ({n}).",
+  "hdl.tn_ack_ban": "Baneado en todos tus grupos.",
+  "hdl.tn_warn_reason": "Contenido sospechoso revisado por el administrador",
+  "hdl.tn_ban_reason": "Spam confirmado por el administrador",
+  "rule.admin_trust_notice": "Lo baneaste tú desde el aviso de usuario de confianza."
 }

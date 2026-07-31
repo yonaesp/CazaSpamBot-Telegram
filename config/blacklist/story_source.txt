@@ -1,0 +1,43 @@
+# Nombres de canal típicos de las historias de spam.
+#
+# Cada línea es un REGEX de Python, sin distinguir mayúsculas. Se contrasta contra
+# el TÍTULO y el @username del canal del que viene la historia, que es lo único
+# que la Bot API entrega siempre (el contenido solo se lee por Telethon, y solo
+# durante las 24 h que vive la historia).
+#
+# Esta lista NO decide sola. Solo pesa cuando alguien comparte la historia de otro
+# canal y apenas ha escrito en el grupo; a un usuario asentado el trust score lo
+# protege. Aun así, ponlo difícil: aquí NO van palabras corrientes. «Ofertas» o
+# «Noticias» banearían canales legítimos.
+#
+# Puedes añadir los tuyos en config/blacklist/custom/ (no se pierden al actualizar)
+# o desde el panel /config.
+
+# --- Cripto y señales de trading, el grueso de este spam ---
+signals?
+crypto
+bitcoin
+\bbtc\b
+binance
+forex
+airdrop
+pump
+whale
+insider
+
+# --- Promesas de dinero ---
+profits?
+\bearn(ings)?\b
+millionaire
+rich
+
+# --- Juego ---
+casino
+jackpot
+\bbetting\b
+
+# --- Adulto ---
+onlyfans
+\b18\+
+\bxxx\b
+escorts?

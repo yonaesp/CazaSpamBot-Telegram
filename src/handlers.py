@@ -990,6 +990,9 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
             is_first_msg=is_first,
             bot_saw_join=_join_ts is not None,
             seconds_since_join=(time.time() - _join_ts) if _join_ts else None,
+            # Cuántos mensajes ha escrito AQUÍ: distingue al que participa de
+            # verdad del que lleva meses callado y de repente planta una historia.
+            msg_count=(_seen_st["msg_count"] if _seen_st is not None else None),
         ))
 
     # 3e) Primer mensaje es media + cuenta sospechosa (patrón spam 2025).
@@ -1115,6 +1118,19 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
                 "user=%s trust=%d en chat=%s → SKIP (acción %s anulada por trust alto, reglas=%s)",
                 user.id, trust, chat_id, decision.action, [h.rule for h in real],
             )
+            # El bot no actúa, pero calla del todo tampoco: alguien de confianza
+            # puede tener la cuenta robada, o estar compartiendo algo sin mirar.
+            # Aviso SOLO por privado (nunca en el grupo: señalar en público a un
+            # veterano por algo que el bot ha decidido no castigar sería peor que
+            # el spam) y con la decisión en tus manos.
+            if decision.action in ("ban", "kick"):
+                await _send_trust_notice(
+                    context, db, cfg, msg, user,
+                    rules=[h.rule for h in real],
+                    reason=" | ".join(h.reason for h in real)[:300],
+                    proposed_action=decision.action,
+                    trust=trust,
+                )
             db.log_action(
                 chat_id=chat_id, user_id=user.id, username=user.username,
                 message_id=msg.message_id,
@@ -1328,6 +1344,102 @@ def _is_reportable(decision) -> bool:
     if rules & single_shot:
         return True
     return decision.score >= _REPORT_MIN_SCORE
+
+
+async def _send_trust_notice(
+    context: ContextTypes.DEFAULT_TYPE,
+    db: DB,
+    cfg: Config,
+    msg,
+    user,
+    rules: list[str],
+    reason: str,
+    proposed_action: str,
+    trust: int,
+) -> None:
+    """Aviso al admin cuando el trust alto ha ANULADO una acción severa.
+
+    Antes esto era un silencio total: el bot decidía no tocar a un veterano y no lo
+    contaba. Pero una cuenta de confianza puede estar robada, o su dueño puede haber
+    compartido algo sin mirar. El admin decide: nada / avisar / banear.
+
+    Solo por privado. Un aviso público sobre un veterano al que el bot ha decidido
+    NO castigar haría más daño que el propio mensaje.
+    """
+    from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+    if not notify_prefs.effective(db, "trust_skip", cfg):
+        return
+    admin_dm = cfg.admin_notify_chat_id
+    if not admin_dm:
+        return
+    texto = msg.text or msg.caption or t("hdl.no_text")
+    info = t(
+        "hdl.trust_notice_dm",
+        uid=user.id,
+        name=(user.first_name or "user")[:40],
+        trust=_trust.render_trust(trust),
+        chat=(msg.chat.title or msg.chat_id),
+        rules=", ".join(rules),
+        action=proposed_action,
+        reason=reason,
+        text=texto[:600],
+    )
+    # callback_data: tnote:<nada|warn|ban>:CHAT:USER:MSG (dentro de los 64 bytes)
+    base = f"{msg.chat_id}:{user.id}:{msg.message_id}"
+    kb = InlineKeyboardMarkup([[
+        InlineKeyboardButton(t("hdl.btn.tn_nothing"), callback_data=f"tnote:nada:{base}"),
+        InlineKeyboardButton(t("hdl.btn.tn_warn"), callback_data=f"tnote:warn:{base}"),
+        InlineKeyboardButton(t("hdl.btn.tn_ban"), callback_data=f"tnote:ban:{base}"),
+    ], [notify_prefs.mute_button("trust_skip")]])
+    try:
+        await context.bot.send_message(
+            chat_id=admin_dm, text=info, parse_mode="HTML", reply_markup=kb,
+            disable_web_page_preview=True,
+        )
+    except TelegramError as exc:
+        log.warning("trust notice DM fallo: %s", exc)
+
+
+async def on_trust_notice_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Botones nada / avisar / banear del aviso de trust alto."""
+    q = update.callback_query
+    if q is None:
+        return
+    cfg: Config = context.bot_data["cfg"]
+    db: DB = context.bot_data["db"]
+    if q.from_user.id != cfg.admin_user_id:
+        await q.answer(t("hdl.only_admin_review"))
+        return
+    try:
+        _, verdicto, chat_s, user_s, msg_s = q.data.split(":", 4)
+        chat_id, user_id, msg_id = int(chat_s), int(user_s), int(msg_s)
+    except Exception as exc:  # noqa: BLE001
+        await q.answer(t("hdl.callback_invalid", error=exc))
+        return
+
+    if verdicto == "nada":
+        await q.answer(t("hdl.tn_ack_nothing"))
+        await q.edit_message_reply_markup(reply_markup=None)
+        return
+
+    if verdicto == "warn":
+        n = db.add_warn(user_id, chat_id, by_admin=cfg.admin_user_id,
+                        reason=t("hdl.tn_warn_reason"))
+        await q.answer(t("hdl.tn_ack_warn", n=n))
+        await q.edit_message_reply_markup(reply_markup=None)
+        return
+
+    # banear: se borra el mensaje y se federa, igual que cualquier otro ban
+    try:
+        await context.bot.delete_message(chat_id=chat_id, message_id=msg_id)
+    except TelegramError:
+        pass
+    await federate_ban(
+        context.bot, db, user_id=user_id, reason=t("hdl.tn_ban_reason"),
+        rule="admin_trust_notice", triggered_in_chat=chat_id, shadow=cfg.shadow,
+    )
+    await q.answer(t("hdl.tn_ack_ban"))
+    await q.edit_message_reply_markup(reply_markup=None)
 
 
 async def _send_review_request(

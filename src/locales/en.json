@@ -949,5 +949,19 @@
   "cfg.b.verified_ttl": "⏳ Verified message lasts: {value} ▸",
   "cfg.vd.text": "⏳ <b>How long the verified message stays</b> · {title}\n\nWhen someone taps I'M HUMAN, the verification message <b>is edited in place</b> (no second message) and becomes the welcome. Here you choose how long it stays before deleting itself.\n\n<b>Never</b> keeps it in the chat for good.\n\nCurrent: <b>{value}</b>",
   "maint.bot_overlap": "🤖 <b>There is another admin bot in the group</b>\n\nIn <b>{chat}</b> (<code>{chat_id}</code>), <b>{bot}</b>{bot_user} is an administrator too.\n\nI cannot tell what that bot does, so this is not a complaint: it is a heads-up that it <b>may</b> overlap with me. The parts of my job that clash most often are the <b>welcome</b>, the <b>verification of new members</b> and the <b>warns</b>. If you would rather have that bot handle those, turn off whatever you want in /config; if you are happy with both running, there is nothing to do.\n\n<i>In case you wonder: I cannot ban a bot that is an administrator (Telegram does not allow it), and I no longer flag non-admin bots for posting messages with buttons.</i>",
-  "maint.bot_overlap.b.config": "⚙️ That group's settings"
+  "maint.bot_overlap.b.config": "⚙️ That group's settings",
+  "reason.story_source": "the channel “{source}” has a spammy name",
+  "reason.story_source_quiet": "the channel “{source}” has a spammy name, and they barely post here ({n} messages)",
+  "notify.trust_skip": "Suspicions about trusted users",
+  "hdl.no_text": "(no text)",
+  "hdl.trust_notice_dm": "🤔 <b>Something odd from a trusted user</b>\n\n<b>User:</b> {name} (id: {uid})\n<b>Trust:</b> {trust}\n<b>Group:</b> {chat}\n\n<b>Would have triggered:</b> {rules} → <b>{action}</b>\n<b>Reason:</b> {reason}\n\n<b>Message:</b>\n<code>{text}</code>\n\n<i>I did nothing: their history speaks for them. But a trusted account can be stolen, or its owner may have shared this without looking. Your call.</i>",
+  "hdl.btn.tn_nothing": "👌 Nothing",
+  "hdl.btn.tn_warn": "⚠️ Warn",
+  "hdl.btn.tn_ban": "🔨 Ban",
+  "hdl.tn_ack_nothing": "Fine, leaving it.",
+  "hdl.tn_ack_warn": "Warning added ({n}).",
+  "hdl.tn_ack_ban": "Banned across all your groups.",
+  "hdl.tn_warn_reason": "Suspicious content reviewed by the administrator",
+  "hdl.tn_ban_reason": "Spam confirmed by the administrator",
+  "rule.admin_trust_notice": "You banned them yourself from the trusted-user notice."
 }

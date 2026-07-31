@@ -24,10 +24,32 @@ años en el grupo, y ese es el falso positivo conocido con usuarios anteriores a
 from __future__ import annotations
 
 from ..i18n import t
+from ..wordlists import load_and_compile
 from . import Hit
 
 # Misma ventana que `forward_first_msg`: «recién llegado» son los primeros 3 minutos.
 VENTANA_RECIENTE_S = 180
+
+# Por debajo de esto se considera que alguien «apenas escribe» en el grupo: lleva
+# tiempo dentro pero no participa. Es el perfil que de repente planta una historia
+# de spam, y el que el usuario pidió distinguir del veterano que sí habla.
+POCO_ACTIVO_MAX_MSGS = 5
+
+# Nombres de canal típicos de este spam. Editable en config/blacklist/story_source.txt
+# (y ampliable desde el panel). Se contrasta contra el título y el @username del
+# canal de origen, que es lo ÚNICO que la Bot API entrega siempre: el contenido
+# solo se lee por Telethon y solo mientras la historia sigue viva.
+_FUENTE_DEFAULTS = [
+    "signals?", "crypto", "bitcoin", r"\bbtc\b", "binance", "forex", "airdrop",
+    "pump", "whale", "insider", "profits?", r"\bearn(ings)?\b", "millionaire",
+    "rich", "casino", "jackpot", r"\bbetting\b", "onlyfans", r"\b18\+", r"\bxxx\b",
+    "escorts?",
+]
+
+
+def _fuente_sospechosa(nombre: str, username: str | None) -> bool:
+    rx = load_and_compile("story_source.txt", _FUENTE_DEFAULTS, boundaries=False)
+    return bool(rx.search(nombre or "") or rx.search(username or ""))
 
 
 def check(
@@ -36,12 +58,10 @@ def check(
     is_first_msg: bool,
     bot_saw_join: bool,
     seconds_since_join: float | None = None,
+    msg_count: int | None = None,
 ) -> Hit:
     story = getattr(msg, "story", None)
     if story is None:
-        return Hit.none()
-    if not bot_saw_join:
-        # Usuario anterior al bot: no sabemos qué es «su primer mensaje».
         return Hit.none()
 
     origen = getattr(story, "chat", None)
@@ -50,24 +70,33 @@ def check(
         # Su propia historia. Es lo normal y no dice nada.
         return Hit.none()
 
-    nombre = (getattr(origen, "title", None)
-              or getattr(origen, "username", None)
-              or str(origen_id or "?"))
+    titulo = getattr(origen, "title", None)
+    uname = getattr(origen, "username", None)
+    nombre = titulo or uname or str(origen_id or "?")
+    datos = {"story_id": getattr(story, "id", None), "source_chat": origen_id}
 
-    if is_first_msg:
-        return Hit(
-            rule="story_share",
-            score=100,
-            reason=t("reason.story_first", source=nombre),
-            payload={"story_id": getattr(story, "id", None), "source_chat": origen_id},
-        )
+    # 1) Estructura: recién llegado. Exige join presenciado, porque sin `join_ts` no
+    #    sabemos si es de verdad su primer mensaje (podría llevar años en el grupo).
+    if bot_saw_join:
+        if is_first_msg:
+            return Hit(rule="story_share", score=100,
+                       reason=t("reason.story_first", source=nombre), payload=datos)
+        if seconds_since_join is not None and seconds_since_join <= VENTANA_RECIENTE_S:
+            return Hit(rule="story_share", score=40,
+                       reason=t("reason.story_recent", source=nombre), payload=datos)
 
-    if seconds_since_join is not None and seconds_since_join <= VENTANA_RECIENTE_S:
-        return Hit(
-            rule="story_share",
-            score=40,
-            reason=t("reason.story_recent", source=nombre),
-            payload={"story_id": getattr(story, "id", None), "source_chat": origen_id},
-        )
+    # 2) El canal de origen tiene pinta de spam. Esta señal NO necesita join
+    #    presenciado: la evidencia es el nombre del canal, no cuándo entró. Cubre
+    #    justo al que lleva tiempo en el grupo y apenas escribe.
+    if _fuente_sospechosa(titulo or "", uname):
+        apenas_escribe = msg_count is not None and msg_count < POCO_ACTIVO_MAX_MSGS
+        if apenas_escribe:
+            return Hit(rule="story_share", score=100,
+                       reason=t("reason.story_source_quiet", source=nombre,
+                                n=msg_count), payload=datos)
+        # Participa de verdad: el nombre por sí solo NO le banea. Suma y que decidan
+        # el resto de señales y el trust, que para eso está.
+        return Hit(rule="story_share", score=40,
+                   reason=t("reason.story_source", source=nombre), payload=datos)
 
     return Hit.none()

@@ -19,6 +19,7 @@ KNOWN_RULES: frozenset[str] = frozenset({
     "personal_channel_spam",
     "premium_new_link",
     "story_share",
+    "admin_trust_notice",
     "dormant_bot_mention",
     # --- Contenido del mensaje ---
     "commercial_ad",
