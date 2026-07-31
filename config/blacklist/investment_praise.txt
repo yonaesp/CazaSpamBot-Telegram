@@ -8,3 +8,9 @@
 gracias\s+a\s+(?:ella|el|él|la\s+se[ñn]ora|don|do[ñn]a)
 me\s+cambi[oó]\s+la\s+vida
 es\s+(?:muy\s+)?(?:legal|honesta?|de\s+confianza|real)
+
+# --- Testimonio en tercera persona sobre el "gurú" (caso real, ago-2026) ---
+tested\s+(?:his|her)\s+(?:predictions|signals|calls)
+(?:shares?|sharing)\s+valuable\s+(?:insights|tips|signals)
+subscribers?\s+have\s+(?:already\s+)?(?:earned|made)
+(?:significantly\s+)?increase[d]?\s+my\s+(?:budget|capital|portfolio)

@@ -17,7 +17,7 @@ from telegram import Message, MessageEntity
 
 from .. import lang
 from ..i18n import t
-from . import Hit
+from . import Hit, trozo_entidad
 
 _TG_HOSTS = {"t.me", "telegram.me", "telegram.dog"}
 
@@ -50,7 +50,7 @@ def find_external_user_mentions(
             if not is_user_in_chat(chat_id, uid):
                 out.append({"type": "text_mention", "user_id": uid, "username": ent.user.username})
         elif ent.type == MessageEntity.MENTION:
-            handle = text[ent.offset : ent.offset + ent.length]
+            handle = trozo_entidad(text, ent.offset, ent.length)
             uid = resolve_username(handle)
             if uid is None or not is_user_in_chat(chat_id, uid):
                 out.append({"type": "mention", "username": handle, "user_id": uid})
@@ -71,7 +71,7 @@ def find_external_telegram_links(msg: Message, own_chat_username: str | None = N
         if ent.type == MessageEntity.TEXT_LINK:
             url = ent.url
         elif ent.type == MessageEntity.URL:
-            url = text[ent.offset : ent.offset + ent.length]
+            url = trozo_entidad(text, ent.offset, ent.length)
         if not url:
             continue
         if "://" not in url:

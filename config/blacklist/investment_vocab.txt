@@ -6,3 +6,11 @@
 se[ñn]ales\s+de\s+trading
 inversi[oó]n\s+garantizada
 duplica\s+tu\s+(?:dinero|inversi[oó]n)
+
+# --- Testimonio de "gurú de cripto con grupo privado" (caso real, ago-2026) ---
+# Frases, nunca palabras sueltas: "altcoin" o "predictions" a secas los dice
+# cualquiera en un grupo de informática o de bolsa.
+\baltcoins?\b
+(?:crypto|bitcoin|btc)\s+signals?
+private\s+(?:group|channel|club)\s+of\s+(?:a|an|the)
+legendary\s+(?:whale|trader|investor)

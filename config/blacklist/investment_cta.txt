@@ -15,3 +15,13 @@
 👇
 👉
 📲
+
+# --- Escasez fabricada + suscripción (caso real, ago-2026) ---
+# "only 100 spots left" es de las señales más fiables: nadie legítimo limita
+# plazas así en un grupo de Telegram. Se exige el número para no cazar
+# "spots left" en una conversación normal sobre entradas o plazas.
+only\s+\d+\s+(?:spots?|places?|seats?|slots?)\s+left
+\d+\s+(?:spots?|places?|slots?)\s+(?:left|remaining|available)
+limited\s+(?:spots?|places?|slots?)
+click\s+to\s+subscribe
+solo\s+quedan\s+\d+\s+(?:plazas|puestos|cupos)

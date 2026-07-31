@@ -23,7 +23,9 @@ from telegram.ext import ContextTypes
 
 from .config import Config
 from .db import DB
+from .detectors import trozo_entidad
 from .detectors import commercial_ad as comad_det
+from .detectors import investment_scam as invscam_det
 from .detectors import contact_spam as contact_det
 from .detectors import emoji_only as emoji_det
 from .detectors import external_mention as ext_det
@@ -45,7 +47,7 @@ def _entity_urls(msg) -> list[str]:
         if ent.type == "text_link" and getattr(ent, "url", None):
             urls.append(ent.url)
         elif ent.type == "url":
-            urls.append(text[ent.offset:ent.offset + ent.length])
+            urls.append(trozo_entidad(text, ent.offset, ent.length))
     return urls
 
 
@@ -201,6 +203,9 @@ async def _responder_scan(context, msg, target, cfg: Config, db: DB) -> None:
         ),
         extreply_det.check(target, is_first_msg=True, is_moderated_chat=cfg.is_moderated),
         comad_det.check(target, is_first_msg=True),
+        # Faltaba: el /scan no corría investment_scam, así que un testimonio de
+        # estafa salía como «no se detectaría» aunque el bot sí lo cazara.
+        invscam_det.check(target, is_first_msg=True),
         emoji_det.check(target, is_first_msg=True),
         fwd_det.check(target, is_first_msg=True, seconds_since_first_seen=0.0),
     ]
@@ -220,6 +225,33 @@ async def _responder_scan(context, msg, target, cfg: Config, db: DB) -> None:
     elif not es_historia:
         lines.append(t("scan.not_detected"))
         lines.append(t("scan.profile_note"))
+    if es_historia:
+        # El /scan solo corre detectores de CONTENIDO: `story_share` necesita saber
+        # quién manda el mensaje (si es su primer mensaje, si el bot vio su entrada,
+        # cuántos lleva escritos) y eso aquí no se sabe. En vez de callarlo, se
+        # simulan los tres perfiles y se dice qué pasaría con cada uno, que es lo
+        # que el admin quiere saber al preguntar por un mensaje raro.
+        from .detectors import story_share as story_det
+        from .scoring import decide as _decide
+        contenido = sum(h.score for h in real)
+
+        def _escenario(**kw):
+            est = story_det.check(target, user_id=0, **kw)
+            total = contenido + (est.score if est else 0)
+            hits_falsos = [h for h in real]
+            if est:
+                hits_falsos = hits_falsos + [est]
+            acc = _decide(hits_falsos, cfg.ban_score, cfg.kick_score, cfg.mute_score,
+                          "ban", False).action if hits_falsos else "noop"
+            return total, acc
+
+        n1, a1 = _escenario(is_first_msg=True, bot_saw_join=True, msg_count=1)
+        n2, a2 = _escenario(is_first_msg=False, bot_saw_join=False, msg_count=2)
+        lines.append("")
+        lines.append(t("scan.story_scenarios",
+                       n1=n1, a1=t(f"scan.act.{a1}"),
+                       n2=n2, a2=t(f"scan.act.{a2}")))
+
     if es_historia and leido is None:
         # Va SIEMPRE que no se haya podido leer, dispare o no alguna regla: el
         # veredicto se habria emitido sin haber

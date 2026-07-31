@@ -20,6 +20,7 @@ def _ctx(tmp_path):
         admin_user_id=1, allowed_scripts=["latin"], non_latin_ratio_threshold=0.5,
         url_blocklist=[], detect_external_mentions=False,
         detect_external_tg_links=False, is_moderated=lambda _cid: False,
+        ban_score=100, kick_score=70, mute_score=40,
     )
     ctx = MagicMock()
     ctx.bot_data = {"cfg": cfg, "db": DB(str(tmp_path / "t.db"))}
@@ -38,7 +39,7 @@ def _update(texto=None, chat_type="private", reply=None, user_id=1):
     # atributos que miran los detectores de estructura
     for attr in ("contact", "reply_markup", "external_reply", "quote", "forward_origin",
                  "photo", "video", "document", "animation", "sticker", "voice",
-                 "video_note", "audio", "entities", "caption_entities"):
+                 "video_note", "audio", "entities", "caption_entities", "story"):
         setattr(msg, attr, None)
     upd = MagicMock()
     upd.effective_message = msg

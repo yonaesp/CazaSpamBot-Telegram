@@ -22,6 +22,7 @@ def _ctx(tmp_path):
         admin_user_id=1, allowed_scripts=["latin"], non_latin_ratio_threshold=0.5,
         url_blocklist=[], detect_external_mentions=False,
         detect_external_tg_links=False, is_moderated=lambda _cid: False,
+        ban_score=100, kick_score=70, mute_score=40,
     )
     ctx = MagicMock()
     ctx.bot_data = {"cfg": cfg, "db": DB(str(tmp_path / "t.db"))}
@@ -125,3 +126,38 @@ async def test_si_no_se_puede_leer_sigue_avisando(tmp_path, monkeypatch):
     await scan_cmd._responder_scan(ctx, msg, msg, ctx.bot_data["cfg"], ctx.bot_data["db"])
     salida = msg.reply_text.await_args.args[0]
     assert "no lo he leído" in salida
+
+
+@pytest.mark.asyncio
+async def test_el_scan_explica_que_pasaria_segun_quien_la_comparta(tmp_path, monkeypatch):
+    """El /scan solo corre detectores de CONTENIDO, así que por sí solo no dice si
+    banearía. Como la estructura depende de quién lo mande, se simulan los perfiles.
+    """
+    from src import story_reader
+    from telegram import MessageEntity
+
+    TEXTO = "Click to subscribe https://t.me/+67gOPOowkDliODQy"
+    off = len(TEXTO[:TEXTO.index("https")].encode("utf-16-le")) // 2
+    ents = [MessageEntity(type="url", offset=off, length=len(TEXTO) - off)]
+
+    async def _lee(_ctx, _story):
+        return TEXTO, ents
+    monkeypatch.setattr(story_reader, "leer_caption", _lee)
+
+    ctx = _ctx(tmp_path)
+    msg = _mensaje(story=True)
+    await scan_cmd._responder_scan(ctx, msg, msg, ctx.bot_data["cfg"], ctx.bot_data["db"])
+    salida = msg.reply_text.await_args.args[0]
+
+    assert "Recién llegado" in salida, "no explica el caso del recién llegado"
+    assert "confianza" in salida, "no menciona qué pasa con un veterano"
+    assert "Nada / Avisar / Banear" in salida, "no dice que al veterano se le pregunta"
+
+
+@pytest.mark.asyncio
+async def test_un_mensaje_normal_no_lleva_el_bloque_de_escenarios(tmp_path):
+    """Solo tiene sentido en historias: en un mensaje normal sería ruido."""
+    ctx = _ctx(tmp_path)
+    msg = _mensaje(story=False, texto="hola, buenas tardes a todos")
+    await scan_cmd._responder_scan(ctx, msg, msg, ctx.bot_data["cfg"], ctx.bot_data["db"])
+    assert "Recién llegado" not in msg.reply_text.await_args.args[0]

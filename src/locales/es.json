@@ -963,5 +963,11 @@
   "hdl.tn_ack_ban": "Baneado en todos tus grupos.",
   "hdl.tn_warn_reason": "Contenido sospechoso revisado por el administrador",
   "hdl.tn_ban_reason": "Spam confirmado por el administrador",
-  "rule.admin_trust_notice": "Lo baneaste tú desde el aviso de usuario de confianza."
+  "rule.admin_trust_notice": "Lo baneaste tú desde el aviso de usuario de confianza.",
+  "scan.story_scenarios": "🧭 <b>Qué pasaría según quién la comparta</b>\n• <b>Recién llegado</b>, primer mensaje: {n1} puntos → <b>{a1}</b>\n• <b>Lleva tiempo pero apenas escribe</b>: {n2} puntos → <b>{a2}</b>\n• <b>Veterano de confianza</b>: no se actúa. Te llega un aviso al privado con botones <i>Nada / Avisar / Banear</i> y decides tú.\n<i>La parte de estructura (ser una historia recién entrado) no necesita Telethon; el texto sí.</i>",
+  "scan.act.ban": "ban",
+  "scan.act.kick": "expulsión",
+  "scan.act.mute": "silenciado 24 h",
+  "scan.act.delete": "borrar el mensaje",
+  "scan.act.noop": "no se actúa"
 }

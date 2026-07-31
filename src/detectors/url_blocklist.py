@@ -6,7 +6,7 @@ from urllib.parse import urlparse
 from telegram import Message, MessageEntity
 
 from ..i18n import t
-from . import Hit
+from . import Hit, trozo_entidad
 
 
 def _iter_urls(msg: Message) -> list[str]:
@@ -17,7 +17,7 @@ def _iter_urls(msg: Message) -> list[str]:
         if ent.type == MessageEntity.TEXT_LINK and ent.url:
             urls.append(ent.url)
         elif ent.type == MessageEntity.URL:
-            urls.append(text[ent.offset : ent.offset + ent.length])
+            urls.append(trozo_entidad(text, ent.offset, ent.length))
     return urls
 
 

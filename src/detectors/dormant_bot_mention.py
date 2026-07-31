@@ -20,7 +20,7 @@ import time
 from telegram import Message, MessageEntity
 
 from ..i18n import t
-from . import Hit
+from . import Hit, trozo_entidad
 
 DORMANT_DAYS = 365
 
@@ -45,7 +45,7 @@ def _mentions_a_bot(msg: Message) -> str | None:
     # 1) Por entidades MENTION (texto @username)
     for ent in (msg.entities or []) + (msg.caption_entities or []):
         if ent.type == MessageEntity.MENTION:
-            candidatos.append(text[ent.offset:ent.offset + ent.length].lstrip("@"))
+            candidatos.append(trozo_entidad(text, ent.offset, ent.length).lstrip("@"))
     # 2) Fallback regex sobre el texto plano
     for m in _BOT_MENTION_RE.finditer(text):
         candidatos.append(m.group(1))
