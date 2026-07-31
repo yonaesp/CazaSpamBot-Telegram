@@ -1,11 +1,11 @@
 # Telegram Bot API (async)
-python-telegram-bot[ext]==21.6
+python-telegram-bot[ext]==22.8
 
 # Async HTTP (CAS lookup + notificaciones)
 aiohttp==3.10.10
 
 # Telethon (MTProto client) — solo para el script scripts/analyze_members.py
-telethon==1.36.0
+telethon==1.44.0
 
 # Variables de entorno
 python-dotenv==1.0.1
