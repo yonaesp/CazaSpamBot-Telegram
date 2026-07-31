@@ -357,7 +357,7 @@
   "rule.emoji_only_first_msg": "Su primer mensaje eran solo emojis (captación de atención típica de spam).",
   "rule.forward_first_msg": "Su primer mensaje fue un reenvío de un canal o bot (patrón de spam).",
   "rule.first_msg_media": "Su primer mensaje fue una foto o vídeo, con un perfil sospechoso.",
-  "rule.story_share": "Compartió la historia de otro canal nada más entrar, sin haber hablado antes. Telegram no deja que los bots lean el contenido de una historia, así que es un formato usado justamente para colar publicidad.",
+  "rule.story_share": "Compartió la historia de otro canal en un patrón de spam: recién entrado sin haber hablado, o con un canal cuyo nombre es de publicidad y apenas participando en el grupo.",
   "rule.via_bot_spam": "Mensaje enviado a través de otro bot con contenido de spam.",
   "rule.learned_similarity": "El mensaje se parecía mucho a spam que ya le marcaste antes al bot.",
   "rule.jfm_fast": "Escribió muy rápido tras entrar (comportamiento automatizado).",

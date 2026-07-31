@@ -5,42 +5,60 @@
 # que la Bot API entrega siempre (el contenido solo se lee por Telethon, y solo
 # durante las 24 h que vive la historia).
 #
-# Esta lista NO decide sola. Solo pesa cuando alguien comparte la historia de otro
-# canal y apenas ha escrito en el grupo; a un usuario asentado el trust score lo
-# protege. Aun así, ponlo difícil: aquí NO van palabras corrientes. «Ofertas» o
-# «Noticias» banearían canales legítimos.
+# ══════════════════════════════════════════════════════════════════════════════
+# REGLA DE ORO: NUNCA UNA PALABRA SUELTA. SIEMPRE PAREJA.
+# ══════════════════════════════════════════════════════════════════════════════
+# Esto no es paranoia. Es la lista de canales REALES que una versión anterior de
+# este fichero habría baneado, con palabras que parecían inequívocas:
 #
-# IMPORTANTE: pon SIEMPRE \b alrededor. Sin límites de palabra, «rich» casa dentro
-# de «Zürich» y «pump» dentro de «Pumpkin»: banearías canales legítimos.
+#   «insider»  -> Windows Insider Program   (¡en un grupo de Windows!)
+#   «pump»     -> Heat Pump UK, bombas de calor  (¡en un grupo de domótica!)
+#   «signals»  -> Signal Messenger, Digital Signal Processing
+#   «crypto»   -> Cryptography Weekly
+#   «airdrop»  -> Apple AirDrop Tips
+#   «escort»   -> Ford Escort Club
+#   «casino»   -> Casino Royale
+#   «whale»    -> Whale Watching Tarifa
+#   «xxx»      -> XXX Aniversario del Club  (números romanos)
+#   «rich»     -> Zürich, Heinrich, Rich Text Editor
 #
-# Puedes añadir los tuyos en config/blacklist/custom/ (no se pierden al actualizar)
-# o desde el panel /config.
+# El tema (dinero, cripto, juego) lo nombra muchísima gente legítima. Lo que no
+# dice nadie normal es la COMBINACIÓN. Por eso aquí van parejas, no palabras.
+#
+# Además, esta lista NO decide sola salvo que el usuario apenas escriba en el
+# grupo: a quien participa de verdad lo protege su historial.
+#
+# Puedes añadir los tuyos en config/blacklist/custom/ (no se pierden al
+# actualizar) o desde el panel /config.
 
-# --- Cripto y señales de trading, el grueso de este spam ---
-\bsignals?\b
-\bcrypto
-\bbitcoin\b
-\bbtc\b
-\bbinance\b
-\bforex\b
-\bairdrop
-\bpump\b
-\bwhale\b
-\binsider\b
+# --- Señales de trading: el grueso de este spam ---
+# Las dos direcciones, porque el spam usa ambas: «VIP Signals» y «Signals VIP».
+# El caso real que motivó todo esto se llamaba «Insider Group Signal».
+\b(?:crypto|bitcoin|btc|forex|binary|vip|free|premium|daily|group|club|insider|private)[\s_-]+signals?\b
+\bsignals?[\s_-]+(?:vip|group|club|channel|premium|free|pro|insider)\b
+\binsider[\s_-]+(?:signals?|trading|tips?|club|vip|profits?)\b
+
+# --- Cripto con promesa, no cripto a secas ---
+\b(?:crypto|bitcoin|btc|forex|binance)[\s_-]+(?:pump|profits?|invest|millionaire|vip)\b
+\bpump[\s_-]*(?:&|and|/|n)?[\s_-]*dump\b
+\bairdrop[\s_-]+(?:free|claim|bonus|token|nft|\d)
+\bfree[\s_-]+airdrop\b
+\bwhale[\s_-]+(?:signals?|alerts?|club|vip|trades?)\b
 
 # --- Promesas de dinero ---
-\bprofits?\b
-\bearn(ings)?\b
-\bmillionaire\b
-\brich\b
+\b(?:daily|guaranteed|easy|fast|quick)[\s_-]+profits?\b
+\bprofits?[\s_-]+(?:daily|guaranteed|100)\b
+\bearn[\s_-]+(?:money|daily|fast|\$|\d)
+\bget[\s_-]+rich\b
+\brich[\s_-]+(?:quick|fast)\b
+\bmillionaire[\s_-]+(?:club|secrets?|system|mindset)\b
 
-# --- Juego ---
-\bcasino\b
-\bjackpot\b
-\bbetting\b
+# --- Juego online, no cines ni casinos sociales ---
+\b(?:online|free|live)[\s_-]+casino\b
+\bcasino[\s_-]+(?:online|bonus|free|slots?|jackpot|777)\b
+\bjackpot[\s_-]+(?:777|slots?|win|casino)\b
 
-# --- Adulto ---
+# --- Adulto: aquí sí caben algunos inequívocos ---
 \bonlyfans\b
-\b18\+
-\bxxx\b
-\bescorts?\b
+\bescorts?[\s_-]+(?:service|girls?|vip|24h|agency)\b
+\bleaks?[\s_-]+(?:nudes?|onlyfans|18)\b

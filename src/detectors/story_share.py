@@ -75,6 +75,10 @@ def check(
         return Hit.none()
 
     origen = getattr(story, "chat", None)
+    if origen is None:
+        # La Bot API siempre manda `chat`, pero sin él no hay nada que evaluar y no
+        # se va a puntuar a ciegas.
+        return Hit.none()
     origen_id = getattr(origen, "id", None)
     if origen_id is not None and origen_id == user_id:
         # Su propia historia. Es lo normal y no dice nada.
@@ -85,28 +89,40 @@ def check(
     nombre = titulo or uname or str(origen_id or "?")
     datos = {"story_id": getattr(story, "id", None), "source_chat": origen_id}
 
+    # Se ACUMULA, no se retorna en la primera coincidencia. Retornando, la rama de
+    # «recién llegado» (más leve) tapaba la del canal sospechoso (más grave) y salía
+    # el score invertido: el recién llegado con un canal de spam puntuaba 40 y el
+    # veterano con el mismo canal, 100. Justo al revés de lo que se pretende.
+    score = 0
+    motivos: list[str] = []
+
     # 1) Estructura: recién llegado. Exige join presenciado, porque sin `join_ts` no
     #    sabemos si es de verdad su primer mensaje (podría llevar años en el grupo).
+    #    Vale POCO a propósito: por debajo de MUTE_SCORE, así que por sí sola no
+    #    hace nada. Compartir una historia al entrar es raro, pero no es delito, y
+    #    puede ser el canal enlazado del propio grupo.
     if bot_saw_join:
         if is_first_msg:
-            return Hit(rule="story_share", score=100,
-                       reason=t("reason.story_first", source=nombre), payload=datos)
-        if seconds_since_join is not None and seconds_since_join <= VENTANA_RECIENTE_S:
-            return Hit(rule="story_share", score=40,
-                       reason=t("reason.story_recent", source=nombre), payload=datos)
+            score += 30
+            motivos.append(t("reason.story_first", source=nombre))
+        elif seconds_since_join is not None and seconds_since_join <= VENTANA_RECIENTE_S:
+            score += 20
+            motivos.append(t("reason.story_recent", source=nombre))
 
-    # 2) El canal de origen tiene pinta de spam. Esta señal NO necesita join
-    #    presenciado: la evidencia es el nombre del canal, no cuándo entró. Cubre
-    #    justo al que lleva tiempo en el grupo y apenas escribe.
+    # 2) El canal de origen tiene nombre de spam. NO necesita join presenciado: la
+    #    evidencia es el nombre, no cuándo entró. Cubre al que lleva tiempo en el
+    #    grupo y apenas escribe. La lista es de PAREJAS, nunca palabras sueltas
+    #    («insider» solo cazaba «Windows Insider Program»).
     if _fuente_sospechosa(titulo or "", uname):
-        apenas_escribe = msg_count is not None and msg_count < POCO_ACTIVO_MAX_MSGS
-        if apenas_escribe:
-            return Hit(rule="story_share", score=100,
-                       reason=t("reason.story_source_quiet", source=nombre,
-                                n=msg_count), payload=datos)
-        # Participa de verdad: el nombre por sí solo NO le banea. Suma y que decidan
-        # el resto de señales y el trust, que para eso está.
-        return Hit(rule="story_share", score=40,
-                   reason=t("reason.story_source", source=nombre), payload=datos)
+        if msg_count is not None and msg_count < POCO_ACTIVO_MAX_MSGS:
+            score += 70
+            motivos.append(t("reason.story_source_quiet", source=nombre, n=msg_count))
+        else:
+            # Participa de verdad: el nombre por sí solo no le toca. Suma y deciden
+            # el resto de señales y el trust, que para eso está.
+            score += 30
+            motivos.append(t("reason.story_source", source=nombre))
 
-    return Hit.none()
+    if not motivos:
+        return Hit.none()
+    return Hit(rule="story_share", score=score, reason=" + ".join(motivos), payload=datos)

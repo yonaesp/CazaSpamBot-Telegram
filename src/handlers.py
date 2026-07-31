@@ -305,7 +305,7 @@ async def on_abuse_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     if action == "ok":
         await q.answer(t("hdl.marked_legit_toast"))
         try:
-            await q.edit_message_reply_markup(reply_markup=None)
+            await _quitar_botones(q)
         except TelegramError:
             pass
         return
@@ -839,12 +839,14 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     # el texto real por MTProto y se sigue el flujo NORMAL con él: mismos
     # detectores, mismos umbrales. La evidencia es el texto de verdad, así que esto
     # no sube el riesgo de falso positivo. Si no se puede leer, todo queda como antes.
+    texto_ajeno = False   # ¿el texto lo redactó un canal ajeno, no este usuario?
     if text_or_caption is None and getattr(msg, "story", None) is not None:
         _leido = await story_reader.leer_caption(context, msg.story)
         if _leido is not None:
             _cap, _ents = _leido
             msg = story_reader.MensajeConTextoDeHistoria(msg, _cap, _ents)
             text_or_caption = _cap
+            texto_ajeno = True
     # Una EDICIÓN re-escaneada (via on_edited_message) NO es un mensaje nuevo: no
     # debe contar para msg_count, antiflood ni topweekly (si no, editar varias veces
     # inflaría trust o dispararía un flood falso). Solo corremos los detectores sobre
@@ -853,11 +855,17 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     if is_edit:
         seen_row = db.get_seen(chat_id, user.id)
         msg_count = int(seen_row["msg_count"]) if seen_row and seen_row["msg_count"] else 1
-        db.update_last_message(chat_id, user.id, msg.message_id, text_or_caption)
+        db.update_last_message(chat_id, user.id, msg.message_id,
+                               None if texto_ajeno else text_or_caption)
     else:
         msg_count = db.record_message(chat_id, user.id, user.username, msg_ts=_msg_ts)
-        # Guardar el último mensaje + first_name para revisar tras bans manuales
-        db.update_last_message(chat_id, user.id, msg.message_id, text_or_caption)
+        # Guardar el último mensaje + first_name para revisar tras bans manuales.
+        # El caption de una HISTORIA lo redactó un canal ajeno, no este usuario: si se
+        # guardara ahí, un "✅ Legítimo" en la revisión lo metería como muestra HAM y
+        # envenenaría el clasificador con vocabulario de spam, además de falsear el
+        # panel de alfabetos y la vista previa de términos.
+        db.update_last_message(chat_id, user.id, msg.message_id,
+                               None if texto_ajeno else text_or_caption)
         db.update_seen_first_name(chat_id, user.id, user.first_name)
         # Recolección topweekly:
         # - Media (foto/video/sticker/audio/voice/document/animation) SIEMPRE cuenta.
@@ -889,7 +897,10 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
     # @admin mention: si el usuario está reportando algo, gestionarlo y NO seguir
     # el pipeline antispam (no es spam, es un reporte de buena fe).
-    if admin_report.contains_admin_mention(msg):
+    # OJO: el caption de una historia lo escribe el spammer en SU canal, así que
+    # podría poner "@admins" ahí para saltarse todos los detectores de golpe. La vía
+    # de aviso a admins es para humanos pidiendo ayuda, no para texto importado.
+    if getattr(msg, "story", None) is None and admin_report.contains_admin_mention(msg):
         await admin_report.handle_admin_mention(context, db, msg)
         return
 
@@ -1346,6 +1357,19 @@ def _is_reportable(decision) -> bool:
     return decision.score >= _REPORT_MIN_SCORE
 
 
+async def _quitar_botones(q) -> None:
+    """Quita los botones de un aviso ya resuelto, tragándose el error del doble toque.
+
+    Sin esto, pulsar dos veces rápido devuelve «message is not modified», que sube
+    hasta el manejador de errores y le manda al admin un traceback de «error interno
+    del bot» por haber hecho doble clic.
+    """
+    try:
+        await q.edit_message_reply_markup(reply_markup=None)
+    except TelegramError:
+        pass
+
+
 async def _send_trust_notice(
     context: ContextTypes.DEFAULT_TYPE,
     db: DB,
@@ -1428,14 +1452,14 @@ async def on_trust_notice_callback(update: Update, context: ContextTypes.DEFAULT
             mode=("shadow" if cfg.shadow else "active"), payload={"via": "trust_notice"},
         )
         await q.answer(t("hdl.tn_ack_nothing"))
-        await q.edit_message_reply_markup(reply_markup=None)
+        await _quitar_botones(q)
         return
 
     if verdicto == "warn":
         n = db.add_warn(user_id, chat_id, by_admin=cfg.admin_user_id,
                         reason=t("hdl.tn_warn_reason"))
         await q.answer(t("hdl.tn_ack_warn", n=n))
-        await q.edit_message_reply_markup(reply_markup=None)
+        await _quitar_botones(q)
         return
 
     # banear: se borra el mensaje y se federa, igual que cualquier otro ban.
@@ -1459,7 +1483,7 @@ async def on_trust_notice_callback(update: Update, context: ContextTypes.DEFAULT
         mode=("shadow" if cfg.shadow else "active"), payload={"via": "trust_notice"},
     )
     await q.answer(t("hdl.tn_ack_ban"))
-    await q.edit_message_reply_markup(reply_markup=None)
+    await _quitar_botones(q)
 
 
 async def _send_review_request(

@@ -60,6 +60,11 @@ class MensajeConTextoDeHistoria:
         object.__setattr__(self, "caption_entities", entities or [])
 
     def __getattr__(self, nombre):
+        # Sin esta guarda, si `_real` no está puesto (copy.copy, unpickle a medias)
+        # la búsqueda de `_real` reentra aquí y revienta con RecursionError en vez
+        # de con un AttributeError legible.
+        if nombre == "_real":
+            raise AttributeError(nombre)
         return getattr(self._real, nombre)
 
 
