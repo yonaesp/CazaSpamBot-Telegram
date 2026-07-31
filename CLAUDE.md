@@ -266,4 +266,8 @@ fine-grained necesita **`Administration: Read`** además de `Contents`; con solo
 scope `repo` lo cubren de sobra, pero dan acceso a TODOS los repos de la cuenta:
 para un repo suelto compensa el fine-grained con esos dos permisos.
 
+Si el `gh` de la máquina está autenticado con **otra** cuenta o con un token que no
+alcanza a este repo, no hace falta reconfigurar `gh`: basta exportar `GH_TOKEN` con
+el token bueno solo para esa ejecución. `gh` lo prefiere sobre su sesión guardada.
+
 *Actualizado: 2026-07-23 — bilingüe es/en, 21 detectores (+investment_scam), 831 tests, panel completo, ajuste money_guard, registro de tráfico local.*
