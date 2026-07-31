@@ -81,3 +81,34 @@ def test_con_muchos_emojis_la_url_pierde_hasta_el_esquema():
     ingenuo = texto[e.offset:e.offset + e.length]
     assert urlparse(ingenuo).netloc != "malo.example", "el desfase ya no rompe la URL"
     assert urlparse(trozo_entidad(texto, e.offset, e.length)).netloc == "malo.example"
+
+
+def test_el_motivo_cita_el_trozo_exacto_que_salto():
+    """El motivo es lo que el admin lee al revisar un ban meses después.
+
+    Las etiquetas genéricas («llama a contactar a esa persona») dejaron de describir
+    la realidad cuando las listas crecieron: en el caso real saltaba por «only 100
+    spots left», que no pide contactar a nadie. Un motivo que cuenta algo que no
+    pasó es peor que uno escueto.
+    """
+    import types
+    from src.detectors import investment_scam as inv
+    texto = ("Recently I came across a private group of a legendary whale. He shares "
+             "valuable insights. only 100 spots left. Click to subscribe")
+    h = inv.check(types.SimpleNamespace(text=texto, caption=None), is_first_msg=True)
+    assert h, "no disparó"
+    assert "only 100 spots left" in h.reason, (
+        f"el motivo no cita lo que realmente saltó: {h.reason}"
+    )
+
+
+def test_la_cita_no_puede_romper_el_html_del_aviso():
+    """El trozo sale del mensaje del spammer: si colara un `<b>`, Telegram
+    rechazaría el aviso entero y el admin no se enteraría de nada."""
+    import types
+    from src.detectors import investment_scam as inv
+    texto = ("<b>Recently I came across a private group of a legendary whale. He shares "
+             "valuable insights. only 100 spots left. <i>Click to subscribe")
+    h = inv.check(types.SimpleNamespace(text=texto, caption=None), is_first_msg=True)
+    assert h
+    assert "<" not in h.reason and ">" not in h.reason, f"HTML colado: {h.reason}"

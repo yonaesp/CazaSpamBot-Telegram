@@ -151,6 +151,24 @@ def _give_back_multiplier(text: str) -> float:
     return vuelto / dado
 
 
+def _cita(m) -> str:
+    """El trozo EXACTO que hizo saltar la señal, listo para enseñárselo al admin.
+
+    Las etiquetas genéricas («elogio a quien te hace ganar») dejaron de describir lo
+    que pasa desde que las listas cubren más formas de este timo: en el caso real
+    saltaba por «legendary whale» y «only 100 spots left», y el motivo hablaba de
+    contactar a una persona, cosa que ese mensaje no pedía. Y ese texto es lo que el
+    admin lee al revisar un ban meses después.
+
+    Se limpian `<`, `>` y `&` en vez de escaparlos: el motivo pasa luego por sitios
+    que ya escapan HTML, y escapar dos veces le enseñaría al admin «&amp;lt;».
+    """
+    import re as _re
+    trozo = _re.sub(r"\s+", " ", m.group(0)).strip()
+    trozo = trozo.translate({ord(c): None for c in "<>&"})
+    return trozo[:40] + ("…" if len(trozo) > 40 else "")
+
+
 def check(msg: Message, is_first_msg: bool = False) -> Hit:
     text = (getattr(msg, "text", None) or getattr(msg, "caption", None) or "").strip()
     if len(text) < 25:
@@ -166,19 +184,20 @@ def check(msg: Message, is_first_msg: bool = False) -> Hit:
         score += 45
         reasons.append(t("reason.invscam_giveback", mult=f"{mult:.0f}"))
 
-    tiene_praise = bool(_praise_re().search(text))
-    tiene_cta = bool(_cta_re().search(text))
-    tiene_vocab = bool(_vocab_re().search(text))
+    m_praise = _praise_re().search(text)
+    m_cta = _cta_re().search(text)
+    m_vocab = _vocab_re().search(text)
+    tiene_praise, tiene_cta, tiene_vocab = bool(m_praise), bool(m_cta), bool(m_vocab)
 
     if tiene_praise:
         score += 30
-        reasons.append(t("reason.invscam_praise"))
+        reasons.append(t("reason.invscam_praise", q=_cita(m_praise)))
     if tiene_cta:
         score += 25
-        reasons.append(t("reason.invscam_cta"))
+        reasons.append(t("reason.invscam_cta", q=_cita(m_cta)))
     if tiene_vocab:
         score += 20
-        reasons.append(t("reason.invscam_vocab"))
+        reasons.append(t("reason.invscam_vocab", q=_cita(m_vocab)))
 
     # Refuerzos que NUNCA deciden solos: solo suman si ya hay estructura de timo.
     hay_estructura = tiene_ancla or tiene_praise or tiene_cta or tiene_vocab
