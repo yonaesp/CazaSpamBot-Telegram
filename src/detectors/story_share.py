@@ -39,17 +39,27 @@ POCO_ACTIVO_MAX_MSGS = 5
 # (y ampliable desde el panel). Se contrasta contra el título y el @username del
 # canal de origen, que es lo ÚNICO que la Bot API entrega siempre: el contenido
 # solo se lee por Telethon y solo mientras la historia sigue viva.
+# TODOS llevan \b a proposito. Con coincidencia por subcadena, «rich» casaba dentro
+# de «Zürich Nachrichten», «Heinrich Böll» o «Ostrich Fans», y «pump» dentro de
+# «Pumpkin Recipes»: ban federado a un usuario legítimo por el nombre de un canal
+# de noticias suizo. El peligro no era el término, era la falta de límites.
 _FUENTE_DEFAULTS = [
-    "signals?", "crypto", "bitcoin", r"\bbtc\b", "binance", "forex", "airdrop",
-    "pump", "whale", "insider", "profits?", r"\bearn(ings)?\b", "millionaire",
-    "rich", "casino", "jackpot", r"\bbetting\b", "onlyfans", r"\b18\+", r"\bxxx\b",
-    "escorts?",
+    r"\bsignals?\b", r"\bcrypto", r"\bbitcoin\b", r"\bbtc\b", r"\bbinance\b",
+    r"\bforex\b", r"\bairdrop", r"\bpump\b", r"\bwhale\b", r"\binsider\b",
+    r"\bprofits?\b", r"\bearn(ings)?\b", r"\bmillionaire\b", r"\brich\b",
+    r"\bcasino\b", r"\bjackpot\b", r"\bbetting\b", r"\bonlyfans\b", r"\b18\+",
+    r"\bxxx\b", r"\bescorts?\b",
 ]
 
 
 def _fuente_sospechosa(nombre: str, username: str | None) -> bool:
     rx = load_and_compile("story_source.txt", _FUENTE_DEFAULTS, boundaries=False)
-    return bool(rx.search(nombre or "") or rx.search(username or ""))
+    # El guion bajo ES carácter de palabra, así que en `btc_signals_vip` el `\b` de
+    # `\bsignals\b` no casa y el término se escaparía. Y los @username de Telegram
+    # van llenos de guiones bajos, que es justo donde vive el nombre del canal.
+    # Se tratan como separadores, que es lo que son a efectos de leerlo.
+    limpio = (username or "").replace("_", " ").replace(".", " ")
+    return bool(rx.search(nombre or "") or rx.search(limpio))
 
 
 def check(

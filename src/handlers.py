@@ -1376,13 +1376,17 @@ async def _send_trust_notice(
     info = t(
         "hdl.trust_notice_dm",
         uid=user.id,
-        name=(user.first_name or "user")[:40],
+        # Todo lo que viene de fuera se escapa: el TÍTULO del canal de origen entra
+        # en `reason` y lo elige quien monta el canal de spam. Un canal llamado
+        # «<b>Signals» dejaba el HTML sin cerrar, Telegram rechazaba el mensaje
+        # entero y el aviso se perdía en silencio: el spammer decidía si te enterabas.
+        name=_h.escape((user.first_name or "user")[:40]),
         trust=_trust.render_trust(trust),
-        chat=(msg.chat.title or msg.chat_id),
-        rules=", ".join(rules),
-        action=proposed_action,
-        reason=reason,
-        text=texto[:600],
+        chat=_h.escape(str(msg.chat.title or msg.chat_id)),
+        rules=_h.escape(", ".join(rules)),
+        action=_h.escape(proposed_action),
+        reason=_h.escape(reason),
+        text=_h.escape(texto[:600]),
     )
     # callback_data: tnote:<nada|warn|ban>:CHAT:USER:MSG (dentro de los 64 bytes)
     base = f"{msg.chat_id}:{user.id}:{msg.message_id}"
@@ -1418,6 +1422,11 @@ async def on_trust_notice_callback(update: Update, context: ContextTypes.DEFAULT
         return
 
     if verdicto == "nada":
+        db.log_action(
+            chat_id=chat_id, user_id=user_id, username=None, message_id=msg_id,
+            rule="admin_trust_notice", action="noop", score=0,
+            mode=("shadow" if cfg.shadow else "active"), payload={"via": "trust_notice"},
+        )
         await q.answer(t("hdl.tn_ack_nothing"))
         await q.edit_message_reply_markup(reply_markup=None)
         return
@@ -1429,14 +1438,25 @@ async def on_trust_notice_callback(update: Update, context: ContextTypes.DEFAULT
         await q.edit_message_reply_markup(reply_markup=None)
         return
 
-    # banear: se borra el mensaje y se federa, igual que cualquier otro ban
-    try:
-        await context.bot.delete_message(chat_id=chat_id, message_id=msg_id)
-    except TelegramError:
-        pass
+    # banear: se borra el mensaje y se federa, igual que cualquier otro ban.
+    # El borrado va DETRÁS de la guarda de shadow: en modo prueba el bot no toca
+    # nada del grupo, y aquí se estaba saltando esa regla.
+    if not cfg.shadow:
+        try:
+            await context.bot.delete_message(chat_id=chat_id, message_id=msg_id)
+        except TelegramError:
+            pass
     await federate_ban(
         context.bot, db, user_id=user_id, reason=t("hdl.tn_ban_reason"),
         rule="admin_trust_notice", triggered_in_chat=chat_id, shadow=cfg.shadow,
+    )
+    # Auditoría obligatoria: sin esto el ban no salía en /recent ni en /stats, y el
+    # único rastro era el `noop_trust` de cuando se envió el aviso, que dice
+    # exactamente lo contrario de lo que acabó pasando.
+    db.log_action(
+        chat_id=chat_id, user_id=user_id, username=None, message_id=msg_id,
+        rule="admin_trust_notice", action="ban", score=0,
+        mode=("shadow" if cfg.shadow else "active"), payload={"via": "trust_notice"},
     )
     await q.answer(t("hdl.tn_ack_ban"))
     await q.edit_message_reply_markup(reply_markup=None)
@@ -1491,13 +1511,15 @@ async def _send_review_request(
     info = t(
         "hdl.review_dm",
         uid=user_id,
-        name=name,
+        # Mismo motivo que en _send_trust_notice: `reason` y el nombre los controla
+        # quien manda el mensaje. Sin escapar, un `<b>` suelto tumba el aviso entero.
+        name=_h.escape(name),
         trust=_trust.render_trust(trust),
-        chat=msg.chat.title or chat_id,
-        rules=", ".join(rules),
-        action=proposed_action,
-        reason=reason,
-        text=text[:600],
+        chat=_h.escape(str(msg.chat.title or chat_id)),
+        rules=_h.escape(", ".join(rules)),
+        action=_h.escape(proposed_action),
+        reason=_h.escape(reason),
+        text=_h.escape(text[:600]),
     )
     # callback_data: prev:legit:CHAT:USER:MSG:PUBLIC  /  prev:spam:CHAT:USER:MSG:PUBLIC
     kb = InlineKeyboardMarkup([[

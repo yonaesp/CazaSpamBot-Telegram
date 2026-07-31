@@ -29,9 +29,18 @@ Nunca se propaga una excepción a la ruta de moderación.
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 
 log = logging.getLogger("antispam")
+
+# PTB procesa los updates de UNO EN UNO (la Application se construye sin
+# `concurrent_updates`), así que cualquier espera aquí congela el bot entero: no se
+# modera nada más, no entran joins. Y `get_input_entity` sobre un canal desconocido
+# dispara `contacts.ResolveUsername`, de lo más propenso a FloodWait, ante el cual
+# Telethon DUERME sola hasta 60 s sin lanzar excepción. Mismo tope que usa
+# `detectors/photos_batch.py`, que ya se topó con esto.
+_TIMEOUT_S = 5.0
 
 
 class MensajeConTextoDeHistoria:
@@ -135,7 +144,7 @@ async def leer_caption(context, story) -> tuple[str, list] | None:
     peer = None
     for ref in referencias:
         try:
-            peer = await client.get_input_entity(ref)
+            peer = await asyncio.wait_for(client.get_input_entity(ref), _TIMEOUT_S)
             break
         except Exception as exc:         # noqa: BLE001
             log.debug("story_reader: no se pudo resolver el peer %r: %s", ref, exc)
@@ -145,7 +154,8 @@ async def leer_caption(context, story) -> tuple[str, list] | None:
         return None
 
     try:
-        res = await client(GetStoriesByIDRequest(peer=peer, id=[story.id]))
+        res = await asyncio.wait_for(
+            client(GetStoriesByIDRequest(peer=peer, id=[story.id])), _TIMEOUT_S)
     except Exception as exc:             # noqa: BLE001
         # CHANNEL_PRIVATE, STORIES_NEVER_CREATED, PEER_ID_INVALID, caducada...
         log.info("story_reader: Telegram no devolvió la historia %s: %s", story.id, exc)

@@ -10,34 +10,37 @@
 # protege. Aun así, ponlo difícil: aquí NO van palabras corrientes. «Ofertas» o
 # «Noticias» banearían canales legítimos.
 #
+# IMPORTANTE: pon SIEMPRE \b alrededor. Sin límites de palabra, «rich» casa dentro
+# de «Zürich» y «pump» dentro de «Pumpkin»: banearías canales legítimos.
+#
 # Puedes añadir los tuyos en config/blacklist/custom/ (no se pierden al actualizar)
 # o desde el panel /config.
 
 # --- Cripto y señales de trading, el grueso de este spam ---
-signals?
-crypto
-bitcoin
+\bsignals?\b
+\bcrypto
+\bbitcoin\b
 \bbtc\b
-binance
-forex
-airdrop
-pump
-whale
-insider
+\bbinance\b
+\bforex\b
+\bairdrop
+\bpump\b
+\bwhale\b
+\binsider\b
 
 # --- Promesas de dinero ---
-profits?
+\bprofits?\b
 \bearn(ings)?\b
-millionaire
-rich
+\bmillionaire\b
+\brich\b
 
 # --- Juego ---
-casino
-jackpot
+\bcasino\b
+\bjackpot\b
 \bbetting\b
 
 # --- Adulto ---
-onlyfans
+\bonlyfans\b
 \b18\+
 \bxxx\b
-escorts?
+\bescorts?\b

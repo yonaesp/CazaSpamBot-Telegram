@@ -34,6 +34,7 @@ from .detectors import tg_deeplink as tgdeep_det
 from .detectors import unicode_script as script_det
 from .detectors import url_blocklist as url_det
 from .i18n import t
+from . import story_reader
 
 
 def _entity_urls(msg) -> list[str]:
@@ -145,7 +146,7 @@ async def cmd_scan(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         else:
             await msg.reply_text(t("scan.usage"), parse_mode="HTML")
         return
-    await _responder_scan(msg, target, cfg, db)
+    await _responder_scan(context, msg, target, cfg, db)
 
 
 async def handle_capture(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
@@ -165,12 +166,23 @@ async def handle_capture(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         return False
     cfg: Config = context.bot_data["cfg"]
     db: DB = context.bot_data["db"]
-    await _responder_scan(msg, msg, cfg, db)
+    await _responder_scan(context, msg, msg, cfg, db)
     return True
 
 
-async def _responder_scan(msg, target, cfg: Config, db: DB) -> None:
-    """Corre los detectores sobre `target` y contesta el informe a `msg`."""
+async def _responder_scan(context, msg, target, cfg: Config, db: DB) -> None:
+    """Corre los detectores sobre `target` y contesta el informe a `msg`.
+
+    Si `target` es una HISTORIA, primero se intenta recuperar su texto por MTProto,
+    igual que hace la moderación. Sin eso el diagnóstico seria incoherente: el bot
+    sabria cazarla en el grupo pero al preguntarle por ella diria que no puede leerla.
+    """
+    leido = None
+    if getattr(target, "story", None) is not None:
+        leido = await story_reader.leer_caption(context, target.story)
+        if leido is not None:
+            texto, ents = leido
+            target = story_reader.MensajeConTextoDeHistoria(target, texto, ents)
     hits = [
         script_det.check(target.text or target.caption, is_first_msgs=True,
                          allowed_scripts=cfg.allowed_scripts,
@@ -208,8 +220,9 @@ async def _responder_scan(msg, target, cfg: Config, db: DB) -> None:
     elif not es_historia:
         lines.append(t("scan.not_detected"))
         lines.append(t("scan.profile_note"))
-    if es_historia:
-        # Va SIEMPRE, dispare o no alguna regla: el veredicto se ha emitido sin haber
+    if es_historia and leido is None:
+        # Va SIEMPRE que no se haya podido leer, dispare o no alguna regla: el
+        # veredicto se habria emitido sin haber
         # leído el contenido. Decir «no dispararía ninguna regla» a secas sería
         # engañoso, porque el admin sí ve el texto en su pantalla y daría por bueno
         # un análisis que el bot no ha podido hacer.

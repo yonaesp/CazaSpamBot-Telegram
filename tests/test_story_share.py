@@ -131,3 +131,22 @@ def test_palabras_corrientes_no_estan_en_la_lista():
     for legitimo in ("Ofertas Informática", "Noticias Tech", "Grupo de Fotografía",
                      "Ayuda Windows 11", "Domótica España"):
         assert not _fuente_sospechosa(legitimo, None), f"falso positivo con {legitimo!r}"
+
+
+def test_los_limites_de_palabra_evitan_banear_canales_legitimos():
+    """Regresión: sin \\b, «rich» casaba dentro de «Zürich» y «pump» dentro de
+    «Pumpkin». Un usuario con 4 mensajes compartiendo una historia de un canal de
+    noticias suizo se comía un ban federado."""
+    from src.detectors.story_share import _fuente_sospechosa
+    for legitimo in ("Zürich Nachrichten", "Heinrich Böll Stiftung", "Pumpkin Recipes",
+                     "Enrichment Center", "Ostrich Fans", "Learn English",
+                     "Richard Fotografía", "Casinos de Historia"):
+        assert not _fuente_sospechosa(legitimo, None), f"falso positivo con {legitimo!r}"
+
+
+def test_los_guiones_bajos_del_username_no_esconden_el_termino():
+    """En `btc_signals_vip` el guion bajo es carácter de palabra, así que `\\bsignals\\b`
+    no casaría. Y los @username de Telegram van llenos de guiones bajos."""
+    from src.detectors.story_share import _fuente_sospechosa
+    for uname in ("btc_signals_vip", "crypto.pump.daily", "vip_forex_signals"):
+        assert _fuente_sospechosa("", uname), f"se escapó {uname!r}"
