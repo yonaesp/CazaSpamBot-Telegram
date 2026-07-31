@@ -302,6 +302,7 @@
   "verif.already_or_expired": "You are already verified, or the button has expired.",
   "verif.unmute_error": "Could not unmute you, please contact an admin.",
   "scan.usage": "🔎 <b>/scan</b> — forward me (or bring into this DM) the suspicious message, reply to it with <code>/scan</code> and I will tell you whether the bot would catch it, and why.\n<i>For quotes pointing to another chat (odd-looking quotes), it is more reliable to run it on the original message in the group: forwarding loses that context.</i>",
+  "scan.await": "🔎 Listening. <b>Forward me the message now</b> and I will tell you whether the bot would catch it, and why.\n<i>I will wait 5 minutes. After that I go back to answering as usual.</i>",
   "main.internal_error": "⚠️ <b>Internal bot error</b>\n<code>{error_type}: {error_msg}</code>\n\n<i>Caught (the bot is still running). Check the logs for details.</i>",
   "chats.header": "<b>Chats:</b>",
   "chats.no_perms": "no permissions",

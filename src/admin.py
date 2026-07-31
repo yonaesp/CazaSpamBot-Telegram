@@ -341,6 +341,11 @@ async def on_private_message(update: Update, context: ContextTypes.DEFAULT_TYPE)
     from . import config_panel
     if await config_panel.handle_capture(update, context):
         return
+    # ¿Un /scan esperando el mensaje? Va DESPUÉS del panel: una edición pendiente es
+    # más específica (el admin acaba de pulsar un botón concreto) y no debe perderse.
+    from . import scan_cmd
+    if await scan_cmd.handle_capture(update, context):
+        return
     await update.effective_message.reply_text(t("dm.hint"), parse_mode="HTML")
 
 

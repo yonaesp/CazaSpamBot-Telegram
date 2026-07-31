@@ -302,6 +302,7 @@
   "verif.already_or_expired": "Ya estás verificado o el botón ha expirado.",
   "verif.unmute_error": "Error desmuteando, contacta admin.",
   "scan.usage": "🔎 <b>/scan</b> — reenvíame (o trae al DM) el mensaje sospechoso, respóndele con <code>/scan</code> y te digo si el bot lo detectaría y por qué.\n<i>Para citas a otro chat (quote raro), es más fiable usarlo sobre el mensaje original en el grupo: el reenvío pierde ese contexto.</i>",
+  "scan.await": "🔎 Te escucho. <b>Reenvíame ahora el mensaje</b> y te digo si el bot lo detectaría y por qué.\n<i>Tengo 5 minutos de paciencia. Pasado ese rato, vuelvo a responder lo de siempre.</i>",
   "main.internal_error": "⚠️ <b>Error interno del bot</b>\n<code>{error_type}: {error_msg}</code>\n\n<i>Capturado (el bot sigue vivo). Revisa los logs para el detalle.</i>",
   "chats.header": "<b>Chats:</b>",
   "chats.no_perms": "sin permisos",

@@ -16,6 +16,7 @@ el mensaje original en el grupo (respondiéndole con /scan) que sobre el reenví
 from __future__ import annotations
 
 import html as _h
+import time
 
 from telegram import Update
 from telegram.ext import ContextTypes
@@ -115,6 +116,12 @@ def _structure(msg) -> list[str]:
     return out
 
 
+# Cuánto espera el bot el mensaje tras un `/scan` a secas. Corto a propósito: si el
+# admin se olvida, lo siguiente que escriba en el DM debe recibir la ayuda normal, no
+# acabar escaneado por sorpresa media hora después.
+_ESPERA_TTL_S = 300
+
+
 async def cmd_scan(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     cfg: Config = context.bot_data["cfg"]
     db: DB = context.bot_data["db"]
@@ -124,12 +131,42 @@ async def cmd_scan(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     msg = update.effective_message
     target = msg.reply_to_message if msg else None
     if target is None:
-        await msg.reply_text(
-            t("scan.usage"),
-            parse_mode="HTML",
-        )
+        # En el DM el mensaje no tiene por qué existir todavía: el bot se queda
+        # esperando el reenvío, que es el orden natural (primero el comando, luego
+        # el mensaje). En grupo NO se hace: capturar el siguiente mensaje de
+        # cualquiera sería impredecible para el resto de la gente.
+        if update.effective_chat is not None and update.effective_chat.type == "private":
+            context.user_data["scan_await"] = time.time()
+            await msg.reply_text(t("scan.await"), parse_mode="HTML")
+        else:
+            await msg.reply_text(t("scan.usage"), parse_mode="HTML")
         return
+    await _responder_scan(msg, target, cfg, db)
 
+
+async def handle_capture(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
+    """Si un `/scan` está esperando mensaje, escanea este y devuelve True.
+
+    Mismo contrato que `config_panel.handle_capture`: quien llama ya comprobó que
+    es el admin en su DM, y si devolvemos True debe hacer return.
+    """
+    pedido = context.user_data.get("scan_await")
+    if not pedido:
+        return False
+    context.user_data.pop("scan_await", None)   # de un solo uso, aunque falle luego
+    if time.time() - pedido > _ESPERA_TTL_S:
+        return False                            # caducó: que reciba la ayuda normal
+    msg = update.effective_message
+    if msg is None:
+        return False
+    cfg: Config = context.bot_data["cfg"]
+    db: DB = context.bot_data["db"]
+    await _responder_scan(msg, msg, cfg, db)
+    return True
+
+
+async def _responder_scan(msg, target, cfg: Config, db: DB) -> None:
+    """Corre los detectores sobre `target` y contesta el informe a `msg`."""
     hits = [
         script_det.check(target.text or target.caption, is_first_msgs=True,
                          allowed_scripts=cfg.allowed_scripts,
