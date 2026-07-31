@@ -259,4 +259,11 @@ El histórico vive en `traffic/` (**gitignored**, no en `data/`, que es del cont
 Docker como root). Ojo al leer los números: los **clones** suelen ser bots que
 rastrean GitHub, no gente; la señal de interés real son los **visitantes web únicos**.
 
+**Permisos del token**: el endpoint de tráfico exige más que empujar código. Un token
+fine-grained necesita **`Administration: Read`** además de `Contents`; con solo
+`Contents: write` el push funciona pero la lectura de tráfico devuelve
+`403 Resource not accessible by personal access token`. Los tokens clásicos con
+scope `repo` lo cubren de sobra, pero dan acceso a TODOS los repos de la cuenta:
+para un repo suelto compensa el fine-grained con esos dos permisos.
+
 *Actualizado: 2026-07-23 — bilingüe es/en, 21 detectores (+investment_scam), 831 tests, panel completo, ajuste money_guard, registro de tráfico local.*
