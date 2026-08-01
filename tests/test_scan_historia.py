@@ -161,3 +161,34 @@ async def test_un_mensaje_normal_no_lleva_el_bloque_de_escenarios(tmp_path):
     msg = _mensaje(story=False, texto="hola, buenas tardes a todos")
     await scan_cmd._responder_scan(ctx, msg, msg, ctx.bot_data["cfg"], ctx.bot_data["db"])
     assert "Recién llegado" not in msg.reply_text.await_args.args[0]
+
+
+@pytest.mark.asyncio
+async def test_el_scan_explica_que_story_share_no_sale_en_la_lista(tmp_path, monkeypatch):
+    """El admin preguntó, con razón, dónde estaba el detector de estructura.
+
+    `forward_first_msg` NO puede saltar en una historia: Telegram no la marca como
+    reenvío, manda los cuatro campos vacíos. Y `story_share`, que es quien cubre ese
+    hueco, no aparece en «reglas disparadas» porque depende de quién mande el
+    mensaje. Sin explicarlo, parece que falta un detector.
+    """
+    from src import story_reader
+    from telegram import MessageEntity
+
+    TEXTO = "Click to subscribe https://t.me/+abc"
+    off = len(TEXTO[:TEXTO.index("https")].encode("utf-16-le")) // 2
+    ents = [MessageEntity(type="url", offset=off, length=len(TEXTO) - off)]
+
+    async def _lee(_c, _s):
+        return TEXTO, ents
+    monkeypatch.setattr(story_reader, "leer_caption", _lee)
+
+    ctx = _ctx(tmp_path)
+    msg = _mensaje(story=True)
+    await scan_cmd._responder_scan(ctx, msg, msg, ctx.bot_data["cfg"], ctx.bot_data["db"])
+    salida = msg.reply_text.await_args.args[0]
+
+    assert "story_share" in salida, "no dice quién aporta la parte de estructura"
+    assert "forward_first_msg" in salida, (
+        "no explica por qué el detector de reenvíos no salta en una historia"
+    )

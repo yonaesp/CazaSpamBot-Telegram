@@ -964,7 +964,7 @@
   "hdl.tn_warn_reason": "Contenido sospechoso revisado por el administrador",
   "hdl.tn_ban_reason": "Spam confirmado por el administrador",
   "rule.admin_trust_notice": "Lo baneaste tú desde el aviso de usuario de confianza.",
-  "scan.story_scenarios": "🧭 <b>Qué pasaría según quién la comparta</b>\n• <b>Recién llegado</b>, primer mensaje: {n1} puntos → <b>{a1}</b>\n• <b>Lleva tiempo pero apenas escribe</b>: {n2} puntos → <b>{a2}</b>\n• <b>Veterano de confianza</b>: no se actúa. Te llega un aviso al privado con botones <i>Nada / Avisar / Banear</i> y decides tú.\n<i>La parte de estructura (ser una historia recién entrado) no necesita Telethon; el texto sí.</i>",
+  "scan.story_scenarios": "🧭 <b>Qué pasaría según quién la comparta</b>\nArriba van solo las reglas de <b>contenido</b> ({contenido} pts). La parte de <b>estructura</b> la aporta <code>story_share</code>, que no sale en esa lista porque depende de quién mande el mensaje:\n• <b>Recién llegado</b>, primer mensaje: {contenido} + <b>{e1}</b> = {n1} → <b>{a1}</b>\n• <b>Lleva tiempo pero apenas escribe</b>: {contenido} + <b>{e2}</b> = {n2} → <b>{a2}</b>\n• <b>Veterano de confianza</b>: no se actúa. Te llega un aviso al privado con botones <i>Nada / Avisar / Banear</i> y decides tú.\n<i>Ojo: <code>forward_first_msg</code> NO puede saltar aquí. Telegram no marca una historia como reenvío, manda los cuatro campos vacíos. Por eso existe <code>story_share</code>. La estructura no necesita Telethon; el texto sí.</i>",
   "scan.act.ban": "ban",
   "scan.act.kick": "expulsión",
   "scan.act.mute": "silenciado 24 h",

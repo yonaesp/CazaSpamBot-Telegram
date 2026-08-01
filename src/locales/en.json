@@ -964,7 +964,7 @@
   "hdl.tn_warn_reason": "Suspicious content reviewed by the administrator",
   "hdl.tn_ban_reason": "Spam confirmed by the administrator",
   "rule.admin_trust_notice": "You banned them yourself from the trusted-user notice.",
-  "scan.story_scenarios": "🧭 <b>What would happen, depending on who shares it</b>\n• <b>Newcomer</b>, first message: {n1} points → <b>{a1}</b>\n• <b>Around for a while but barely posts</b>: {n2} points → <b>{a2}</b>\n• <b>Trusted regular</b>: nothing happens. You get a DM with <i>Nothing / Warn / Ban</i> buttons and decide yourself.\n<i>The structural part (a story from a newcomer) needs no Telethon; the text does.</i>",
+  "scan.story_scenarios": "🧭 <b>What would happen, depending on who shares it</b>\nAbove are only the <b>content</b> rules ({contenido} pts). The <b>structural</b> part comes from <code>story_share</code>, which is not in that list because it depends on who sent the message:\n• <b>Newcomer</b>, first message: {contenido} + <b>{e1}</b> = {n1} → <b>{a1}</b>\n• <b>Around for a while but barely posts</b>: {contenido} + <b>{e2}</b> = {n2} → <b>{a2}</b>\n• <b>Trusted regular</b>: nothing happens. You get a DM with <i>Nothing / Warn / Ban</i> buttons and decide yourself.\n<i>Note: <code>forward_first_msg</code> CANNOT fire here. Telegram does not mark a story as a forward, it sends all four fields empty. That is why <code>story_share</code> exists. The structural part needs no Telethon; the text does.</i>",
   "scan.act.ban": "ban",
   "scan.act.kick": "kick",
   "scan.act.mute": "24 h mute",

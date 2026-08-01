@@ -249,8 +249,9 @@ async def _responder_scan(context, msg, target, cfg: Config, db: DB) -> None:
         n2, a2 = _escenario(is_first_msg=False, bot_saw_join=False, msg_count=2)
         lines.append("")
         lines.append(t("scan.story_scenarios",
-                       n1=n1, a1=t(f"scan.act.{a1}"),
-                       n2=n2, a2=t(f"scan.act.{a2}")))
+                       contenido=contenido,
+                       e1=n1 - contenido, n1=n1, a1=t(f"scan.act.{a1}"),
+                       e2=n2 - contenido, n2=n2, a2=t(f"scan.act.{a2}")))
 
     if es_historia and leido is None:
         # Va SIEMPRE que no se haya podido leer, dispare o no alguna regla: el
