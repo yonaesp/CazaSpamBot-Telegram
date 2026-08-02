@@ -550,22 +550,14 @@ async def _delete_command_safely(update: Update) -> None:
 
 
 async def _cleanup_welcome_on_ban(context: ContextTypes.DEFAULT_TYPE, db: DB, user_id: int) -> None:
-    """Tras un ban manual, borra el mensaje de bienvenida del user si sigue
-    pendiente en algún chat federado, y limpia la fila pending_verifications.
-    Evita welcomes huérfanos con botón SOY HUMANO de un user ya baneado."""
-    for chat_row in db.all_chats():
-        if not chat_row["am_admin"]:
-            continue
-        chat_id = chat_row["chat_id"]
-        pending = db.get_pending(chat_id, user_id)
-        if pending and pending["welcome_msg_id"]:
-            try:
-                await context.bot.delete_message(chat_id=chat_id, message_id=pending["welcome_msg_id"])
-                log.info("welcome borrado tras ban manual user=%s chat=%s", user_id, chat_id)
-            except TelegramError:
-                pass
-        if pending:
-            db.delete_pending(chat_id, user_id)
+    """Borra la bienvenida del baneado. Delega en la limpieza compartida.
+
+    Antes esta función solo miraba `pending_verifications`, así que con la
+    verificación desactivada (que es el modo por defecto) no encontraba nada y la
+    bienvenida se quedaba en el grupo saludando a alguien ya expulsado.
+    """
+    from . import verification
+    await verification.limpiar_bienvenidas(context, db, user_id)
 
 
 async def _notify_admin_ack(context: ContextTypes.DEFAULT_TYPE, text: str) -> None:

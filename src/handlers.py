@@ -353,6 +353,16 @@ async def on_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         bot_id=context.bot.id,
     ):
         await _notify_manual_ban(context, db, cmu)
+        # Un admin baneando desde la propia app de Telegram no pasa por ningún
+        # comando del bot, así que este era el único camino de ban que dejaba la
+        # bienvenida huérfana en el grupo. Solo en BAN: a un kick puede seguirle
+        # una reentrada legítima, y ahí borrar el saludo no aporta nada.
+        if new_status == ChatMemberStatus.BANNED:
+            try:
+                await verification.limpiar_bienvenidas(
+                    context, db, cmu.new_chat_member.user.id)
+            except Exception as exc:  # noqa: BLE001
+                log.debug("limpieza de bienvenida tras ban manual falló: %s", exc)
         # Anti-abuse: solo cuenta los BANEOS (no kicks). Si un admin banea a muchos
         # en poco tiempo, avisa para revisar (con botón para deshacer los baneos).
         if new_status == ChatMemberStatus.BANNED and cfg.admin_ban_abuse_enabled:
@@ -2191,16 +2201,9 @@ async def _apply_action(
         mode=mode, payload={"reason": decision.reason, **(decision.payload or {})},
     )
 
-    # Si el user tenía una verificación pendiente, limpiarla (welcome huérfano + pending row).
-    # Sucede cuando el bot ejecuta ban/kick por otra regla mientras la verificación seguía activa.
-    if user_id and decision.action in ("ban", "kick") and not cfg.shadow:
-        pending = db.get_pending(chat_id, user_id)
-        if pending and pending["welcome_msg_id"]:
-            try:
-                await context.bot.delete_message(chat_id=chat_id, message_id=pending["welcome_msg_id"])
-            except TelegramError:
-                pass
-        db.delete_pending(chat_id, user_id)
+    # Bienvenida del baneado: se borra siempre, mire donde mire el id. La versión
+    # anterior solo consultaba `pending_verifications`, que no existe en modo limpio.
+    await verification.limpiar_bienvenidas(context, db, user_id)
 
     fed_results: dict[int, str] | None = None
     if decision.action != "noop":

@@ -497,6 +497,13 @@ async def _send_friendly_welcome(context, db, chat, user, settings) -> None:
             is_suspicious=False,
         )
         db.mark_verified(chat.id, user.id)
+        # Duplicado a propósito en seen_users: la fila de `pending_verifications`
+        # se limpia al verificar, y a partir de ahí un ban posterior ya no sabría
+        # qué mensaje borrar.
+        try:
+            db.set_welcome_msg(chat.id, user.id, sent.message_id)
+        except Exception as exc:  # noqa: BLE001
+            log.debug("no se pudo recordar el welcome chat=%s user=%s: %s", chat.id, user.id, exc)
     # Auto-borrar a los 15 min para no ensuciar el chat
     jq = context.application.job_queue
     if jq is not None and sent is not None:
@@ -665,6 +672,14 @@ async def _send_clean_welcome(context, db, chat, user, settings) -> None:
     except TelegramError as exc:
         log.warning("clean welcome send fallo chat=%s: %s", chat.id, exc)
         return
+    # Recordar cuál es su bienvenida: si luego lo banean (a mano o con /ban), hay
+    # que poder borrarla. Sin esto se quedaba en el grupo saludando a alguien ya
+    # expulsado, que es justo lo que veía el admin.
+    if sent:
+        try:
+            db.set_welcome_msg(chat.id, user.id, sent.message_id)
+        except Exception as exc:  # noqa: BLE001
+            log.debug("no se pudo recordar el welcome chat=%s user=%s: %s", chat.id, user.id, exc)
     delete_after = (settings["welcome_delete_after_s"] if settings else 0) or 0
     if sent and delete_after > 0:
         jq = context.application.job_queue
@@ -832,6 +847,13 @@ async def on_join(
         chat_id=chat.id, user_id=user.id,
         welcome_msg_id=msg_id, is_suspicious=suspicious,
     )
+    # También en seen_users: la fila pending se limpia al verificar y a partir de
+    # ahí un ban posterior no sabría qué borrar. Ver `limpiar_bienvenidas`.
+    if msg_id:
+        try:
+            db.set_welcome_msg(chat.id, user.id, msg_id)
+        except Exception as exc:  # noqa: BLE001
+            log.debug("no se pudo recordar el welcome chat=%s user=%s: %s", chat.id, user.id, exc)
     log.info(
         "verification iniciada user=%s chat=%s suspicious=%s msg=%s",
         user.id, chat.id, suspicious, msg_id,
@@ -1142,3 +1164,57 @@ async def _send_reminder(
         log.warning("verification reminder send fallo: %s", exc)
 
     db.mark_reminder_sent(chat_id, user_id, new_msg_id)
+
+
+async def limpiar_bienvenidas(context, db, user_id: int) -> int:
+    """Borra las bienvenidas vivas de un usuario en TODOS los chats federados.
+
+    Se llama al banear, venga el ban de donde venga: `/ban`, el combo de `/spam`,
+    una regla automática o un ban a mano desde la propia app de Telegram. Sin esto,
+    la bienvenida se quedaba en el grupo saludando a alguien ya expulsado.
+
+    Mira los DOS sitios donde puede estar el id, porque ninguno cubre todos los
+    casos: `pending_verifications` solo existe si la verificación está activa y
+    desaparece al verificar, y `seen_users.welcome_msg_id` cubre el resto
+    (incluido el modo limpio, que es el que viene por defecto).
+
+    Devuelve cuántos mensajes se borraron. Best-effort: un fallo de Telegram
+    (mensaje ya borrado, sin permisos) nunca interrumpe el ban.
+    """
+    borrados = 0
+    vistos: set[tuple[int, int]] = set()
+
+    for chat_id, msg_id in db.welcomes_pendientes(user_id):
+        if not msg_id or (chat_id, msg_id) in vistos:
+            continue
+        vistos.add((chat_id, msg_id))
+        try:
+            await context.bot.delete_message(chat_id=chat_id, message_id=msg_id)
+            borrados += 1
+        except TelegramError:
+            pass
+        try:
+            db.set_welcome_msg(chat_id, user_id, None)
+        except Exception:  # noqa: BLE001
+            pass
+
+    for chat_row in db.all_chats():
+        if not chat_row["am_admin"]:
+            continue
+        chat_id = chat_row["chat_id"]
+        pending = db.get_pending(chat_id, user_id)
+        if not pending:
+            continue
+        msg_id = pending["welcome_msg_id"]
+        if msg_id and (chat_id, msg_id) not in vistos:
+            vistos.add((chat_id, msg_id))
+            try:
+                await context.bot.delete_message(chat_id=chat_id, message_id=msg_id)
+                borrados += 1
+            except TelegramError:
+                pass
+        db.delete_pending(chat_id, user_id)
+
+    if borrados:
+        log.info("bienvenidas borradas tras ban user=%s: %d", user_id, borrados)
+    return borrados

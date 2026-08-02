@@ -376,6 +376,12 @@ class DB:
             self._conn.execute("ALTER TABLE seen_users ADD COLUMN last_msg_text TEXT")
         if "last_msg_ts" not in su_cols:
             self._conn.execute("ALTER TABLE seen_users ADD COLUMN last_msg_ts REAL")
+        # Id del mensaje de bienvenida, para poder borrarlo si al usuario lo banean
+        # después. Antes solo se guardaba en `pending_verifications`, así que con la
+        # verificación desactivada (que es el defecto) la bienvenida se quedaba
+        # huérfana en el grupo saludando a alguien ya expulsado.
+        if "welcome_msg_id" not in su_cols:
+            self._conn.execute("ALTER TABLE seen_users ADD COLUMN welcome_msg_id INTEGER")
 
     def close(self) -> None:
         self._conn.close()
@@ -563,6 +569,24 @@ class DB:
                 (user_id, since_ts),
             ).fetchone()
         return int(row["n"]) if row else 0
+
+    def set_welcome_msg(self, chat_id: int, user_id: int, msg_id: int | None) -> None:
+        """Recuerda qué mensaje es la bienvenida de este usuario en este chat."""
+        with self._cur() as c:
+            c.execute(
+                "UPDATE seen_users SET welcome_msg_id=? WHERE chat_id=? AND user_id=?",
+                (msg_id, chat_id, user_id),
+            )
+
+    def welcomes_pendientes(self, user_id: int) -> list[tuple[int, int]]:
+        """(chat_id, welcome_msg_id) de las bienvenidas vivas de un usuario."""
+        with self._cur() as c:
+            filas = c.execute(
+                "SELECT chat_id, welcome_msg_id FROM seen_users "
+                "WHERE user_id=? AND welcome_msg_id IS NOT NULL",
+                (user_id,),
+            ).fetchall()
+        return [(f["chat_id"], f["welcome_msg_id"]) for f in filas]
 
     def get_pref(self, key: str) -> bool | None:
         """Preferencia runtime: True/False si está guardada, None si no (usar default)."""
