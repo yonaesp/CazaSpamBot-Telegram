@@ -588,6 +588,21 @@ class DB:
             ).fetchall()
         return [(f["chat_id"], f["welcome_msg_id"]) for f in filas]
 
+    def bienvenidas_de_baneados(self, limite: int = 50) -> list[tuple[int, int, int]]:
+        """(chat_id, user_id, welcome_msg_id) de bienvenidas vivas de usuarios ya
+        baneados. Red de seguridad: si el bot se reinicia antes de que corra el
+        borrado programado, el job en memoria se pierde y el saludo se quedaría
+        para siempre dando la bienvenida a un expulsado."""
+        with self._cur() as c:
+            filas = c.execute(
+                "SELECT s.chat_id, s.user_id, s.welcome_msg_id FROM seen_users s "
+                "JOIN banned_users b ON b.user_id = s.user_id "
+                "WHERE s.welcome_msg_id IS NOT NULL AND b.revoked_at IS NULL "
+                "LIMIT ?",
+                (limite,),
+            ).fetchall()
+        return [(f["chat_id"], f["user_id"], f["welcome_msg_id"]) for f in filas]
+
     def get_pref(self, key: str) -> bool | None:
         """Preferencia runtime: True/False si está guardada, None si no (usar default)."""
         with self._cur() as c:
