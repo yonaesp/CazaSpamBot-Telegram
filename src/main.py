@@ -17,7 +17,7 @@ from telegram.ext import (
     filters,
 )
 
-from . import admin, chat_picker, chat_settings_cmd, config_panel, group_clean, lang_cmd, maintenance, scan_cmd, telethon_bridge, topweekly, verification, warns_mod
+from . import admin, chat_picker, chat_settings_cmd, config_panel, group_clean, lang_cmd, maintenance, scan_cmd, scanuser_cmd, telethon_bridge, topweekly, verification, warns_mod
 from .config import load_config
 from .db import DB
 from .handlers import (
@@ -286,6 +286,8 @@ def main() -> int:
     app.add_handler(CommandHandler("samples", admin.cmd_samples))
     app.add_handler(CommandHandler("forget", admin.cmd_forget))
     app.add_handler(CommandHandler("scan", scan_cmd.cmd_scan))
+    app.add_handler(CommandHandler("scanuser", scanuser_cmd.cmd_scanuser))
+    app.add_handler(CommandHandler("analizarusuario", scanuser_cmd.cmd_scanuser))  # alias es
     app.add_handler(CommandHandler("analizar", scan_cmd.cmd_scan))  # alias
     app.add_handler(CommandHandler("setgreeter", admin.cmd_setgreeter))
     app.add_handler(CommandHandler("rmgreeter", admin.cmd_rmgreeter))

@@ -56,6 +56,7 @@ _ADMIN_MENU = [
     ("samples", "cmd.samples"),
     ("forget", "cmd.forget"),
     ("scan", "cmd.scan"),
+    ("scanuser", "cmd.scanuser"),
     ("config", "cmd.config"),
     ("sync", "cmd.sync"),
     ("quips", "cmd.quips"),
