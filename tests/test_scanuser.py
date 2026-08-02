@@ -64,8 +64,11 @@ async def test_informa_de_lo_que_el_bot_sabe(tmp_path):
     await scanuser_cmd.cmd_scanuser(upd, ctx)
     salida = _texto(msg)
     assert "Williams" in salida and "777" in salida
-    assert "Confianza" in salida, "no muestra el trust"
-    assert "mensajes" in salida, "no dice cuánto ha escrito"
+    assert "Cuánto me fío" in salida, "no muestra el trust"
+    assert "sobre 100" in salida, "no muestra la cifra de confianza"
+    assert "mensajes en total" in salida, "no dice cuánto ha escrito"
+    assert "últimos 30 días" in salida, "no dice la actividad reciente"
+    assert "La cuenta" in salida, "no dice cuándo se creó la cuenta"
 
 
 @pytest.mark.asyncio
