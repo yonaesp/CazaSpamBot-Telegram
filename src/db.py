@@ -144,7 +144,9 @@ CREATE TABLE IF NOT EXISTS chat_settings (
     verification_kick_after_reminder_hours INTEGER NOT NULL DEFAULT 6,
     verification_reminders_enabled INTEGER NOT NULL DEFAULT 1,  -- enviar recordatorio a los normales
     verification_kick_normal      INTEGER NOT NULL DEFAULT 1,   -- 1=kick al no verificar, 0=quedan muteados
-    verification_review_suspicious INTEGER NOT NULL DEFAULT 1,  -- 1=en vez de verificar en grupo, aviso privado con botones
+    -- OFF por defecto: quien monte el bot por primera vez no debe encontrarse
+    -- el privado lleno de avisos el primer dia. Se enciende desde /config.
+    verification_review_suspicious INTEGER NOT NULL DEFAULT 0,  -- 1=en vez de verificar en grupo, aviso privado con botones
     cleanservice                  INTEGER NOT NULL DEFAULT 1,
     topweekly_enabled             INTEGER NOT NULL DEFAULT 0,
     -- NULL = hereda de PUBLIC_QUIP_ENABLED (.env). Ver quips_on() en quips.py.
@@ -339,7 +341,7 @@ class DB:
                 # sospechosos apagada mientras las nuevas la tenian encendida, y a
                 # nadie se le dijo. Cambiarlo aqui solo afecta a chats futuros: las
                 # filas ya creadas conservan su valor, hay que subirlas a mano.
-                "ALTER TABLE chat_settings ADD COLUMN verification_review_suspicious INTEGER NOT NULL DEFAULT 1"
+                "ALTER TABLE chat_settings ADD COLUMN verification_review_suspicious INTEGER NOT NULL DEFAULT 0"
             )
         if "topweekly_enabled" not in cs_cols:
             self._conn.execute(
@@ -387,6 +389,12 @@ class DB:
         # después. Antes solo se guardaba en `pending_verifications`, así que con la
         # verificación desactivada (que es el defecto) la bienvenida se quedaba
         # huérfana en el grupo saludando a alguien ya expulsado.
+        cs_cols_nv = {r[1] for r in self._conn.execute("PRAGMA table_info(chat_settings)").fetchall()}
+        if "review_level" not in cs_cols_nv:
+            # NULL = el nivel mas callado ("alto"). Patron NULL = hereda: quien ya
+            # tuviera los avisos encendidos no cambia de comportamiento al azar.
+            self._conn.execute(
+                "ALTER TABLE chat_settings ADD COLUMN review_level TEXT DEFAULT NULL")
         if "welcome_msg_id" not in su_cols:
             self._conn.execute("ALTER TABLE seen_users ADD COLUMN welcome_msg_id INTEGER")
 
@@ -957,7 +965,7 @@ class DB:
             c.execute(
                 "INSERT OR IGNORE INTO chat_settings "
                 "(chat_id, updated_at, verification_enabled, verification_review_suspicious, welcome_enabled) "
-                "VALUES (?, ?, 0, 1, 0)",
+                "VALUES (?, ?, 0, 0, 0)",
                 (chat_id, time.time()),
             )
 
@@ -972,6 +980,7 @@ class DB:
             "verification_reminders_enabled", "verification_kick_normal",
             "verification_review_suspicious", "cleanservice",
             "topweekly_enabled", "quips_enabled", "money_guard", "allowed_scripts", "verified_ttl_s",
+            "review_level",
         }
         if field not in ALLOWED:
             raise ValueError(f"campo no permitido: {field}")

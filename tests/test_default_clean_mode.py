@@ -1,5 +1,11 @@
-"""Tests del modo LIMPIO por defecto: verificación/bienvenida OFF + revisión de
-sospechosos por privado ON, y el anti-ruido de la revisión (_is_review_worthy).
+"""Modo LIMPIO por defecto y sensibilidad de los avisos de sospechosos.
+
+El defecto de la revisión pasó de ON a OFF: avisando por cada usuario sin foto ni
+@username el privado se llenaba, y un aviso que se ignora es peor que no tenerlo.
+Quien monte el bot por primera vez no debe encontrarse eso el primer día.
+
+Y cuando se enciende, tiene tres niveles. El defecto es el más callado (`alto`):
+solo señales que de verdad huelen a spam.
 """
 from __future__ import annotations
 
@@ -14,11 +20,13 @@ from src import verification as v
 # --------------------------- default de la DB ---------------------------
 
 def test_ensure_chat_settings_default_limpio(tmp_db):
-    """Un chat nuevo nace con verificación OFF y revisión de sospechosos ON."""
+    """Un chat nuevo nace CALLADO: verificación OFF y avisos de sospechosos OFF."""
     tmp_db.ensure_chat_settings(-100777)
     s = tmp_db.get_chat_settings(-100777)
     assert s["verification_enabled"] == 0
-    assert s["verification_review_suspicious"] == 1
+    assert s["verification_review_suspicious"] == 0, (
+        "un admin que instala el bot se encontraría el privado lleno el primer día")
+    assert s["review_level"] is None, "NULL = el nivel más callado"
 
 
 # --------------------------- anti-ruido de la revisión ---------------------------
@@ -36,16 +44,41 @@ def test_review_worthy_nombre_no_latino_dispara():
     assert v.REASON_NON_LATIN_NAME in [code for code, _ in reasons]
 
 
-def test_review_worthy_sin_foto_dispara():
+def test_sin_foto_NO_avisa_en_el_nivel_alto():
+    """El ruido que motivó los niveles: muchísima gente legítima no tiene foto."""
     sig = SimpleNamespace(photo_count=0, account_age_days=500)
     worthy, _ = v._is_review_worthy(sig, username="ana", first_name="Ana", last_name=None)
+    assert worthy is False, "sigue avisando por no tener foto"
+
+
+def test_sin_foto_SI_avisa_en_el_nivel_medio():
+    """Quien quiera el comportamiento de antes lo tiene a un botón."""
+    sig = SimpleNamespace(photo_count=0, account_age_days=500)
+    worthy, _ = v._is_review_worthy(sig, username="ana", first_name="Ana",
+                                    last_name=None, nivel=v.NIVEL_MEDIO)
     assert worthy is True
 
 
-def test_review_worthy_dos_señales_debiles_dispara():
-    """Dos indicios débiles acumulados sí (sin username + sin first_name)."""
-    worthy, _ = v._is_review_worthy(None, username=None, first_name=None, last_name=None)
-    assert worthy is True
+def test_dos_señales_debiles_solo_avisan_de_medio_para_abajo():
+    for nivel, esperado in ((v.NIVEL_ALTO, False), (v.NIVEL_MEDIO, True), (v.NIVEL_BAJO, True)):
+        worthy, _ = v._is_review_worthy(None, username=None, first_name=None,
+                                        last_name=None, nivel=nivel)
+        assert worthy is esperado, f"nivel {nivel} debería dar {esperado}"
+
+
+def test_el_nombre_en_otro_alfabeto_avisa_en_todos_los_niveles():
+    """Eso sí es una señal de verdad, y es la que no se puede perder."""
+    for nivel in v.NIVELES:
+        worthy, _ = v._is_review_worthy(None, username="ivan", first_name="Иван",
+                                        last_name=None, nivel=nivel)
+        assert worthy is True, f"el nivel {nivel} se pierde un nombre no latino"
+
+
+def test_nivel_desconocido_cae_al_mas_callado():
+    """Un valor raro en la BD no puede acabar en el nivel más ruidoso."""
+    assert v.nivel_de({"review_level": "loquesea"}) == v.NIVEL_ALTO
+    assert v.nivel_de({"review_level": None}) == v.NIVEL_ALTO
+    assert v.nivel_de(None) == v.NIVEL_ALTO
 
 
 def test_decision_no_depende_del_idioma():
@@ -54,11 +87,12 @@ def test_decision_no_depende_del_idioma():
     las comparaba literalmente, así que traducirlas habría roto la lógica en silencio.
     """
     from src import i18n
-    sig = SimpleNamespace(photo_count=0, account_age_days=500)
     resultados = []
     for lg in ("es", "en"):
         i18n.set_lang(lg)
-        worthy, reasons = v._is_review_worthy(sig, username="ana", first_name="Ana")
+        # Nombre en otro alfabeto: dispara en todos los niveles, así el test mide lo
+        # que quiere medir (el idioma) y no el umbral.
+        worthy, reasons = v._is_review_worthy(None, username="ivan", first_name="Иван")
         resultados.append((worthy, sorted(code for code, _ in reasons)))
     i18n.set_lang("es")
     assert resultados[0] == resultados[1], "la decisión cambió con el idioma"
@@ -105,8 +139,10 @@ async def test_on_join_welcome_activo_saluda_en_grupo(tmp_db):
 
 @pytest.mark.asyncio
 async def test_on_join_limpio_sospechoso_avisa_por_privado(tmp_db):
-    """Default: perfil dudoso (nombre no-latino) → aviso privado al admin, nada en grupo."""
+    """Con los avisos ENCENDIDOS: perfil dudoso (nombre no latino) → aviso privado
+    al admin, nada en el grupo. Ya no es el defecto: hay que activarlo."""
     tmp_db.ensure_chat_settings(-100)
+    tmp_db.update_chat_setting(-100, "verification_review_suspicious", 1)
     ctx = _ctx(tmp_db, admin_notify=555)
     chat = SimpleNamespace(id=-100, title="G")
     user = SimpleNamespace(id=7, username="x", first_name="Иван", last_name=None, is_premium=False)

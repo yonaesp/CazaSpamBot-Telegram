@@ -64,7 +64,11 @@ nativa; se itera `banChatMember` sobre los chats donde el bot es admin.
 5. `photos_batch_upload` (≥3 fotos en ≤2min = identidad robada; bypass si cuenta >1 año)
 6. `lols.bot` lookup → ban (review humano si trust≥90)
 7. `cas` lookup → ban si offenses≥2 (review si =1 o trust≥90)
-8. `verification.on_join` — **default LIMPIO**: verificación/bienvenida OFF + revisión de sospechosos por privado ON. Todo por chat vía `/config`.
+8. `verification.on_join` — **default LIMPIO Y CALLADO**: verificación, bienvenida y **avisos de sospechosos, los tres OFF**. Los avisos estaban ON y llenaban el privado: saltaban por «sin foto de perfil», que cumple muchísima gente legítima, y un aviso que se acaba ignorando es peor que no tenerlo. Al encenderlos hay **tres niveles** (`chat_settings.review_level`, NULL = el más callado):
+   - `alto` (defecto): solo señales que de verdad huelen a spam (nombre o usuario en otro alfabeto, nombre con homoglifos, cuenta nueva sin ninguna foto).
+   - `medio`: el comportamiento anterior (una señal fuerte, o dos cualesquiera).
+   - `bajo`: cualquier indicio, incluido no tener @usuario.
+   Todo por chat vía `/config`.
 
 **`on_message`** — recolecta hits, `decide()`, luego trust score:
 - trust ≥70 → SKIP (excepto HARD_RULES: `cas_match`, `lols_match`, `federation_known_ban`, `reaction_farming`)

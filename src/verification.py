@@ -323,24 +323,65 @@ _STRONG_SUSP_REASONS = {
     REASON_NON_LATIN_NAME, REASON_NON_LATIN_USERNAME, REASON_NO_PHOTO, REASON_RECENT_ACCOUNT,
 }
 
+# Señales que de verdad correlacionan con spam, no con «usuario discreto». Muchísima
+# gente legítima no tiene foto ni @username, así que esas DOS no entran aquí: en el
+# nivel alto avisar por ellas convierte el aviso en ruido y se acaba ignorando, que
+# es peor que no tenerlo. Lo que sí es raro es el nombre en otro alfabeto, el nombre
+# decorativo (homoglifos) o una cuenta recién creada sin ninguna foto.
+_ALARMANTES = {
+    REASON_NON_LATIN_NAME, REASON_NON_LATIN_USERNAME, REASON_DECORATIVE,
+    REASON_NON_LATIN_FIELD, REASON_HAN_DOMINANT, REASON_NO_PHOTO_NEW,
+}
+
+# Niveles de aviso. El defecto es el más callado: quien monte el bot por primera vez
+# no debe encontrarse el privado lleno el primer día.
+NIVEL_ALTO = "alto"      # solo señales alarmantes de verdad
+NIVEL_MEDIO = "medio"    # una señal fuerte, o dos cualesquiera
+NIVEL_BAJO = "bajo"      # cualquier indicio
+NIVELES = (NIVEL_ALTO, NIVEL_MEDIO, NIVEL_BAJO)
+
+
+def nivel_de(settings) -> str:
+    """Nivel de aviso de este chat. NULL = el más callado."""
+    try:
+        v = settings["review_level"] if settings is not None else None
+    except (KeyError, IndexError, TypeError):
+        return NIVEL_ALTO
+    return v if v in NIVELES else NIVEL_ALTO
+
 
 def _is_review_worthy(
     sig: Optional[user_signals.UserSignals],
     username: Optional[str],
     first_name: Optional[str],
     last_name: Optional[str] = None,
+    nivel: str = NIVEL_ALTO,
 ) -> tuple[bool, list[str]]:
-    """¿Merece un aviso privado de revisión? Más estricto que _is_suspicious_profile.
+    """¿Merece un aviso privado de revisión? Depende del NIVEL elegido en el chat.
 
-    En modo revisión (default), avisar por CADA usuario sin @username sería ruido
-    (muchos legítimos no lo tienen). Solo avisamos si hay una señal fuerte (nombre
-    en otro alfabeto, sin foto, cuenta reciente con foto) o al menos DOS señales
-    acumuladas. Un único indicio débil (p.ej. "sin username") no dispara aviso.
+    - `alto` (defecto): solo señales alarmantes de verdad. Nombre o usuario en otro
+      alfabeto, nombre decorativo con homoglifos, o cuenta recién creada sin foto.
+    - `medio`: el comportamiento anterior. Una señal fuerte, o dos cualesquiera.
+    - `bajo`: cualquier indicio, por débil que sea.
+
+    El nivel existe porque en `medio` bastaba con «sin foto de perfil» para avisar, y
+    eso lo cumple muchísima gente legítima: el privado se llenaba y el aviso acababa
+    ignorándose, que es peor que no tenerlo.
     """
     suspicious, reasons = _is_suspicious_profile(sig, username, first_name, last_name)
     if not suspicious:
         return (False, [])
-    strong = [code for code, _ in reasons if code in _STRONG_SUSP_REASONS]
+    codigos = [code for code, _ in reasons]
+
+    if nivel == NIVEL_BAJO:
+        return (True, reasons)
+
+    if nivel == NIVEL_ALTO:
+        # Solo lo que de verdad huele a spam. «Sin foto» y «sin @username» sueltas
+        # NO bastan: las cumple muchísima gente legítima y llenaban el privado.
+        return (any(c in _ALARMANTES for c in codigos), reasons)
+
+    strong = [c for c in codigos if c in _STRONG_SUSP_REASONS]
     if strong or len(reasons) >= 2:
         return (True, reasons)
     return (False, reasons)
@@ -740,7 +781,9 @@ async def on_join(
             except Exception as exc:
                 log.debug("user_signals fetch user=%s exc: %s", user.id, exc)
     suspicious, susp_reasons = _is_suspicious_profile(sig, user.username, user.first_name, user.last_name)
-    review_worthy, review_reasons = _is_review_worthy(sig, user.username, user.first_name, user.last_name)
+    review_worthy, review_reasons = _is_review_worthy(
+        sig, user.username, user.first_name, user.last_name,
+        nivel=nivel_de(settings))
 
     # MODO REVISIÓN: perfil claramente dudoso + review activo → aviso privado al admin
     # con Permitir/Banear (sin mute ni botón en el grupo); entra permitido por defecto.

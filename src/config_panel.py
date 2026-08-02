@@ -61,6 +61,7 @@ _WELCOME_TTL_PRESETS = [0, 300, 900, 3600]
 _WARN_LIMITS = [1, 3, 5, 10]
 _WARN_ACTIONS = ("ban", "kick", "mute")
 # Rigor de los detectores de dinero/trabajo (commercial_ad, investment_scam).
+_REVIEW_LEVELS = ("alto", "medio", "bajo")
 _MONEY_MODES = ("normal", "soft", "off")
 
 
@@ -403,7 +404,9 @@ def build_panel_keyboard(
         [InlineKeyboardButton(t("cfg.b.verif", state=_onoff(_b(s, "verification_enabled"))),
                               callback_data=f"{PREFIX}:tog:verification_enabled:{cid}")],
         [InlineKeyboardButton(t("cfg.b.review", state=_onoff(_b(s, "verification_review_suspicious"))),
-                              callback_data=f"{PREFIX}:tog:verification_review_suspicious:{cid}")],
+                              callback_data=f"{PREFIX}:tog:verification_review_suspicious:{cid}"),
+         InlineKeyboardButton(t("cfg.b.rvl", mode=t(f"cfg.rvl.{_review_level(s)}")),
+                              callback_data=f"{PREFIX}:rvl:{cid}")],
         [InlineKeyboardButton(t("cfg.b.reminders", state=_onoff(_b(s, "verification_reminders_enabled"))),
                               callback_data=f"{PREFIX}:tog:verification_reminders_enabled:{cid}")],
         [InlineKeyboardButton(t("cfg.b.action", action=accion),
@@ -567,6 +570,29 @@ def build_warns_keyboard(chat_id: int, s) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
         limits, actions,
         [InlineKeyboardButton(t("cfg.b.back"), callback_data=f"{PREFIX}:open:{cid}")],
+    ])
+
+
+def _review_level(s) -> str:
+    """Nivel de aviso de sospechosos. NULL = el más callado."""
+    try:
+        v = (s["review_level"] or "alto").lower()
+    except (KeyError, IndexError, TypeError):
+        return "alto"
+    return v if v in _REVIEW_LEVELS else "alto"
+
+
+def build_review_level_keyboard(chat_id: int, s) -> InlineKeyboardMarkup:
+    """Submenú de sensibilidad de los avisos de sospechosos: 3 niveles + volver."""
+    actual = _review_level(s)
+    fila = [
+        InlineKeyboardButton(("✅ " if n == actual else "") + t(f"cfg.rvl.{n}"),
+                             callback_data=f"{PREFIX}:rvlset:{n}:{chat_id}")
+        for n in _REVIEW_LEVELS
+    ]
+    return InlineKeyboardMarkup([
+        fila,
+        [InlineKeyboardButton(t("cfg.b.back"), callback_data=f"{PREFIX}:open:{chat_id}")],
     ])
 
 
@@ -1389,6 +1415,31 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             return
         await q.answer()
         await _show_money(q.edit_message_text, db, cid)
+        return
+
+    if action == "rvl":
+        cid = _cid(2)
+        if cid is None:
+            await q.answer(t("cfg.invalid_chat"))
+            return
+        db.ensure_chat_settings(cid)
+        st = db.get_chat_settings(cid)
+        await q.edit_message_text(t("cfg.rvl.title"), parse_mode="HTML",
+                                  reply_markup=build_review_level_keyboard(cid, st))
+        return
+
+    if action == "rvlset":
+        nivel = parts[2] if len(parts) > 2 else ""
+        cid = _cid(3)
+        if cid is None or nivel not in _REVIEW_LEVELS:
+            await q.answer(t("cfg.invalid_opt"))
+            return
+        db.ensure_chat_settings(cid)
+        n = settings_sync.apply_setting(db, cid, "review_level", nivel)
+        await q.answer(f"✅ {t('cfg.rvl.' + nivel)}" + (t("cfg.dot_n", n=n) if n > 1 else ""))
+        st = db.get_chat_settings(cid)
+        await q.edit_message_text(t("cfg.rvl.title"), parse_mode="HTML",
+                                  reply_markup=build_review_level_keyboard(cid, st))
         return
 
     if action == "mgset":
