@@ -15,7 +15,6 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from src import admin
-from src.db import DB
 
 
 def _ctx(notifier_ok: bool | None):
