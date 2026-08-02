@@ -225,6 +225,17 @@ def main() -> int:
     log.info("CazaSpamBot arrancando en modo=%s", cfg.mode)
 
     db = DB(cfg.db_path)
+    # El modo elegido con /shadow MANDA sobre el .env. Antes solo se cambiaba en
+    # memoria: pasabas a activo, reiniciabas (que es el flujo normal para recargar
+    # código) y el bot volvía a shadow SIN DECIR NADA, o sea sin moderar nada
+    # mientras tú creías que sí. Patrón NULL = hereda: si nunca se tocó /shadow,
+    # el .env sigue mandando.
+    _pref_shadow = db.get_pref("mode_shadow")
+    if _pref_shadow is not None:
+        _modo = "shadow" if _pref_shadow else "active"
+        if _modo != cfg.mode:
+            log.warning("Modo %s tomado de /shadow (el .env decía %s)", _modo, cfg.mode)
+        object.__setattr__(cfg, "mode", _modo)
 
     app = (
         Application.builder()

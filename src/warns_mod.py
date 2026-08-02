@@ -20,6 +20,7 @@ from telegram.error import TelegramError
 from telegram.ext import ContextTypes
 
 from .config import Config
+from . import settings_sync
 from .db import DB
 from .i18n import t
 from .federation import federate_ban
@@ -323,7 +324,10 @@ async def cmd_warnlimit(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         await update.effective_message.reply_text(t("warnlimit.usage"))
         return
     n = max(1, min(20, int(context.args[0])))
-    db.update_chat_setting(chat_id, "warns_limit", n)
+    # Vía settings_sync, no `db.update_chat_setting` directo: con /sync ON el
+    # panel propaga a todos los grupos y el comando no lo hacía, así que el MISMO
+    # ajuste acababa en sitios distintos según por dónde lo tocaras.
+    settings_sync.apply_setting(db, chat_id, "warns_limit", n)
     await update.effective_message.reply_text(t("warnlimit.set", n=n))
 
 
@@ -340,5 +344,8 @@ async def cmd_warnaction(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     if action not in ("ban", "kick", "mute"):
         await update.effective_message.reply_text(t("warnaction.usage"))
         return
-    db.update_chat_setting(chat_id, "warns_action", action)
+    # Vía settings_sync, no `db.update_chat_setting` directo: con /sync ON el
+    # panel propaga a todos los grupos y el comando no lo hacía, así que el MISMO
+    # ajuste acababa en sitios distintos según por dónde lo tocaras.
+    settings_sync.apply_setting(db, chat_id, "warns_action", action)
     await update.effective_message.reply_text(t("warnaction.set", action=action))

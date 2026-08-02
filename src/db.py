@@ -136,6 +136,8 @@ CREATE TABLE IF NOT EXISTS chat_settings (
     -- llega aviso privado al admin (Permitir/Banear) cuando entra un perfil dudoso.
     -- Todo ajustable por chat con /config o /verificacion.
     verification_enabled          INTEGER NOT NULL DEFAULT 0,
+    -- SIN USO: no la lee nadie. La sustituyo verification_suspicious_kick_minutes.
+    -- Se conserva para no romper instalaciones; no añadir logica nueva sobre ella.
     verification_suspicious_kick_h INTEGER NOT NULL DEFAULT 12,
     verification_suspicious_kick_minutes INTEGER NOT NULL DEFAULT 30,
     verification_reminder_hours   INTEGER NOT NULL DEFAULT 3,
@@ -332,7 +334,12 @@ class DB:
             )
         if "verification_review_suspicious" not in cs_cols:
             self._conn.execute(
-                "ALTER TABLE chat_settings ADD COLUMN verification_review_suspicious INTEGER NOT NULL DEFAULT 0"
+                # DEFAULT 1 para que coincida con el esquema. Estaba en 0, asi que las
+                # instalaciones que ACTUALIZARON se quedaron con la revision de
+                # sospechosos apagada mientras las nuevas la tenian encendida, y a
+                # nadie se le dijo. Cambiarlo aqui solo afecta a chats futuros: las
+                # filas ya creadas conservan su valor, hay que subirlas a mano.
+                "ALTER TABLE chat_settings ADD COLUMN verification_review_suspicious INTEGER NOT NULL DEFAULT 1"
             )
         if "topweekly_enabled" not in cs_cols:
             self._conn.execute(

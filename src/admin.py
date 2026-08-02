@@ -9,7 +9,7 @@ from telegram.ext import ContextTypes
 
 from telegram.error import TelegramError
 
-from . import chat_picker, learning, notify_prefs, permissions, quips, trust as _trust
+from . import chat_picker, learning, notify_prefs, permissions, quips, settings_sync, trust as _trust
 from .config import Config
 from .db import DB
 from .federation import federate_ban, unfederate_ban
@@ -452,9 +452,14 @@ async def cmd_shadow(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         await update.effective_message.reply_text(t("shadow.usage"))
         return
     cfg: Config = context.bot_data["cfg"]
+    db: DB = context.bot_data["db"]
     new_mode = "shadow" if context.args[0] == "on" else "active"
     # Hot-swap del Config (no es frozen idealmente, pero replicamos atributo)
     object.__setattr__(cfg, "mode", new_mode)
+    # Y PERSISTIR: sin esto el cambio vivía solo en memoria y el siguiente reinicio
+    # devolvía el bot al modo del .env sin avisar. Alguien que pasara a activo y
+    # reiniciara se quedaba sin moderación creyendo que la tenía.
+    db.set_pref("mode_shadow", new_mode == "shadow")
     await update.effective_message.reply_text(t("shadow.changed", mode=new_mode), parse_mode="HTML")
     log.warning("Modo cambiado en runtime a %s por admin %s", new_mode, update.effective_user.id)
 
@@ -988,10 +993,10 @@ async def cmd_topweekly(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         return
     val = context.args[0].lower()
     if val in ("on", "true", "yes", "1"):
-        db.update_chat_setting(chat_id, "topweekly_enabled", 1)
+        settings_sync.apply_setting(db, chat_id, "topweekly_enabled", 1)
         await update.effective_message.reply_text(t("topweekly.on"))
     elif val in ("off", "false", "no", "0"):
-        db.update_chat_setting(chat_id, "topweekly_enabled", 0)
+        settings_sync.apply_setting(db, chat_id, "topweekly_enabled", 0)
         await update.effective_message.reply_text(t("topweekly.off"))
     else:
         await update.effective_message.reply_text(t("topweekly.usage"))
@@ -1015,7 +1020,7 @@ async def on_topweekly_callback(update: Update, context: ContextTypes.DEFAULT_TY
     db.ensure_chat_settings(chat_id)
     s = db.get_chat_settings(chat_id)
     new_value = 0 if s["topweekly_enabled"] else 1
-    db.update_chat_setting(chat_id, "topweekly_enabled", new_value)
+    settings_sync.apply_setting(db, chat_id, "topweekly_enabled", new_value)
     await q.answer(t("topweekly.toast_on") if new_value else t("topweekly.toast_off"))
     try:
         await q.edit_message_reply_markup(reply_markup=_topweekly_keyboard(db))
