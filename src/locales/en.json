@@ -1038,5 +1038,6 @@
   "cfg.rvl.title": "🔔 <b>Suspicious user alerts</b>\n\nHow much a newcomer has to smell of spam before I ping you privately.\n\n<b>High</b> — only what really stands out: name or username in another script, name with look-alike characters, or a brand-new account with no photo at all.\n<b>Medium</b> — plus any single strong signal (no photo, recent account) or two signals together.\n<b>Low</b> — any hint at all, including having no @username.\n\n<i>Careful going lower: plenty of ordinary people have no photo and no @username, and if your DMs fill up you end up ignoring the alerts, which is worse than not having them.</i>",
   "cfg.rvl.alto": "High",
   "cfg.rvl.medio": "Medium",
-  "cfg.rvl.bajo": "Low"
+  "cfg.rvl.bajo": "Low",
+  "scan.was_welcome": "↪️ <i>That is a welcome message, I wrote it myself. Here is what I know about the user I greeted.</i>"
 }

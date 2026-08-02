@@ -148,6 +148,16 @@ async def cmd_scan(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         else:
             await msg.reply_text(t("scan.usage"), parse_mode="HTML")
         return
+    # ¿Es un mensaje de BIENVENIDA? Entonces lo que el admin quiere saber no es qué
+    # dice el saludo (lo escribió el propio bot, no dice nada), sino quién es el
+    # recién llegado. Se redirige al informe de usuario.
+    dueno = db.usuario_de_bienvenida(msg.chat_id, target.message_id)
+    if dueno is not None:
+        from . import scanuser_cmd
+        informe = await scanuser_cmd._componer(context, cfg, db, msg.chat_id, dueno)
+        await _entregar(context, msg, t("scan.was_welcome") + "\n\n" + informe, cfg)
+        return
+
     await _responder_scan(context, msg, target, cfg, db)
 
 

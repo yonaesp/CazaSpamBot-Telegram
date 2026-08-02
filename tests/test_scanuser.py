@@ -180,3 +180,102 @@ def test_el_comando_esta_registrado():
     main = Path("src/main.py").read_text()
     assert 'CommandHandler("scanuser"' in main, "el comando no está registrado"
     assert 'CommandHandler("analizarusuario"' in main, "falta el alias en español"
+
+
+# ------------------------- /scan sobre un mensaje de bienvenida -------------------
+
+@pytest.mark.asyncio
+async def test_scan_de_una_bienvenida_informa_del_recien_llegado(tmp_path):
+    """Escanear el TEXTO de la bienvenida no dice nada: lo escribió el propio bot.
+    Lo que el admin quiere saber es quién es el que acaba de entrar."""
+    from src import scan_cmd
+    from src.db import DB
+
+    db = DB(str(tmp_path / "t.db"))
+    db.upsert_bot_chat(-100100, "G", "supergroup", True, True, True)
+    db.record_message(-100100, 777, "pepe")
+    db.set_welcome_msg(-100100, 777, 4242)      # el mensaje 4242 es su bienvenida
+
+    bienvenida = MagicMock()
+    bienvenida.message_id = 4242
+    bienvenida.from_user = types.SimpleNamespace(id=999, is_bot=True, first_name="Bot")
+
+    msg = MagicMock()
+    msg.chat_id = -100100
+    msg.message_id = 77
+    msg.reply_to_message = bienvenida
+    msg.chat = types.SimpleNamespace(id=-100100, type="private", title="G")
+    msg.reply_text = AsyncMock()
+    upd = MagicMock()
+    upd.effective_message = msg
+    upd.effective_user = types.SimpleNamespace(id=1)
+    upd.effective_chat = types.SimpleNamespace(id=-100100, type="private")
+
+    ctx = MagicMock()
+    ctx.args = []
+    ctx.user_data = {}
+    ctx.bot.get_chat_member = AsyncMock(return_value=types.SimpleNamespace(
+        user=types.SimpleNamespace(id=777, username="pepe", first_name="Pepe", last_name=None)))
+    ctx.bot.send_message = AsyncMock()
+    ctx.bot_data = {
+        "cfg": types.SimpleNamespace(admin_user_id=1, allowed_scripts=["latin"],
+                                     non_latin_ratio_threshold=0.5, url_blocklist=[],
+                                     detect_external_mentions=False, detect_external_tg_links=False,
+                                     is_moderated=lambda _c: False, ban_score=100,
+                                     kick_score=70, mute_score=40, cas_enabled=False,
+                                     lols_enabled=False, cas_cache_ttl_seconds=3600,
+                                     admin_notify_chat_id=1),
+        "db": db, "reporter": None, "http": None,
+    }
+
+    await scan_cmd.cmd_scan(upd, ctx)
+    salida = re.sub(r"<[^>]+>", "", msg.reply_text.await_args.args[0])
+    assert "777" in salida, "no informó del usuario, sino del mensaje"
+    assert "Cuánto me fío" in salida, "no es el informe de usuario"
+    assert "bienvenida" in salida.lower(), "no explica por qué cambió de objetivo"
+
+
+@pytest.mark.asyncio
+async def test_scan_de_un_mensaje_normal_no_se_desvia(tmp_path):
+    """Contrapeso: solo se redirige si el mensaje ES una bienvenida registrada."""
+    from src import scan_cmd
+    from src.db import DB
+
+    db = DB(str(tmp_path / "t.db"))
+    db.upsert_bot_chat(-100100, "G", "supergroup", True, True, True)
+
+    objetivo = MagicMock()
+    objetivo.message_id = 555          # no es ninguna bienvenida
+    objetivo.text = "gana 500 USD por dia, escribime @quien"
+    objetivo.caption = None
+    for a in ("contact", "reply_markup", "external_reply", "quote", "forward_origin",
+              "forward_from_chat", "forward_from", "forward_sender_name", "via_bot",
+              "photo", "video", "document", "animation", "sticker", "voice",
+              "video_note", "audio", "entities", "caption_entities", "story"):
+        setattr(objetivo, a, None)
+
+    msg = MagicMock()
+    msg.chat_id = -100100
+    msg.message_id = 77
+    msg.reply_to_message = objetivo
+    msg.chat = types.SimpleNamespace(id=-100100, type="private", title="G")
+    msg.reply_text = AsyncMock()
+    upd = MagicMock()
+    upd.effective_message = msg
+    upd.effective_user = types.SimpleNamespace(id=1)
+    upd.effective_chat = types.SimpleNamespace(id=-100100, type="private")
+
+    ctx = MagicMock()
+    ctx.user_data = {}
+    ctx.bot_data = {
+        "cfg": types.SimpleNamespace(admin_user_id=1, allowed_scripts=["latin"],
+                                     non_latin_ratio_threshold=0.5, url_blocklist=[],
+                                     detect_external_mentions=False, detect_external_tg_links=False,
+                                     is_moderated=lambda _c: False, ban_score=100,
+                                     kick_score=70, mute_score=40, admin_notify_chat_id=1),
+        "db": db, "reporter": None,
+    }
+    await scan_cmd.cmd_scan(upd, ctx)
+    salida = re.sub(r"<[^>]+>", "", msg.reply_text.await_args.args[0])
+    assert "Resultado del scan" in salida, "se desvió con un mensaje normal"
+    assert "Cuánto me fío" not in salida

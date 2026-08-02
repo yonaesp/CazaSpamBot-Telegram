@@ -34,6 +34,7 @@ def _update(texto=None, chat_type="private", reply=None, user_id=1):
     msg.caption = None
     msg.reply_to_message = reply
     msg.chat_id = 99
+    msg.message_id = 500
     msg.chat = types.SimpleNamespace(type=chat_type, id=99)
     msg.reply_text = AsyncMock()
     # atributos que miran los detectores de estructura

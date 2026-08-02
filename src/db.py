@@ -634,6 +634,27 @@ class DB:
             ).fetchone()
         return int(fila["n"]) if fila else 0
 
+    def usuario_de_bienvenida(self, chat_id: int, msg_id: int) -> int | None:
+        """¿De quién es este mensaje de bienvenida? Devuelve su user_id o None.
+
+        Mira los dos sitios donde se guarda el id: `seen_users.welcome_msg_id`
+        (todos los casos, incluido el modo limpio) y `pending_verifications`
+        (mientras la verificación siga pendiente).
+        """
+        with self._cur() as c:
+            fila = c.execute(
+                "SELECT user_id FROM seen_users WHERE chat_id=? AND welcome_msg_id=?",
+                (chat_id, msg_id),
+            ).fetchone()
+            if fila:
+                return int(fila["user_id"])
+            fila = c.execute(
+                "SELECT user_id FROM pending_verifications "
+                "WHERE chat_id=? AND welcome_msg_id=?",
+                (chat_id, msg_id),
+            ).fetchone()
+        return int(fila["user_id"]) if fila else None
+
     def get_pref(self, key: str) -> bool | None:
         """Preferencia runtime: True/False si está guardada, None si no (usar default)."""
         with self._cur() as c:

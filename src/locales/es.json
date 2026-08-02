@@ -1038,5 +1038,6 @@
   "cfg.rvl.title": "🔔 <b>Avisos de usuarios sospechosos</b>\n\nCuánto tiene que oler a spam un recién llegado para que te avise por privado.\n\n<b>Alto</b> — solo lo que de verdad canta: nombre o usuario en otro alfabeto, nombre con letras trucadas, o cuenta recién creada y sin ninguna foto.\n<b>Medio</b> — además, cualquier señal fuerte suelta (sin foto, cuenta reciente) o dos señales juntas.\n<b>Bajo</b> — cualquier indicio, incluido no tener @usuario.\n\n<i>Ojo con bajar el nivel: no tener foto ni @usuario lo cumple muchísima gente normal, y si el privado se llena acabas ignorando los avisos, que es peor que no tenerlos.</i>",
   "cfg.rvl.alto": "Alto",
   "cfg.rvl.medio": "Medio",
-  "cfg.rvl.bajo": "Bajo"
+  "cfg.rvl.bajo": "Bajo",
+  "scan.was_welcome": "↪️ <i>Eso es un mensaje de bienvenida, lo escribí yo. Te enseño lo que sé del usuario al que saludé.</i>"
 }
