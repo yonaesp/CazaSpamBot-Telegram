@@ -25,7 +25,7 @@ anotado para no volver a proponerlo.
 
 Y esto ni siquiera estaba en la lista, pero se hizo:
 
-- **Bilingüe es/en** completo (`src/locales/`, 889 claves por idioma) con
+- **Bilingüe es/en** completo (`src/locales/`, 973 claves por idioma) con
   autodescubrimiento: soltar un `fr.json` basta.
 - **Panel visual `/config`** con todos los ajustes por chat, más sincronización
   a todos los grupos. Esto **sustituye al Web UI Flask** que proponía el item
@@ -184,4 +184,4 @@ Telegram ya restringe bastante los usernames.
 - **Soporte Postgres**: SQLite WAL sobra de largo para este volumen.
 - **Filtro de palabrotas**: antispam no es moderación de lenguaje.
 
-*Actualizado: 2026-07-19. 798 tests en verde, 20 detectores.*
+*Actualizado: 2026-08-02. 1018 tests en verde, 22 detectores.*

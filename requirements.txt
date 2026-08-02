@@ -4,7 +4,9 @@ python-telegram-bot[ext]==22.8
 # Async HTTP (CAS lookup + notificaciones)
 aiohttp==3.10.10
 
-# Telethon (MTProto client) — solo para el script scripts/analyze_members.py
+# Telethon (cliente MTProto). NO es solo para scripts: lo usan en runtime
+# reporter.py, user_signals.py, telethon_bridge.py y story_reader.py, o sea
+# reportes oficiales, bio/fotos de perfil, borrados y lectura de historias.
 telethon==1.44.0
 
 # Variables de entorno

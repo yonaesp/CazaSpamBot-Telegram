@@ -8,8 +8,8 @@
 | | Versión | Nota |
 |---|---|---|
 | Bot API publicada por Telegram | **10.2** (2026-07-14) | [changelog oficial](https://core.telegram.org/bots/api-changelog) |
-| Bot API que alcanza este bot | **7.10** | `python-telegram-bot==21.6` ([docs v21.6](https://docs.python-telegram-bot.org/en/v21.6/)) |
-| MTProto (Telethon) | `telethon==1.36.0` | capa TL con `personal_channel_id` disponible |
+| Bot API que alcanza este bot | **10.0** | `python-telegram-bot==22.8` ([docs v22.8](https://docs.python-telegram-bot.org/en/v22.8/)) |
+| MTProto (Telethon) | `telethon==1.44.0` | capa TL con `personal_channel_id` disponible |
 
 **Hay tres versiones mayores de distancia.** Todo lo que este documento marca como
 «Bot API 8/9/10» existe en la plataforma pero **no es invocable sin subir PTB**.
@@ -85,7 +85,7 @@ Qué significa para nosotros, siendo honestos sobre lo no probado:
    Lo que falta por comprobar es si @combot acepta órdenes de un bot (puede filtrarlo
    por su cuenta, es decisión suya, no de Telegram) y si basta con que el modo lo
    active nuestro lado. **Nadie lo ha probado en este proyecto.**
-2. No es alcanzable hoy de todas formas: PTB 21.6 se queda en Bot API 7.10.
+2. No es alcanzable hoy de todas formas: PTB 22.8 se queda en Bot API 10.0.
 3. Aunque funcionase, **no sustituiría al reporte MTProto**: `/spam` a Combot alimenta
    la lista de Combot, no a los moderadores de Telegram. Son cosas distintas (ver
    «Tres tipos de reporte»).
@@ -165,7 +165,7 @@ del constructor ([core.telegram.org/constructor/userFull](https://core.telegram.
 
 - Es una función de Telegram de **2024** y un campo **SEPARADO** de la bio:
   **un perfil con la bio vacía puede tener ahí un canal entero de spam.**
-- **Telethon 1.36 ya lo expone** (el pin actual del proyecto). No hace falta subir nada.
+- **Telethon 1.44 ya lo expone** (el pin actual del proyecto). No hace falta subir nada.
 - El **título** del canal no viene en `full_user`: hay que cruzar el id contra
   `full.chats`, que trae las entidades relacionadas. Ver `src/user_signals.py`.
 - **No existe en Bot API**, en ninguna versión. Es motivo suficiente por sí solo para
@@ -284,4 +284,4 @@ mirábamos). Al revisar:
 4. Cuando algo se caiga, **dejar escrito que era falso** en vez de borrarlo en
    silencio: el error corregido enseña más que el dato correcto.
 
-*Actualizado: 2026-07-19. Verificado contra Bot API 10.2, PTB 21.6 y Telethon 1.36.*
+*Actualizado: 2026-07-19. Verificado contra Bot API 10.2, PTB 22.8 y Telethon 1.44.*

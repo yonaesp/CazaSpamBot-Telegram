@@ -8,7 +8,7 @@
 [![python-telegram-bot](https://img.shields.io/badge/PTB-22.8-26A5E4?logo=telegram&logoColor=white)](https://python-telegram-bot.org/)
 [![Telethon](https://img.shields.io/badge/Telethon-1.44-blueviolet)](https://docs.telethon.dev/)
 [![Languages](https://img.shields.io/badge/languages-es%20%7C%20en%20%7C%20add%20yours-orange)](src/locales/README.md)
-[![Tests](https://img.shields.io/badge/tests-934%20passing-success)](#-tests)
+[![Tests](https://img.shields.io/badge/tests-1018%20passing-success)](#-tests)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 
 🌍 **English** · [**Español**](README.es.md)
@@ -24,7 +24,7 @@
 CazaSpamBot watches your Telegram groups and removes spam **before it becomes a nuisance**, with one obsession: **never ban a legitimate user**. It would rather let a borderline spam slip through than kick a real person.
 
 - 🔗 **Synchronized bans** — a ban in one group = a ban across **all** your groups (what other bots call *federation*). No native primitive: it iterates over every chat where it's an admin.
-- 🧠 **21 detectors** combined with a graduated trust system.
+- 🧠 **22 detectors** combined with a graduated trust system.
 - 🤫 **Silent moderation** — automatic bans don't clutter the chat.
 - 📚 **Active learning** — learns from your `/spam` and `/legal` calls (Naive Bayes + cosine similarity).
 - 🛰️ **Official reports** to Telegram (Native Antispam) over MTProto.
@@ -68,6 +68,7 @@ Everyone else  ──► clean mode by default (see below)
 | `personal_channel_spam` | Channel linked on the profile used as a spam shopfront |
 | `forward_first_msg` | Channel forward as the very first message |
 | `first_msg_media` · `inline_buttons` | Suspicious photo/buttons right out of the gate |
+| `story_share` | **A story from another channel** shared right after joining, or by someone who barely posts and whose source channel has a spammy name. **No Telethon needed** |
 | `photos_batch_upload` | 3+ profile photos uploaded within seconds |
 | `obvious_spam_profile` | Profile with multiple bot signals |
 | `reaction_farming` | Accounts that only drop likes without ever writing |
@@ -87,7 +88,10 @@ It also bans **spam posted "on behalf of a channel"** (`sender_chat` → `banCha
 
 Every user has a **trust level from 1 to 10** (rises with messages and time in the group, drops with warnings; whitelist = instant 10):
 
-- **Level 7-10** (veterans) → practically untouchable.
+- **Level 7-10** (veterans) → practically untouchable. The bot takes no action, but **no longer stays
+  silent**: if a rule fires on a veteran you get a **private** notice (never in the group) with
+  **Nothing / Warn / Ban** buttons and you decide. A trusted account can be stolen, or its owner may
+  have shared something without looking. Mute it from `/alerts`.
 - **Level 4-6** + something suspicious → the bot **asks you privately** with ✅ Legit / ❌ Spam buttons, and **learns** from your answer.
 - **Level 1-3** (newcomers) → normal moderation.
 
@@ -96,6 +100,33 @@ Every alert also includes a **spam level from 1 to 10** for the message, so it's
 Reinforcements: **NFKC + [confusable_homoglyphs](https://github.com/vhf/confusable_homoglyphs) (UTS#39)** so decorative names (Cherokee, mathematical, mixed scripts) aren't mistaken for spam. Bypass for old accounts with a photo.
 
 ---
+
+### 📖 Stories: the format bots cannot read
+
+Telegram hands a shared story to bots with **only two fields**: `chat` and `id`. No text, no image,
+no entities, **not even a forward marker**, so `forward_first_msg` does not fire either. To the bot
+it is an empty message, and that is how crypto ads slipped through with their invite link in plain
+sight for every human in the group.
+
+The bot covers it in **two layers**, and the first one works with no secondary account:
+
+| Layer | Needs Telethon | What it does |
+|---|---|---|
+| **Structure** (`story_share`) | No | Sharing ANOTHER channel's story right after joining, or coming from a spammy-named channel while barely posting |
+| **Content** (`story_reader.py`) | Yes | Fetches the real text over MTProto and runs the usual detectors on it, same thresholds |
+
+Two things worth knowing:
+
+- **It does not expose your account.** Reading a story with `stories.getStoriesByID` **does not count
+  as a view** (that is `incrementStoryViews`), so you never show up in the viewer list the poster sees.
+- **Stories expire in 24h** (6 to 48 depending on the account). Plenty for live moderation, since spam
+  arrives while the story is fresh. For after-the-fact analysis there is nothing left to read, and
+  `/scan` says so instead of faking a verdict.
+
+No single signal decides on its own: structure alone stays below the action threshold, and the channel
+name only counts if the user also barely participates. The name list
+(`config/blacklist/story_source.txt`) holds **pairs** ("crypto signals", "pump and dump"), never single
+words: plain "insider" matched "Windows Insider Program".
 
 ## 🎨 Configuration without touching code
 
@@ -177,8 +208,8 @@ Each folder has its own `README.md` explaining the format.
 
 | Component | Technology |
 |---|---|
-| Bot API (async polling) | `python-telegram-bot[ext]` 21.6 |
-| MTProto (bio, photos, personal channel, official reports) | `Telethon` 1.36 |
+| Bot API (async polling) | `python-telegram-bot[ext]` 22.8 |
+| MTProto (bio, photos, personal channel, official reports) | `Telethon` 1.44 |
 | Database | SQLite (WAL) |
 | Classifier | Naive Bayes + cosine (stdlib, no sklearn) |
 | Homoglyphs | `confusable-homoglyphs` (UTS#39) |
@@ -285,6 +316,12 @@ Only the **bot admin** (`ADMIN_USER_ID`) can run actions; **group admins** can q
 | `/forget <id>` | Delete a classifier sample |
 | `/shadow on/off` | Test mode (log only) / active |
 
+> **Heads-up about `/ban` and the reason.** When replying to a message, the bot **deletes that message
+> too**. And the **reason acts as consent**: with no reason the ban stays silent, like the automatic
+> ones; if you write one, the bot posts it in the group and **that notice stays permanently**, because
+> a hand-written reason is a moderation record, not a joke that expires. To auto-delete it, set the
+> seconds in `BAN_NOTICE_DELETE_AFTER_S` (default `0` = permanent).
+
 **English aliases:** the commands with Spanish names also answer to `/verification`, `/language`, `/alerts`, `/cleanup` and `/commands`. Telegram's `/` menu shows whichever name matches the active language, and the Spanish names keep working either way, so nothing breaks if you switch languages mid-flight.
 
 Group members can report with **`@admin`** (reply to a message); the bot notifies the admin and, if it acts, thanks the reporter.
@@ -294,7 +331,7 @@ Group members can report with **`@admin`** (reply to a message); the bot notifie
 ## 🧪 Tests
 
 ```bash
-.venv/bin/python -m pytest tests/ -q     # 798 tests
+.venv/bin/python -m pytest tests/ -q     # 1018 tests
 ```
 
 Every detector has **positive and negative** test cases (emphasis on anti-false-positives). Philosophy: *a false positive is worse than a false negative.*
@@ -327,7 +364,7 @@ config/
 ├── welcomes/            # editable greetings (generic + per group)
 └── blacklist/           # editable anti-spam words/regex
 docs/                    # ARCHITECTURE, ROADMAP, ...
-tests/                   # 798 tests
+tests/                   # 1018 tests
 ```
 
 ---

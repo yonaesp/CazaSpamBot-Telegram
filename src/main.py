@@ -300,7 +300,10 @@ def main() -> int:
     app.add_handler(CommandHandler("sync", config_panel.cmd_sync))
     app.add_handler(CommandHandler("sincronizar", config_panel.cmd_sync))  # alias
     app.add_handler(CommandHandler("limpieza", group_clean.cmd_limpieza))
-    app.add_handler(CommandHandler("grouplean", group_clean.cmd_limpieza))  # alias
+    app.add_handler(CommandHandler("groupclean", group_clean.cmd_limpieza))  # alias en inglés
+    # "grouplean" era una errata de "groupclean". Se mantiene por si alguien la
+    # tenía en un guion: quitarla solo rompería, y no cuesta nada dejarla.
+    app.add_handler(CommandHandler("grouplean", group_clean.cmd_limpieza))
     app.add_handler(CommandHandler("cleanup", group_clean.cmd_limpieza))  # alias en inglés
     app.add_handler(CommandHandler("idioma", lang_cmd.cmd_idioma))
     app.add_handler(CommandHandler("language", lang_cmd.cmd_idioma))  # alias

@@ -8,7 +8,7 @@
 [![python-telegram-bot](https://img.shields.io/badge/PTB-22.8-26A5E4?logo=telegram&logoColor=white)](https://python-telegram-bot.org/)
 [![Telethon](https://img.shields.io/badge/Telethon-1.44-blueviolet)](https://docs.telethon.dev/)
 [![Idiomas](https://img.shields.io/badge/idiomas-es%20%7C%20en%20%7C%20a%C3%B1ade%20el%20tuyo-orange)](src/locales/README.md)
-[![Tests](https://img.shields.io/badge/tests-934%20passing-success)](#-tests)
+[![Tests](https://img.shields.io/badge/tests-1018%20passing-success)](#-tests)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 
 🌍 [**English**](README.md) · **Español**
@@ -24,7 +24,7 @@
 CazaSpamBot vigila tus grupos de Telegram y elimina el spam **antes de que moleste**, con una obsesión: **nunca banear a un usuario legítimo**. Prefiere dejar pasar un spam dudoso que expulsar a una persona real.
 
 - 🔗 **Bans sincronizados** — un ban en un grupo = ban en **todos** tus grupos (lo que otros bots llaman *federación*). Sin primitiva nativa: itera sobre los chats donde es admin.
-- 🧠 **21 detectores** combinados con un sistema de confianza graduado.
+- 🧠 **22 detectores** combinados con un sistema de confianza graduado.
 - 🤫 **Moderación silenciosa** — los bans automáticos no ensucian el chat.
 - 📚 **Aprendizaje activo** — aprende de tus `/spam` y `/legal` (Naive Bayes + similitud coseno).
 - 🛰️ **Reportes oficiales** a Telegram (Native Antispam) vía MTProto.
@@ -68,6 +68,7 @@ El resto  ──► modo limpio por defecto (ver más abajo)
 | `personal_channel_spam` | Canal enlazado en el perfil usado como escaparate de spam |
 | `forward_first_msg` | Forward de canal en el primer mensaje |
 | `first_msg_media` · `inline_buttons` | Foto/botones sospechosos al empezar |
+| `story_share` | **Historia (story) de otro canal** compartida nada más entrar, o por alguien que apenas escribe y viene de un canal con nombre de spam. **No necesita Telethon** |
 | `photos_batch_upload` | 3+ fotos de perfil subidas en segundos |
 | `obvious_spam_profile` | Perfil con múltiples señales de bot |
 | `reaction_farming` | Cuentas que solo dan likes sin escribir |
@@ -87,7 +88,10 @@ También banea el **spam publicado "en nombre de un canal"** (`sender_chat` → 
 
 Cada usuario tiene un **nivel de confianza del 1 al 10** (sube con mensajes y antigüedad en el grupo, baja con warns; whitelist = 10 directo):
 
-- **Nivel 7-10** (veteranos) → prácticamente intocables.
+- **Nivel 7-10** (veteranos) → prácticamente intocables. El bot no actúa, pero **ya no se calla**:
+  si a un veterano le salta una regla, te llega un aviso **por privado** (nunca al grupo) con botones
+  **Nada / Avisar / Banear** y decides tú. Una cuenta de confianza puede estar robada, o su dueño
+  puede haber compartido algo sin mirarlo. Se silencia desde `/alertas`.
 - **Nivel 4-6** + algo sospechoso → el bot **pregunta al admin por privado** con botones ✅ Legítimo / ❌ Spam, y **aprende** de la respuesta.
 - **Nivel 1-3** (nuevos) → moderación normal.
 
@@ -96,6 +100,34 @@ Cada alerta incluye también un **nivel de spam 1-10** del mensaje, para que se 
 Refuerzos: **NFKC + [confusable_homoglyphs](https://github.com/vhf/confusable_homoglyphs) (UTS#39)** para no confundir nombres decorativos (Cherokee, matemáticos, mezclas) con spam. Bypass para cuentas antiguas con foto.
 
 ---
+
+### 📖 Historias (stories): el formato que los bots no pueden leer
+
+Telegram entrega a los bots una historia compartida con **solo dos campos**: `chat` e `id`.
+Ni texto, ni imagen, ni entidades, **ni siquiera marca de reenvío**, así que `forward_first_msg`
+tampoco salta. Para el bot es un mensaje vacío, y por ahí se colaba publicidad con su enlace
+de invitación bien visible para cualquier humano del grupo.
+
+El bot lo cubre en **dos capas**, y la primera funciona sin cuenta secundaria:
+
+| Capa | Necesita Telethon | Qué hace |
+|---|---|---|
+| **Estructura** (`story_share`) | No | Compartir la historia de OTRO canal nada más entrar, o viniendo de un canal con nombre de spam siendo alguien que apenas escribe |
+| **Contenido** (`story_reader.py`) | Sí | Pide el texto real por MTProto y lo pasa por los detectores de siempre, con los mismos umbrales |
+
+Dos cosas que conviene saber:
+
+- **No delata a tu cuenta.** Leer una historia con `stories.getStoriesByID` **no cuenta como
+  visualización** (eso es `incrementStoryViews`), así que no apareces en la lista de espectadores
+  que ve quien la publicó.
+- **Caducan en 24 h** (entre 6 y 48 según la cuenta). Para moderar en vivo sobra, porque el spam
+  llega con la historia recién puesta. Para analizar a posteriori un mensaje viejo ya no hay nada
+  que leer, y `/scan` te lo dice en vez de fingir un veredicto.
+
+Ninguna señal decide sola: la estructura por sí misma no llega al umbral de acción, y el nombre
+del canal solo pesa si además el usuario apenas participa. La lista de nombres
+(`config/blacklist/story_source.txt`) es de **parejas** («crypto signals», «pump and dump»), nunca
+palabras sueltas: «insider» a secas casaba con «Windows Insider Program».
 
 ## 🎨 Personalización sin tocar código
 
@@ -184,8 +216,8 @@ Todo por grupo, desde el propio Telegram (solo el admin del bot). `/verificacion
 
 | Componente | Tecnología |
 |---|---|
-| Bot API (async polling) | `python-telegram-bot[ext]` 21.6 |
-| MTProto (bio, fotos, canal personal, reportes oficiales) | `Telethon` 1.36 |
+| Bot API (async polling) | `python-telegram-bot[ext]` 22.8 |
+| MTProto (bio, fotos, canal personal, reportes oficiales) | `Telethon` 1.44 |
 | Base de datos | SQLite (WAL) |
 | Clasificador | Naive Bayes + coseno (stdlib, sin sklearn) |
 | Homóglifos | `confusable-homoglyphs` (UTS#39) |
@@ -297,6 +329,12 @@ Solo el **admin del bot** (`ADMIN_USER_ID`) puede ejecutar acciones; los **admin
 | `/forget <id>` | Borra una muestra del clasificador |
 | `/shadow on/off` | Modo prueba (solo loggea) / activo |
 
+> **Ojo con `/ban` y el motivo.** Si respondes a un mensaje, el bot **borra también ese mensaje**.
+> Y el **motivo actúa como consentimiento**: sin motivo el ban es silencioso, como los automáticos;
+> si escribes uno, el bot lo publica en el grupo y **ese aviso se queda de forma permanente**, porque
+> un motivo escrito a mano es un registro de moderación, no un chiste que caduca. Para que se
+> autoborre, pon los segundos en `BAN_NOTICE_DELETE_AFTER_S` (por defecto `0` = permanente).
+
 **Alias en inglés:** los comandos con nombre en español responden también a `/verification`, `/language`, `/alerts`, `/cleanup` y `/commands`. El menú «/» de Telegram muestra el nombre que corresponda al idioma activo, y los nombres en español siguen funcionando siempre, así que no se rompe nada si cambias de idioma sobre la marcha.
 
 Los miembros del grupo pueden reportar con **`@admin`** (reply a un mensaje); el bot avisa al admin y, si actúa, agradece al reporter.
@@ -306,7 +344,7 @@ Los miembros del grupo pueden reportar con **`@admin`** (reply a un mensaje); el
 ## 🧪 Tests
 
 ```bash
-.venv/bin/python -m pytest tests/ -q     # 798 tests
+.venv/bin/python -m pytest tests/ -q     # 1018 tests
 ```
 
 Cada detector tiene tests de casos positivos **y negativos** (énfasis en anti-falsos-positivos). Filosofía: *un falso positivo es peor que un falso negativo.*
@@ -339,7 +377,7 @@ config/
 ├── welcomes/            # saludos editables (genérico + por grupo)
 └── blacklist/           # palabras/regex antispam editables
 docs/                    # ARCHITECTURE, ROADMAP, ...
-tests/                   # 798 tests
+tests/                   # 1018 tests
 ```
 
 ---

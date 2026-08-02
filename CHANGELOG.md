@@ -4,6 +4,75 @@ Cambios relevantes de CazaSpamBot, lo más reciente arriba. Se anotan hitos, no
 cada commit: para el detalle está el historial de git. Sin números de versión
 porque el bot es un servicio en producción continua, no un paquete que se libera.
 
+## 2026-08 · Historias, avisos que llegan y bienvenidas que se van
+
+Dos días largos a raíz de un spam que se coló: publicidad de cripto compartida
+como **historia** (story). El bot no estaba roto, estaba ciego.
+
+### Historias (stories)
+
+- Telegram entrega a los bots una historia con **solo `chat` e `id`**: ni texto, ni
+  imagen, ni entidades, **ni marca de reenvío**, así que `forward_first_msg` tampoco
+  saltaba. Para el bot era un mensaje vacío.
+- Detector nuevo **`story_share`**, que **no necesita Telethon**: cubre compartir la
+  historia de otro canal nada más entrar, o venir de un canal con nombre de spam
+  siendo alguien que apenas participa.
+- **`story_reader.py`** recupera el texto real por MTProto (`stories.getStoriesByID`)
+  y lo pasa por los detectores de siempre, con los mismos umbrales. Comprobado en la
+  documentación oficial antes de usarlo: **leer una historia no cuenta como
+  visualización**, así que la cuenta secundaria no aparece en la lista de espectadores.
+- Las **entidades hay que traducirlas** de MTProto a la Bot API: los detectores de
+  enlaces no miran el texto plano, así que sin traducir se leía la publicidad pero se
+  perdía el enlace, que es la prueba.
+- Lista editable `config/blacklist/story_source.txt`, de **parejas** y nunca palabras
+  sueltas. Lección cara: «insider» a secas casaba con «Windows Insider Program» y
+  «pump» con «Heat Pump UK», o sea ban federado a usuarios legítimos en los grupos de
+  Windows y de domótica.
+- **Ninguna señal decide sola**, que es la doctrina que ya seguía `investment_scam`:
+  la estructura por sí misma no llega al umbral de acción.
+
+### Avisos que sí llegan
+
+- **Bug real**: un `/ban` en respuesta baneaba y federaba bien, pero el admin solo veía
+  desaparecer su comando. El acuse salía únicamente por el notificador externo, que es
+  **opcional**, así que sin configurar se perdía en silencio. Ahora hay respaldo por el
+  propio bot. Afectaba a 11 puntos de los comandos admin.
+- **`/ban` y `/unban` no registraban en `moderation_log`**: no salían en `/recent` ni
+  contaban en `/stats`.
+- Con **trust alto** el bot ya no se calla: si a un veterano le salta una regla, llega
+  aviso **por privado** con botones **Nada / Avisar / Banear**. Silenciable en `/alertas`.
+- El botón **Avisar** hace ya lo mismo que `/warn` (publica, borra y respeta el límite).
+  Al unificarlo apareció un `NameError` en `/warn`: con la acción por defecto (`ban`),
+  llegar al límite reventaba, el contador no se reseteaba y el grupo no veía nada.
+
+### Bienvenidas y `/ban`
+
+- La **bienvenida del baneado se borra**, venga el ban de donde venga: `/ban`, el combo
+  de `/spam`, una regla automática o un ban a mano desde la app de Telegram. Antes el id
+  del mensaje solo se guardaba con la verificación activa, y el modo limpio (sin
+  verificación) es el que viene por defecto.
+- **`/ban` con reply borra el mensaje** del spammer, y el **motivo actúa como
+  consentimiento**: sin motivo el ban sigue mudo; con motivo se publica y **se queda**
+  (`BAN_NOTICE_DELETE_AFTER_S=0`).
+
+### `/scan`
+
+- Ahora **espera el mensaje**: escribe `/scan` y reenvía después, no solo al revés.
+- Distingue **«no dispararía ninguna regla»** de **«no he podido leerlo»**, que es lo que
+  pasaba con las historias y llevaba a dar por limpio un mensaje que nadie había leído.
+- Explica **qué pasaría según quién comparta** el mensaje, y por qué
+  `forward_first_msg` no puede saltar en una historia.
+
+### Dependencias y arreglos
+
+- **PTB 21.6 → 22.8** y **Telethon 1.36 → 1.44** (Bot API 7.10 → 10.0).
+- Los **desplazamientos de las entidades** se calculaban en caracteres y Telegram los
+  manda en unidades UTF-16: cada emoji antes de un enlace desviaba el corte. Estaba mal
+  en 5 sitios; en las menciones dejaba un espacio pegado y no se encontraba al usuario.
+- Aviso cuando **otro bot admin** del grupo puede solapar funciones.
+- El HTML de los avisos al admin **se escapa**: el título de un canal lo elige el
+  spammer, y un `<b>` suelto hacía que Telegram rechazara el aviso entero.
+
 ## 2026-07 · Bilingüe y configurable desde el móvil
 
 Salto grande: el bot deja de ser una herramienta de un solo grupo en español y

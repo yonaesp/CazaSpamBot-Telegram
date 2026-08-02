@@ -29,8 +29,8 @@ cuando solo queda el código. No hace falta leerlo entero, salta a lo que toques
 
 Bot de moderación antispam para Telegram, multi-grupo y federado, en producción 24/7.
 
-- **14.684 líneas** en `src/` (59 módulos), **6.723** en `tests/` (57 ficheros, 798 tests).
-- **20 detectores**, tres capas de listas negras, clasificador propio, panel de ajustes
+- **16.436 líneas** en `src/` (62 módulos), **9.591** en `tests/` (74 ficheros, 1018 tests).
+- **22 detectores**, tres capas de listas negras, clasificador propio, panel de ajustes
   por chat, i18n con autodescubrimiento de idiomas.
 - Un solo proceso Python, una sola base SQLite, un contenedor Docker.
 
@@ -46,8 +46,8 @@ nadie se entere.
 | Pieza | Versión | Papel |
 |---|---|---|
 | Python | 3.11 | |
-| `python-telegram-bot[ext]` | 21.6 | Bot API async, polling |
-| `telethon` | 1.36.0 | MTProto, solo para lo que la Bot API no expone |
+| `python-telegram-bot[ext]` | 22.8 | Bot API async, polling |
+| `telethon` | 1.44.0 | MTProto, solo para lo que la Bot API no expone |
 | `aiohttp` | 3.10.10 | consultas a CAS y lols.bot, notificaciones externas |
 | `confusable-homoglyphs` | 3.3.1 | UTS#39, anti falso positivo en nombres decorativos |
 | `python-dotenv` | 1.0.1 | carga del `.env` |
@@ -243,7 +243,10 @@ mensaje
  │
  ├─ F. TRUST        (salvo HARD_RULES)
  │                    40-69 + ban/kick  → revisión al admin, return
- │                    >= 70             → SKIP total, return
+ │                    >= 70             → no se actúa, PERO aviso al admin por
+│                                        privado con botones Nada/Avisar/Banear
+│                                        (regla admin_trust_notice, silenciable
+│                                        desde /alertas como trust_skip)
  │                    40-69 + leve      → degrada (ban→mute, mute→noop)
  │                    < 40              → acción intacta
  │
@@ -453,7 +456,7 @@ nadie lo re-banease. Ante la duda no se toca y se reintenta al día siguiente.
 ## 8. i18n
 
 Todo el texto que ve el usuario vive en `src/locales/<código>.json`. Hoy `es.json` y
-`en.json` con **903 claves cada uno y paridad total** (0 claves exclusivas en ninguno de los dos).
+`en.json` con **973 claves cada uno y paridad total** (0 claves exclusivas en ninguno de los dos).
 
 ### Por qué JSON y no módulos `.py`
 
@@ -597,7 +600,7 @@ Prefijos registrados: `cfg:`, `pick:`, `verify:`, `prev:`, `flood:`, `abuse:`, `
 
 ## 10. Detección y listas
 
-### Los 20 detectores
+### Los 22 detectores
 
 Cada `check()` devuelve un `Hit(rule, score, reason, payload)`. Agrupados por lo que miran:
 
@@ -616,7 +619,7 @@ Cada `check()` devuelve un `Hit(rule, score, reason, payload)`. Agrupados por lo
 
 Más las reglas que no vienen de `detectors/`: `federation_known_ban` (999), `manual_admin_ban`
 (200), `flood_confirmed_bot` (200), `antiflood`, `warns_limit`, `via_bot_spam` y los timeouts de
-verificación. El inventario canónico son las 36 entradas de `rule_explain.KNOWN_RULES`, que se
+verificación. El inventario canónico son las 40 entradas de `rule_explain.KNOWN_RULES`, que se
 mantiene a mano y no derivado de los JSON a propósito: así añadir un detector obliga a pasar por
 ese fichero aunque el texto viva en otro sitio.
 
@@ -627,7 +630,7 @@ razón del detector, y si no un genérico.
 ### El perfil tiene más de un escaparate
 
 Durante mucho tiempo solo se leía `about`, la bio. El **canal personal**
-(`personal_channel_id`, novedad de Telegram 2024 disponible desde Telethon 1.36) es un campo
+(`personal_channel_id`, novedad de Telegram 2024 disponible desde Telethon 1.36, hoy 1.44) es un campo
 **separado**: un perfil con la bio vacía puede tener ahí un canal entero de spam. El caso que lo
 destapó fue una cuenta llamada "Matthew", nombre latino, sin foto, sin username y con la bio
 vacía (por eso pasó todos los filtros anteriores), que tenía un canal chino reclutando mulas de
@@ -837,7 +840,7 @@ capturaba como error genérico y **el ban se perdía en silencio, sin reintento*
 
 ## 13. Tests
 
-**798 tests en 4,4 segundos**, sin red ni base real. Cada detector tiene sus casos positivos y
+**1018 tests en 6,8 segundos**, sin red ni base real. Cada detector tiene sus casos positivos y
 negativos, con foco en los negativos: un falso positivo es peor que un falso negativo.
 
 Aparte de los tests de lógica, hay **tests meta que protegen invariantes del proyecto**. Cada uno
