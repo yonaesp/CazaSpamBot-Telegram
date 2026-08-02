@@ -346,6 +346,10 @@ async def on_private_message(update: Update, context: ContextTypes.DEFAULT_TYPE)
     from . import scan_cmd
     if await scan_cmd.handle_capture(update, context):
         return
+    # ¿Un /scanuser esperando de quién hablamos?
+    from . import scanuser_cmd
+    if await scanuser_cmd.handle_capture(update, context):
+        return
     await update.effective_message.reply_text(t("dm.hint"), parse_mode="HTML")
 
 

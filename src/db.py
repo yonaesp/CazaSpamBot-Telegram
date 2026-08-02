@@ -610,6 +610,22 @@ class DB:
             ).fetchall()
         return [(f["chat_id"], f["user_id"], f["welcome_msg_id"]) for f in filas]
 
+    def mensajes_ultimos_dias(self, chat_id: int, user_id: int, dias: int = 30) -> int:
+        """Cuántos mensajes ha escrito en los últimos N días en ese chat.
+
+        Sale de `weekly_msg_log`, que se purga a los 31 días: pedir más que eso
+        devolvería un número engañosamente bajo, así que se topa.
+        """
+        import time as _t
+        dias = min(dias, 31)
+        with self._cur() as c:
+            fila = c.execute(
+                "SELECT COUNT(*) AS n FROM weekly_msg_log "
+                "WHERE chat_id=? AND user_id=? AND ts >= ?",
+                (chat_id, user_id, _t.time() - dias * 86400),
+            ).fetchone()
+        return int(fila["n"]) if fila else 0
+
     def get_pref(self, key: str) -> bool | None:
         """Preferencia runtime: True/False si está guardada, None si no (usar default)."""
         with self._cur() as c:

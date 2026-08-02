@@ -159,9 +159,11 @@ async def cleanup_nightly_job(context: ContextTypes.DEFAULT_TYPE) -> None:
         ).rowcount
         stats["admin_reports_stale"] = n
 
-        # weekly_msg_log > 14 días (suficiente histórico para la semana actual)
+        # weekly_msg_log > 31 días. Eran 14 (bastaba para el top semanal), pero
+        # /scanuser informa de la actividad del ÚLTIMO MES y con 14 días habría que
+        # mentir o dar otra ventana. El coste es ridículo: ~180 filas en 14 días.
         n = c.execute(
-            "DELETE FROM weekly_msg_log WHERE ts < ?", (now - 14 * 86400,),
+            "DELETE FROM weekly_msg_log WHERE ts < ?", (now - 31 * 86400,),
         ).rowcount
         stats["weekly_msg_log"] = n
 

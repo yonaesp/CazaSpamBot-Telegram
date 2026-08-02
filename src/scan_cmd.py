@@ -172,6 +172,31 @@ async def handle_capture(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     return True
 
 
+async def _entregar(context, msg, texto: str, cfg) -> None:
+    """En grupo: borra el comando y contesta al PRIVADO del admin.
+
+    Un informe de «esto lo habría baneado» no pinta nada en el grupo, y además
+    obligaba al admin a borrarlo a mano después. Igual que hace /scanuser.
+    """
+    from telegram.error import TelegramError
+    en_grupo = bool(msg and msg.chat and msg.chat.type in ("group", "supergroup"))
+    if not en_grupo:
+        await msg.reply_text(texto, parse_mode="HTML", disable_web_page_preview=True)
+        return
+    try:
+        await msg.delete()
+    except TelegramError:
+        pass
+    destino = cfg.admin_notify_chat_id or cfg.admin_user_id
+    try:
+        await context.bot.send_message(chat_id=destino, text=texto, parse_mode="HTML",
+                                       disable_web_page_preview=True)
+    except TelegramError:
+        # Un informe que no llega no sirve de nada: mejor en el grupo que perderlo.
+        await context.bot.send_message(chat_id=msg.chat_id, text=texto,
+                                       parse_mode="HTML", disable_web_page_preview=True)
+
+
 async def _responder_scan(context, msg, target, cfg: Config, db: DB) -> None:
     """Corre los detectores sobre `target` y contesta el informe a `msg`.
 
@@ -262,4 +287,4 @@ async def _responder_scan(context, msg, target, cfg: Config, db: DB) -> None:
         lines.append("")
         lines.append(t("scan.story_blind"))
 
-    await msg.reply_text("\n".join(lines), parse_mode="HTML", disable_web_page_preview=True)
+    await _entregar(context, msg, "\n".join(lines), cfg)

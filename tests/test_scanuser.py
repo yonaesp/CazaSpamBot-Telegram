@@ -44,9 +44,11 @@ def _montar(tmp_path, con_telethon=False, baneado=False, whitelist=False):
     if con_telethon:
         reporter = MagicMock()
         reporter.get_client.return_value = MagicMock()
+    ctx.user_data = {}          # dict de verdad: un MagicMock rompe el `get`
     ctx.bot_data = {
         "cfg": types.SimpleNamespace(cas_enabled=False, lols_enabled=False,
-                                     cas_cache_ttl_seconds=3600),
+                                     cas_cache_ttl_seconds=3600,
+                                     admin_notify_chat_id=555, admin_user_id=1),
         "db": db, "reporter": reporter, "http": None,
     }
     return upd, ctx, db, msg
@@ -96,13 +98,69 @@ async def test_avisa_si_ya_esta_baneado(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_sin_objetivo_explica_como_usarlo(tmp_path):
-    upd, ctx, _db, msg = _montar(tmp_path)
+async def test_sin_objetivo_se_queda_esperando(tmp_path):
+    """El orden natural: escribes el comando y DESPUÉS le dices de quién hablas."""
+    upd, ctx, _db, _msg = _montar(tmp_path)
     upd.effective_message.reply_to_message = None
     upd.effective_message.entities = None
     ctx.args = []
     await scanuser_cmd.cmd_scanuser(upd, ctx)
-    assert "/scanuser" in _texto(msg)
+    assert "scanuser_await" in ctx.user_data, "no se quedó esperando"
+    enviado = ctx.bot.send_message.await_args.kwargs["text"]
+    assert "@usuario" in enviado or "@username" in enviado
+
+
+@pytest.mark.asyncio
+async def test_captura_por_reenvio(tmp_path):
+    """Le reenvías un mensaje suyo y saca el informe de su autor."""
+    upd, ctx, _db, msg = _montar(tmp_path)
+    ctx.user_data["scanuser_await"] = {"t": __import__("time").time(), "chat": -100100}
+    msg.forward_origin = types.SimpleNamespace(
+        sender_user=types.SimpleNamespace(id=777, username=None, first_name="W"))
+    msg.forward_from = None
+    consumido = await scanuser_cmd.handle_capture(upd, ctx)
+    assert consumido is True
+    assert "777" in _texto(msg)
+
+
+@pytest.mark.asyncio
+async def test_captura_por_username(tmp_path):
+    upd, ctx, db, msg = _montar(tmp_path)
+    db.remember_username("pepe", 777)
+    ctx.user_data["scanuser_await"] = {"t": __import__("time").time(), "chat": -100100}
+    msg.forward_origin = None
+    msg.forward_from = None
+    msg.text = "@pepe"
+    assert await scanuser_cmd.handle_capture(upd, ctx) is True
+    assert "777" in _texto(msg)
+
+
+@pytest.mark.asyncio
+async def test_la_espera_caduca(tmp_path):
+    upd, ctx, _db, msg = _montar(tmp_path)
+    ctx.user_data["scanuser_await"] = {
+        "t": __import__("time").time() - scanuser_cmd.ESPERA_TTL_S - 1, "chat": -100100}
+    msg.forward_origin = None
+    msg.forward_from = None
+    msg.text = "hola"
+    assert await scanuser_cmd.handle_capture(upd, ctx) is False
+
+
+@pytest.mark.asyncio
+async def test_en_grupo_borra_el_comando_y_responde_por_privado(tmp_path):
+    """Un informe con el nombre de alguien a quien se mira con lupa no pinta nada
+    en el grupo, y así el admin no tiene que borrarlo a mano después."""
+    upd, ctx, _db, msg = _montar(tmp_path)
+    msg.chat = types.SimpleNamespace(id=-100100, type="supergroup", title="G")
+    msg.delete = AsyncMock()
+    ctx.bot_data["cfg"] = types.SimpleNamespace(
+        cas_enabled=False, lols_enabled=False, cas_cache_ttl_seconds=3600,
+        admin_notify_chat_id=555, admin_user_id=1)
+    await scanuser_cmd.cmd_scanuser(upd, ctx)
+    assert msg.delete.await_count == 1, "no borró el comando del grupo"
+    destinos = [c.kwargs.get("chat_id") for c in ctx.bot.send_message.await_args_list]
+    assert 555 in destinos, f"no respondió por privado: {destinos}"
+    assert -100100 not in destinos, "publicó el informe en el grupo"
 
 
 @pytest.mark.asyncio
