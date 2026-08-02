@@ -666,8 +666,18 @@ async def cmd_ban(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     # Borrar el comando del admin (en grupo) ANTES de ejecutar el ban para
     # que el grupo no vea el "/ban @x razón" mientras se procesa
+    objetivo_msg = update.effective_message.reply_to_message if update.effective_message else None
     if is_group:
         await _delete_command_safely(update)
+        # Borrar TAMBIÉN el mensaje al que se respondió: banear al spammer y dejar
+        # su spam a la vista no tiene sentido. Solo con reply, claro: con /ban por
+        # @usuario no hay ningún mensaje concreto que borrar.
+        if objetivo_msg is not None and not cfg.shadow:
+            try:
+                await context.bot.delete_message(
+                    chat_id=update.effective_chat.id, message_id=objetivo_msg.message_id)
+            except TelegramError as exc:
+                log.debug("no se pudo borrar el mensaje baneado: %s", exc)
 
     results = await federate_ban(
         context.bot, db, user_id=user_id, reason=reason, rule="manual_admin_ban",
@@ -697,9 +707,23 @@ async def cmd_ban(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     else:
         await update.effective_message.reply_text(ack, parse_mode="HTML")
 
+    # Aviso público con el MOTIVO. Va aparte de los quips a propósito: los quips
+    # son la capa de humor, opaca por diseño y desactivada por defecto. Escribir un
+    # motivo a mano es otra cosa: es el admin decidiendo que el grupo lo sepa. Por
+    # eso el motivo actúa como consentimiento, y sin motivo el ban sigue mudo.
+    # Sin enlace al perfil (regla 6): nombre + id, para no dar visibilidad al spammer.
+    if is_group and not cfg.shadow and has_explicit_reason:
+        nombre = html.escape(first_name or username or str(user_id))
+        await _post_ban_quip_to_chats(
+            context, chats=[update.effective_chat.id],
+            text=t("admin.ban.public_notice", name=nombre, uid=user_id,
+                   reason=html.escape(reason)),
+            delete_after=cfg.ban_notice_delete_after_s,
+        )
+
     # Quip público SOLO en el chat donde se ejecutó /ban (no en todos los federados).
     # Si /ban se ejecuta desde DM con el bot → ban silencioso sin publicar en grupos.
-    if is_group and not cfg.shadow and quips.quips_on(db, update.effective_chat.id, cfg):
+    elif is_group and not cfg.shadow and quips.quips_on(db, update.effective_chat.id, cfg):
         quip = quips.pick(
             rule="manual_admin_ban", username=username, user_id=user_id,
             payload={"reason": reason}, first_name=first_name,

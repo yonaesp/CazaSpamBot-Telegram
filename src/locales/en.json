@@ -970,5 +970,6 @@
   "scan.act.mute": "24 h mute",
   "scan.act.delete": "delete the message",
   "scan.act.noop": "no action",
-  "rule.manual_admin_unban": "You lifted their ban yourself with /unban."
+  "rule.manual_admin_unban": "You lifted their ban yourself with /unban.",
+  "admin.ban.public_notice": "🔨 <b>{name}</b> (id: {uid}) has been banned.\n<b>Reason:</b> {reason}"
 }

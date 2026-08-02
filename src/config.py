@@ -91,6 +91,10 @@ class Config:
     # si quieres el quip público (sarcástico) en el grupo al banear.
     public_quip_enabled: bool = False
     public_quip_delete_after_s: int = 3600
+    # Cuánto dura el aviso público de un /ban CON motivo escrito a mano.
+    # 0 = permanente, que es el defecto: si el admin se molestó en escribir
+    # el motivo, es que quiere que quede constancia en el grupo.
+    ban_notice_delete_after_s: int = 0
     # Aunque actives el quip público, sigue siendo SOLO en bans manuales del admin.
     # Los bans automáticos de detectores (chino/bots/bio/etc.) son silenciosos.
     # True = también quip en auto-bans (requiere además PUBLIC_QUIP_ENABLED=true).
@@ -230,6 +234,7 @@ def load_config() -> Config:
         external_notify_chat_id=ext_chat,
         public_quip_enabled=_bool("PUBLIC_QUIP_ENABLED", False),
         public_quip_delete_after_s=_int("PUBLIC_QUIP_DELETE_AFTER_S", 3600),
+        ban_notice_delete_after_s=_int("BAN_NOTICE_DELETE_AFTER_S", 0),
         quip_on_auto_ban=_bool("QUIP_ON_AUTO_BAN", False),
         public_quip_batch_delete_after_s=_int("PUBLIC_QUIP_BATCH_DELETE_AFTER_S", 0),
         reporter_rate_per_hour=_int("REPORTER_RATE_PER_HOUR", 20),
