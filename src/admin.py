@@ -569,13 +569,40 @@ async def _cleanup_welcome_on_ban(context: ContextTypes.DEFAULT_TYPE, db: DB, us
 
 
 async def _notify_admin_ack(context: ContextTypes.DEFAULT_TYPE, text: str) -> None:
-    """Envía el ack técnico (resultado del ban/unban) al admin por DM (bot de notificaciones externo)."""
+    """Ack técnico al admin (resultado de /ban, /unban, /spam...). SIEMPRE debe llegar.
+
+    Antes salía ÚNICAMENTE por el notificador externo, que es OPCIONAL: sin
+    configurar, `send_text` devuelve False sin enviar nada y el admin se quedaba a
+    ciegas. Caso real: un `/ban` en respuesta a un mensaje baneó y federó
+    correctamente, pero desde fuera solo se vio desaparecer el comando. Con los
+    quips desactivados por defecto tampoco salía nada en el grupo, así que el
+    moderador no tenía forma de saber si había funcionado o si el bot estaba roto.
+
+    Ahora hay respaldo: si el notificador externo no está o falla, escribe el
+    propio bot por privado. Un comando de moderación sin respuesta es un fallo,
+    aunque la acción se haya ejecutado bien.
+    """
     notifier = context.bot_data.get("notifier")
-    if notifier:
+    if notifier is not None:
         try:
-            await notifier.send_text(text)
+            if await notifier.send_text(text):
+                return
         except Exception as exc:  # noqa: BLE001
-            log.warning("notifier ack falló: %s", exc)
+            log.warning("notifier ack falló, se usa el propio bot: %s", exc)
+
+    cfg = context.bot_data.get("cfg")
+    destino = (getattr(cfg, "admin_notify_chat_id", None)
+               or getattr(cfg, "admin_user_id", None))
+    if not destino:
+        log.warning("ack sin destino: ni notificador externo ni admin_notify_chat_id")
+        return
+    try:
+        await context.bot.send_message(
+            chat_id=destino, text=text, parse_mode="HTML",
+            disable_web_page_preview=True,
+        )
+    except TelegramError as exc:
+        log.warning("ack por el propio bot falló: %s", exc)
 
 
 @_only_admin
@@ -659,6 +686,17 @@ async def cmd_ban(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     shadow = sum(1 for v in results.values() if v == "shadow")
     err = sum(1 for v in results.values() if v.startswith("error"))
     ack = t("admin.ban.ack", uid=user_id, ok=ok, shadow=shadow, err=err)
+    # Auditoría obligatoria: sin esto un ban manual quedaba en `banned_users` pero
+    # NO en `moderation_log`, así que no salía en /recent ni contaba en /stats.
+    # La regla del proyecto pide persistir TODA acción de moderación, shadow o real.
+    db.log_action(
+        chat_id=(update.effective_chat.id if update.effective_chat else 0),
+        user_id=user_id, username=username,
+        message_id=(update.effective_message.message_id if update.effective_message else 0),
+        rule="manual_admin_ban", action="ban", score=0,
+        mode=("shadow" if cfg.shadow else "active"),
+        payload={"reason": reason, "chats_ok": ok, "chats_error": err},
+    )
     # Borrar welcome huérfano del baneado si seguía pendiente
     if not cfg.shadow:
         await _cleanup_welcome_on_ban(context, db, user_id)
@@ -737,6 +775,15 @@ async def cmd_unban(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     ok = sum(1 for v in results.values() if v == "ok")
     err = sum(1 for v in results.values() if v.startswith("error"))
     ack = t("admin.unban.ack", uid=user_id, ok=ok, err=err)
+    # Misma auditoría obligatoria que el ban: levantar un ban es una acción de
+    # moderación, y sin registro no hay forma de saber quién ni cuándo.
+    db.log_action(
+        chat_id=(update.effective_chat.id if update.effective_chat else 0),
+        user_id=user_id, username=None,
+        message_id=(update.effective_message.message_id if update.effective_message else 0),
+        rule="manual_admin_unban", action="noop", score=0,
+        mode="active", payload={"chats_ok": ok, "chats_error": err},
+    )
     if is_group:
         await _notify_admin_ack(context, ack)
     else:

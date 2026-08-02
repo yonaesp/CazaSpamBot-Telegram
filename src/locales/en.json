@@ -969,5 +969,6 @@
   "scan.act.kick": "kick",
   "scan.act.mute": "24 h mute",
   "scan.act.delete": "delete the message",
-  "scan.act.noop": "no action"
+  "scan.act.noop": "no action",
+  "rule.manual_admin_unban": "You lifted their ban yourself with /unban."
 }

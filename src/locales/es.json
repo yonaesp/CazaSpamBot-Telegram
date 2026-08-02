@@ -969,5 +969,6 @@
   "scan.act.kick": "expulsión",
   "scan.act.mute": "silenciado 24 h",
   "scan.act.delete": "borrar el mensaje",
-  "scan.act.noop": "no se actúa"
+  "scan.act.noop": "no se actúa",
+  "rule.manual_admin_unban": "Le levantaste el ban tú a mano con /unban."
 }
