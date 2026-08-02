@@ -1180,30 +1180,6 @@ async def _send_reminder(
     db.mark_reminder_sent(chat_id, user_id, new_msg_id)
 
 
-# Cuánto se espera antes de borrar la bienvenida de alguien recién baneado. No es
-# inmediato a propósito: un borrado instantáneo junto al del mensaje del spammer
-# hace que el chat "parpadee" y deja al resto sin entender qué ha pasado. Un minuto
-# basta para que se vea la secuencia y no se quede el saludo de un expulsado.
-RETRASO_BORRADO_BIENVENIDA_S = 60
-
-
-async def _borrar_bienvenida_job(context) -> None:
-    """Borra la bienvenida programada y suelta el registro."""
-    from telegram.error import TelegramError as _TE
-    datos = context.job.data
-    try:
-        await context.bot.delete_message(
-            chat_id=datos["chat_id"], message_id=datos["message_id"])
-    except _TE:
-        pass
-    db = context.bot_data.get("db")
-    if db is not None:
-        try:
-            db.set_welcome_msg(datos["chat_id"], datos["user_id"], None)
-        except Exception:  # noqa: BLE001
-            pass
-
-
 async def limpiar_bienvenidas(context, db, user_id: int) -> int:
     """Borra las bienvenidas vivas de un usuario en TODOS los chats federados.
 
@@ -1216,32 +1192,23 @@ async def limpiar_bienvenidas(context, db, user_id: int) -> int:
     desaparece al verificar, y `seen_users.welcome_msg_id` cubre el resto
     (incluido el modo limpio, que es el que viene por defecto).
 
-    Devuelve cuántos mensajes se borraron. Best-effort: un fallo de Telegram
-    (mensaje ya borrado, sin permisos) nunca interrumpe el ban.
+    Se borra AL MOMENTO del ban: es lo más limpio para el grupo y lo más simple
+    de razonar. Devuelve cuántos se borraron. Best-effort: un fallo de Telegram
+    (mensaje ya borrado, sin permisos) nunca interrumpe el ban, y deja el
+    registro puesto para que el barrido del `cleanup_job` lo reintente.
     """
     borrados = 0
     vistos: set[tuple[int, int]] = set()
 
-    jq = getattr(getattr(context, "application", None), "job_queue", None)
-
-    async def _programar(chat_id: int, msg_id: int) -> bool:
-        """Encola el borrado a un minuto. Si no hay cola de trabajos, borra ya:
-        más vale un borrado brusco que un saludo eterno a alguien expulsado."""
-        if jq is not None:
-            # El nombre incluye el mensaje, así que dos bans seguidos del mismo
-            # usuario no encolan dos borrados del mismo saludo.
-            nombre = f"del_welcome_ban_{chat_id}_{msg_id}"
-            for job in jq.get_jobs_by_name(nombre):
-                job.schedule_removal()
-            jq.run_once(
-                _borrar_bienvenida_job, when=RETRASO_BORRADO_BIENVENIDA_S,
-                data={"chat_id": chat_id, "message_id": msg_id, "user_id": user_id},
-                name=nombre,
-            )
-            return True
+    async def _borrar(chat_id: int, msg_id: int) -> bool:
+        """Borra ya. Si Telegram falla, se CONSERVA el registro a propósito: el
+        barrido del cleanup_job lo reintentará dentro de un rato. Soltarlo aquí
+        dejaría el saludo en el grupo para siempre y sin rastro de que quedó."""
         try:
             await context.bot.delete_message(chat_id=chat_id, message_id=msg_id)
-        except TelegramError:
+        except TelegramError as exc:
+            log.debug("bienvenida no borrada chat=%s msg=%s (se reintentará): %s",
+                      chat_id, msg_id, exc)
             return False
         try:
             db.set_welcome_msg(chat_id, user_id, None)
@@ -1253,9 +1220,7 @@ async def limpiar_bienvenidas(context, db, user_id: int) -> int:
         if not msg_id or (chat_id, msg_id) in vistos:
             continue
         vistos.add((chat_id, msg_id))
-        # El registro se deja puesto hasta que el borrado ocurra de verdad: si el
-        # bot se reinicia dentro de ese minuto, el barrido del cleanup_job lo caza.
-        if await _programar(chat_id, msg_id):
+        if await _borrar(chat_id, msg_id):
             borrados += 1
 
     for chat_row in db.all_chats():
@@ -1268,7 +1233,7 @@ async def limpiar_bienvenidas(context, db, user_id: int) -> int:
         msg_id = pending["welcome_msg_id"]
         if msg_id and (chat_id, msg_id) not in vistos:
             vistos.add((chat_id, msg_id))
-            if await _programar(chat_id, msg_id):
+            if await _borrar(chat_id, msg_id):
                 borrados += 1
         db.delete_pending(chat_id, user_id)
 
