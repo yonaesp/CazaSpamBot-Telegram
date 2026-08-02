@@ -44,11 +44,26 @@ POCO_ACTIVO_MAX_MSGS = 5
 # «Pumpkin Recipes»: ban federado a un usuario legítimo por el nombre de un canal
 # de noticias suizo. El peligro no era el término, era la falta de límites.
 _FUENTE_DEFAULTS = [
-    r"\bsignals?\b", r"\bcrypto", r"\bbitcoin\b", r"\bbtc\b", r"\bbinance\b",
-    r"\bforex\b", r"\bairdrop", r"\bpump\b", r"\bwhale\b", r"\binsider\b",
-    r"\bprofits?\b", r"\bearn(ings)?\b", r"\bmillionaire\b", r"\brich\b",
-    r"\bcasino\b", r"\bjackpot\b", r"\bbetting\b", r"\bonlyfans\b", r"\b18\+",
-    r"\bxxx\b", r"\bescorts?\b",
+    # OJO: estos son el respaldo si falta config/blacklist/story_source.txt, y el
+    # Dockerfile NO copia config/ (aquí llega por bind-mount). Un `docker run` de la
+    # imagen pelada se queda con ESTA lista, así que tiene que cumplir la misma regla
+    # de oro que el fichero: PAREJAS, nunca palabras sueltas. Cuando eran sueltas,
+    # «insider» casaba con «Windows Insider Program» y «pump» con «Heat Pump UK».
+    r"\b(?:crypto|bitcoin|btc|forex|binary|vip|free|premium|daily|group|club|insider|private)[\s_-]+signals?\b",
+    r"\bsignals?[\s_-]+(?:vip|group|club|channel|premium|free|pro|insider)\b",
+    r"\binsider[\s_-]+(?:signals?|trading|tips?|club|vip|profits?)\b",
+    r"\b(?:crypto|bitcoin|btc|forex|binance)[\s_-]+(?:pump|profits?|invest|millionaire|vip)\b",
+    r"\bpump[\s_-]*(?:&|and|/|n)?[\s_-]*dump\b",
+    r"\bairdrop[\s_-]+(?:free|claim|bonus|token|nft|\d)",
+    r"\bfree[\s_-]+airdrop\b",
+    r"\bwhale[\s_-]+(?:signals?|alerts?|club|vip|trades?)\b",
+    r"\b(?:daily|guaranteed|easy|fast|quick)[\s_-]+profits?\b",
+    r"\bget[\s_-]+rich\b",
+    r"\brich[\s_-]+(?:quick|fast)\b",
+    r"\b(?:online|free|live)[\s_-]+casino\b",
+    r"\bcasino[\s_-]+(?:online|bonus|free|slots?|jackpot|777)\b",
+    r"\bonlyfans\b",
+    r"\bescorts?[\s_-]+(?:service|girls?|vip|24h|agency)\b",
 ]
 
 

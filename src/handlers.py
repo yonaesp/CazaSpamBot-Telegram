@@ -1023,9 +1023,12 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     if is_first:
         seen_row_fm = db.get_seen(chat_id, user.id)
         bot_saw_join = seen_row_fm is not None and seen_row_fm["join_ts"] is not None
+        # MISMA lista que topweekly y que /scan. Estaban desalineadas: sin voice ni
+        # audio, `/scan` decía «tiene media» ante una nota de voz y el detector no
+        # podía saltar nunca, o sea el comando que explica qué pasaría mentía.
         has_media = bool(
             msg.photo or msg.video or msg.animation or msg.sticker
-            or msg.document or msg.video_note
+            or msg.voice or msg.audio or msg.document or msg.video_note
         )
         if has_media and bot_saw_join:
             # Calcular sospecha: reusamos verification._is_suspicious_profile
@@ -2201,9 +2204,15 @@ async def _apply_action(
         mode=mode, payload={"reason": decision.reason, **(decision.payload or {})},
     )
 
-    # Bienvenida del baneado: se borra siempre, mire donde mire el id. La versión
-    # anterior solo consultaba `pending_verifications`, que no existe en modo limpio.
-    await verification.limpiar_bienvenidas(context, db, user_id)
+    # Bienvenida del baneado. La guarda es IMPRESCINDIBLE y se perdió en un refactor:
+    # `_apply_action` corre con CUALQUIER decisión, también `noop`, y esta limpieza
+    # borra la fila `pending_verifications` del usuario en TODOS los chats. Sin la
+    # guarda, un recién llegado que saluda a los 10 s (jfm_fast = 30 puntos = noop,
+    # o sea el bot NO sanciona) perdía su verificación pendiente en OTRO grupo: al
+    # pulsar SOY HUMANO allí, el bot no encontraba la fila, no le quitaba el mute y
+    # se quedaba mudo para siempre, invisible para el recordatorio y para el kick.
+    if user_id and decision.action in ("ban", "kick") and not cfg.shadow:
+        await verification.limpiar_bienvenidas(context, db, user_id)
 
     fed_results: dict[int, str] | None = None
     if decision.action != "noop":

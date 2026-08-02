@@ -25,8 +25,12 @@ def check(msg: Message, blocklist: list[str], is_first_msg: bool) -> Hit:
     bad: list[str] = []
     for raw in _iter_urls(msg):
         url = raw if "://" in raw else "https://" + raw
+        # removeprefix, NO lstrip: `lstrip("www.")` recibe un CONJUNTO de caracteres,
+        # así que "wa.me" se convertía en "a.me" y "whatsapp.com" en "hatsapp.com".
+        # Inofensivo con la lista actual, pero el día que alguien añada wa.me (vector
+        # habitual de spam) el detector no casaría y nadie vería ningún error.
         try:
-            host = (urlparse(url).netloc or "").lower().lstrip("www.")
+            host = (urlparse(url).netloc or "").lower().removeprefix("www.")
         except ValueError:
             continue
         if any(host == d or host.endswith("." + d) for d in blocklist):

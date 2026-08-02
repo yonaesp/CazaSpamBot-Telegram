@@ -984,15 +984,25 @@ async def cleanup_job(context: ContextTypes.DEFAULT_TYPE) -> None:
     # borrado normal se programa a un minuto del ban, pero ese job vive en memoria:
     # si el bot se reinicia antes, se pierde y el saludo se queda para siempre.
     for chat_id, user_id, msg_id in db.bienvenidas_de_baneados():
+        soltar = True
         try:
             await context.bot.delete_message(chat_id=chat_id, message_id=msg_id)
             log.info("barrido: bienvenida huérfana borrada user=%s chat=%s", user_id, chat_id)
-        except TelegramError:
-            pass
-        try:
-            db.set_welcome_msg(chat_id, user_id, None)
-        except Exception:  # noqa: BLE001
-            pass
+        except TelegramError as exc:
+            # Solo se suelta el registro si el mensaje YA NO ESTÁ. Ante un fallo
+            # transitorio (flood control, corte de red) hay que conservarlo: si no,
+            # había un único reintento y la bienvenida del baneado se quedaba en el
+            # grupo para siempre, que es justo lo que este barrido viene a evitar.
+            texto = str(exc).lower()
+            soltar = ("not found" in texto or "message to delete" in texto
+                      or "message can't be deleted" in texto)
+            log.debug("barrido: no se pudo borrar chat=%s msg=%s (%s), %s",
+                      chat_id, msg_id, exc, "se olvida" if soltar else "se reintentará")
+        if soltar:
+            try:
+                db.set_welcome_msg(chat_id, user_id, None)
+            except Exception:  # noqa: BLE001
+                pass
 
     chats = {row["chat_id"]: row for row in db.all_chats() if row["am_admin"]}
     for chat_id, chat_row in chats.items():

@@ -41,6 +41,11 @@ log = logging.getLogger("antispam")
 # Telethon DUERME sola hasta 60 s sin lanzar excepción. Mismo tope que usa
 # `detectors/photos_batch.py`, que ya se topó con esto.
 _TIMEOUT_S = 5.0
+# Tope de la operación ENTERA. El de arriba es por llamada, y se encadenan hasta
+# tres (resolver por @username, resolver por id, pedir la historia): medido, el
+# peor caso tardaba 10,3 s con el bot congelado, porque PTB procesa los updates de
+# uno en uno. Con este tope, lo peor que puede pasar son 6 s.
+_TIMEOUT_TOTAL_S = 6.0
 
 
 class MensajeConTextoDeHistoria:
@@ -124,6 +129,15 @@ async def leer_caption(context, story) -> tuple[str, list] | None:
 
     `story` es el objeto de la Bot API: solo trae `chat` e `id`.
     """
+    try:
+        return await asyncio.wait_for(_leer(context, story), _TIMEOUT_TOTAL_S)
+    except asyncio.TimeoutError:
+        log.info("story_reader: se agotó el tiempo total leyendo la historia %s",
+                 getattr(story, "id", "?"))
+        return None
+
+
+async def _leer(context, story) -> tuple[str, list] | None:
     reporter = context.bot_data.get("reporter")
     client = reporter.get_client() if reporter else None
     if client is None:

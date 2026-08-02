@@ -194,7 +194,7 @@ async def _spam_combo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             if member.status in (ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER):
                 warn = t(
                     "admin.spam.is_admin",
-                    name=author.first_name, uid=author.id,
+                    name=html.escape(author.first_name or str(author.id)), uid=author.id,
                     chat=chat_row["title"], note=sample_note,
                 )
                 if is_group:
@@ -242,7 +242,7 @@ async def _spam_combo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     if is_group and not cfg.shadow and quips.quips_on(db, msg.chat_id, cfg):
         quip = quips.pick(
             rule="manual_admin_ban", username=author.username,
-            user_id=author.id, payload={}, first_name=author.first_name,
+            user_id=author.id, payload={}, first_name=html.escape(author.first_name or str(author.id)),
         )
         if quip:
             await _post_ban_quip_to_chats(
@@ -253,7 +253,7 @@ async def _spam_combo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     # 6) Ack al admin
     ack = t(
         "admin.spam.ack",
-        name=author.first_name, uid=author.id,
+        name=html.escape(author.first_name or str(author.id)), uid=author.id,
         ok=ok, shadow=shadow, err=err, note=sample_note,
     )
     if is_group:
