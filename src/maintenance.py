@@ -231,19 +231,37 @@ async def _reconcile_banned_users(context, db) -> None:
     log.info("reconcile_banned_users: %d users a verificar", len(pending))
     revoked = 0
     sin_respuesta = 0
+    reaplicados = 0
     for uid in pending:
         kicked_anywhere = False
         lookup_ok = False  # ¿respondió AL MENOS una consulta?
+        dentro_en: list[int] = []   # chats donde consta baneado pero SIGUE dentro
         for cid in chats:
             try:
                 member = await context.bot.get_chat_member(chat_id=cid, user_id=uid)
                 lookup_ok = True
                 if member.status == ChatMemberStatus.BANNED:
                     kicked_anywhere = True
-                    break
+                elif member.status in ("member", "restricted", "administrator", "creator"):
+                    dentro_en.append(cid)
             except Exception as exc:  # noqa: BLE001
                 log.debug("reconcile get_chat_member fallo chat=%s uid=%s: %s",
                           cid, uid, exc)
+
+        # BAN A MEDIAS: expulsado en unos grupos y dentro en otros. Pasa cuando el
+        # ban federado falla en un chat (error de Telegram, el bot aún no era admin,
+        # o alguien lo readmitió a mano) y hasta ahora NADIE lo detectaba: en la BD
+        # constaba baneado y en el grupo seguía escribiendo. Caso real: 156 mensajes
+        # de un usuario baneado día y medio antes.
+        if kicked_anywhere and dentro_en and not cfg.shadow:
+            for cid in dentro_en:
+                try:
+                    await context.bot.ban_chat_member(chat_id=cid, user_id=uid)
+                    reaplicados += 1
+                    log.warning("reconcile: ban a medias, re-aplicado user=%s chat=%s", uid, cid)
+                except Exception as exc:  # noqa: BLE001
+                    log.warning("reconcile: no se pudo re-aplicar el ban user=%s chat=%s: %s",
+                                uid, cid, exc)
         # Solo revocamos ante un "ya no está baneado" CONFIRMADO. Si ninguna consulta
         # respondió (red caída, 5xx de Telegram, flood-wait, o el bot perdió admin),
         # "fallo" es indistinguible de "no baneado": revocar ahí borraría un ban real
@@ -260,6 +278,8 @@ async def _reconcile_banned_users(context, db) -> None:
                     (_t.time(), 0, uid),  # revoked_by=0 = sistema
                 )
             revoked += 1
+    if reaplicados > 0:
+        log.warning("reconcile_banned_users: %d bans a medias re-aplicados", reaplicados)
     if revoked > 0:
         log.info("reconcile_banned_users: %d users revocados (ya no kicked en Telegram)", revoked)
     if sin_respuesta > 0:

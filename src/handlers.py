@@ -841,6 +841,31 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         db.record_message(chat_id, user.id, user.username, msg_ts=_msg_ts)
         return
 
+    # BANEADO QUE SIGUE ESCRIBIENDO. Hasta ahora el bot solo comprobaba la lista de
+    # baneados al ENTRAR, así que si un ban federado fallaba en un chat (Telegram
+    # devolvió error, el bot no era admin todavía, o alguien lo readmitió a mano),
+    # esa persona seguía escribiendo indefinidamente y nadie se enteraba: en la BD
+    # constaba como baneada y en el grupo estaba tan tranquila.
+    #
+    # Caso real: un usuario baneado el 2-ago seguía escribiendo el 3-ago con 156
+    # mensajes acumulados. El ban se aplicó en dos de los tres grupos y en el
+    # tercero no, y como /ban ni contestaba ni dejaba registro, no hubo forma de
+    # notarlo. Ahora cada mensaje suyo re-aplica el ban: la lista federada deja de
+    # ser una intención y pasa a cumplirse.
+    if db.is_banned(user.id):
+        log.warning("baneado ESCRIBIENDO user=%s chat=%s → re-ban", user.id, chat_id)
+        decision = Decision(
+            action="ban", score=999, rule="federation_known_ban",
+            reason=t("reason.federation_rejoin"), payload={"via": "mensaje"},
+        )
+        await _apply_action(
+            context, db, cfg, chat_id=chat_id, chat_title=msg.chat.title,
+            user_id=user.id, username=user.username, message_id=msg.message_id,
+            decision=decision, original_text=(msg.text or msg.caption),
+            first_name=user.first_name,
+        )
+        return
+
     # NUEVO: capturar el last_msg_ts PREVIO antes de actualizarlo, para detectar
     # cuentas dormidas que reaparecen mencionando un bot (cuenta hackeada).
     prev_seen = db.get_seen(chat_id, user.id)
