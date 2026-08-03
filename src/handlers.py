@@ -2000,14 +2000,13 @@ async def _antiflood_apply(
     now = time.time()
     until = int(now) + mute_hours * 3600
     if not cfg.shadow:
-        try:
-            await context.bot.restrict_chat_member(
-                chat_id=chat_id, user_id=user_id,
-                permissions=ChatPermissions(can_send_messages=False),
-                until_date=until,
-            )
-        except TelegramError as exc:
-            log.warning("antiflood mute fallo user=%s: %s", user_id, exc)
+        # Un mute sobre alguien EXPULSADO lo DEVUELVE al grupo como restringido.
+        # En una ráfaga de flood es fácil que otra regla ya lo haya baneado antes
+        # de que llegue este mute, y entonces el mute deshace el ban en silencio.
+        if not await verification.restringir_seguro(
+                context.bot, db, chat_id, user_id,
+                ChatPermissions(can_send_messages=False), "antiflood",
+                until_date=until):
             return
     mute_count, review_sent, human_confirmed = db.flood_record_mute(chat_id, user_id, now)
     db.log_action(
@@ -2477,11 +2476,12 @@ async def _apply_action(
 
                 if decision.action == "mute":
                     from telegram import ChatPermissions
-                    until = int(time.time()) + 24 * 3600
-                    await context.bot.restrict_chat_member(
-                        chat_id=chat_id, user_id=user_id,
-                        permissions=ChatPermissions(can_send_messages=False),
-                        until_date=until,
+                    # Mismo motivo que en el antiflood: si el usuario ya está
+                    # baneado, este mute lo devolvería al grupo.
+                    await verification.restringir_seguro(
+                        context.bot, db, chat_id, user_id,
+                        ChatPermissions(can_send_messages=False), "acción mute",
+                        until_date=int(time.time()) + 24 * 3600,
                     )
                 # delete ya hecho arriba
         except TelegramError as exc:

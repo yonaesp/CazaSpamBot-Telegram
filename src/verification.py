@@ -990,14 +990,12 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         await query.answer(t("verif.already_or_expired"))
         return
 
-    # Unmute
-    try:
-        await context.bot.restrict_chat_member(
-            chat_id=chat_id, user_id=target_user_id,
-            permissions=VERIFIED_PERMISSIONS,
-        )
-    except TelegramError as exc:
-        log.warning("verification unmute fallo chat=%s user=%s: %s", chat_id, target_user_id, exc)
+    # Unmute. Vía `restringir_seguro`: si el usuario fue baneado mientras su
+    # verificación seguía pendiente, pulsar el botón lo habría devuelto al grupo.
+    # La fila pendiente se limpia al banear, pero eso es una protección indirecta;
+    # esta es explícita y no depende de que ningún otro camino se acuerde.
+    if not await restringir_seguro(context.bot, db, chat_id, target_user_id,
+                                   VERIFIED_PERMISSIONS, "verificación correcta"):
         await query.answer(t("verif.unmute_error"))
         return
 
@@ -1363,3 +1361,40 @@ async def avisar_han_mudo(context, db, cfg, chat, user, sig) -> None:
         )
     except TelegramError as exc:
         log.warning("aviso han mudo falló: %s", exc)
+
+
+async def restringir_seguro(bot, db, chat_id: int, user_id: int, permissions,
+                            motivo: str = "", until_date=None) -> bool:
+    """Aplica permisos a alguien SOLO si no está baneado. Devuelve si se aplicó.
+
+    En Telegram, `restrictChatMember` sobre alguien EXPULSADO **lo devuelve al
+    grupo** como restringido: pasa de estar fuera a estar dentro y callado. O sea
+    que cualquier mute aplicado por descuido a un baneado deshace el ban en
+    silencio, y encima deja el registro diciendo que sigue baneado.
+
+    Esa es exactamente la transición que costó día y medio detectar en agosto de
+    2026 (un usuario baneado apareció como `restricted` y siguió escribiendo). Allí
+    la causó la app de Telegram, no el bot, pero el bot tenía SEIS sitios que
+    podían provocar lo mismo sin ninguna comprobación: el botón SOY HUMANO, el
+    mute del antiflood, el de la acción de moderación y el mute provisional al
+    entrar. Este helper cierra todos de una vez.
+    """
+    try:
+        if db is not None and db.is_banned(user_id):
+            log.warning(
+                "restricción ABORTADA sobre un baneado user=%s chat=%s (%s): "
+                "aplicarla lo habría readmitido en el grupo", user_id, chat_id, motivo)
+            return False
+    except Exception as exc:  # noqa: BLE001
+        log.debug("no se pudo comprobar el ban de %s: %s", user_id, exc)
+    try:
+        # `until_date` importa: sin él un mute temporal (antiflood 24 h) se
+        # convertiría en permanente, y nadie lo notaría hasta que el usuario se
+        # quejara de seguir mudo días después.
+        kw = {"until_date": until_date} if until_date else {}
+        await bot.restrict_chat_member(chat_id=chat_id, user_id=user_id,
+                                       permissions=permissions, **kw)
+        return True
+    except TelegramError as exc:
+        log.debug("restrict (%s) falló chat=%s user=%s: %s", motivo, chat_id, user_id, exc)
+        return False
