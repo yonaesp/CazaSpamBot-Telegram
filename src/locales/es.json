@@ -1041,5 +1041,10 @@
   "cfg.rvl.bajo": "Bajo",
   "scan.was_welcome": "↪️ <i>Eso es un mensaje de bienvenida, lo escribí yo. Te enseño lo que sé del usuario al que saludé.</i>",
   "rule.han_pending_review": "Entró con el nombre en ideogramas chinos y una cuenta antigua con foto. No le baneé por si es un chino-hablante real, pero tampoco le dejé escribir: lo decidiste tú.",
-  "han.muted_review": "⚠️ <b>Alguien ha entrado y le he dejado MUDO</b>\n\n👤 {name} (id: <code>{uid}</code>)\n📍 {chat}\n\nSu nombre está en <b>ideogramas chinos</b>, que en un grupo hispano casi siempre es un bot de promoción. Pero su cuenta tiene <b>más de un año y foto</b>, así que podría ser una persona real y no he querido banearla por mi cuenta.\n\n<b>No puede escribir hasta que decidas.</b> Si no haces nada, sigue mudo."
+  "han.muted_review": "⚠️ <b>Alguien ha entrado y le he dejado MUDO</b>\n\n👤 {name} (id: <code>{uid}</code>)\n📍 {chat}\n\nSu nombre está en <b>ideogramas chinos</b>, que en un grupo hispano casi siempre es un bot de promoción. Pero su cuenta tiene <b>más de un año y foto</b>, así que podría ser una persona real y no he querido banearla por mi cuenta.\n\n<b>No puede escribir hasta que decidas.</b> Si no haces nada, sigue mudo.",
+  "hdl.readmitido": "♻️ <b>Han readmitido a alguien que tenías baneado</b>\n\n👤 {name} (id: <code>{uid}</code>)\n📍 {chat}\n👮 Lo readmitió: {actor}\n\nLe he vuelto a aplicar el ban, porque seguía en tu lista federada. Si el otro admin tenía razón, levántalo de verdad y dejará de rebotar.",
+  "hdl.btn.readm_keep": "🔨 Mantener el ban",
+  "hdl.btn.readm_lift": "✅ Levantarlo de verdad",
+  "hdl.readm_kept": "Sigue baneado.",
+  "hdl.readm_lifted": "Ban levantado en todos tus grupos."
 }

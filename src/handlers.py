@@ -346,6 +346,38 @@ async def on_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     # Detección de ban/kick realizado por OTRO admin (no por el bot). Ver
     # _is_admin_ban_or_kick: separa self-leave (se va solo) de kick por admin.
+    # READMISIÓN de alguien que TÚ tenías baneado en la federación. Otro admin del
+    # grupo puede levantar el ban desde la app de Telegram, y hasta ahora el bot no
+    # miraba esa transición: solo vigilaba las que van HACIA ban o expulsión. Caso
+    # real: un usuario baneado el 2-ago apareció readmitido y silenciado en uno de
+    # los tres grupos, siguió escribiendo día y medio, y nadie se enteró.
+    #
+    # Se vuelve a aplicar el ban (una lista federada que otro puede deshacer en
+    # silencio no sirve de nada) y se AVISA, con un botón para aceptar la decisión
+    # del otro admin si te parece bien. Sin el aviso sería una guerra invisible.
+    _readmitido = (
+        old_status == ChatMemberStatus.BANNED
+        and new_status in (ChatMemberStatus.MEMBER, ChatMemberStatus.RESTRICTED)
+        and cmu.from_user is not None and cmu.from_user.id != context.bot.id
+    )
+    if _readmitido and db.is_banned(cmu.new_chat_member.user.id):
+        objetivo = cmu.new_chat_member.user
+        log.warning("READMITIDO un baneado: user=%s chat=%s por actor=%s → re-ban",
+                    objetivo.id, cmu.chat.id, cmu.from_user.id)
+        if not cfg.shadow:
+            try:
+                await context.bot.ban_chat_member(chat_id=cmu.chat.id, user_id=objetivo.id)
+            except TelegramError as exc:
+                log.warning("no se pudo re-banear al readmitido %s: %s", objetivo.id, exc)
+        db.log_action(
+            chat_id=cmu.chat.id, user_id=objetivo.id, username=objetivo.username,
+            message_id=0, rule="federation_known_ban", action="ban", score=0,
+            mode=("shadow" if cfg.shadow else "active"),
+            payload={"via": "readmision", "actor": cmu.from_user.id},
+        )
+        await _avisar_readmision(context, cfg, cmu, objetivo)
+        return
+
     if _is_admin_ban_or_kick(
         old_status, new_status,
         actor_id=cmu.from_user.id if cmu.from_user else None,
@@ -2512,3 +2544,73 @@ async def _apply_action(
         )
 
 
+
+
+async def _avisar_readmision(context, cfg, cmu, objetivo) -> None:
+    """Avisa de que otro admin readmitió a alguien que estaba baneado.
+
+    Con botón para aceptar su decisión: si el otro admin tenía razón, levantar el
+    ban de verdad (quitarlo de la lista federada) en vez de dejar al bot y a la
+    persona peleándose cada vez que escriba.
+    """
+    from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+    destino = cfg.admin_notify_chat_id or cfg.admin_user_id
+    if not destino:
+        return
+    actor = cmu.from_user
+    texto = t(
+        "hdl.readmitido",
+        name=_h.escape((objetivo.first_name or str(objetivo.id))[:40]),
+        uid=objetivo.id,
+        chat=_h.escape(str(cmu.chat.title or cmu.chat.id)),
+        actor=_h.escape("@" + actor.username if actor.username else (actor.first_name or str(actor.id))),
+    )
+    kb = InlineKeyboardMarkup([[
+        InlineKeyboardButton(t("hdl.btn.readm_keep"),
+                             callback_data=f"readm:keep:{objetivo.id}"),
+        InlineKeyboardButton(t("hdl.btn.readm_lift"),
+                             callback_data=f"readm:lift:{objetivo.id}"),
+    ]])
+    try:
+        await context.bot.send_message(chat_id=destino, text=texto, parse_mode="HTML",
+                                       reply_markup=kb, disable_web_page_preview=True)
+    except TelegramError as exc:
+        log.warning("aviso de readmisión falló: %s", exc)
+
+
+async def on_readmision_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Botones del aviso de readmisión: mantener el ban o levantarlo de verdad."""
+    q = update.callback_query
+    if q is None:
+        return
+    cfg: Config = context.bot_data["cfg"]
+    db: DB = context.bot_data["db"]
+    if q.from_user.id != cfg.admin_user_id:
+        await q.answer(t("hdl.only_admin_review"))
+        return
+    try:
+        _, accion, uid_s = q.data.split(":", 2)
+        user_id = int(uid_s)
+    except Exception as exc:  # noqa: BLE001
+        await q.answer(t("hdl.callback_invalid", error=exc))
+        return
+
+    if accion == "lift":
+        # Aceptar la decisión del otro admin: fuera de la lista federada y
+        # desbaneado en todos los grupos, para que deje de rebotar.
+        db.revoke_ban(user_id, revoked_by=cfg.admin_user_id)
+        for fila in db.all_chats():
+            if not fila["am_admin"]:
+                continue
+            try:
+                await context.bot.unban_chat_member(
+                    chat_id=fila["chat_id"], user_id=user_id, only_if_banned=True)
+            except TelegramError:
+                pass
+        await q.answer(t("hdl.readm_lifted"))
+    else:
+        await q.answer(t("hdl.readm_kept"))
+    try:
+        await q.edit_message_reply_markup(reply_markup=None)
+    except TelegramError:
+        pass

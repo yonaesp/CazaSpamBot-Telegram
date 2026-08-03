@@ -21,6 +21,7 @@ from . import admin, chat_picker, chat_settings_cmd, config_panel, group_clean, 
 from .config import load_config
 from .db import DB
 from .handlers import (
+    on_readmision_callback,
     on_trust_notice_callback,
     on_chat_member,
     on_edited_message,
@@ -351,6 +352,7 @@ def main() -> int:
     from .handlers import on_pending_review_callback
     app.add_handler(CallbackQueryHandler(on_pending_review_callback, pattern=r"^prev:"))
     app.add_handler(CallbackQueryHandler(on_trust_notice_callback, pattern=r"^tnote:"))
+    app.add_handler(CallbackQueryHandler(on_readmision_callback, pattern=r"^readm:"))
     # Callback de antiflood (botones ✅ No es bot / ❌ Es bot en DM admin)
     from .handlers import on_flood_callback
     app.add_handler(CallbackQueryHandler(on_flood_callback, pattern=r"^flood:"))

@@ -65,3 +65,37 @@ def test_el_barrido_sigue_sin_revocar_a_ciegas():
     fuente = Path("src/maintenance.py").read_text()
     i = fuente.index("if not lookup_ok:")
     assert "continue" in fuente[i:i + 100]
+
+
+# ------------------------- readmisión por otro admin -------------------------
+
+def test_se_detecta_que_otro_admin_readmita_a_un_baneado():
+    """El bot solo vigilaba las transiciones HACIA ban o expulsión. La contraria,
+    que alguien levante el ban, no la miraba nadie: por eso el usuario del caso
+    volvió a estar dentro y nadie se enteró en día y medio."""
+    fuente = Path("src/handlers.py").read_text()
+    assert "_readmitido" in fuente, "no se detecta la readmisión"
+    i = fuente.index("_readmitido = (")
+    bloque = fuente[i:i + 500]
+    assert "ChatMemberStatus.BANNED" in bloque, "no parte del estado baneado"
+    assert "MEMBER" in bloque and "RESTRICTED" in bloque, (
+        "no cubre readmitir silenciado, que es justo lo que pasó")
+
+
+def test_la_readmision_re_aplica_el_ban_y_avisa():
+    fuente = Path("src/handlers.py").read_text()
+    i = fuente.index("if _readmitido and db.is_banned(")
+    bloque = fuente[i:i + 1200]
+    assert "ban_chat_member" in bloque, "no re-aplica el ban"
+    assert "_avisar_readmision" in bloque, "no avisa al admin"
+    assert "not cfg.shadow" in bloque, "banearía de verdad en modo prueba"
+
+
+def test_el_aviso_deja_aceptar_la_decision_del_otro_admin():
+    """Sin una salida, el bot y la persona se pelearían cada vez que escriba. El
+    botón permite levantar el ban de verdad si el otro admin tenía razón."""
+    fuente = Path("src/handlers.py").read_text()
+    i = fuente.index("async def on_readmision_callback")
+    bloque = fuente[i:i + 1200]
+    assert "revoke_ban" in bloque, "no permite levantar el ban de la lista"
+    assert "unban_chat_member" in bloque, "lo quita de la lista pero lo deja expulsado"
