@@ -19,6 +19,7 @@ from telegram import Update
 from telegram.error import TelegramError
 from telegram.ext import ContextTypes
 
+from . import permissions
 from .config import Config
 from . import settings_sync
 from .db import DB
@@ -29,21 +30,33 @@ log = logging.getLogger(__name__)
 
 
 def _admin_only(func):
-    async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        cfg: Config = context.bot_data["cfg"]
-        u = update.effective_user
-        if not u or u.id != cfg.admin_user_id:
-            return
-        return await func(update, context)
-    return wrapper
+    """Delega en `permissions.bot_admin_only`, que es la implementación canónica.
+
+    Antes esto era una COPIA byte a byte del wrapper, repetida en dos módulos. Si
+    `permissions.py` crece (por ejemplo para admitir más de un admin), las copias
+    se quedarían atrás en silencio, y en una comprobación de permisos eso es lo
+    último que quieres que pase sin enterarte.
+    """
+    return permissions.bot_admin_only(func)
 
 
-def _get_target(update: Update) -> tuple[int | None, str | None]:
+async def _get_target(update: Update, context, db) -> tuple[int | None, str | None]:
+    """Objetivo de /warns, /rmwarn y /resetwarns.
+
+    Antes SOLO aceptaba respuesta a un mensaje, así que `/warn @usuario` funcionaba
+    y `/warns @usuario` contestaba «responde a alguien». Ahora usa la misma
+    resolución que /ban: respuesta, @usuario, id o mención de alguien sin username.
+    """
     msg = update.effective_message
     if msg and msg.reply_to_message and msg.reply_to_message.from_user:
         u = msg.reply_to_message.from_user
         return u.id, u.username or u.first_name
-    return None, None
+    from .admin import _resolve_target_user
+    uid, _resto, _err = await _resolve_target_user(update, context, db)
+    if uid is None:
+        return None, None
+    nombre = db.username_of(uid) if hasattr(db, "username_of") else None
+    return uid, nombre or str(uid)
 
 
 @_admin_only
@@ -263,7 +276,7 @@ async def _delete_warn_msg_job(context: ContextTypes.DEFAULT_TYPE) -> None:
 @_admin_only
 async def cmd_warns(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     msg = update.effective_message
-    target_id, target_name = _get_target(update)
+    target_id, target_name = await _get_target(update, context, context.bot_data["db"])
     if not target_id:
         await msg.reply_text(t("warns.reply_needed"))
         return
@@ -287,7 +300,7 @@ async def cmd_warns(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 @_admin_only
 async def cmd_rmwarn(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     msg = update.effective_message
-    target_id, _ = _get_target(update)
+    target_id, _ = await _get_target(update, context, context.bot_data["db"])
     if not target_id:
         await msg.reply_text(t("rmwarn.reply_needed"))
         return
@@ -302,7 +315,7 @@ async def cmd_rmwarn(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 @_admin_only
 async def cmd_resetwarns(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     msg = update.effective_message
-    target_id, _ = _get_target(update)
+    target_id, _ = await _get_target(update, context, context.bot_data["db"])
     if not target_id:
         await msg.reply_text(t("resetwarns.reply_needed"))
         return

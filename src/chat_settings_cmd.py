@@ -10,7 +10,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 
 from . import chat_picker, i18n, settings_sync
-from .config import Config
+from . import permissions
 from .db import DB
 from .i18n import t
 
@@ -40,13 +40,14 @@ log = logging.getLogger(__name__)
 
 
 def _admin_only(func):
-    async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        cfg: Config = context.bot_data["cfg"]
-        u = update.effective_user
-        if not u or u.id != cfg.admin_user_id:
-            return
-        return await func(update, context)
-    return wrapper
+    """Delega en `permissions.bot_admin_only`, que es la implementación canónica.
+
+    Antes esto era una COPIA byte a byte del wrapper, repetida en dos módulos. Si
+    `permissions.py` crece (por ejemplo para admitir más de un admin), las copias
+    se quedarían atrás en silencio, y en una comprobación de permisos eso es lo
+    último que quieres que pase sin enterarte.
+    """
+    return permissions.bot_admin_only(func)
 
 
 async def _render_welcome(db: DB, chat_id: int) -> str:

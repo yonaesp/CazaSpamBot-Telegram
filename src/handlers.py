@@ -1034,6 +1034,44 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
             msg_count=(_seen_st["msg_count"] if _seen_st is not None else None),
         ))
 
+    # 3d ter) LISTAS EXTERNAS en los primeros mensajes, no solo al entrar.
+    #
+    # Caso real: un spammer entró el 1-ago, lols.bot todavía no lo tenía fichado, y
+    # se coló. Escribió el día 3, y para entonces lols YA lo tenía (lo marcó a las
+    # 08:16 UTC; nosotros baneamos a las 08:27, once minutos tarde y por el idioma
+    # del mensaje, no por la lista). Consultando también aquí, ese caso cae por
+    # lols con cualquier texto, incluso si escribe en español perfecto.
+    #
+    # Solo en los primeros mensajes: quien ya participa no se re-consulta, así el
+    # coste en llamadas queda acotado a los recién llegados. CAS ya cachea; para
+    # lols se cachea en memoria, que basta para no repetir dentro de la ráfaga.
+    if is_first and not db.is_whitelisted(chat_id, user.id):
+        _sess = context.bot_data.get("http")
+        if _sess is not None:
+            _cache = context.bot_data.setdefault("_lols_cache", {})
+            _ahora = time.time()
+            if cfg.lols_enabled:
+                _cached = _cache.get(user.id)
+                if _cached is None or _ahora - _cached[0] > 3600:
+                    try:
+                        _h = await lols_det.check(user.id, _sess)
+                        _cache[user.id] = (_ahora, bool(_h), _h)
+                    except Exception as exc:  # noqa: BLE001
+                        log.debug("lols en primer mensaje falló user=%s: %s", user.id, exc)
+                        _cache[user.id] = (_ahora, False, None)
+                    _cached = _cache.get(user.id)
+                if _cached and _cached[1] and _cached[2]:
+                    log.info("lols_match en primer mensaje user=%s chat=%s", user.id, chat_id)
+                    hits.append(_cached[2])
+            if cfg.cas_enabled:
+                try:
+                    _c = await cas_det.check(user.id, _sess, db, cfg.cas_cache_ttl_seconds)
+                    if _c:
+                        log.info("cas_match en primer mensaje user=%s chat=%s", user.id, chat_id)
+                        hits.append(_c)
+                except Exception as exc:  # noqa: BLE001
+                    log.debug("CAS en primer mensaje falló user=%s: %s", user.id, exc)
+
     # 3e) Primer mensaje es media + cuenta sospechosa (patrón spam 2025).
     # GUARD anti-falso-positivo: solo aplicar si el bot presenció el JOIN del user.
     # Si join_ts IS NULL, el user ya estaba en el grupo antes que el bot → NO sabemos
@@ -2449,9 +2487,3 @@ async def _apply_action(
         )
 
 
-async def _delete_quip_job(context: ContextTypes.DEFAULT_TYPE) -> None:
-    data = context.job.data
-    try:
-        await context.bot.delete_message(chat_id=data["chat_id"], message_id=data["message_id"])
-    except TelegramError as exc:
-        log.debug("delete_quip_job: %s", exc)

@@ -1053,15 +1053,6 @@ class DB:
                 (chat_id, user_id),
             ).fetchone()
 
-    def expired_suspicious_pending(self, hours: int) -> list[sqlite3.Row]:
-        """Suspicious users que llevan >hours sin verificar."""
-        with self._cur() as c:
-            return c.execute(
-                "SELECT * FROM pending_verifications "
-                "WHERE verified_at IS NULL AND is_suspicious=1 AND joined_at <= ?",
-                (time.time() - hours * 3600,),
-            ).fetchall()
-
     def expired_suspicious_pending_minutes(self, minutes: int) -> list[sqlite3.Row]:
         """Suspicious users que llevan >minutes sin verificar (granularidad fina)."""
         with self._cur() as c:
