@@ -478,6 +478,24 @@ async def on_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             )
             return
 
+        # Nombre con ideogramas Han que SOLO se libra por el salvoconducto de
+        # «cuenta antigua con foto». No se banea (podría ser un chino-hablante
+        # real) pero tampoco se le deja pasar por la verificación de botón, que un
+        # bot pulsa en tres segundos: se queda MUDO con el mute provisional ya
+        # aplicado y decide el admin desde su privado. Caso medido: entró así,
+        # se verificó en 3 s y soltó spam dos días después.
+        if not cfg.shadow and verification.han_requiere_decision(
+                sig_pre, user.username, user.first_name, user.last_name):
+            log.info("HAN con salvoconducto user=%s chat=%s → mudo a la espera del admin",
+                     user.id, cmu.chat.id)
+            db.log_action(
+                chat_id=cmu.chat.id, user_id=user.id, username=user.username,
+                message_id=0, rule="han_pending_review", action="mute", score=0,
+                mode="active", payload={"motivo": "nombre en Han + cuenta antigua con foto"},
+            )
+            await verification.avisar_han_mudo(context, db, cfg, cmu.chat, user, sig_pre)
+            return
+
         # NUEVO: bio del perfil con señales claras de spam (invite link + emojis
         # sexuales + idioma extranjero + keywords). Caso real: bio alemán con
         # t.me/+ y emojis 🔥🥵. Aprovecha sig_pre ya cargado.

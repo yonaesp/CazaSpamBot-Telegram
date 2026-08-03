@@ -1039,5 +1039,7 @@
   "cfg.rvl.alto": "High",
   "cfg.rvl.medio": "Medium",
   "cfg.rvl.bajo": "Low",
-  "scan.was_welcome": "↪️ <i>That is a welcome message, I wrote it myself. Here is what I know about the user I greeted.</i>"
+  "scan.was_welcome": "↪️ <i>That is a welcome message, I wrote it myself. Here is what I know about the user I greeted.</i>",
+  "rule.han_pending_review": "They joined with a name in Chinese characters and an established account with a photo. I did not ban them in case they are a real Chinese speaker, but I did not let them post either: you decided.",
+  "han.muted_review": "⚠️ <b>Someone joined and I muted them</b>\n\n👤 {name} (id: <code>{uid}</code>)\n📍 {chat}\n\nTheir name is in <b>Chinese characters</b>, which in a Spanish-speaking group is almost always a promo bot. But their account is <b>over a year old and has a photo</b>, so they could be a real person and I did not want to ban them on my own.\n\n<b>They cannot post until you decide.</b> If you do nothing, they stay muted."
 }

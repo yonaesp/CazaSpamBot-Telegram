@@ -1201,6 +1201,28 @@ async def on_suspicious_review_callback(update: Update, context: ContextTypes.DE
             pass
         return
 
+    if action == "allowu":
+        # Permitir DESMUTEANDO: viene del aviso de «entró y está mudo esperando».
+        # El `allow` normal no desmutea porque allí el usuario ya estaba dentro.
+        try:
+            await context.bot.restrict_chat_member(
+                chat_id=chat_id, user_id=user_id,
+                permissions=verification.VERIFIED_PERMISSIONS,
+            )
+        except TelegramError as exc:
+            log.warning("no se pudo desmutear a %s en %s: %s", user_id, chat_id, exc)
+        db.log_action(
+            chat_id=chat_id, user_id=user_id, username=None, message_id=0,
+            rule="han_pending_review", action="noop", score=0, mode="active",
+            payload={"decision": "permitido por el admin"},
+        )
+        await q.answer(t("toast.allowed"))
+        try:
+            await q.edit_message_text(base + t("review.allowed"), parse_mode="HTML")
+        except TelegramError:
+            pass
+        return
+
     if action == "allow":
         await q.answer(t("toast.allowed"))
         try:

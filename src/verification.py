@@ -14,6 +14,7 @@ Criterio de "suspicious" (vía Telethon `user_signals`):
 from __future__ import annotations
 
 import html
+import html as _html
 import logging
 import os
 import random
@@ -350,6 +351,35 @@ def nivel_de(settings) -> str:
     return v if v in NIVELES else NIVEL_ALTO
 
 
+def han_requiere_decision(
+    sig: Optional[user_signals.UserSignals],
+    username: Optional[str],
+    first_name: Optional[str],
+    last_name: Optional[str] = None,
+) -> bool:
+    """¿Nombre con ideogramas Han que SOLO se libra por el salvoconducto?
+
+    `_is_obvious_spam_profile` banea al entrar por un nombre en Han, salvo que
+    Telegram diga que la cuenta tiene más de un año y foto: ese salvoconducto está
+    para no expulsar a un chino-hablante real con cuenta asentada.
+
+    El problema medido: un spammer usó justo eso. Cuenta antigua con foto, pasó a
+    la verificación normal, **pulsó el botón a los 3 segundos** y entró; dos días
+    después soltó el spam. Pulsar un botón no demuestra nada frente a un bot.
+
+    Así que en ese caso concreto no se banea ni se deja pasar: se deja MUDO y
+    decide el admin desde su privado. Cero falsos positivos (si es legítimo, el
+    admin lo deja entrar) y cero coladas (si no hace nada, no puede escribir).
+    """
+    if not any(_han_dominant(v) for v in (first_name, last_name, username)):
+        return False
+    # Sin señales de Telethon el salvoconducto no aplica: ahí `_is_obvious_spam_profile`
+    # ya banea solo, y este camino no debe pisarlo.
+    if sig is None:
+        return False
+    return sig.photo_count >= 1 and (sig.account_age_days or 0) >= 365
+
+
 def _is_review_worthy(
     sig: Optional[user_signals.UserSignals],
     username: Optional[str],
@@ -587,6 +617,18 @@ def _rv_decide_row(chat_id: int, user_id: int) -> list:
         InlineKeyboardButton(t("btn.allow"), callback_data=f"susrev:allow:{chat_id}:{user_id}"),
         InlineKeyboardButton(t("btn.ban"), callback_data=f"susrev:ban:{chat_id}:{user_id}"),
     ]
+
+
+def build_muted_review_keyboard(chat_id: int, user_id: int) -> InlineKeyboardMarkup:
+    """Botones del aviso de «entró y está mudo esperando tu decisión».
+
+    Acción `allowu` en vez de `allow` porque aquí Permitir tiene que DESMUTEAR: en
+    el flujo normal el usuario ya estaba dentro y no había nada que deshacer.
+    """
+    return InlineKeyboardMarkup([[
+        InlineKeyboardButton(t("btn.allow"), callback_data=f"susrev:allowu:{chat_id}:{user_id}"),
+        InlineKeyboardButton(t("btn.ban"), callback_data=f"susrev:ban:{chat_id}:{user_id}"),
+    ]])
 
 
 def build_review_keyboard(db: DB, chat_id: int, user_id: int) -> InlineKeyboardMarkup:
@@ -1293,3 +1335,31 @@ async def limpiar_bienvenidas(context, db, user_id: int) -> int:
     if borrados:
         log.info("bienvenidas borradas tras ban user=%s: %d", user_id, borrados)
     return borrados
+
+
+async def avisar_han_mudo(context, db, cfg, chat, user, sig) -> None:
+    """Aviso al admin: alguien con nombre en Han ha entrado y está MUDO.
+
+    Se manda aunque los avisos de sospechosos estén apagados: no es el aviso
+    informativo de «perfil dudoso», es una decisión pendiente que bloquea a una
+    persona. Silenciarlo dejaría a alguien mudo indefinidamente sin que nadie lo sepa.
+    """
+    if not cfg.admin_notify_chat_id:
+        return
+    etiqueta = f"@{user.username}" if user.username else (user.first_name or str(user.id))
+    extra = ""
+    if sig is not None:
+        try:
+            extra = "\n" + user_signals.render_markup(sig)
+        except Exception:  # noqa: BLE001
+            pass
+    texto = t("han.muted_review", name=_html.escape(etiqueta), uid=user.id,
+              chat=_html.escape(str(chat.title or chat.id))) + extra
+    try:
+        await context.bot.send_message(
+            chat_id=cfg.admin_notify_chat_id, text=texto, parse_mode="HTML",
+            reply_markup=build_muted_review_keyboard(chat.id, user.id),
+            disable_web_page_preview=True,
+        )
+    except TelegramError as exc:
+        log.warning("aviso han mudo falló: %s", exc)

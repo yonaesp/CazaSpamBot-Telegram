@@ -1039,5 +1039,7 @@
   "cfg.rvl.alto": "Alto",
   "cfg.rvl.medio": "Medio",
   "cfg.rvl.bajo": "Bajo",
-  "scan.was_welcome": "↪️ <i>Eso es un mensaje de bienvenida, lo escribí yo. Te enseño lo que sé del usuario al que saludé.</i>"
+  "scan.was_welcome": "↪️ <i>Eso es un mensaje de bienvenida, lo escribí yo. Te enseño lo que sé del usuario al que saludé.</i>",
+  "rule.han_pending_review": "Entró con el nombre en ideogramas chinos y una cuenta antigua con foto. No le baneé por si es un chino-hablante real, pero tampoco le dejé escribir: lo decidiste tú.",
+  "han.muted_review": "⚠️ <b>Alguien ha entrado y le he dejado MUDO</b>\n\n👤 {name} (id: <code>{uid}</code>)\n📍 {chat}\n\nSu nombre está en <b>ideogramas chinos</b>, que en un grupo hispano casi siempre es un bot de promoción. Pero su cuenta tiene <b>más de un año y foto</b>, así que podría ser una persona real y no he querido banearla por mi cuenta.\n\n<b>No puede escribir hasta que decidas.</b> Si no haces nada, sigue mudo."
 }
