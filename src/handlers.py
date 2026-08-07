@@ -16,6 +16,7 @@ from telegram.constants import ChatMemberStatus
 from telegram.error import TelegramError
 from telegram.ext import ContextTypes
 
+from . import borrado_diferido
 from . import admin_report, gentle_warning, greetings, learning, notify_prefs, quips, rule_explain, story_reader, trust as _trust, user_signals, verification
 from .config import Config
 from .db import DB
@@ -1661,7 +1662,7 @@ async def _send_review_request(
         jq = context.application.job_queue
         if jq is not None and public is not None:
             jq.run_once(
-                _antiflood_delete_job, when=6 * 3600,
+                borrado_diferido.borrar_mensaje_job, when=6 * 3600,
                 data={"chat_id": chat_id, "message_id": public.message_id},
                 name=f"del_review_aviso_{chat_id}_{public.message_id}",
             )
@@ -2026,7 +2027,7 @@ async def _antiflood_apply(
         jq = context.application.job_queue
         if jq is not None and sent is not None:
             jq.run_once(
-                _antiflood_delete_job, when=3600,
+                borrado_diferido.borrar_mensaje_job, when=3600,
                 data={"chat_id": chat_id, "message_id": sent.message_id},
                 name=f"del_antiflood_{chat_id}_{sent.message_id}",
             )
@@ -2110,14 +2111,6 @@ async def on_flood_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             pass
     else:
         await query.answer()
-
-
-async def _antiflood_delete_job(context: ContextTypes.DEFAULT_TYPE) -> None:
-    data = context.job.data
-    try:
-        await context.bot.delete_message(chat_id=data["chat_id"], message_id=data["message_id"])
-    except TelegramError:
-        pass
 
 
 async def _safe_cleanup_consecutive(

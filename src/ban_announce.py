@@ -11,6 +11,8 @@ Estado por chat en `context.bot_data["_ban_burst"][chat_id]`.
 """
 from __future__ import annotations
 
+from . import borrado_diferido
+
 import logging
 import time
 
@@ -56,15 +58,10 @@ def _schedule_delete(context, chat_id: int, message_id: int, delete_after: int,
             job.schedule_removal()
     name = f"del_banannounce_{chat_id}_{message_id}"
     jq.run_once(
-        _delete_announce_job, when=delete_after,
+        borrado_diferido.borrar_mensaje_job, when=delete_after,
         data={"chat_id": chat_id, "message_id": message_id}, name=name,
     )
     return name
-
-
-async def _delete_announce_job(context: ContextTypes.DEFAULT_TYPE) -> None:
-    data = context.job.data
-    await _delete_msg(context, data["chat_id"], data["message_id"])
 
 
 async def announce_ban(

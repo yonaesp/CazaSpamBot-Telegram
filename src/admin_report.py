@@ -28,6 +28,7 @@ from telegram import Message
 from telegram.error import TelegramError
 from telegram.ext import ContextTypes
 
+from . import borrado_diferido
 from .db import DB
 from .i18n import t, variant_keys
 
@@ -128,7 +129,7 @@ async def handle_admin_mention(
         jq = context.application.job_queue
         if jq:
             jq.run_once(
-                _delete_confirm_job, when=CONFIRM_TTL_S,
+                borrado_diferido.borrar_mensaje_job, when=CONFIRM_TTL_S,
                 data={"chat_id": msg.chat_id, "msg_id": bot_msg_id},
                 name=f"del_admin_confirm_{msg.chat_id}_{bot_msg_id}",
             )
@@ -163,14 +164,6 @@ async def handle_admin_mention(
             )
         except TelegramError as exc:
             log.debug("admin_report copy to admin DM fallo: %s", exc)
-
-
-async def _delete_confirm_job(context: ContextTypes.DEFAULT_TYPE) -> None:
-    data = context.job.data
-    try:
-        await context.bot.delete_message(chat_id=data["chat_id"], message_id=data["msg_id"])
-    except TelegramError:
-        pass
 
 
 async def on_reported_message_deleted(
