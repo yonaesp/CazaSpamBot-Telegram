@@ -1088,5 +1088,6 @@
   "hdl.bot_demoted": "⚠️ <b>My permissions were taken away</b>\n📍 Chat: {chat}\n👮 By: {actor}\n\nI am still in the group, but <b>I can no longer {perdidos}</b>.\n<i>Until they are restored I cannot moderate there: I will spot the spam and be unable to act on it.</i>",
   "hdl.bot_demoted.borrar": "delete messages",
   "hdl.bot_demoted.restringir": "kick or mute anyone",
-  "hdl.bot_demoted.admin": "act at all (no longer an admin)"
+  "hdl.bot_demoted.admin": "act at all (no longer an admin)",
+  "antiraid.aviso": "🌊 <b>Flood of joins</b>\n📍 Chat: {chat}\n\n<b>{n}</b> accounts joined within {ventana} seconds. For the next <b>{minutos} minutes</b> I will be stricter <i>only</i> with those arriving now.\n\n<i>I do not lock the group or mute anyone for joining: in a flood there are always ordinary people who happened to walk in.</i>"
 }

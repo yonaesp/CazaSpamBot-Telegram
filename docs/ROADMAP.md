@@ -20,6 +20,7 @@ anotado para no volver a proponerlo.
 | Cleanup agresivo post-ban | `maintenance.aggressive_post_ban_cleanup()`, solo Bot API y verificando el autor antes de borrar |
 | Detector de espaciado anómalo (era el 8) | `src/desofuscar.py`. Resuelto **al revés** de como estaba planteado: en vez de puntuar el espaciado, se DESHACE y deciden las reglas de contenido de siempre. Así no hay umbral nuevo que calibrar ni falso positivo que inventar. Medido: 11.560 mensajes reales, 0 tocados |
 | Palabras que mezclan alfabetos | `src/desofuscar.py`. **No estaba en la lista y era el agujero más grave**: cambiar UNA letra por su gemela cirílica dejaba `commercial_ad` en 0 (de 75) sin que saltara `unicode_script`, que mide proporción sobre el total |
+| Antiraid (era el 6) | `src/antiraid.py`. Resuelto como decía la nota: **no se cierra el grupo ni se silencia a nadie por entrar**, solo se bajan los umbrales unos minutos y **solo a quien llegó con la avalancha**. Umbral calibrado sobre las 881 entradas reales registradas: el máximo histórico en 60 s es 2 |
 | Meta-checks (contacto, solo-emoji, solo-media) | `contact_spam.py`, `emoji_only.py`, `first_msg_media.py`, `inline_buttons.py` |
 | Reputation graduation | `src/trust.py` + `src/gentle_warning.py`. Trust 0-100 que degrada, anula o manda a revisión |
 | Antiflood por usuario | `flood_state` en `db.py`, graduado por trust (5/8/12 msgs en 10s) |
@@ -112,17 +113,6 @@ tenemos `learning.text_hash()` y federación: hace falta una tabla
 Señal de una limpieza notable y con muy pocos falsos positivos, porque exige
 identidad exacta del texto normalizado. Es lo más rentable que queda por hacer.
 
-### 6. Antiraid: N entradas en M segundos
-**Dificultad**: BAJA-MEDIA.
-
-Ventana sobre `seen_users.join_ts`: si entran más de 5 en 30 segundos, subir la
-severidad temporalmente en ese chat. Hoy cada entrada se evalúa aislada, así que
-una raid coordinada se cuela mientras cada cuenta individual parezca normal.
-
-Cuidado con la acción: un mute global es tentador y castiga a los legítimos que
-entraban en ese momento. Mejor endurecer los umbrales durante unos minutos que
-cerrar el grupo.
-
 ---
 
 ## P2. Útil, pero sin urgencia
@@ -196,4 +186,4 @@ es un cambio pequeño.
 - **Soporte Postgres**: SQLite WAL sobra de largo para este volumen.
 - **Filtro de palabrotas**: antispam no es moderación de lenguaje.
 
-*Actualizado: 2026-08-02. 1182 tests en verde, 24 detectores.*
+*Actualizado: 2026-08-02. 1196 tests en verde, 24 detectores.*

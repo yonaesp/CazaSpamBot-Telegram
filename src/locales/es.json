@@ -1088,5 +1088,6 @@
   "hdl.bot_demoted": "⚠️ <b>Me han quitado permisos</b>\n📍 Chat: {chat}\n👮 Lo hizo: {actor}\n\nSigo dentro del grupo, pero <b>ya no puedo {perdidos}</b>.\n<i>Hasta que me los devuelvan, ahí no puedo moderar: detecto el spam y no puedo hacer nada con él.</i>",
   "hdl.bot_demoted.borrar": "borrar mensajes",
   "hdl.bot_demoted.restringir": "expulsar ni silenciar",
-  "hdl.bot_demoted.admin": "actuar (ya no soy administrador)"
+  "hdl.bot_demoted.admin": "actuar (ya no soy administrador)",
+  "antiraid.aviso": "🌊 <b>Avalancha de entradas</b>\n📍 Chat: {chat}\n\nHan entrado <b>{n}</b> cuentas en {ventana} segundos. Durante los próximos <b>{minutos} minutos</b> seré más estricto <i>solo</i> con quien llegue ahora.\n\n<i>No cierro el grupo ni silencio a nadie por entrar: en una avalancha siempre hay gente normal que pasaba por ahí.</i>"
 }

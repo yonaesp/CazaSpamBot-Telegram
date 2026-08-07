@@ -17,6 +17,7 @@ from telegram.error import TelegramError
 from telegram.ext import ContextTypes
 
 from . import borrado_diferido
+from . import antiraid
 from . import desofuscar
 from . import link_reader
 from . import admin_report, gentle_warning, greetings, learning, notify_prefs, quips, rule_explain, story_reader, trust as _trust, user_signals, verification
@@ -486,6 +487,14 @@ async def on_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     join_epoch = cmu.date.timestamp() if cmu.date else None
     db.record_join(cmu.chat.id, user.id, user.username, join_ts=join_epoch)
     db.remember_username(user.username, user.id)
+
+    # ¿Está entrando una avalancha? Todo lo demás en el bot razona persona a
+    # persona, y contra una raid eso no vale: el ataque no está en ninguna cuenta,
+    # está en el conjunto. Ver `antiraid.py`. NO se cierra el grupo ni se silencia
+    # a nadie por entrar; solo se endurecen los umbrales de quien llega ahora.
+    if antiraid.registrar_entrada(context, cmu.chat.id, join_epoch):
+        log.warning("antiraid: avalancha de entradas en chat=%s (%s)", cmu.chat.id, cmu.chat.title)
+        await antiraid.avisar(context, cfg, cmu.chat.id, cmu.chat.title)
 
     if db.is_banned(user.id):
         log.info("Usuario %s reentra estando baneado en federación → ban local", user.id)
@@ -1332,8 +1341,14 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     is_first_attack = is_first and any(
         h.rule in ("non_allowed_script", "external_mention_or_link") for h in real
     )
+    # Umbrales: los de siempre, salvo que esta persona haya llegado con una
+    # avalancha de entradas, y entonces un peldaño más abajo. No es una acción
+    # nueva ni una regla nueva: es la misma escala, con la duda resolviéndose al
+    # revés durante unos minutos. A quien ya estaba en el grupo no le afecta.
+    _ban_s, _kick_s, _mute_s = antiraid.umbrales(
+        context, cfg, chat_id, (prev_seen["join_ts"] if prev_seen is not None else None))
     decision = decide(
-        real, cfg.ban_score, cfg.kick_score, cfg.mute_score,
+        real, _ban_s, _kick_s, _mute_s,
         cfg.first_msg_attack_action, is_first_msg_attack=is_first_attack,
     )
 
