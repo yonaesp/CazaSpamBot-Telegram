@@ -20,6 +20,7 @@ from . import borrado_diferido
 from . import antiraid
 from . import desofuscar
 from . import link_reader
+from . import llm_veto
 from . import admin_report, gentle_warning, greetings, learning, notify_prefs, quips, rule_explain, story_reader, trust as _trust, user_signals, verification
 from .config import Config
 from .db import DB
@@ -1384,6 +1385,33 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         real, _ban_s, _kick_s, _mute_s,
         cfg.first_msg_attack_action, is_first_msg_attack=is_first_attack,
     )
+
+    # Segunda opinión de un modelo, y SOLO para TUMBAR la acción. Nunca para
+    # crearla: en el peor de los casos deja pasar un spam (el error barato), nunca
+    # castiga a alguien legítimo (el error caro). Apagado por defecto, solo en la
+    # zona gris, y cualquier fallo mantiene lo que decían las reglas. Ver `llm_veto.py`.
+    if llm_veto.activo(cfg) and llm_veto.procede_preguntar(
+            decision.action, decision.score, [h.rule for h in real], HARD_RULES_BAN):
+        vetar, motivo = await llm_veto.veta(
+            cfg, (msg_txt.text or msg_txt.caption or ""),
+            [h.rule for h in real], getattr(msg.chat, "title", None))
+        if vetar:
+            log.info("llm_veto: acción %s ANULADA sobre user=%s (%s) reglas=%s",
+                     decision.action, user.id, motivo, [h.rule for h in real])
+            db.log_action(
+                chat_id=chat_id, user_id=user.id, username=user.username,
+                message_id=msg.message_id, rule="+".join(h.rule for h in real),
+                action="noop_llm_veto", score=decision.score,
+                mode=("shadow" if cfg.shadow else "active"),
+                payload={"would_be": decision.action, "motivo": motivo},
+            )
+            await _send_trust_notice(
+                context, db, cfg, msg, user, rules=[h.rule for h in real],
+                reason=decision.reason + " | veto: " + motivo,
+                proposed_action=decision.action,
+                trust=_trust_score_cached(context, db, chat_id, user.id),
+            )
+            return
 
     # Modo suave del chat: silenciar para siempre en vez de expulsar. Un falso
     # positivo con mute se deshace sin que la persona se entere; uno con ban la

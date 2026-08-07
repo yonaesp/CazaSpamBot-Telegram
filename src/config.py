@@ -91,6 +91,8 @@ class Config:
     # si quieres el quip público (sarcástico) en el grupo al banear.
     public_quip_enabled: bool = False
     soft_ban: bool = False
+    llm_veto: bool = False
+    llm_veto_model: str = "claude-opus-5"
     public_quip_delete_after_s: int = 3600
     # Cuánto dura el aviso público de un /ban CON motivo escrito a mano.
     # 0 = permanente, que es el defecto: si el admin se molestó en escribir
@@ -235,6 +237,8 @@ def load_config() -> Config:
         external_notify_chat_id=ext_chat,
         public_quip_enabled=_bool("PUBLIC_QUIP_ENABLED", False),
         soft_ban=_bool("SOFT_BAN", False),
+        llm_veto=_bool("LLM_VETO", False),
+        llm_veto_model=os.getenv("LLM_VETO_MODEL", "claude-opus-5"),
         public_quip_delete_after_s=_int("PUBLIC_QUIP_DELETE_AFTER_S", 3600),
         ban_notice_delete_after_s=_int("BAN_NOTICE_DELETE_AFTER_S", 0),
         quip_on_auto_ban=_bool("QUIP_ON_AUTO_BAN", False),

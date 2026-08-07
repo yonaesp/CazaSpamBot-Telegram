@@ -29,7 +29,7 @@ cuando solo queda el código. No hace falta leerlo entero, salta a lo que toques
 
 Bot de moderación antispam para Telegram, multi-grupo y federado, en producción 24/7.
 
-- **18.117 líneas** en `src/` (68 módulos), **11.016** en `tests/` (89 ficheros, 1213 tests).
+- **18.117 líneas** en `src/` (68 módulos), **11.016** en `tests/` (89 ficheros, 1232 tests).
 - **25 detectores**, tres capas de listas negras, clasificador propio, panel de ajustes
   por chat, i18n con autodescubrimiento de idiomas.
 - Un solo proceso Python, una sola base SQLite, un contenedor Docker.
@@ -143,7 +143,7 @@ cualquier excepción. Ninguna función decorativa puede impedir una acción de m
 | `notifier.py` | Aviso al admin, opcionalmente vía un segundo bot |
 | `reporter.py` | Cola async + worker Telethon para reportes oficiales a Telegram |
 | `telethon_bridge.py` | Listener `MessageDeleted` para borrar avisos en cascada |
-| `admin.py` | Comandos de admin (1213 líneas) |
+| `admin.py` | Comandos de admin (1232 líneas) |
 | `warns_mod.py`, `topweekly.py`, `group_clean.py`, `admin_report.py`, `gentle_warning.py`, `greetings.py`, `maintenance.py`, `scan_cmd.py`, `lang_cmd.py`, `permissions.py` | Funciones acotadas, ver docstring de cada uno |
 
 ## 4. Flujo de un join (`on_chat_member`)
@@ -840,7 +840,7 @@ capturaba como error genérico y **el ban se perdía en silencio, sin reintento*
 
 ## 13. Tests
 
-**1213 tests en 8,3 segundos**, sin red ni base real. Cada detector tiene sus casos positivos y
+**1232 tests en 8,3 segundos**, sin red ni base real. Cada detector tiene sus casos positivos y
 negativos, con foco en los negativos: un falso positivo es peor que un falso negativo.
 
 Aparte de los tests de lógica, hay **tests meta que protegen invariantes del proyecto**. Cada uno

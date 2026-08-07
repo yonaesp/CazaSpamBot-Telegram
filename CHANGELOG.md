@@ -4,6 +4,68 @@ Cambios relevantes de CazaSpamBot, lo más reciente arriba. Se anotan hitos, no
 cada commit: para el detalle está el historial de git. Sin números de versión
 porque el bot es un servicio en producción continua, no un paquete que se libera.
 
+## 2026-08 · Lo que faltaba del repaso a otros bots
+
+Cuatro piezas que salieron de comparar con `tg-spam` y del propio roadmap, más un
+bloque de mantenimiento.
+
+### Antiraid — mirar el grupo, no a cada uno por separado
+
+Todo lo demás razona persona a persona, y contra una raid eso no vale: el ataque
+no está en ninguna cuenta, está en el conjunto. **No se cierra el grupo ni se
+silencia a nadie por entrar** (eso convierte un ataque en una caída del grupo, que
+es lo que busca quien lo lanza): el chat entra en alerta unos minutos y los
+umbrales bajan un peldaño **solo para quien llegó con la avalancha**. El umbral se
+calibró sobre las **881 entradas reales** registradas: el máximo histórico en 60 s
+es **2**, así que con 6 hay un margen de tres veces.
+
+### El mismo mensaje en varios grupos a la vez
+
+Aprovecha la **federación**, que casi ningún bot tiene: quien modera un grupo no
+puede ver esto. **No mira el contenido**, así que caza campañas cuyo vocabulario
+las listas todavía no conocen. Tres chats como mínimo (con dos se equivocaba: quien
+tiene un problema pregunta en el de Windows 10 y en el de Windows 11), ventana de
+15 min, textos cortos fuera, y comparación sobre el texto normalizado.
+
+### Modo suave por grupo
+
+Silenciar para siempre en vez de expulsar: un falso positivo con mute se deshace
+sin que la persona se entere. Apagado por defecto, por chat desde `/config`. **Las
+reglas duras no se ablandan**: a un spammer confirmado por CAS o lols, dejarlo
+dentro mudo es dejarlo dentro.
+
+### Veto por LLM — solo puede TUMBAR acciones
+
+La idea de `tg-spam` que sí merecía la pena, y solo en su modo veto. El modelo **no
+acusa**: se le pregunta por lo que las reglas ya marcaron, y si dice que aquello no
+es spam, se anula el castigo. Encaja con la primera regla del proyecto porque solo
+puede **reducir** acciones: en el peor caso deja pasar un spam (el error barato) y
+jamás castiga a alguien legítimo (el caro).
+
+Apagado por defecto y con cinturones por todas partes: sin `ANTHROPIC_API_KEY` no
+se activa aunque esté a true; solo se pregunta en la zona gris (70-160 puntos) y
+nunca por las reglas duras; tope de 8 s porque los updates se procesan de uno en
+uno; y **cualquier** problema — timeout, error de red, respuesta ambigua, paquete
+ausente — mantiene lo que decidieron las reglas. El silencio no perdona a nadie.
+Cada veto queda anotado en `moderation_log` y avisa al admin.
+
+### Mantenimiento
+
+- **Los contadores de los docs ya no se pudren**: un test compara lo que presumen
+  README/ARCHITECTURE/ROADMAP con la realidad. Nada más escribirlo encontró dos
+  desfases (el README decía 1018 con 1146 tests; ARCHITECTURE, «los 15 detectores»
+  con 24).
+- **Aviso cuando le recortan permisos sin echarlo**, que era el fallo más
+  silencioso: el bot se quedaba dentro, aparecía en `/chats`, detectaba el spam y
+  no podía tocarlo.
+- **Se guarda el primer mensaje de cada usuario**: `last_msg_text` se pisa, y de
+  una cuenta cuyo último texto era «0.1» no había forma de saber qué escribió al
+  entrar.
+- Fuera dos duplicados que iban a divergir (la tabla de tiempos de verificación,
+  el pintado del top semanal).
+- **`external_mention` deja de estar atado al español**: puntuaba 130 en vez de 60
+  cuando el texto «no parece español», con la heurística clavada en el código.
+
 ## 2026-08 · Quitarle el disfraz al texto
 
 De repasar qué hacen mejor otros bots conocidos. `tg-spam` (umputun, el más

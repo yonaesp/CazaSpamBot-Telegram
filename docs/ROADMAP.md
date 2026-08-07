@@ -23,6 +23,7 @@ anotado para no volver a proponerlo.
 | Antiraid (era el 6) | `src/antiraid.py`. Resuelto como decía la nota: **no se cierra el grupo ni se silencia a nadie por entrar**, solo se bajan los umbrales unos minutos y **solo a quien llegó con la avalancha**. Umbral calibrado sobre las 881 entradas reales registradas: el máximo histórico en 60 s es 2 |
 | Mensaje duplicado entre chats (era el 5) | `src/detectors/cross_post.py`. **No mira el contenido**, así que caza campañas cuyo vocabulario las listas todavía no conocen. Tres chats distintos como mínimo (con dos se equivocaba: quien tiene un problema pregunta en el de Windows 10 y en el de Windows 11) |
 | Soft-ban (era el 7) | Columna `chat_settings.soft_ban` (NULL = hereda `SOFT_BAN` del .env) y botón en `/config`. Convierte `ban` en mute permanente, **salvo reglas duras**: a un spammer confirmado por CAS o lols dejarlo dentro mudo es dejarlo dentro |
+| Veto por LLM (era el 11) | `src/llm_veto.py`. **Solo puede TUMBAR acciones, nunca crearlas**: en el peor caso deja pasar un spam (el error barato), jamás castiga a alguien legítimo (el caro). Apagado por defecto, solo en la zona gris (70-160), nunca en reglas duras, y cualquier fallo o espera mantiene lo que decidieron las reglas |
 | Meta-checks (contacto, solo-emoji, solo-media) | `contact_spam.py`, `emoji_only.py`, `first_msg_media.py`, `inline_buttons.py` |
 | Reputation graduation | `src/trust.py` + `src/gentle_warning.py`. Trust 0-100 que degrada, anula o manda a revisión |
 | Antiflood por usuario | `flood_state` en `db.py`, graduado por trust (5/8/12 msgs en 10s) |
@@ -128,19 +129,7 @@ es *revisión humana* y nunca una acción automática.
 zalgo ni ristras de emojis en el `username`. Hueco pequeño y algo anticuado:
 Telegram ya restringe bastante los usernames.
 
-### 10. Veto por LLM (solo para TUMBAR, nunca para acusar)
-
-**Dificultad**: MEDIA. **Origen**: tg-spam `--openai.veto` / `--gemini`.
-
-tg-spam puede consultar a un modelo en dos modos, y el interesante es el segundo:
-en modo **veto** el modelo NO acusa, solo se le pregunta por lo que las reglas ya
-han marcado, y si dice que no es spam se anula la acción. Encaja con la doctrina de
-aquí (falsos positivos > falsos negativos) porque solo puede REDUCIR acciones, nunca
-crearlas. Coste: una dependencia de red y de dinero en la ruta de moderación, con lo
-que habría que acotarlo a los casos borderline (40-69) y con timeout, o acabaría
-congelando el bot. Antes de esto está agotar las señales deterministas.
-
-### 11. Contexto de conversación en los detectores
+### 10. Contexto de conversación en los detectores
 
 **Dificultad**: MEDIA. **Origen**: tg-spam (`context window`).
 
@@ -166,4 +155,4 @@ es un cambio pequeño.
 - **Soporte Postgres**: SQLite WAL sobra de largo para este volumen.
 - **Filtro de palabrotas**: antispam no es moderación de lenguaje.
 
-*Actualizado: 2026-08-02. 1213 tests en verde, 25 detectores.*
+*Actualizado: 2026-08-02. 1232 tests en verde, 25 detectores.*
