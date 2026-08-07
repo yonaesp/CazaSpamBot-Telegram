@@ -18,6 +18,8 @@ anotado para no volver a proponerlo.
 | Normalizador zero-width + NFKC | `learning.normalize()` (NFKC + zero-width + casefold) |
 | Forward de canal sospechoso | `src/detectors/forward_first_msg.py`. Distinto de lo planeado: en vez de blocklist de canales concretos, dispara por *forward en los primeros mensajes*, que envejece mejor y no hay que mantener |
 | Cleanup agresivo post-ban | `maintenance.aggressive_post_ban_cleanup()`, solo Bot API y verificando el autor antes de borrar |
+| Detector de espaciado anómalo (era el 8) | `src/desofuscar.py`. Resuelto **al revés** de como estaba planteado: en vez de puntuar el espaciado, se DESHACE y deciden las reglas de contenido de siempre. Así no hay umbral nuevo que calibrar ni falso positivo que inventar. Medido: 11.560 mensajes reales, 0 tocados |
+| Palabras que mezclan alfabetos | `src/desofuscar.py`. **No estaba en la lista y era el agujero más grave**: cambiar UNA letra por su gemela cirílica dejaba `commercial_ad` en 0 (de 75) sin que saltara `unicode_script`, que mide proporción sobre el total |
 | Meta-checks (contacto, solo-emoji, solo-media) | `contact_spam.py`, `emoji_only.py`, `first_msg_media.py`, `inline_buttons.py` |
 | Reputation graduation | `src/trust.py` + `src/gentle_warning.py`. Trust 0-100 que degrada, anula o manda a revisión |
 | Antiflood por usuario | `flood_state` en `db.py`, graduado por trust (5/8/12 msgs en 10s) |
@@ -133,18 +135,7 @@ requiere que vuelva a pedir entrar. Encaja con la filosofía del proyecto. El
 motivo de que no esté es que el trust score ya degrada `ban` a `mute` en la zona
 gris, que era el 80% del beneficio.
 
-### 8. Detector de espaciado anómalo
-**Dificultad**: BAJA.
-**Origen**: tg-spam `--space.enabled`.
-
-Ratio `espacios/caracteres > 0.4`, o más del 70% de palabras de 2 caracteres o
-menos. Caza el «G A N A  D I N E R O» que rompe las blocklists.
-
-Ojo con los falsos positivos: mensajes muy cortos y listas de siglas dan ese
-ratio de forma natural. Debería exigir longitud mínima y limitarse a primeros
-mensajes.
-
-### 9. Normalizar emojis antes de pasar las blocklists
+### 8. Normalizar emojis antes de pasar las blocklists
 **Dificultad**: BAJA.
 
 Sustituir emojis por su nombre (`emoji.demojize`) antes de aplicar los patrones,
@@ -152,7 +143,7 @@ para cazar el «💰💰 gana 500€ 💰» donde el emoji reemplaza a la palabr
 `emoji_only.py` cubre otro caso distinto (el mensaje que es solo emojis), no
 este. Añade una dependencia por un beneficio moderado.
 
-### 10. `/report` de miembros con umbral
+### 9. `/report` de miembros con umbral
 **Dificultad**: BAJA de código, DUDOSA de diseño.
 
 Que 3 miembros distintos reporten un mensaje en X minutos y eso lo mande a
@@ -160,12 +151,33 @@ revisión del admin. Suena bien y es un vector de abuso obvio: tres cuentas
 coordinadas mandan a revisión a quien quieran. Solo tiene sentido si el resultado
 es *revisión humana* y nunca una acción automática.
 
-### 11. Blocklist de símbolos en el username
+### 10. Blocklist de símbolos en el username
 **Dificultad**: BAJA.
 
 `_is_obvious_spam_profile` ya mira scripts no latinos en el perfil, pero no
 zalgo ni ristras de emojis en el `username`. Hueco pequeño y algo anticuado:
 Telegram ya restringe bastante los usernames.
+
+### 11. Veto por LLM (solo para TUMBAR, nunca para acusar)
+
+**Dificultad**: MEDIA. **Origen**: tg-spam `--openai.veto` / `--gemini`.
+
+tg-spam puede consultar a un modelo en dos modos, y el interesante es el segundo:
+en modo **veto** el modelo NO acusa, solo se le pregunta por lo que las reglas ya
+han marcado, y si dice que no es spam se anula la acción. Encaja con la doctrina de
+aquí (falsos positivos > falsos negativos) porque solo puede REDUCIR acciones, nunca
+crearlas. Coste: una dependencia de red y de dinero en la ruta de moderación, con lo
+que habría que acotarlo a los casos borderline (40-69) y con timeout, o acabaría
+congelando el bot. Antes de esto está agotar las señales deterministas.
+
+### 12. Contexto de conversación en los detectores
+
+**Dificultad**: MEDIA. **Origen**: tg-spam (`context window`).
+
+Hoy cada mensaje se juzga solo. Un mensaje inocuo puede ser spam por lo que va
+antes o después (el clásico: primero «hola», luego el enlace). Guardar los últimos
+N mensajes del usuario y juzgarlos juntos cambiaría bastantes umbrales, así que no
+es un cambio pequeño.
 
 ---
 
