@@ -1,0 +1,12 @@
+# «Este es mi NUEVO numero» (detector `offplatform_contact`): quien se hace pasar
+# por un contacto conocido que ha cambiado de telefono.
+#
+# Senal de APOYO: nunca dispara sola. Va en su propia lista, y no junto al gancho
+# afectivo, porque es una senal de naturaleza distinta y conviene poder tocarlas
+# por separado.
+
+nuevo\s+n[úu]mero
+n[úu]mero\s+nuevo
+cambi[ée]\s+de\s+n[úu]mero
+new\s+number
+changed\s+my\s+number

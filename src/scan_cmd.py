@@ -32,6 +32,7 @@ from .detectors import external_mention as ext_det
 from .detectors import external_reply as extreply_det
 from .detectors import forward_first_msg as fwd_det
 from .detectors import inline_buttons as buttons_det
+from .detectors import offplatform_contact as offplat_det
 from .detectors import tg_deeplink as tgdeep_det
 from .detectors import unicode_script as script_det
 from .detectors import url_blocklist as url_det
@@ -242,6 +243,7 @@ async def _responder_scan(context, msg, target, cfg: Config, db: DB) -> None:
         # estafa salía como «no se detectaría» aunque el bot sí lo cazara.
         invscam_det.check(target, is_first_msg=True),
         emoji_det.check(target, is_first_msg=True),
+        offplat_det.check(target, is_first_msg=True),
         fwd_det.check(target, is_first_msg=True, seconds_since_first_seen=0.0),
     ]
     real = [h for h in hits if h]

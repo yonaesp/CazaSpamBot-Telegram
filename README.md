@@ -8,7 +8,7 @@
 [![python-telegram-bot](https://img.shields.io/badge/PTB-22.8-26A5E4?logo=telegram&logoColor=white)](https://python-telegram-bot.org/)
 [![Telethon](https://img.shields.io/badge/Telethon-1.44-blueviolet)](https://docs.telethon.dev/)
 [![Languages](https://img.shields.io/badge/languages-es%20%7C%20en%20%7C%20add%20yours-orange)](src/locales/README.md)
-[![Tests](https://img.shields.io/badge/tests-1117%20passing-success)](#-tests)
+[![Tests](https://img.shields.io/badge/tests-1137%20passing-success)](#-tests)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 
 🌍 **English** · [**Español**](README.es.md)
@@ -24,7 +24,7 @@
 CazaSpamBot watches your Telegram groups and removes spam **before it becomes a nuisance**, with one obsession: **never ban a legitimate user**. It would rather let a borderline spam slip through than kick a real person.
 
 - 🔗 **Synchronized bans** — a ban in one group = a ban across **all** your groups (what other bots call *federation*). No native primitive: it iterates over every chat where it's an admin.
-- 🧠 **23 detectors** combined with a graduated trust system.
+- 🧠 **24 detectors** combined with a graduated trust system.
 - 🤫 **Silent moderation** — automatic bans don't clutter the chat.
 - 📚 **Active learning** — learns from your `/spam` and `/legal` calls (Naive Bayes + cosine similarity).
 - 🛰️ **Official reports** to Telegram (Native Antispam) over MTProto.
@@ -331,7 +331,7 @@ Group members can report with **`@admin`** (reply to a message); the bot notifie
 ## 🧪 Tests
 
 ```bash
-.venv/bin/python -m pytest tests/ -q     # 1117 tests
+.venv/bin/python -m pytest tests/ -q     # 1137 tests
 ```
 
 Every detector has **positive and negative** test cases (emphasis on anti-false-positives). Philosophy: *a false positive is worse than a false negative.*
@@ -364,7 +364,7 @@ config/
 ├── welcomes/            # editable greetings (generic + per group)
 └── blacklist/           # editable anti-spam words/regex
 docs/                    # ARCHITECTURE, ROADMAP, ...
-tests/                   # 1117 tests
+tests/                   # 1137 tests
 ```
 
 ---

@@ -1,0 +1,29 @@
+# Aplicaciones de mensajeria FUERA de Telegram (detector `offplatform_contact`).
+#
+# Esta lista es solo el ANCLA, y el ancla no decide nada sola: hace falta ademas
+# un numero de telefono en el mismo mensaje y al menos una senal de apoyo. Nombrar
+# WhatsApp no es spam; darlo como destino al que seguir la conversacion, si.
+#
+# Los nombres son iguales en todos los idiomas, por eso no hay variante por idioma.
+# Un patron por linea (palabra o regex). # = comentario. Usa (?:...) no (...).
+
+# --- Los mas usados por el timo romantico y la estafa de inversion ---
+zangi
+botim
+viber
+
+# --- Mensajeria general ---
+whats?app
+wasap
+wsp
+wa\.me
+wechat
+weixin
+kakaotalk
+skype
+snapchat
+hangouts
+facetime
+imessage
+signal
+messenger

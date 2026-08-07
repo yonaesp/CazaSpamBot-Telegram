@@ -1,0 +1,14 @@
+# Llamada a seguir la conversacion EN OTRO SITIO (detector `offplatform_contact`).
+#
+# El adverbio es lo que importa: «escribeme AHI», «contactame AHORA». Sin el no es
+# una redireccion, es un «escribeme» corriente, que en un grupo de ayuda dice
+# cualquiera y no prueba absolutamente nada.
+#
+# Un patron por linea (palabra o regex). # = comentario. Usa (?:...) no (...).
+
+escr[íi]b[ei]me\s+(?:por\s+)?(?:ah[íi]|all[íi]|all[áa]|ahora)
+escribirme\s+(?:ah[íi]|all[íi]|ahora)
+cont[áa]ctame\s+(?:ah[íi]|all[íi]|ahora)
+h[áa]blame\s+(?:por\s+)?(?:ah[íi]|all[íi])
+agr[ée]game\s+(?:ah[íi]|all[íi])
+b[úu]scame\s+(?:ah[íi]|all[íi])

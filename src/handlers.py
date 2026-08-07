@@ -40,6 +40,7 @@ from .detectors import dormant_bot_mention as dormant_bot_det
 from .detectors import emoji_only as emoji_only_det
 from .detectors import jfm_delta as jfm_det
 from .detectors import link_target as link_target_det
+from .detectors import offplatform_contact as offplat_det
 from .detectors import lols_bot as lols_det
 from .detectors import premium_new_link as premium_det
 from .detectors import reaction_farming as react_det
@@ -1078,6 +1079,10 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     # 3d-quint) Primer mensaje dominado por emojis sin texto real (captación
     # de atención típica de spam, ej. "🍭🍄🌟").
     hits.append(emoji_only_det.check(msg, is_first_msg=is_first))
+    # 3d-sext) "Este es mi número de <otra app>, escríbeme ahí". Sin enlace, sin
+    # mención y en español correcto, así que ningún otro detector lo veía: hubo que
+    # borrarlo a mano tras hora y cuarto en el grupo.
+    hits.append(offplat_det.check(msg, is_first_msg=is_first))
     # 3d-bis) Forward desde canal/bot en primer mensaje o primeros 3 min → ban directo
     seen_row_fwd = db.get_seen(chat_id, user.id)
     secs_since_first = None

@@ -1,0 +1,10 @@
+# Llamada a seguir la conversacion en otro sitio, en INGLES
+# (detector `offplatform_contact`). Se SUMAN a las del archivo generico.
+#
+# Igual que en el generico: el adverbio de destino («there», «now») es lo que
+# convierte un «write me» normal en una redireccion fuera de Telegram.
+
+(?:write|text|message|dm)\s+(?:to\s+)?me\s+(?:there|now|right\s+now)
+(?:contact|reach)\s+me\s+(?:there|now)
+add\s+me\s+(?:there|on\s+\w+)
+hit\s+me\s+up\s+(?:there|on\s+\w+)

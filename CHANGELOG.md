@@ -4,6 +4,32 @@ Cambios relevantes de CazaSpamBot, lo más reciente arriba. Se anotan hitos, no
 cada commit: para el detalle está el historial de git. Sin números de versión
 porque el bot es un servicio en producción continua, no un paquete que se libera.
 
+## 2026-08 · «Escríbeme a este otro sitio»
+
+Segundo de los dos spams que había que borrar a mano, y por un motivo **distinto**
+al del enlace: a este no lo tapó ninguna regla, es que **no había regla**.
+
+- **Lo que pasó** (07/08, Windows 10): cuenta nueva, catorce minutos después de
+  entrar, primer y único mensaje: *«Este es mi número de Zangi; puedes escribirme
+  ahí ahora mismo 👉👉 …  Cariño, este es mi nuevo número de Zangi: … Escríbeme
+  ahora 💞❤️❤️»*. Ni enlace, ni @mención, ni alfabeto raro, y en español correcto:
+  **ningún detector tenía nada que mirar**. Hora y cuarto en el grupo hasta que un
+  admin lo borró y baneó a mano.
+- Detector **`offplatform_contact`**. Es la entrada del timo romántico y de la
+  estafa de inversión: sacar a la víctima de Telegram, donde nadie modera, antes de
+  pedirle nada.
+- Diseñado con el molde de `investment_scam`, porque el riesgo es el mismo: **la
+  señal fuerte no es el tema, es la discordancia**. Dar un teléfono no es spam y
+  decir «escríbeme por privado» tampoco; lo raro es un número **de otra app** más
+  una llamada a seguir la conversación **allí**. El adverbio de destino («ahí»,
+  «there») es justo lo que separa el spam del mensaje legítimo que más se le parece.
+- **Ninguna señal decide sola**: sin ancla no se mira nada, y con ancla hace falta
+  al menos un apoyo (redirección, gancho afectivo o «número nuevo»). El primer
+  mensaje solo refuerza. Así «mi whatsapp es 600123456» NO cae.
+- Cuatro listas editables (`offplatform_apps` · `_cta` · `_hook` · `_newnumber`).
+- **Medido contra el tráfico real de los tres grupos: 11.560 mensajes, 0 falsos
+  positivos.**
+
 ## 2026-08 · A dónde lleva el enlace
 
 Un enlace `t.me` a otro chat era una señal **a ciegas**: el bot sabía que existía,

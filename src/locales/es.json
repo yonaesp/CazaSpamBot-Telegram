@@ -1069,5 +1069,15 @@
   "quip.link_target_spam.2": "🕵️ Antes de dejar pasar un enlace me gusta ver qué hay al otro lado. Lo de <b>{name}</b> no era domótica precisamente.",
   "quip.link_target_spam.3": "🚪 <b>{name}</b> abría la puerta a un sitio que se describe solito. Fuera.",
   "quip.link_target_spam.4": "📎 El enlace de <b>{name}</b> no iba donde decía ir. Adiós.",
-  "quip.link_target_spam.5": "🧭 He seguido el enlace de <b>{name}</b> hasta el final. Mejor no cuento lo que había."
+  "quip.link_target_spam.5": "🧭 He seguido el enlace de <b>{name}</b> hasta el final. Mejor no cuento lo que había.",
+  "reason.offplatform_anchor": "Da un número de {app} (otra app de mensajería)",
+  "reason.offplatform_redirect": "y pide seguir la conversación allí",
+  "reason.offplatform_hook": "con trato afectivo de entrada",
+  "reason.offplatform_new_number": "presentándolo como su «número nuevo»",
+  "rule.offplatform_contact": "Daba su número en otra aplicación de mensajería y pedía seguir la conversación allí. Es la entrada del timo romántico y de la estafa de inversión: sacar a la víctima de Telegram, donde nadie modera, antes de pedirle nada.",
+  "quip.offplatform_contact.1": "📵 <b>{name}</b> quería llevarse la conversación a otra app. Se la lleva él solo. Hasta lueguito.",
+  "quip.offplatform_contact.2": "☎️ Aquí no repartimos teléfonos de desconocidos. <b>{name}</b>, fuera.",
+  "quip.offplatform_contact.3": "💔 <b>{name}</b> llamando «cariño» a mil desconocidos a la vez. Adiós.",
+  "quip.offplatform_contact.4": "🚪 «Escríbeme por ahí» es el primer paso del timo. <b>{name}</b> no dará el segundo.",
+  "quip.offplatform_contact.5": "📞 <b>{name}</b> dejaba su número para seguir en privado fuera de aquí. Justo por eso se va."
 }

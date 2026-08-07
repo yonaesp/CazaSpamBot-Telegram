@@ -1,0 +1,16 @@
+# Trato afectivo de entrada (detector `offplatform_contact`): el gancho del timo
+# romantico, que llama «carino» a alguien a quien no conoce de nada.
+#
+# Es una senal de APOYO: nunca dispara sola, solo suma cuando ya hay un numero de
+# otra app en el mensaje. Por eso puede permitirse palabras corrientes.
+#
+# Un patron por linea (palabra o regex). # = comentario. Usa (?:...) no (...).
+
+cari[ñn]o
+mi\s+amor
+mi\s+vida
+mi\s+cielo
+beb[ée]
+guap[oa]
+preciosa
+linda

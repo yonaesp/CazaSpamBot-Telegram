@@ -1,0 +1,9 @@
+# Trato afectivo de entrada, en INGLES (detector `offplatform_contact`).
+# Se SUMAN a los del archivo generico. Senal de APOYO: nunca dispara sola.
+
+honey
+sweetie
+darling
+\bbabe\b
+my\s+love
+beautiful\s+(?:lady|girl)

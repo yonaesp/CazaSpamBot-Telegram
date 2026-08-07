@@ -1069,5 +1069,15 @@
   "quip.link_target_spam.2": "🕵️ Before letting a link through I like to see what is on the other side. <b>{name}</b>'s was not it.",
   "quip.link_target_spam.3": "🚪 <b>{name}</b> was opening a door to a place that describes itself. Out.",
   "quip.link_target_spam.4": "📎 <b>{name}</b>'s link did not go where it said it did. Goodbye.",
-  "quip.link_target_spam.5": "🧭 I followed <b>{name}</b>'s link all the way. Better not say what was there."
+  "quip.link_target_spam.5": "🧭 I followed <b>{name}</b>'s link all the way. Better not say what was there.",
+  "reason.offplatform_anchor": "Gives a {app} number (another messaging app)",
+  "reason.offplatform_redirect": "and asks to continue the conversation there",
+  "reason.offplatform_hook": "with an opening term of endearment",
+  "reason.offplatform_new_number": "presenting it as their «new number»",
+  "rule.offplatform_contact": "They gave their number on another messaging app and asked to continue there. That is the opening move of romance and investment scams: get the victim off Telegram, where nobody moderates, before asking for anything.",
+  "quip.offplatform_contact.1": "📵 <b>{name}</b> wanted to move the chat to another app. Moving on alone, then. Bye now.",
+  "quip.offplatform_contact.2": "☎️ We do not hand out strangers' phone numbers here. <b>{name}</b>, out.",
+  "quip.offplatform_contact.3": "💔 <b>{name}</b> calling a thousand strangers «darling» at once. Goodbye.",
+  "quip.offplatform_contact.4": "🚪 «Write me over there» is step one of the scam. <b>{name}</b> will not take step two.",
+  "quip.offplatform_contact.5": "📞 <b>{name}</b> left a number to keep talking somewhere else. That is exactly why they are leaving."
 }
