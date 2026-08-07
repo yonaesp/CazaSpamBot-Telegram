@@ -1,0 +1,243 @@
+"""Vigilar al recién llegado que aún no ha escrito.
+
+El bot mira dos veces a cada usuario: **al entrar** y **al escribir su primer
+mensaje**. Entre esas dos hay un hueco que puede durar horas o días, y ahí es
+donde se cuelan dos cosas medidas en producción, las dos en el grupo de domótica:
+
+1. **lols.bot ficha tarde.** Esas listas se alimentan de denuncias, así que un
+   spammer recién creado todavía no está en ellas cuando entra. Medido:
+
+       @Juan  (8681588748)  entró 07/08 07:14 → limpio en lols
+                            escribió 08:49    → lols YA lo tenía  (1 h 35 min)
+       (8953604344)         entró 06/08 00:01 → limpio en lols
+                            escribió 12:16    → lols YA lo tenía  (12 h 14 min)
+       (8633122166)         entró 05/08 07:51 → escribió 27 h después, fichado
+
+   El bot no «esperaba a que escribieran»: preguntó al entrar y le dijeron que
+   estaban limpios. Solo se enteró al volver a preguntar con el primer mensaje.
+
+2. **El nombre se cambia DESPUÉS de verificarse.** El 8953604344 pasó la
+   verificación de botón **en 3 segundos** y doce horas más tarde escribía con el
+   nombre `唔活诗我` y el usuario `zBuepQqZEcvifAeaGK`. Con ese nombre, entrar le
+   habría costado un ban inmediato (`_is_obvious_spam_profile` lo confirma), así
+   que lo lógico es que entrara con otro y se lo cambiara ya dentro. El perfil no
+   se volvía a mirar nunca.
+
+Este trabajo cierra el hueco: cada cuarto de hora repasa a los que entraron hace
+poco y **todavía no han escrito**, y les vuelve a aplicar exactamente los mismos
+criterios del join. Nada nuevo que ajustar, ningún umbral propio: si algo cambió
+(la lista ya lo tiene, el nombre ya no es el de antes), se actúa igual que si
+acabara de entrar.
+
+Topes, porque esto corre solo y contra APIs de terceros:
+- solo se vigila las primeras `VENTANA_S` horas desde la entrada,
+- a la misma persona no se le consulta más de una vez por `RECHEQUEO_S`,
+- como mucho `MAX_POR_CICLO` personas por vuelta.
+"""
+from __future__ import annotations
+
+import logging
+import time
+
+from telegram.error import TelegramError
+
+from .config import Config
+from .db import DB
+from .detectors import cas as cas_det
+from .detectors import lols_bot as lols_det
+from .i18n import t
+from .scoring import decide
+
+log = logging.getLogger(__name__)
+
+# Cuánto tiempo se vigila a alguien que acaba de entrar. Un día cubre de sobra los
+# casos medidos (el peor tardó 27 h en escribir, pero ya estaba fichado a las 24).
+VENTANA_S = 24 * 3600
+# Espera mínima entre dos consultas sobre la misma persona.
+RECHEQUEO_S = 3600
+# Personas por vuelta. Con el trabajo cada 15 min son 100 a la hora como techo.
+MAX_POR_CICLO = 25
+
+_CLAVE_CACHE = "_recien_llegados_visto"
+
+
+def _toca_mirar(context, chat_id: int, user_id: int) -> bool:
+    """¿Ha pasado ya el tiempo mínimo desde la última consulta sobre esta persona?
+
+    En memoria a propósito: perderlo al reiniciar solo cuesta unas consultas de
+    más, y no merece una columna nueva en la base de datos.
+    """
+    cache = context.bot_data.setdefault(_CLAVE_CACHE, {})
+    ahora = time.time()
+    if ahora - cache.get((chat_id, user_id), 0.0) < RECHEQUEO_S:
+        return False
+    cache[(chat_id, user_id)] = ahora
+    # La ventana es de un día, así que nada anterior a eso vuelve a hacer falta.
+    for clave, visto in list(cache.items()):
+        if ahora - visto > VENTANA_S:
+            del cache[clave]
+    return True
+
+
+async def revisar_job(context) -> None:
+    """Repasa a los recién llegados que aún no han escrito."""
+    db: DB = context.bot_data["db"]
+    cfg: Config = context.bot_data["cfg"]
+    session = context.bot_data.get("http")
+
+    try:
+        candidatos = db.recien_llegados_callados(time.time() - VENTANA_S, limite=200)
+    except Exception as exc:  # noqa: BLE001 — un trabajo de fondo nunca tumba el bot
+        log.warning("recien_llegados: no se pudo consultar la lista: %s", exc)
+        return
+
+    mirados = 0
+    for fila in candidatos:
+        if mirados >= MAX_POR_CICLO:
+            break
+        chat_id, user_id = fila["chat_id"], fila["user_id"]
+        if db.is_banned(user_id) or db.is_whitelisted(chat_id, user_id):
+            continue
+        if not _toca_mirar(context, chat_id, user_id):
+            continue
+        mirados += 1
+        try:
+            if await _revisar_uno(context, db, cfg, session, fila):
+                continue
+        except Exception as exc:  # noqa: BLE001
+            log.warning("recien_llegados: fallo revisando user=%s: %s", user_id, exc)
+
+
+async def _revisar_uno(context, db: DB, cfg: Config, session, fila) -> bool:
+    """True si se actuó sobre esa persona."""
+    user_id = fila["user_id"]
+    espera = int(time.time() - float(fila["join_ts"]))
+
+    # 1) Las listas externas, que es lo que más tarde en ponerse al día.
+    if cfg.lols_enabled and session is not None:
+        hit = await lols_det.check(user_id, session)
+        if hit and await _actuar(context, db, cfg, fila, hit, espera, "lols"):
+            return True
+    if cfg.cas_enabled and session is not None:
+        hit = await cas_det.check(user_id, session, db, cfg.cas_cache_ttl_seconds)
+        if hit and (hit.payload or {}).get("offenses", 0) >= cfg.cas_autoban_min:
+            if await _actuar(context, db, cfg, fila, hit, espera, "cas"):
+                return True
+
+    # 2) El perfil, que puede haber cambiado después de verificarse.
+    return await _revisar_perfil(context, db, cfg, fila, espera)
+
+
+async def _actuar(context, db: DB, cfg: Config, fila, hit, espera: int, origen: str) -> bool:
+    """Aplica el mismo criterio que en el join, incluida la protección al veterano."""
+    from .handlers import _apply_action, _trust_score_cached
+    chat_id: int = fila["chat_id"]
+    user_id: int = fila["user_id"]
+    trust = _trust_score_cached(context, db, chat_id, user_id)
+    if trust >= 90:
+        # Igual que en el join: un veterano fichado por una lista externa huele a
+        # falso positivo de la lista, no a spammer. Se anota y decide un humano.
+        log.warning("recien_llegados: %s user=%s trust=%d → no se autobanea", origen, user_id, trust)
+        db.log_action(
+            chat_id=chat_id, user_id=user_id, username=fila["username"], message_id=None,
+            rule=f"{hit.rule}_trusted_review", action="noop", score=hit.score, mode=cfg.mode,
+            payload={"trust": trust, "would_be": "ban", "via": "recien_llegados"},
+        )
+        return True
+    log.info(
+        "recien_llegados: %s fichó a user=%s %ds después de entrar (aún sin escribir) → ban",
+        origen, user_id, espera,
+    )
+    decision = decide([hit], cfg.ban_score, cfg.kick_score, cfg.mute_score,
+                      cfg.first_msg_attack_action, is_first_msg_attack=False)
+    await _apply_action(
+        context, db, cfg, chat_id=chat_id, chat_title=fila["chat_title"],
+        user_id=user_id, username=fila["username"], message_id=None,
+        decision=decision, original_text=None, first_name=fila["first_name"],
+    )
+    return True
+
+
+async def _revisar_perfil(context, db: DB, cfg: Config, fila, espera: int) -> bool:
+    """¿Se ha puesto un nombre que al entrar le habría costado la entrada?
+
+    Se pregunta a Telegram por el nombre ACTUAL (`get_chat_member`, una llamada
+    barata de la Bot API). Solo si ese nombre ya dispara por sí solo se paga el
+    coste de leer el perfil por Telethon, que es lo que decide entre banear y
+    dejar mudo: el salvoconducto de «cuenta antigua con foto» tiene que valer aquí
+    exactamente igual que en el join, o estaríamos siendo más duros por la puerta
+    de atrás con un chino-hablante legítimo que se cambió el nombre.
+    """
+    from . import user_signals, verification
+    from .handlers import _apply_action
+    chat_id, user_id = fila["chat_id"], fila["user_id"]
+
+    try:
+        miembro = await context.bot.get_chat_member(chat_id=chat_id, user_id=user_id)
+    except TelegramError as exc:
+        log.debug("recien_llegados: no se pudo leer al miembro %s: %s", user_id, exc)
+        return False
+    usuario = miembro.user
+    if usuario is None or usuario.is_bot:
+        return False
+
+    obvio, _razones = verification._is_obvious_spam_profile(
+        None, usuario.username, usuario.first_name, usuario.last_name,
+    )
+    if not obvio:
+        return False
+
+    sig = None
+    reporter = context.bot_data.get("reporter")
+    client = reporter.get_client() if reporter else None
+    if client is not None:
+        try:
+            sig = await user_signals.fetch(client, user_id, chat_id=chat_id,
+                                           first_name=usuario.first_name)
+        except Exception as exc:  # noqa: BLE001
+            log.debug("recien_llegados: sin señales de %s: %s", user_id, exc)
+
+    obvio, razones = verification._is_obvious_spam_profile(
+        sig, usuario.username, usuario.first_name, usuario.last_name,
+    )
+    if obvio:
+        log.info(
+            "recien_llegados: user=%s cambió su perfil tras entrar (%ds) → ban directo",
+            user_id, espera,
+        )
+        from .scoring import Decision
+        await _apply_action(
+            context, db, cfg, chat_id=chat_id, chat_title=fila["chat_title"],
+            user_id=user_id, username=usuario.username, message_id=None,
+            decision=Decision(
+                action="ban", score=200, rule="obvious_spam_profile",
+                reason=t("alert.obvious_spam") + " | ".join(
+                    verification.render_reason_list(razones)[:3]),
+                payload={"reasons": razones, "via": "recien_llegados", "espera_s": espera},
+            ),
+            original_text=None, first_name=usuario.first_name,
+        )
+        return True
+
+    if not cfg.shadow and verification.han_requiere_decision(
+            sig, usuario.username, usuario.first_name, usuario.last_name):
+        log.info("recien_llegados: user=%s con nombre Han y salvoconducto → mudo", user_id)
+        db.log_action(
+            chat_id=chat_id, user_id=user_id, username=usuario.username, message_id=0,
+            rule="han_pending_review", action="mute", score=0, mode="active",
+            payload={"motivo": "nombre en Han puesto tras entrar", "via": "recien_llegados"},
+        )
+        chat = getattr(miembro, "chat", None)
+        if chat is None:
+            try:
+                chat = await context.bot.get_chat(chat_id)
+            except TelegramError:
+                return False
+        exito = await verification.restringir_seguro(
+            context.bot, db, chat_id, user_id, verification.MUTED_PERMISSIONS,
+            motivo="han tras entrar",
+        )
+        if exito:
+            await verification.avisar_han_mudo(context, db, cfg, chat, usuario, sig)
+        return True
+    return False

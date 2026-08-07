@@ -4,6 +4,30 @@ Cambios relevantes de CazaSpamBot, lo más reciente arriba. Se anotan hitos, no
 cada commit: para el detalle está el historial de git. Sin números de versión
 porque el bot es un servicio en producción continua, no un paquete que se libera.
 
+## 2026-08 · La ventana ciega entre entrar y escribir
+
+El bot miraba a cada usuario **dos veces**: al entrar y al escribir su primer
+mensaje. Entre las dos pueden pasar horas, y en ese hueco no volvía a mirar nunca.
+
+- **lols.bot ficha tarde**, porque se alimenta de denuncias: un spammer recién
+  creado está limpio cuando entra. Medido en el grupo de domótica: **1 h 35 min**,
+  **12 h 14 min** y **27 h** entre la entrada (limpio) y el primer mensaje (ya
+  fichado). No es que el bot esperase a que escribieran: preguntó al entrar y le
+  dijeron que no había nada.
+- **El nombre se cambia después de verificarse.** Una cuenta pulsó el botón de
+  verificación **en 3 segundos** y doce horas más tarde escribía como `唔活诗我`.
+  Con ese nombre no habría entrado (`_is_obvious_spam_profile` lo banea al join):
+  se lo puso ya dentro, y el perfil no se volvía a mirar.
+- **`recien_llegados.py`**: cada 15 min repasa a quien entró hace menos de 24 h y
+  **aún no ha escrito**, y le aplica **los mismos criterios del join**, listas
+  externas y perfil incluidos. Ningún umbral nuevo: si la lista ya lo tiene o el
+  nombre ya no es el de antes, se actúa igual que si acabara de entrar. La
+  protección al veterano (trust ≥ 90 → revisión humana, nunca autoban) también.
+- Topes: ventana de 24 h, una consulta por persona y hora como mucho, 25 personas
+  por vuelta. Un fallo con una persona no interrumpe el repaso de las demás.
+- **Dry-run antes de activarlo: 20 candidatos, 3 ya fichados** esperando dentro de
+  los grupos sin haber escrito todavía.
+
 ## 2026-08 · «Escríbeme a este otro sitio»
 
 Segundo de los dos spams que había que borrar a mano, y por un motivo **distinto**

@@ -459,6 +459,31 @@ class DB:
                 (chat_id, user_id),
             ).fetchone()
 
+    def recien_llegados_callados(self, desde_ts: float, limite: int = 50) -> list[sqlite3.Row]:
+        """Quien entró después de `desde_ts` y todavía NO ha escrito.
+
+        Es la ventana en la que el bot está ciego: la comprobación del join ya
+        pasó y la del primer mensaje aún no ha llegado. Ahí es donde a un spammer
+        le da tiempo a que lols.bot lo fiche o a cambiarse el nombre.
+
+        Se excluye a los de la lista blanca aquí y no en el que llama, para que la
+        consulta devuelva ya solo candidatos de verdad.
+        """
+        with self._cur() as c:
+            return c.execute(
+                """SELECT s.chat_id, s.user_id, s.username, s.first_name, s.join_ts,
+                          b.title AS chat_title
+                     FROM seen_users s
+                     LEFT JOIN bot_chats b ON b.chat_id = s.chat_id
+                    WHERE s.join_ts IS NOT NULL
+                      AND s.join_ts > ?
+                      AND s.msg_count = 0
+                      AND s.whitelisted = 0
+                 ORDER BY s.join_ts DESC
+                    LIMIT ?""",
+                (desde_ts, limite),
+            ).fetchall()
+
     def record_join(
         self, chat_id: int, user_id: int, username: str | None,
         join_ts: float | None = None,

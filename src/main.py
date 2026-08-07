@@ -17,7 +17,7 @@ from telegram.ext import (
     filters,
 )
 
-from . import admin, chat_picker, chat_settings_cmd, config_panel, group_clean, lang_cmd, maintenance, quienfue_cmd, scan_cmd, scanuser_cmd, telethon_bridge, topweekly, verification, warns_mod
+from . import admin, chat_picker, chat_settings_cmd, config_panel, group_clean, lang_cmd, maintenance, quienfue_cmd, recien_llegados, scan_cmd, scanuser_cmd, telethon_bridge, topweekly, verification, warns_mod
 from .config import load_config
 from .db import DB
 from .handlers import (
@@ -132,6 +132,11 @@ async def _post_init(app: Application) -> None:
         # Cada 15 min: cleanup verificaciones (3 tiers: kick suspicious 30min +
         # reminder normal 3h + kick post-reminder +6h). 15min basta: el plazo mínimo es 30min.
         app.job_queue.run_repeating(verification.cleanup_job, interval=900, first=60)
+        # Cada 15 min: repaso a quien entró hace poco y AÚN NO HA ESCRITO. Es la
+        # ventana ciega entre las dos miradas del bot (entrar y escribir), y ahí le
+        # da tiempo a un spammer a que lols.bot lo fiche (medido: de 1 h 35 min a
+        # 27 h después de entrar) o a cambiarse el nombre una vez verificado.
+        app.job_queue.run_repeating(recien_llegados.revisar_job, interval=900, first=180)
         # Cada 24h: cleanup nightly de tablas viejas (reaction_events, gentle_warnings,
         # pending_verifications, cas_cache, suppressions)
         app.job_queue.run_repeating(maintenance.cleanup_nightly_job, interval=86400, first=3600)
