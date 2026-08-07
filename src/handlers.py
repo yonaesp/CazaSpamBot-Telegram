@@ -155,6 +155,30 @@ async def _avisar_si_le_recortan(context, db: DB, cfg: Config, chat, old, new, a
         log.warning("aviso de permisos recortados fallo: %s", exc)
 
 
+# Reglas de severidad máxima: ni el trust las degrada ni el modo suave las ablanda.
+#
+# `link_target_spam` entra aquí porque no es una heurística sobre el mensaje: es lo
+# que el chat enlazado dice de sí mismo. Justo el caso que el trust dejaba escapar
+# (cuenta veterana, probablemente robada, publicando un canal de packs): con el
+# atajo por trust alto el enlace se quedaba en el grupo.
+HARD_RULES_BAN = frozenset({
+    "cas_match", "lols_match", "federation_known_ban", "reaction_farming",
+    "link_target_spam",
+})
+
+
+def _modo_suave(db: DB, chat_id: int, cfg) -> bool:
+    """¿Este chat silencia en vez de expulsar? NULL en la columna = hereda el .env."""
+    try:
+        s = db.get_chat_settings(chat_id)
+        v = s["soft_ban"] if s is not None else None
+    except Exception:  # noqa: BLE001 — chat sin settings, columna vieja, BD ocupada
+        return bool(getattr(cfg, "soft_ban", False))
+    if v is None:
+        return bool(getattr(cfg, "soft_ban", False))
+    return bool(v)
+
+
 def _enlaces_tg_de(hits: list[Hit]) -> list[str]:
     """URLs t.me que ya han disparado un hit, para ir a mirar a dónde llevan.
 
@@ -1361,14 +1385,27 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         cfg.first_msg_attack_action, is_first_msg_attack=is_first_attack,
     )
 
+    # Modo suave del chat: silenciar para siempre en vez de expulsar. Un falso
+    # positivo con mute se deshace sin que la persona se entere; uno con ban la
+    # obliga a pedir entrar otra vez, y mucha gente no vuelve.
+    #
+    # NO se aplica a las reglas duras (CAS, lols, ban federado, reaction farming):
+    # ahí no hay duda que proteger, son spammers confirmados, y dejarlos dentro
+    # mudos es dejarlos dentro. El modo suave existe para la zona gris, no para
+    # ablandar lo que ya está probado.
+    if decision.action == "ban" and _modo_suave(db, chat_id, cfg) and not any(
+            h.rule in HARD_RULES_BAN for h in real):
+        log.info("modo suave en chat=%s: user=%s se silencia en vez de expulsarse (reglas=%s)",
+                 chat_id, user.id, [h.rule for h in real])
+        decision = Decision(
+            action="mute", score=decision.score, rule=decision.rule,
+            reason=decision.reason + " | " + t("reason.soft_ban"),
+            payload={**(decision.payload or {}), "soft_ban": True},
+        )
+
     # Trust score genérico (0-100): degradar acción para users de confianza.
     # Excepciones: reglas de severidad máxima nunca se degradan.
-    # `link_target_spam` entra aquí porque no es una heurística sobre el mensaje:
-    # es lo que el chat enlazado dice de sí mismo. Justo el caso que el trust dejaba
-    # escapar (cuenta veterana, probablemente robada, publicando un canal de packs):
-    # con el atajo por trust alto el enlace se quedaba en el grupo.
-    HARD_RULES = {"cas_match", "lols_match", "federation_known_ban", "reaction_farming",
-                  "link_target_spam"}
+    HARD_RULES = HARD_RULES_BAN
     has_hard_rule = any(h.rule in HARD_RULES for h in real)
     if not has_hard_rule and decision.action != "noop":
         trust = _trust_score_cached(context, db, chat_id, user.id)

@@ -1095,5 +1095,7 @@
   "quip.cross_post.1": "📣 <b>{name}</b> repartiendo el mismo mensaje por todos los grupos. Aquí también nos hablamos entre nosotros. Hasta lueguito.",
   "quip.cross_post.2": "📋 Copiar y pegar en cuatro grupos a la vez tiene nombre, <b>{name}</b>, y no es «consulta».",
   "quip.cross_post.3": "🔁 <b>{name}</b> no tenía una duda, tenía una campaña. Adiós.",
-  "quip.cross_post.4": "📨 El mismo texto en tres grupos en diez minutos. Nos hemos dado cuenta, <b>{name}</b>."
+  "quip.cross_post.4": "📨 El mismo texto en tres grupos en diez minutos. Nos hemos dado cuenta, <b>{name}</b>.",
+  "cfg.b.softban": "🔇 Silenciar en vez de expulsar: {state}",
+  "reason.soft_ban": "Silenciado en vez de expulsado (modo suave del grupo)"
 }

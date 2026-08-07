@@ -151,6 +151,7 @@ CREATE TABLE IF NOT EXISTS chat_settings (
     topweekly_enabled             INTEGER NOT NULL DEFAULT 0,
     -- NULL = hereda de PUBLIC_QUIP_ENABLED (.env). Ver quips_on() en quips.py.
     quips_enabled                 INTEGER DEFAULT NULL,
+    soft_ban                      INTEGER DEFAULT NULL,
     -- Agresividad de los detectores de dinero/trabajo (commercial_ad, investment_scam)
     -- en el primer mensaje. 'normal' (defecto) | 'soft' (solo casos muy claros) |
     -- 'off' (no actúan). Ver _apply_money_guard() en handlers.py.
@@ -347,6 +348,13 @@ class DB:
             self._conn.execute(
                 "ALTER TABLE chat_settings ADD COLUMN topweekly_enabled INTEGER NOT NULL DEFAULT 0"
             )
+        # Soft-ban: silenciar para siempre en vez de expulsar. NULL = hereda el
+        # .env, como manda la regla del proyecto para todo ajuste nuevo: con un
+        # default 0, quien lo tuviera activo por .env se quedaría sin él al
+        # actualizar y en silencio.
+        if "soft_ban" not in cs_cols:
+            self._conn.execute(
+                "ALTER TABLE chat_settings ADD COLUMN soft_ban INTEGER DEFAULT NULL")
         if "quips_enabled" not in cs_cols:
             # SIN default 0 y aceptando NULL a propósito: NULL significa «lo que
             # diga PUBLIC_QUIP_ENABLED del .env». Si la columna naciera en 0, una
@@ -1088,7 +1096,7 @@ class DB:
             "verification_reminder_hours", "verification_kick_after_reminder_hours",
             "verification_reminders_enabled", "verification_kick_normal",
             "verification_review_suspicious", "cleanservice",
-            "topweekly_enabled", "quips_enabled", "money_guard", "allowed_scripts", "verified_ttl_s",
+            "topweekly_enabled", "quips_enabled", "soft_ban", "money_guard", "allowed_scripts", "verified_ttl_s",
             "review_level",
         }
         if field not in ALLOWED:

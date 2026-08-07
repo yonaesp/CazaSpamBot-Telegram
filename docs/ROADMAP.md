@@ -22,6 +22,7 @@ anotado para no volver a proponerlo.
 | Palabras que mezclan alfabetos | `src/desofuscar.py`. **No estaba en la lista y era el agujero más grave**: cambiar UNA letra por su gemela cirílica dejaba `commercial_ad` en 0 (de 75) sin que saltara `unicode_script`, que mide proporción sobre el total |
 | Antiraid (era el 6) | `src/antiraid.py`. Resuelto como decía la nota: **no se cierra el grupo ni se silencia a nadie por entrar**, solo se bajan los umbrales unos minutos y **solo a quien llegó con la avalancha**. Umbral calibrado sobre las 881 entradas reales registradas: el máximo histórico en 60 s es 2 |
 | Mensaje duplicado entre chats (era el 5) | `src/detectors/cross_post.py`. **No mira el contenido**, así que caza campañas cuyo vocabulario las listas todavía no conocen. Tres chats distintos como mínimo (con dos se equivocaba: quien tiene un problema pregunta en el de Windows 10 y en el de Windows 11) |
+| Soft-ban (era el 7) | Columna `chat_settings.soft_ban` (NULL = hereda `SOFT_BAN` del .env) y botón en `/config`. Convierte `ban` en mute permanente, **salvo reglas duras**: a un spammer confirmado por CAS o lols dejarlo dentro mudo es dejarlo dentro |
 | Meta-checks (contacto, solo-emoji, solo-media) | `contact_spam.py`, `emoji_only.py`, `first_msg_media.py`, `inline_buttons.py` |
 | Reputation graduation | `src/trust.py` + `src/gentle_warning.py`. Trust 0-100 que degrada, anula o manda a revisión |
 | Antiflood por usuario | `flood_state` en `db.py`, graduado por trust (5/8/12 msgs en 10s) |
@@ -104,15 +105,7 @@ a cada grupo sin nada.
 
 ## P2. Útil, pero sin urgencia
 
-### 7. Soft-ban (mute permanente en vez de expulsar)
-**Dificultad**: BAJA.
-
-Un falso positivo con mute se revierte sin que el usuario se entere; uno con ban
-requiere que vuelva a pedir entrar. Encaja con la filosofía del proyecto. El
-motivo de que no esté es que el trust score ya degrada `ban` a `mute` en la zona
-gris, que era el 80% del beneficio.
-
-### 8. Normalizar emojis antes de pasar las blocklists
+### 7. Normalizar emojis antes de pasar las blocklists
 **Dificultad**: BAJA.
 
 Sustituir emojis por su nombre (`emoji.demojize`) antes de aplicar los patrones,
@@ -120,7 +113,7 @@ para cazar el «💰💰 gana 500€ 💰» donde el emoji reemplaza a la palabr
 `emoji_only.py` cubre otro caso distinto (el mensaje que es solo emojis), no
 este. Añade una dependencia por un beneficio moderado.
 
-### 9. `/report` de miembros con umbral
+### 8. `/report` de miembros con umbral
 **Dificultad**: BAJA de código, DUDOSA de diseño.
 
 Que 3 miembros distintos reporten un mensaje en X minutos y eso lo mande a
@@ -128,14 +121,14 @@ revisión del admin. Suena bien y es un vector de abuso obvio: tres cuentas
 coordinadas mandan a revisión a quien quieran. Solo tiene sentido si el resultado
 es *revisión humana* y nunca una acción automática.
 
-### 10. Blocklist de símbolos en el username
+### 9. Blocklist de símbolos en el username
 **Dificultad**: BAJA.
 
 `_is_obvious_spam_profile` ya mira scripts no latinos en el perfil, pero no
 zalgo ni ristras de emojis en el `username`. Hueco pequeño y algo anticuado:
 Telegram ya restringe bastante los usernames.
 
-### 11. Veto por LLM (solo para TUMBAR, nunca para acusar)
+### 10. Veto por LLM (solo para TUMBAR, nunca para acusar)
 
 **Dificultad**: MEDIA. **Origen**: tg-spam `--openai.veto` / `--gemini`.
 
@@ -147,7 +140,7 @@ crearlas. Coste: una dependencia de red y de dinero en la ruta de moderación, c
 que habría que acotarlo a los casos borderline (40-69) y con timeout, o acabaría
 congelando el bot. Antes de esto está agotar las señales deterministas.
 
-### 12. Contexto de conversación en los detectores
+### 11. Contexto de conversación en los detectores
 
 **Dificultad**: MEDIA. **Origen**: tg-spam (`context window`).
 
@@ -173,4 +166,4 @@ es un cambio pequeño.
 - **Soporte Postgres**: SQLite WAL sobra de largo para este volumen.
 - **Filtro de palabrotas**: antispam no es moderación de lenguaje.
 
-*Actualizado: 2026-08-02. 1206 tests en verde, 25 detectores.*
+*Actualizado: 2026-08-02. 1213 tests en verde, 25 detectores.*

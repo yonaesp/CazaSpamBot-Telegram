@@ -190,9 +190,8 @@ def test_solo_se_mira_el_destino_de_enlaces_ya_sospechosos():
 
 def test_el_trust_no_puede_anular_el_destino_confeso():
     """Es justo lo que falló: el autor era veterano y el enlace se quedó."""
-    fuente = _fuente()
-    i = fuente.index("HARD_RULES = {")
-    assert "link_target_spam" in fuente[i:fuente.index("}", i)]
+    from src.handlers import HARD_RULES_BAN
+    assert "link_target_spam" in HARD_RULES_BAN
 
 
 def test_el_aviso_suave_ya_no_es_un_silencio():

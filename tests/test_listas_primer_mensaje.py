@@ -47,10 +47,8 @@ def test_hay_cache_para_no_repetir_llamadas():
 def test_son_reglas_duras_asi_que_el_trust_no_las_anula():
     """Un veterano cuya cuenta acabe fichada por lols debe caer igual: si el trust
     las anulara, una cuenta robada con historial seguiría spameando."""
-    fuente = Path("src/handlers.py").read_text()
-    i = fuente.index("HARD_RULES = {")
-    linea = fuente[i:fuente.index("}", i)]
-    assert "cas_match" in linea and "lols_match" in linea
+    from src.handlers import HARD_RULES_BAN
+    assert "cas_match" in HARD_RULES_BAN and "lols_match" in HARD_RULES_BAN
 
 
 def test_un_fallo_de_red_no_tumba_la_moderacion():

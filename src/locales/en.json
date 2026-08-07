@@ -1095,5 +1095,7 @@
   "quip.cross_post.1": "📣 <b>{name}</b> spreading the same message across every group. We talk to each other here too. Bye now.",
   "quip.cross_post.2": "📋 Pasting into four groups at once has a name, <b>{name}</b>, and it is not «a question».",
   "quip.cross_post.3": "🔁 <b>{name}</b> did not have a question, they had a campaign. Goodbye.",
-  "quip.cross_post.4": "📨 The same text in three groups within ten minutes. We noticed, <b>{name}</b>."
+  "quip.cross_post.4": "📨 The same text in three groups within ten minutes. We noticed, <b>{name}</b>.",
+  "cfg.b.softban": "🔇 Mute instead of removing: {state}",
+  "reason.soft_ban": "Muted instead of removed (group's soft mode)"
 }

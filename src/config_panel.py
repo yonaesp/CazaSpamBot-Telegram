@@ -42,6 +42,7 @@ _TOGGLE_FIELDS = {
     "welcome_enabled",
     "cleanservice",
     "topweekly_enabled",
+    "soft_ban",
 }
 
 # Presets de tiempos (dentro de los rangos que valida /verificacion).
@@ -427,7 +428,9 @@ def build_panel_keyboard(
                               callback_data=f"{PREFIX}:quips:{cid}"),
          InlineKeyboardButton(t("cfg.b.alerts"), callback_data=f"{PREFIX}:alertas:{cid}")],
         [InlineKeyboardButton(t("cfg.b.money", mode=t(f"cfg.money.{_money_guard(s)}")),
-                              callback_data=f"{PREFIX}:mg:{cid}")],
+                              callback_data=f"{PREFIX}:mg:{cid}"),
+         InlineKeyboardButton(t("cfg.b.softban", state=_onoff(_b(s, "soft_ban"))),
+                              callback_data=f"{PREFIX}:tog:soft_ban:{cid}")],
         # Y las dos de QUÉ contenido se marca (palabras y alfabetos): submenús sin
         # estado en la etiqueta y del mismo ancho, así que la fila compartida se lee
         # bien en móvil y el panel no gana filas. Los alfabetos NO llevan estado en el
