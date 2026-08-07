@@ -1082,5 +1082,11 @@
   "quip.offplatform_contact.5": "📞 <b>{name}</b> left a number to keep talking somewhere else. That is exactly why they are leaving.",
   "scan.disfraz": "🎭 <b>Disguised text</b>: {trucos}. It is judged after cleaning it up.",
   "scan.disfraz.homoglifos": "letters swapped for look-alikes from another alphabet",
-  "scan.disfraz.espaciado": "letters spaced apart"
+  "scan.disfraz.espaciado": "letters spaced apart",
+  "scanuser.first_msg": "✍️ <b>Their very first message:</b>\n  <i>{text}</i>",
+  "notify.bot_demoted": "My permissions are taken away in a group",
+  "hdl.bot_demoted": "⚠️ <b>My permissions were taken away</b>\n📍 Chat: {chat}\n👮 By: {actor}\n\nI am still in the group, but <b>I can no longer {perdidos}</b>.\n<i>Until they are restored I cannot moderate there: I will spot the spam and be unable to act on it.</i>",
+  "hdl.bot_demoted.borrar": "delete messages",
+  "hdl.bot_demoted.restringir": "kick or mute anyone",
+  "hdl.bot_demoted.admin": "act at all (no longer an admin)"
 }

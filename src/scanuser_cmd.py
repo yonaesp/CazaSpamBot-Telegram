@@ -189,6 +189,13 @@ async def _componer(context, cfg: Config, db: DB, chat_id: int, user_id: int) ->
         if sig.is_premium:
             L.append(t("scanuser.premium"))
 
+    # --- Lo primero que dijo ---
+    # El último mensaje se pisa con cada uno nuevo; el primero explica POR QUÉ entró
+    # y es lo que hace falta para entender a posteriori por qué el bot no lo vio.
+    if seen is not None and seen["first_msg_text"]:
+        L += ["", t("scanuser.first_msg",
+                    text=_h.escape(str(seen["first_msg_text"])[:200]))]
+
     # --- Listas externas ---
     externas = await _listas_externas(context, cfg, user_id)
     if externas:

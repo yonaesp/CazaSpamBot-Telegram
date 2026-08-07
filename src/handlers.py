@@ -104,6 +104,55 @@ def _apply_money_guard(hit: Hit, mode: str) -> Hit:
     return hit
 
 
+def permisos_perdidos(old, new) -> list[str]:
+    """Qué podía hacer el bot y ya no, sin haber salido del grupo.
+
+    Se compara ANTES contra DESPUÉS en vez de mirar solo el estado nuevo, porque lo
+    que hay que avisar es el CAMBIO: un bot que nunca fue admin en un grupo no debe
+    generar un aviso cada vez que alguien toca cualquier otra cosa del chat.
+    """
+    dentro = ("member", "restricted", "administrator", "creator", "owner")
+    if new is None or getattr(new, "status", None) not in dentro:
+        return []                      # ya no está dentro: de eso avisa el otro aviso
+    if old is None or getattr(old, "status", None) not in dentro:
+        return []                      # acaba de entrar, no ha perdido nada
+    perdidos: list[str] = []
+    era_admin = getattr(old, "status", None) in ("administrator", "creator", "owner")
+    es_admin = getattr(new, "status", None) in ("administrator", "creator", "owner")
+    if era_admin and not es_admin:
+        return ["admin"]               # lo engloba todo, no hace falta detallar más
+    if _can_delete(old) and not _can_delete(new):
+        perdidos.append("borrar")
+    if _can_restrict(old) and not _can_restrict(new):
+        perdidos.append("restringir")
+    return perdidos
+
+
+async def _avisar_si_le_recortan(context, db: DB, cfg: Config, chat, old, new, actor) -> None:
+    perdidos = permisos_perdidos(old, new)
+    if not perdidos:
+        return
+    log.warning("permisos recortados en chat=%s (%s): %s", chat.id, chat.title, perdidos)
+    if not cfg.admin_notify_chat_id or not notify_prefs.effective(db, "bot_demoted", cfg):
+        return
+    actor_label = "?"
+    if actor is not None:
+        actor_label = f"@{actor.username}" if actor.username else (actor.first_name or str(actor.id))
+    from telegram import InlineKeyboardMarkup
+    try:
+        await context.bot.send_message(
+            chat_id=cfg.admin_notify_chat_id,
+            text=t("hdl.bot_demoted",
+                   chat=_h.escape(str(chat.title or chat.id)),
+                   actor=_h.escape(str(actor_label)),
+                   perdidos=" · ".join(t(f"hdl.bot_demoted.{p}") for p in perdidos)),
+            parse_mode="HTML",
+            reply_markup=InlineKeyboardMarkup([[notify_prefs.mute_button("bot_demoted")]]),
+        )
+    except TelegramError as exc:
+        log.warning("aviso de permisos recortados fallo: %s", exc)
+
+
 def _enlaces_tg_de(hits: list[Hit]) -> list[str]:
     """URLs t.me que ya han disparado un hit, para ir a mirar a dónde llevan.
 
@@ -159,6 +208,11 @@ async def on_my_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         "my_chat_member chat=%s (%s) status=%s admin=%s restrict=%s delete=%s",
         chat.id, chat.title, new.status, am_admin, _can_restrict(new), _can_delete(new),
     )
+
+    # Aviso si le QUITAN PERMISOS sin echarlo. Es el fallo silencioso: el bot se
+    # queda dentro, sale como siempre en `/chats`, sigue detectando el spam... y no
+    # puede tocarlo. Sin este aviso no te enteras hasta que se cuela algo.
+    await _avisar_si_le_recortan(context, db, cfg, chat, old, new, cmu.from_user)
 
     # Aviso si EXPULSAN al bot de un grupo (estaba dentro y ahora está fuera).
     # Activo por defecto, configurable con NOTIFY_BOT_REMOVED.

@@ -385,6 +385,13 @@ class DB:
             self._conn.execute("ALTER TABLE seen_users ADD COLUMN last_msg_text TEXT")
         if "last_msg_ts" not in su_cols:
             self._conn.execute("ALTER TABLE seen_users ADD COLUMN last_msg_ts REAL")
+        # El PRIMER mensaje, además del último. `last_msg_text` se pisa con cada
+        # mensaje nuevo, así que de quien escribió dos veces solo queda el segundo:
+        # de una cuenta baneada a mano cuyo último texto era «0.1» no hubo forma de
+        # saber qué había escrito al entrar, que es justo lo que hace falta para
+        # entender por qué el bot no la vio. El primer mensaje no se pisa nunca.
+        if "first_msg_text" not in su_cols:
+            self._conn.execute("ALTER TABLE seen_users ADD COLUMN first_msg_text TEXT")
         # Id del mensaje de bienvenida, para poder borrarlo si al usuario lo banean
         # después. Antes solo se guardaba en `pending_verifications`, así que con la
         # verificación desactivada (que es el defecto) la bienvenida se quedaba
@@ -552,9 +559,14 @@ class DB:
         """Guarda el último mensaje del user (truncado a 500 chars) para revisar tras bans."""
         with self._cur() as c:
             c.execute(
-                "UPDATE seen_users SET last_msg_id=?, last_msg_text=?, last_msg_ts=? "
+                "UPDATE seen_users SET last_msg_id=?, last_msg_text=?, last_msg_ts=?, "
+                # COALESCE: solo escribe si está vacío. El primer mensaje es el
+                # que explica por qué alguien entró, y se conserva intacto aunque
+                # luego escriba mil veces.
+                "       first_msg_text=COALESCE(first_msg_text, ?) "
                 "WHERE chat_id=? AND user_id=?",
-                (msg_id, (text or "")[:500], time.time(), chat_id, user_id),
+                (msg_id, (text or "")[:500], time.time(), (text or "")[:500] or None,
+                 chat_id, user_id),
             )
 
     def record_message(

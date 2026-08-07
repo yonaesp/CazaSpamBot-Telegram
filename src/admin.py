@@ -1208,7 +1208,7 @@ async def on_suspicious_review_callback(update: Update, context: ContextTypes.DE
         return
     if action == "st":  # susrev:st:{code}:{val}:{chat}:{user}
         code = parts[2] if len(parts) > 2 else ""
-        info = verification._REVIEW_TIME_FIELDS.get(code)
+        info = verification.TIME_FIELDS.get(code)
         try:
             val = int(parts[3])
         except (IndexError, ValueError):

@@ -54,6 +54,24 @@ def _format_period() -> str:
     return f"{start.strftime('%d/%m')} - {end.strftime('%d/%m')}"
 
 
+def _pintar(rows, *, con_pie: bool) -> str:
+    """El texto del top. Una sola vez.
+
+    Lo pintaban por separado el trabajo semanal y el `/top` manual, con el mismo
+    bucle copiado: cambiar una medalla o el formato de una fila en uno dejaba el
+    otro distinto sin que ningún test lo notara. La única diferencia real entre
+    los dos era el pie (agradecimiento y nota), y eso es lo que dice `con_pie`.
+    """
+    lineas = [t("topweekly.title", period=_format_period()), ""]
+    medallas = ["🥇", "🥈", "🥉", "🏅", "🏅"]
+    for i, r in enumerate(rows):
+        medalla = medallas[i] if i < len(medallas) else "•"
+        lineas.append(t("topweekly.row", medal=medalla, user=_format_user(r), count=r["cnt"]))
+    if con_pie:
+        lineas += ["", t("topweekly.thanks"), t("topweekly.note")]
+    return "\n".join(lineas)
+
+
 async def weekly_top_job(context: ContextTypes.DEFAULT_TYPE) -> None:
     """Publica el top semanal en cada chat con topweekly_enabled=1.
 
@@ -93,16 +111,7 @@ async def weekly_top_job(context: ContextTypes.DEFAULT_TYPE) -> None:
             continue
 
         # Construir mensaje
-        period = _format_period()
-        lines = [t("topweekly.title", period=period), ""]
-        medals = ["🥇", "🥈", "🥉", "🏅", "🏅"]
-        for i, r in enumerate(rows):
-            medal = medals[i] if i < len(medals) else "•"
-            lines.append(t("topweekly.row", medal=medal, user=_format_user(r), count=r["cnt"]))
-        lines.append("")
-        lines.append(t("topweekly.thanks"))
-        lines.append(t("topweekly.note"))
-        text = "\n".join(lines)
+        text = _pintar(rows, con_pie=True)
 
         try:
             await context.bot.send_message(
@@ -129,10 +138,4 @@ async def render_top(db: DB, chat_id: int) -> str:
     rows = [r for r in rows if r["cnt"] >= MIN_PER_USER][:5]
     if not rows:
         return t("topweekly.empty", min_msgs=MIN_PER_USER)
-    period = _format_period()
-    lines = [t("topweekly.title", period=period), ""]
-    medals = ["🥇", "🥈", "🥉", "🏅", "🏅"]
-    for i, r in enumerate(rows):
-        medal = medals[i] if i < len(medals) else "•"
-        lines.append(t("topweekly.row", medal=medal, user=_format_user(r), count=r["cnt"]))
-    return "\n".join(lines)
+    return _pintar(rows, con_pie=False)

@@ -1082,5 +1082,11 @@
   "quip.offplatform_contact.5": "📞 <b>{name}</b> dejaba su número para seguir en privado fuera de aquí. Justo por eso se va.",
   "scan.disfraz": "🎭 <b>Texto disfrazado</b>: {trucos}. Se juzga el texto ya limpio.",
   "scan.disfraz.homoglifos": "letras cambiadas por gemelas de otro alfabeto",
-  "scan.disfraz.espaciado": "letras separadas por espacios"
+  "scan.disfraz.espaciado": "letras separadas por espacios",
+  "scanuser.first_msg": "✍️ <b>Lo primero que escribió:</b>\n  <i>{text}</i>",
+  "notify.bot_demoted": "Me quitan permisos en un grupo",
+  "hdl.bot_demoted": "⚠️ <b>Me han quitado permisos</b>\n📍 Chat: {chat}\n👮 Lo hizo: {actor}\n\nSigo dentro del grupo, pero <b>ya no puedo {perdidos}</b>.\n<i>Hasta que me los devuelvan, ahí no puedo moderar: detecto el spam y no puedo hacer nada con él.</i>",
+  "hdl.bot_demoted.borrar": "borrar mensajes",
+  "hdl.bot_demoted.restringir": "expulsar ni silenciar",
+  "hdl.bot_demoted.admin": "actuar (ya no soy administrador)"
 }

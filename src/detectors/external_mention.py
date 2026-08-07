@@ -7,7 +7,10 @@ Reglas:
   → spam. EXCEPCIÓN: si apunta al propio chat (t.me/PROPIO_USERNAME/...) se
   permite como enlace interno (mensajes anclados, posts del mismo grupo).
 - Refinamiento 2026-05: si hay mención externa y el texto que la acompaña
-  está vacío, es muy corto, o no parece español → score muy alto (ban directo).
+  está vacío, es muy corto, o no parece del IDIOMA DEL BOT → score muy alto
+  (ban directo). Antes ese "no parece" estaba clavado al español, así que una
+  instalación en inglés se comía la puntuación máxima por escribir en inglés.
+  De un idioma sin vocabulario propio se asume que sí: no saber no puede acusar.
 """
 from __future__ import annotations
 
@@ -132,7 +135,7 @@ def check(
                 if not ctx_text or len(ctx_text) < 5:
                     score += 130
                     reasons.append(t("reason.mention_no_context", n=len(externals)))
-                elif not lang.likely_spanish(ctx_text):
+                elif not lang.parece_del_idioma_activo(ctx_text):
                     score += 130
                     reasons.append(t("reason.mention_not_spanish", text=ctx_text[:50]))
                 else:

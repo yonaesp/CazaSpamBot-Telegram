@@ -633,7 +633,13 @@ async def _delete_friendly_welcome_job(context) -> None:
 
 
 # Presets de tiempos del panel de revisión (mismos que /config).
-_REVIEW_TIME_FIELDS = {
+# Tiempos de la verificación: código del botón → (columna, presets, unidad).
+#
+# Vive AQUÍ y lo importa el panel. Estaba clonado en `config_panel._TIME_FIELDS`
+# con los mismos valores, y dos copias de una tabla de configuración es una bomba
+# de relojería: el día que se añada un preset en una y no en la otra, el panel y
+# el comando ofrecen cosas distintas y nadie se entera.
+TIME_FIELDS = {
     "sk": ("verification_suspicious_kick_minutes", [15, 30, 60, 120], "min"),
     "rh": ("verification_reminder_hours", [1, 3, 6, 12], "h"),
     "kh": ("verification_kick_after_reminder_hours", [3, 6, 12, 24], "h"),
@@ -702,7 +708,7 @@ def build_review_times_keyboard(db: DB, chat_id: int, user_id: int) -> InlineKey
     db.ensure_chat_settings(chat_id)
     s = db.get_chat_settings(chat_id)
     rows = []
-    for code, (field, presets, unit) in _REVIEW_TIME_FIELDS.items():
+    for code, (field, presets, unit) in TIME_FIELDS.items():
         cur = (s[field] if s else None) or presets[1]
         row = []
         for val in presets:

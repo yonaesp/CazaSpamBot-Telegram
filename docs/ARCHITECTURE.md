@@ -29,7 +29,7 @@ cuando solo queda el código. No hace falta leerlo entero, salta a lo que toques
 
 Bot de moderación antispam para Telegram, multi-grupo y federado, en producción 24/7.
 
-- **18.117 líneas** en `src/` (68 módulos), **11.016** en `tests/` (89 ficheros, 1168 tests).
+- **18.117 líneas** en `src/` (68 módulos), **11.016** en `tests/` (89 ficheros, 1182 tests).
 - **24 detectores**, tres capas de listas negras, clasificador propio, panel de ajustes
   por chat, i18n con autodescubrimiento de idiomas.
 - Un solo proceso Python, una sola base SQLite, un contenedor Docker.
@@ -810,7 +810,7 @@ tanto quedan muertas: ese es el momento en que el usuario se entera, no meses de
 | `first_msg_media` | funciona, pierde el refuerzo de perfil sospechoso |
 | `obvious_spam_profile` | funciona, pierde la rama de "1 campo no latino más cuenta nueva sin foto" |
 
-Los 15 detectores restantes funcionan igual. Está documentado en ambos README porque quien
+El resto de detectores funcionan igual. Está documentado en ambos README porque quien
 instale sin cuenta secundaria no sabría qué se está perdiendo.
 
 `reporter.get_client()` devuelve el cliente **aunque los reportes estén desactivados**: bio,
@@ -840,7 +840,7 @@ capturaba como error genérico y **el ban se perdía en silencio, sin reintento*
 
 ## 13. Tests
 
-**1168 tests en 8,3 segundos**, sin red ni base real. Cada detector tiene sus casos positivos y
+**1182 tests en 8,3 segundos**, sin red ni base real. Cada detector tiene sus casos positivos y
 negativos, con foco en los negativos: un falso positivo es peor que un falso negativo.
 
 Aparte de los tests de lógica, hay **tests meta que protegen invariantes del proyecto**. Cada uno

@@ -24,7 +24,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.error import TelegramError
 from telegram.ext import ContextTypes
 
-from . import custom_terms, quips, rule_explain, settings_sync
+from . import custom_terms, quips, rule_explain, settings_sync, verification
 from .config import Config
 from .db import DB
 from .detectors import unicode_script
@@ -45,11 +45,9 @@ _TOGGLE_FIELDS = {
 }
 
 # Presets de tiempos (dentro de los rangos que valida /verificacion).
-_TIME_FIELDS = {
-    "sk": ("verification_suspicious_kick_minutes", [15, 30, 60, 120], "min"),
-    "rh": ("verification_reminder_hours", [1, 3, 6, 12], "h"),
-    "kh": ("verification_kick_after_reminder_hours", [3, 6, 12, 24], "h"),
-}
+# La tabla de tiempos vive en `verification`: aquí solo se usa. Tenerla duplicada
+# hacía que el panel y `/verificacion` pudieran ofrecer presets distintos.
+_TIME_FIELDS = verification.TIME_FIELDS
 
 # Textos libres capturables: code → columna.
 _EDIT_FIELDS = {"w": "welcome_text", "r": "rules_text"}

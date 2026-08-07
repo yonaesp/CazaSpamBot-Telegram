@@ -48,8 +48,42 @@ _SPANISH_STOPWORDS = frozenset({
     "alguien", "ayuda", "sabe", "sabéis", "veo", "creo", "pienso",
 })
 
+# Inglés: sin marcas ortográficas propias, así que solo cuentan las stopwords.
+_ENGLISH_STOPWORDS = frozenset({
+    "the", "a", "an", "and", "or", "but", "because", "as", "if", "of", "to",
+    "in", "on", "at", "for", "with", "without", "from", "by", "about", "into",
+    "is", "are", "was", "were", "be", "been", "being", "have", "has", "had",
+    "do", "does", "did", "can", "could", "will", "would", "should", "may",
+    "i", "you", "he", "she", "it", "we", "they", "me", "him", "her", "us", "them",
+    "my", "your", "his", "its", "our", "their", "this", "that", "these", "those",
+    "not", "no", "yes", "too", "also", "very", "more", "less", "well", "now",
+    "here", "there", "always", "never", "just", "only", "even", "still",
+    "hello", "hi", "thanks", "thank", "please", "sorry", "good", "morning",
+    "what", "which", "who", "how", "when", "where", "why", "help", "know",
+    "need", "want", "think", "see", "get", "make", "use", "try", "any", "some",
+})
+
 _ACCENT_RE = re.compile(r"[ñÑáéíóúüÁÉÍÓÚÜ¿¡]")
 _WORD_RE = re.compile(r"\b[\w']+\b", re.UNICODE)
+
+
+def _parece(text: str | None, palabras: frozenset, marcas, min_chars: int) -> bool:
+    """La heurística, sin atarla a ningún idioma concreto.
+
+    `marcas` es un regex de signos que solo usa ese idioma (la ñ y los acentos en
+    español, nada en inglés) o None si no los tiene.
+    """
+    if not text or len(text.strip()) < min_chars:
+        return False
+    if marcas is not None and marcas.search(text):
+        return True
+    words = [w.lower() for w in _WORD_RE.findall(text)]
+    if not words:
+        return False
+    matches = sum(1 for w in words if w in palabras)
+    if matches == 0:
+        return False
+    return matches >= 1 or (matches / len(words)) >= 0.15
 
 
 def likely_spanish(text: str | None, min_chars: int = 5) -> bool:
@@ -57,15 +91,30 @@ def likely_spanish(text: str | None, min_chars: int = 5) -> bool:
 
     Si el texto es muy corto (< min_chars), devuelve False (no podemos saber).
     """
-    if not text or len(text.strip()) < min_chars:
-        return False
-    # Marcadores fuertes
-    if _ACCENT_RE.search(text):
+    return _parece(text, _SPANISH_STOPWORDS, _ACCENT_RE, min_chars)
+
+
+# Idiomas con lista de palabras corrientes. Cuál se usa lo decide el idioma
+# ACTIVO del bot, no el código: `external_mention` puntúa 130 en vez de 60 cuando
+# el texto que acompaña a una mención «no parece del idioma del grupo», y con la
+# heurística clavada al español ese salto se le aplicaba a CUALQUIER instalación.
+# Un grupo inglés se comía la puntuación máxima por escribir en inglés.
+_POR_IDIOMA = {
+    "es": (_SPANISH_STOPWORDS, _ACCENT_RE),
+    "en": (_ENGLISH_STOPWORDS, None),
+}
+
+
+def parece_del_idioma_activo(text: str | None, min_chars: int = 5) -> bool:
+    """¿El texto parece escrito en el idioma configurado en el bot?
+
+    Con un idioma del que no tenemos vocabulario devuelve **True**: «no lo sé» no
+    puede castigar a nadie. Es la diferencia entre no saber y acusar, y aquí el
+    resultado se usa para subir la puntuación de 60 a 130.
+    """
+    from .i18n import current_lang
+    datos = _POR_IDIOMA.get(current_lang())
+    if datos is None:
         return True
-    words = [w.lower() for w in _WORD_RE.findall(text)]
-    if not words:
-        return False
-    matches = sum(1 for w in words if w in _SPANISH_STOPWORDS)
-    if matches == 0:
-        return False
-    return matches >= 1 or (matches / len(words)) >= 0.15
+    palabras, marcas = datos
+    return _parece(text, palabras, marcas, min_chars)
