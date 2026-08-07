@@ -1046,5 +1046,19 @@
   "hdl.btn.readm_keep": "🔨 Mantener el ban",
   "hdl.btn.readm_lift": "✅ Levantarlo de verdad",
   "hdl.readm_kept": "Sigue baneado.",
-  "hdl.readm_lifted": "Ban levantado en todos tus grupos."
+  "hdl.readm_lifted": "Ban levantado en todos tus grupos.",
+  "cmd.quienfue": "Quién moderó a este usuario y qué le hizo",
+  "quienfue.usage": "🕵️ <b>/quienfue</b> — responde al mensaje de alguien, o escribe <code>/quienfue @usuario</code> o su id, y te digo quién le ha baneado, expulsado o cambiado los permisos en este grupo.\n<i>Solo informa, no toca nada.</i>",
+  "quienfue.header": "🕵️ <b>Quién tocó a</b> <code>{uid}</code>",
+  "quienfue.linea": "• <b>{fecha}</b> · por {actor}\n    {antes} → <b>{despues}</b>",
+  "quienfue.sin_eventos": "Sin movimientos suyos en el historial que conserva Telegram.\n<i>Ese historial tiene una ventana limitada: si fue hace mucho, ya no está.</i>",
+  "quienfue.sin_telethon": "No puedo consultarlo: este historial no lo da la Bot API, hace falta la cuenta de Telethon.\n<i>Esto NO significa que no haya pasado nada.</i>",
+  "quienfue.footer": "\n\n<i>Ojo: banear y quitar el ban son el MISMO evento en Telegram, así que fíjate en el antes y el después, no en quién aparece.</i>",
+  "quienfue.st_expulsado": "expulsado",
+  "quienfue.st_silenciado": "silenciado (dentro del grupo)",
+  "quienfue.st_miembro": "miembro normal",
+  "quienfue.st_admin": "administrador",
+  "quienfue.st_creador": "creador",
+  "quienfue.st_fuera": "fuera del grupo",
+  "quienfue.st_ninguno": "sin estado previo"
 }

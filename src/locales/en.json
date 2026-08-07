@@ -1046,5 +1046,19 @@
   "hdl.btn.readm_keep": "🔨 Keep the ban",
   "hdl.btn.readm_lift": "✅ Lift it for real",
   "hdl.readm_kept": "Still banned.",
-  "hdl.readm_lifted": "Ban lifted across your groups."
+  "hdl.readm_lifted": "Ban lifted across your groups.",
+  "cmd.quienfue": "Who moderated this user, and what they did",
+  "quienfue.usage": "🕵️ <b>/quienfue</b> — reply to someone's message, or type <code>/quienfue @user</code> or their id, and I'll tell you who banned, kicked or changed their permissions in this group.\n<i>Report only, nothing is touched.</i>",
+  "quienfue.header": "🕵️ <b>Who acted on</b> <code>{uid}</code>",
+  "quienfue.linea": "• <b>{fecha}</b> · by {actor}\n    {antes} → <b>{despues}</b>",
+  "quienfue.sin_eventos": "No moves of theirs in the history Telegram keeps.\n<i>That history has a limited window: if it was long ago, it is gone.</i>",
+  "quienfue.sin_telethon": "I cannot check: the Bot API does not expose this history, the Telethon account is required.\n<i>This does NOT mean nothing happened.</i>",
+  "quienfue.footer": "\n\n<i>Note: banning and unbanning are the SAME event in Telegram, so look at the before and after, not at who shows up.</i>",
+  "quienfue.st_expulsado": "banned",
+  "quienfue.st_silenciado": "restricted (still in the group)",
+  "quienfue.st_miembro": "regular member",
+  "quienfue.st_admin": "administrator",
+  "quienfue.st_creador": "creator",
+  "quienfue.st_fuera": "left the group",
+  "quienfue.st_ninguno": "no previous state"
 }
