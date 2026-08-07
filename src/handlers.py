@@ -17,6 +17,7 @@ from telegram.error import TelegramError
 from telegram.ext import ContextTypes
 
 from . import borrado_diferido
+from . import desofuscar
 from . import link_reader
 from . import admin_report, gentle_warning, greetings, learning, notify_prefs, quips, rule_explain, story_reader, trust as _trust, user_signals, verification
 from .config import Config
@@ -1070,19 +1071,29 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     # estafa de inversión). Su agresividad la modula el ajuste money_guard del chat:
     # 'normal' (defecto), 'soft' (solo casos muy claros) u 'off'. Es lo que pediste
     # para poder relajar los bans por mensajes de trabajo/dinero en el primer mensaje.
+    # Antes de mirar el contenido, se le quita el disfraz: una sola letra cambiada
+    # por su gemela cirílica dejaba `commercial_ad` en 0 sin que saltara nada más
+    # (medido: 75 → 0 cambiando la «o» de «euros»), y el espaciado letra a letra
+    # tampoco casaba con ningún patrón. Solo lo ven los detectores de texto plano:
+    # los de enlaces y menciones siguen con el mensaje original, cuyas entidades no
+    # se pueden descuadrar. Ver `desofuscar.py`.
+    msg_txt, _trucos = desofuscar.para_detectores(msg)
+    if _trucos:
+        log.info("texto disfrazado (%s) user=%s chat=%s → se evalúa el texto limpio",
+                 "+".join(_trucos), user.id, chat_id)
     _money_guard = (_chat_money_guard(db, chat_id))
-    hits.append(_apply_money_guard(comad_det.check(msg, is_first_msg=is_first), _money_guard))
+    hits.append(_apply_money_guard(comad_det.check(msg_txt, is_first_msg=is_first), _money_guard))
     # Testimonio "di X, me devolvieron Y mayor" con elogio y llamada a contactar.
     # Sin este detector se colaba cuando no ponían @usuario final (lo único que lo
     # cazaba era external_mention).
-    hits.append(_apply_money_guard(invscam_det.check(msg, is_first_msg=is_first), _money_guard))
+    hits.append(_apply_money_guard(invscam_det.check(msg_txt, is_first_msg=is_first), _money_guard))
     # 3d-quint) Primer mensaje dominado por emojis sin texto real (captación
     # de atención típica de spam, ej. "🍭🍄🌟").
     hits.append(emoji_only_det.check(msg, is_first_msg=is_first))
     # 3d-sext) "Este es mi número de <otra app>, escríbeme ahí". Sin enlace, sin
     # mención y en español correcto, así que ningún otro detector lo veía: hubo que
     # borrarlo a mano tras hora y cuarto en el grupo.
-    hits.append(offplat_det.check(msg, is_first_msg=is_first))
+    hits.append(offplat_det.check(msg_txt, is_first_msg=is_first))
     # 3d-bis) Forward desde canal/bot en primer mensaje o primeros 3 min → ban directo
     seen_row_fwd = db.get_seen(chat_id, user.id)
     secs_since_first = None

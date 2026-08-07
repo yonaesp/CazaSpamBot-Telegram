@@ -4,6 +4,43 @@ Cambios relevantes de CazaSpamBot, lo más reciente arriba. Se anotan hitos, no
 cada commit: para el detalle está el historial de git. Sin números de versión
 porque el bot es un servicio en producción continua, no un paquete que se libera.
 
+## 2026-08 · Quitarle el disfraz al texto
+
+De repasar qué hacen mejor otros bots conocidos. `tg-spam` (umputun, el más
+completo de los abiertos) tiene dos comprobaciones que aquí no existían: palabras
+que **mezclan alfabetos** y **espaciado anómalo**. Al probarlo contra este bot, el
+agujero era peor de lo que parecía:
+
+    «Gana 500 euros al dia trabajando desde casa»   commercial_ad = 75
+    «Gana 500 eurоs al dia trabajando desde casa»   commercial_ad =  0
+
+La única diferencia es la `о` de «euros», que es **cirílica**. Una letra, y el
+mensaje se volvía invisible entero: tampoco saltaba `unicode_script`, porque mide
+la PROPORCIÓN de caracteres ajenos y una entre cuarenta y siete no llega al umbral.
+Con el espaciado (`G a n a  5 0 0  e u r o s`) pasaba lo mismo.
+
+- **`desofuscar.py`** lo resuelve al revés que `tg-spam`, y sale más barato: en vez
+  de una regla nueva que puntúe el disfraz, se **deshace el disfraz** y deciden las
+  reglas de siempre con sus umbrales de siempre. Si el texto desenmascarado no dice
+  nada punible, no pasa nada: **quitar el disfraz no puede inventar un falso
+  positivo que no existiera ya**.
+- **Solo se tocan las palabras MEZCLADAS.** Una palabra entera en cirílico, griego
+  o árabe es una palabra de ese idioma y se deja intacta; «traducirla» a letras
+  latinas convertiría la conversación de un grupo ruso en galimatías que podría
+  casar con cualquier patrón por casualidad. Lo que delata el disfraz es la mezcla
+  DENTRO de una palabra, que nadie escribe queriendo.
+- La sustitución **conserva la longitud** (una letra por una letra): los
+  desplazamientos de las entidades de Telegram se cuentan sobre el texto y
+  cambiarla rompería enlaces y menciones. El desespaciado sí acorta, y por eso su
+  texto solo lo ven los detectores que no miran entidades.
+- Los dos disfraces combinados también caen: con las letras separadas no hay mezcla
+  que ver, así que se vuelve a pasar el esqueleto **después** de juntarlas.
+- `/scan` avisa de que el texto venía camuflado, para que el motivo no parezca un
+  error del bot.
+- **Medido contra el tráfico real: 11.560 mensajes, 0 tocados, 0 falsos positivos
+  nuevos.** Ω y µ (grupo de domótica), «H O L A» de énfasis y los mensajes en ruso,
+  griego, árabe y chino salen intactos.
+
 ## 2026-08 · La ventana ciega entre entrar y escribir
 
 El bot miraba a cada usuario **dos veces**: al entrar y al escribir su primer

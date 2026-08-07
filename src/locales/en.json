@@ -1079,5 +1079,8 @@
   "quip.offplatform_contact.2": "☎️ We do not hand out strangers' phone numbers here. <b>{name}</b>, out.",
   "quip.offplatform_contact.3": "💔 <b>{name}</b> calling a thousand strangers «darling» at once. Goodbye.",
   "quip.offplatform_contact.4": "🚪 «Write me over there» is step one of the scam. <b>{name}</b> will not take step two.",
-  "quip.offplatform_contact.5": "📞 <b>{name}</b> left a number to keep talking somewhere else. That is exactly why they are leaving."
+  "quip.offplatform_contact.5": "📞 <b>{name}</b> left a number to keep talking somewhere else. That is exactly why they are leaving.",
+  "scan.disfraz": "🎭 <b>Disguised text</b>: {trucos}. It is judged after cleaning it up.",
+  "scan.disfraz.homoglifos": "letters swapped for look-alikes from another alphabet",
+  "scan.disfraz.espaciado": "letters spaced apart"
 }

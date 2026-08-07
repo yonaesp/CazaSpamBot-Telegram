@@ -37,6 +37,7 @@ from .detectors import tg_deeplink as tgdeep_det
 from .detectors import unicode_script as script_det
 from .detectors import url_blocklist as url_det
 from .i18n import t
+from . import desofuscar
 from . import story_reader
 
 
@@ -221,6 +222,7 @@ async def _responder_scan(context, msg, target, cfg: Config, db: DB) -> None:
         if leido is not None:
             texto, ents = leido
             target = story_reader.MensajeConTextoDeHistoria(target, texto, ents)
+    _limpio, _trucos = desofuscar.para_detectores(target)
     hits = [
         script_det.check(target.text or target.caption, is_first_msgs=True,
                          allowed_scripts=cfg.allowed_scripts,
@@ -238,12 +240,12 @@ async def _responder_scan(context, msg, target, cfg: Config, db: DB) -> None:
             own_chat_username=None,
         ),
         extreply_det.check(target, is_first_msg=True, is_moderated_chat=cfg.is_moderated),
-        comad_det.check(target, is_first_msg=True),
+        comad_det.check(_limpio, is_first_msg=True),
         # Faltaba: el /scan no corría investment_scam, así que un testimonio de
         # estafa salía como «no se detectaría» aunque el bot sí lo cazara.
-        invscam_det.check(target, is_first_msg=True),
+        invscam_det.check(_limpio, is_first_msg=True),
         emoji_det.check(target, is_first_msg=True),
-        offplat_det.check(target, is_first_msg=True),
+        offplat_det.check(_limpio, is_first_msg=True),
         fwd_det.check(target, is_first_msg=True, seconds_since_first_seen=0.0),
     ]
     real = [h for h in hits if h]
@@ -251,6 +253,12 @@ async def _responder_scan(context, msg, target, cfg: Config, db: DB) -> None:
 
     lines = [t("scan.header"), ""]
     lines += _structure(target)
+    # Si el texto venía camuflado hay que decirlo: si no, el admin ve que salta
+    # `commercial_ad` sobre un mensaje que en pantalla no se parece a lo que dice
+    # el motivo, y parece un error del bot cuando es justo lo contrario.
+    if _trucos:
+        lines.append(t("scan.disfraz",
+                       trucos=", ".join(t(f"scan.disfraz.{x}") for x in _trucos)))
     lines.append("")
     if real:
         total = sum(h.score for h in real)

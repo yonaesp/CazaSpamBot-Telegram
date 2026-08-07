@@ -1079,5 +1079,8 @@
   "quip.offplatform_contact.2": "☎️ Aquí no repartimos teléfonos de desconocidos. <b>{name}</b>, fuera.",
   "quip.offplatform_contact.3": "💔 <b>{name}</b> llamando «cariño» a mil desconocidos a la vez. Adiós.",
   "quip.offplatform_contact.4": "🚪 «Escríbeme por ahí» es el primer paso del timo. <b>{name}</b> no dará el segundo.",
-  "quip.offplatform_contact.5": "📞 <b>{name}</b> dejaba su número para seguir en privado fuera de aquí. Justo por eso se va."
+  "quip.offplatform_contact.5": "📞 <b>{name}</b> dejaba su número para seguir en privado fuera de aquí. Justo por eso se va.",
+  "scan.disfraz": "🎭 <b>Texto disfrazado</b>: {trucos}. Se juzga el texto ya limpio.",
+  "scan.disfraz.homoglifos": "letras cambiadas por gemelas de otro alfabeto",
+  "scan.disfraz.espaciado": "letras separadas por espacios"
 }
