@@ -831,15 +831,39 @@ class DB:
     # ------------- username_map -------------
 
     def remember_username(self, username: str | None, user_id: int) -> None:
+        """Guarda @usuario -> id. Una persona solo puede tener UN @usuario a la vez.
+
+        Antes solo se resolvía el conflicto en un sentido (mismo alias, otra
+        persona) y los alias VIEJOS se quedaban para siempre. Efecto real medido en
+        producción: `/warn @anthony10a` resolvía a un id cuyo usuario actual es
+        @Milagros90b, así que el admin escribía un nombre y el bot mencionaba otro,
+        y warneaba a quien no era. Ahora al ver a alguien con su @usuario se borran
+        sus alias anteriores.
+        """
         if not username:
             return
+        limpio = username.lower().lstrip("@")
         with self._cur() as c:
             c.execute(
                 """
                 INSERT INTO username_map (username_lower, user_id, updated_at) VALUES (?, ?, ?)
                 ON CONFLICT(username_lower) DO UPDATE SET user_id=excluded.user_id, updated_at=excluded.updated_at
                 """,
-                (username.lower().lstrip("@"), user_id, time.time()),
+                (limpio, user_id, time.time()),
+            )
+            c.execute(
+                "DELETE FROM username_map WHERE user_id=? AND username_lower<>?",
+                (user_id, limpio),
+            )
+            # Y refrescar el nombre en TODOS los chats. `record_message` solo lo
+            # actualiza en el chat donde la persona escribe, así que quien participa
+            # en un grupo y no en otro se quedaba con dos nombres distintos según
+            # dónde se le mirara, y los avisos del segundo grupo la mencionaban con
+            # el viejo. Solo toca las filas que difieren.
+            c.execute(
+                "UPDATE seen_users SET username=? "
+                "WHERE user_id=? AND (username IS NULL OR lower(username)<>?)",
+                (username.lstrip("@"), user_id, limpio),
             )
 
     def resolve_username(self, username: str) -> int | None:

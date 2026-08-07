@@ -1061,5 +1061,6 @@
   "quienfue.st_creador": "creator",
   "quienfue.st_fuera": "left the group",
   "quienfue.st_ninguno": "no previous state",
-  "reason.bio_no_latina": "bio entirely in another script, with a channel link"
+  "reason.bio_no_latina": "bio entirely in another script, with a channel link",
+  "admin.resolve.alias_cambiado": "The name <code>@{pedido}</code> is no longer theirs: that person is now <code>@{actual}</code>. Retry with the new name, or reply to one of their messages."
 }

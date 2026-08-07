@@ -1061,5 +1061,6 @@
   "quienfue.st_creador": "creador",
   "quienfue.st_fuera": "fuera del grupo",
   "quienfue.st_ninguno": "sin estado previo",
-  "reason.bio_no_latina": "bio entera en otro alfabeto con enlace a un canal"
+  "reason.bio_no_latina": "bio entera en otro alfabeto con enlace a un canal",
+  "admin.resolve.alias_cambiado": "El nombre <code>@{pedido}</code> ya no es suyo: esa persona ahora es <code>@{actual}</code>. Repite el comando con el nombre nuevo, o responde a un mensaje suyo."
 }

@@ -468,6 +468,20 @@ async def cmd_shadow(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     log.warning("Modo cambiado en runtime a %s por admin %s", new_mode, update.effective_user.id)
 
 
+async def _username_actual(context, user_id: int) -> str | None:
+    """@usuario que tiene HOY esa persona, o None si no se puede saber.
+
+    None significa «no lo sé», no «no tiene»: ante la duda se deja pasar, porque
+    bloquear un /ban legítimo porque Telegram no responde sería peor.
+    """
+    try:
+        chat = await context.bot.get_chat(user_id)
+        return getattr(chat, "username", None)
+    except Exception as exc:  # noqa: BLE001
+        log.debug("no se pudo comprobar el @usuario de %s: %s", user_id, exc)
+        return None
+
+
 async def _resolve_target_user(
     update: Update, context: ContextTypes.DEFAULT_TYPE, db: DB,
 ) -> tuple[int | None, list[str], str | None]:
@@ -519,10 +533,22 @@ async def _resolve_target_user(
     uname = first.lstrip("@").strip()
     if not uname:
         return None, args, t("admin.resolve.empty_arg")
-    # 3a) Cache local
+    # 3a) Cache local, CONTRASTADA con Telegram.
+    #
+    # El mapa @usuario -> id puede estar desfasado: la gente se cambia el nombre y
+    # el alias viejo se quedaba apuntando a esa persona. Efecto medido: escribías
+    # `/warn @anthony10a` y el bot warneaba (y mencionaba) a @Milagros90b, o sea a
+    # quien no era. `remember_username` ya limpia los alias antiguos, pero eso solo
+    # arregla a quien el bot vuelve a ver; esta comprobación cubre el resto y es la
+    # que impide actuar sobre la persona equivocada.
     uid = db.resolve_username(uname)
     if uid is not None:
-        return uid, rest, None
+        actual = await _username_actual(context, uid)
+        if actual is None or actual.lower() == uname.lower():
+            return uid, rest, None
+        log.warning("alias desfasado: @%s apuntaba a %s, que hoy es @%s", uname, uid, actual)
+        db.remember_username(actual, uid)   # corrige el mapa de paso
+        return None, args, t("admin.resolve.alias_cambiado", pedido=uname, actual=actual)
     # 3b) Fallback Bot API (solo resuelve usernames públicos que el bot ya vio)
     try:
         chat = await context.bot.get_chat(f"@{uname}")
