@@ -17,6 +17,36 @@ from .i18n import t
 
 log = logging.getLogger(__name__)
 
+# Topes de tiempo. Esto NO es cosmético: `fetch()` se llama en la ruta caliente
+# (cada entrada al grupo, y en varios caminos de `on_message`), y PTB procesa los
+# updates DE UNO EN UNO, así que cada segundo aquí es un segundo en el que el bot
+# no modera nada más.
+#
+# Sin tope, el peor caso era abierto por dos motivos que se suman:
+#   1. `_resolve_entity` reintenta 3 veces con 1,5 s de espera entre intentos.
+#      Medido con un cliente que falla al instante: **4,3 s** de reloj, íntegros
+#      de `asyncio.sleep`, cada vez que una entidad no se resuelve.
+#   2. Ante un FloodWait, Telethon **duerme sola hasta 60 s y no lanza excepción**
+#      (lo mismo que ya obligó a poner topes en `story_reader` y `photos_batch`).
+#      Y aquí hay hasta seis llamadas encadenadas.
+#
+# Con esto, lo peor que puede pasar son `_TIMEOUT_TOTAL_S` segundos y un None, que
+# es un valor que TODOS los que llaman ya saben tratar («no lo sé», nunca «está
+# limpio»). El total se ha elegido por encima de los 4,3 s de los reintentos a
+# propósito: recortar por debajo desactivaría en silencio la espera del race del
+# join, que existe porque Telegram tarda 1-2 s en propagar una participación nueva.
+_TIMEOUT_LLAMADA_S = 5.0
+_TIMEOUT_TOTAL_S = 12.0
+
+
+async def _con_tope(coro, que: str, user_id: int):
+    """Ejecuta una llamada de Telethon con tope. Devuelve None si se pasa."""
+    try:
+        return await asyncio.wait_for(coro, _TIMEOUT_LLAMADA_S)
+    except asyncio.TimeoutError:
+        log.info("user_signals: %s tardó demasiado (user=%s)", que, user_id)
+        return None
+
 
 @dataclass
 class UserSignals:
@@ -66,7 +96,9 @@ async def _resolve_once(client, user_id: int, chat_id: Optional[int],
     # 1) get_participants con search por nombre (el más fiable para users nuevos)
     if chat_id is not None and first_name:
         try:
-            parts = await client.get_participants(chat_id, search=first_name[:32], limit=15)
+            parts = await _con_tope(
+                client.get_participants(chat_id, search=first_name[:32], limit=15),
+                "get_participants", user_id) or []
             for p in parts:
                 if getattr(p, "id", None) == user_id:
                     return p
@@ -76,8 +108,12 @@ async def _resolve_once(client, user_id: int, chat_id: Optional[int],
     if chat_id is not None:
         try:
             from telethon.tl.functions.channels import GetParticipantRequest
-            channel = await client.get_entity(chat_id)
-            res = await client(GetParticipantRequest(channel=channel, participant=user_id))
+            channel = await _con_tope(client.get_entity(chat_id), "get_entity(chat)", user_id)
+            if channel is None:
+                raise TimeoutError("chat irresoluble")
+            res = await _con_tope(
+                client(GetParticipantRequest(channel=channel, participant=user_id)),
+                "GetParticipant", user_id)
             for u in getattr(res, "users", None) or []:
                 if getattr(u, "id", None) == user_id:
                     return u
@@ -85,7 +121,7 @@ async def _resolve_once(client, user_id: int, chat_id: Optional[int],
             log.debug("GetParticipant user=%s chat=%s fallo: %s", user_id, chat_id, exc)
     # 3) get_entity directo (funciona si ya está en caché)
     try:
-        return await client.get_entity(user_id)
+        return await _con_tope(client.get_entity(user_id), "get_entity(user)", user_id)
     except Exception as exc:  # noqa: BLE001
         log.debug("get_entity(%s) fallo: %s", user_id, exc)
         return None
@@ -117,11 +153,24 @@ async def _resolve_entity(client, user_id: int, chat_id: Optional[int],
 
 async def fetch(client, user_id: int, chat_id: Optional[int] = None,
                 first_name: Optional[str] = None) -> Optional[UserSignals]:
-    """Obtiene señales de un usuario vía Telethon. Devuelve None si falla.
+    """Señales del perfil, o None si no se pueden obtener a tiempo.
 
-    `chat_id` + `first_name` permiten resolver la entidad de cuentas recién
-    llegadas (no cacheadas) vía get_participants(search=nombre).
+    None significa «no lo sé», nunca «está limpio»: quien llama debe tratarlo como
+    ausencia de información. Ver el tope de tiempo arriba y por qué existe.
     """
+    if client is None:
+        return None
+    try:
+        return await asyncio.wait_for(
+            _fetch(client, user_id, chat_id, first_name), _TIMEOUT_TOTAL_S)
+    except asyncio.TimeoutError:
+        log.warning("user_signals: se agotó el tiempo total con user=%s (%.0fs)",
+                    user_id, _TIMEOUT_TOTAL_S)
+        return None
+
+
+async def _fetch(client, user_id: int, chat_id: Optional[int] = None,
+                 first_name: Optional[str] = None) -> Optional[UserSignals]:
     if client is None:
         return None
     try:
@@ -131,7 +180,8 @@ async def fetch(client, user_id: int, chat_id: Optional[int] = None,
             return None
         # Fotos: get_profile_photos devuelve Photo[] con .date
         try:
-            photos = await client.get_profile_photos(entity, limit=20)
+            photos = await _con_tope(
+                client.get_profile_photos(entity, limit=20), "get_profile_photos", user_id)
             sig.photo_count = len(photos) if photos else 0
             if photos:
                 dates = [p.date for p in photos if getattr(p, "date", None)]
@@ -143,7 +193,10 @@ async def fetch(client, user_id: int, chat_id: Optional[int] = None,
         # Bio: get_full_user sobre la entidad ya resuelta
         try:
             from telethon.tl.functions.users import GetFullUserRequest
-            full = await client(GetFullUserRequest(entity))
+            full = await _con_tope(
+                client(GetFullUserRequest(entity)), "GetFullUser", user_id)
+            if full is None:
+                raise TimeoutError("GetFullUser sin respuesta")
             sig.bio = (full.full_user.about or "").strip()[:300] or None
             # El canal personal viene en full_user; su TÍTULO hay que buscarlo en
             # full.chats, que trae las entidades relacionadas.

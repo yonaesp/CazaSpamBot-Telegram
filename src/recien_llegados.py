@@ -92,6 +92,7 @@ async def revisar_job(context) -> None:
         return
 
     mirados = 0
+    saltados = 0
     for fila in candidatos:
         if mirados >= MAX_POR_CICLO:
             break
@@ -99,6 +100,7 @@ async def revisar_job(context) -> None:
         if db.is_banned(user_id) or db.is_whitelisted(chat_id, user_id):
             continue
         if not _toca_mirar(context, chat_id, user_id):
+            saltados += 1
             continue
         mirados += 1
         try:
@@ -106,6 +108,14 @@ async def revisar_job(context) -> None:
                 continue
         except Exception as exc:  # noqa: BLE001
             log.warning("recien_llegados: fallo revisando user=%s: %s", user_id, exc)
+
+    # Latido. Sin esto el trabajo era invisible: solo escribía cuando actuaba, así
+    # que «no hay líneas en el log» no distinguía entre «corrió y no había nada» y
+    # «lleva días sin correr». Sale como mucho una línea por vuelta, y solo cuando
+    # de verdad ha consultado a alguien.
+    if mirados:
+        log.info("recien_llegados: %d revisados, %d aún en espera, %d en la ventana",
+                 mirados, saltados, len(candidatos))
 
 
 async def _revisar_uno(context, db: DB, cfg: Config, session, fila) -> bool:

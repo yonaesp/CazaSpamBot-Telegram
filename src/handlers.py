@@ -60,6 +60,9 @@ log = logging.getLogger(__name__)
 # Con money_guard='soft' un hit de dinero/trabajo solo sobrevive si es MUY claro.
 # El umbral de los detectores es 60; aquí exigimos bastante más para que solo caigan
 # los casos evidentes y los borderline (trabajo/dinero legítimo dudoso) pasen.
+_LOLS_CACHE_MAX = 5000
+_LOLS_CACHE_TTL = 3600  # segundos; el mismo plazo que se comprueba al leerla
+
 _MONEY_SOFT_MIN_SCORE = 100
 
 
@@ -1238,6 +1241,17 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         if _sess is not None:
             _cache = context.bot_data.setdefault("_lols_cache", {})
             _ahora = time.time()
+            # Poda. Esta caché solo crecía: se escribía una entrada por cada usuario
+            # nuevo que escribiera y no se borraba ninguna nunca. En un proceso que
+            # lleva meses levantado eso es una fuga lenta, y `_trust_cache` (justo
+            # abajo) ya se protegía de lo mismo. Se tira lo caducado, que además es
+            # gratis: pasada la hora, la entrada no vale para nada.
+            if len(_cache) >= _LOLS_CACHE_MAX:
+                for _k in [k for k, v in _cache.items() if _ahora - v[0] > _LOLS_CACHE_TTL]:
+                    _cache.pop(_k, None)
+                if len(_cache) >= _LOLS_CACHE_MAX:      # todas frescas: fuera la mitad más vieja
+                    for _k, _ in sorted(_cache.items(), key=lambda kv: kv[1][0])[: len(_cache) // 2]:
+                        _cache.pop(_k, None)
             if cfg.lols_enabled:
                 _cached = _cache.get(user.id)
                 if _cached is None or _ahora - _cached[0] > 3600:
