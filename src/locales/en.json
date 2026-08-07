@@ -1060,5 +1060,6 @@
   "quienfue.st_admin": "administrator",
   "quienfue.st_creador": "creator",
   "quienfue.st_fuera": "left the group",
-  "quienfue.st_ninguno": "no previous state"
+  "quienfue.st_ninguno": "no previous state",
+  "reason.bio_no_latina": "bio entirely in another script, with a channel link"
 }

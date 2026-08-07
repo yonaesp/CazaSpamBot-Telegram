@@ -16,6 +16,7 @@ from __future__ import annotations
 import html
 import html as _html
 import logging
+import re as _re_bio
 import os
 import random
 from pathlib import Path
@@ -165,6 +166,22 @@ def _han_dominant(value: Optional[str]) -> bool:
     return han >= 2 and han / len(letters) >= 0.5
 
 
+_INVITE_EN_BIO_RE = _re_bio.compile(
+    r"t\.me/(?:\+|joinchat/)[A-Za-z0-9_-]+|t\.me/[A-Za-z0-9_]{4,}",
+    _re_bio.IGNORECASE,
+)
+
+
+def _bio_es_publicidad(bio) -> bool:
+    """¿La biografía lleva un enlace a un canal o grupo de Telegram?
+
+    Es la señal que separa a un chino-hablante real de un anuncio ambulante. Una
+    persona normal no pone en su bio una invitación a un canal privado; el spam de
+    blanqueo y de «señales» sí, porque la bio ES su anuncio.
+    """
+    return bool(bio) and bool(_INVITE_EN_BIO_RE.search(bio))
+
+
 def _is_obvious_spam_profile(
     sig: Optional[user_signals.UserSignals],
     username: Optional[str],
@@ -207,8 +224,17 @@ def _is_obvious_spam_profile(
                 high_ratio_single = True
     # BYPASS de seguridad: si Telethon dice cuenta ≥365d + con foto,
     # NUNCA ban directo por nombre. Es un user bilingüe probable.
+    #
+    # SALVO que la bio sea PUBLICIDAD. El salvoconducto existe para proteger a una
+    # persona real con cuenta asentada, y una persona real no lleva un enlace de
+    # invitación a un canal en la biografía. Caso real (7-ago-2026): cuenta de 1218
+    # días con 8 fotos, nombre en Han y bio «【新币公群】…押金18万U: https://t.me/+…»,
+    # o sea publicidad de blanqueo. Con el salvoconducto puesto se quedaba en
+    # «decide tú», cuando no hay nada que decidir.
     if sig is not None and sig.photo_count >= 1 and (sig.account_age_days or 0) >= 365:
-        return False, reasons + [(REASON_BYPASS_OLD, {})]
+        if not _bio_es_publicidad(getattr(sig, "bio", None)):
+            return False, reasons + [(REASON_BYPASS_OLD, {})]
+        reasons = reasons + [(REASON_BIO_PROMO, {})]
     # Chino REAL (ideogramas Han) en cualquier campo: señal muy fuerte de spam en
     # grupos hispanos. A diferencia del árabe/cirílico (con users legítimos) o el
     # katakana decorativo (ツ), un nombre dominado por ideogramas Han en un grupo
@@ -276,6 +302,7 @@ REASON_NON_LATIN_FIELD = "non_latin_field"
 REASON_BYPASS_OLD = "bypass_old_photo"
 REASON_HAN_DOMINANT = "han_dominant"
 REASON_NO_PHOTO_NEW = "no_photo_new"
+REASON_BIO_PROMO = "bio_promo"
 
 
 def render_reason_list(reasons) -> list[str]:
@@ -377,6 +404,10 @@ def han_requiere_decision(
     # Sin señales de Telethon el salvoconducto no aplica: ahí `_is_obvious_spam_profile`
     # ya banea solo, y este camino no debe pisarlo.
     if sig is None:
+        return False
+    # Con la bio anunciando un canal tampoco: eso ya se banea, y pedir decisión de
+    # algo resuelto solo genera un aviso que el admin tiene que descartar a mano.
+    if _bio_es_publicidad(getattr(sig, "bio", None)):
         return False
     return sig.photo_count >= 1 and (sig.account_age_days or 0) >= 365
 

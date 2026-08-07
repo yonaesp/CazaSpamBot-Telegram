@@ -29,6 +29,11 @@ _TG_INVITE_RE = re.compile(
 # Cualquier link t.me/ a un canal/grupo (no a user)
 _TG_LINK_RE = re.compile(r't\.me/[A-Za-z0-9_]{4,}', re.IGNORECASE)
 # URLs externas
+# Proporción de alfabeto NO latino a partir de la cual se considera que la bio
+# está escrita en otro sistema de escritura. No vale con «¿hay alguna letra
+# latina?»: el spam de USDT escribe «收U» y «18万U», y esa U sola bastaba para
+# colarse. Se reutiliza el mismo cálculo que usa el detector de mensajes.
+_RATIO_NO_LATINA = 0.6
 _EXTERNAL_URL_RE = re.compile(
     r'\b(?:https?://|www\.)\S+',
     re.IGNORECASE,
@@ -98,6 +103,11 @@ def check(bio: str | None) -> Hit:
         return Hit.none()
 
     text = bio.strip()
+    # Sin URLs: son siempre latinas y falsearían la comprobación de alfabeto.
+    # ORDEN IMPORTANTE: primero la URL completa (con esquema) y después los enlaces
+    # sueltos sin `https://`. Al revés quedaba un «https://» huérfano contando como
+    # texto latino, que bajaba la proporción y colaba la bio.
+    sin_urls = re.sub(r"t\.me/\S+", " ", _EXTERNAL_URL_RE.sub(" ", text))
     score = 0
     reasons: list[str] = []
 
@@ -120,6 +130,23 @@ def check(bio: str | None) -> Hit:
     if _cta_re().search(text) or _FOREIGN_LANG_HINT_RE.search(text):
         score += 15
         reasons.append(t("reason.bio_cta"))
+    # Bio SIN una sola letra latina + enlace a un canal. Las señales de arriba
+    # (emojis, CTA, cifras de dinero) están pensadas para texto latino, así que una
+    # bio entera en otro alfabeto no sumaba NADA y se quedaba en los 40 del enlace,
+    # por debajo del umbral. Caso real (7-ago-2026): «【新币公群】…押金18万U:
+    # https://t.me/+…», publicidad de blanqueo, que pasaba como bio inocente.
+    #
+    # Se exige ADEMÁS un enlace de invitación PRIVADO (t.me/+ o joinchat), no uno
+    # cualquiera: quien tiene un canal propio lo enlaza por su @nombre público, y
+    # eso es corriente en cualquier idioma. El enlace privado en una bio es lo que
+    # no hace nadie normal. Con «cualquier enlace t.me» se marcaba a un ruso que
+    # anunciaba su canal, y eso es un falso positivo con ban al entrar.
+    from .unicode_script import non_allowed_ratio as _ratio_no_latina
+    _r, _ = _ratio_no_latina(sin_urls, ["latin"])
+    if _TG_INVITE_RE.search(text) and _r >= _RATIO_NO_LATINA:
+        score += 20
+        reasons.append(t("reason.bio_no_latina"))
+
     if _spam_keywords_re().search(text):
         score += 30
         reasons.append(t("reason.bio_keywords"))

@@ -1060,5 +1060,6 @@
   "quienfue.st_admin": "administrador",
   "quienfue.st_creador": "creador",
   "quienfue.st_fuera": "fuera del grupo",
-  "quienfue.st_ninguno": "sin estado previo"
+  "quienfue.st_ninguno": "sin estado previo",
+  "reason.bio_no_latina": "bio entera en otro alfabeto con enlace a un canal"
 }
