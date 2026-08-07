@@ -34,6 +34,7 @@ from .detectors import inline_buttons as buttons_det
 from .detectors import commercial_ad as comad_det
 from .detectors import investment_scam as invscam_det
 from .detectors import contact_spam as contact_det
+from .detectors import cross_post as crosspost_det
 from .detectors import external_reply as extreply_det
 from .detectors import photos_batch as photos_batch_det
 from .detectors import bio_spam as bio_spam_det
@@ -1153,6 +1154,14 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     # 3d-quint) Primer mensaje dominado por emojis sin texto real (captación
     # de atención típica de spam, ej. "🍭🍄🌟").
     hits.append(emoji_only_det.check(msg, is_first_msg=is_first))
+    # 3d-cinq) El MISMO texto, a la vez, en varios de nuestros grupos. Aprovecha la
+    # federación: quien modera un solo grupo no puede ver esto. No mira el
+    # contenido, así que caza campañas cuyo vocabulario las listas todavía no
+    # conocen. El texto ya viene normalizado, así que cambiar mayúsculas o meter
+    # caracteres invisibles no sirve para esquivarlo.
+    if not texto_ajeno:
+        hits.append(crosspost_det.check(db, chat_id, user.id, normalized_text or text))
+
     # 3d-sext) "Este es mi número de <otra app>, escríbeme ahí". Sin enlace, sin
     # mención y en español correcto, así que ningún otro detector lo veía: hubo que
     # borrarlo a mano tras hora y cuarto en el grupo.

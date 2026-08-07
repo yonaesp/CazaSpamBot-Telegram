@@ -1089,5 +1089,11 @@
   "hdl.bot_demoted.borrar": "borrar mensajes",
   "hdl.bot_demoted.restringir": "expulsar ni silenciar",
   "hdl.bot_demoted.admin": "actuar (ya no soy administrador)",
-  "antiraid.aviso": "🌊 <b>Avalancha de entradas</b>\n📍 Chat: {chat}\n\nHan entrado <b>{n}</b> cuentas en {ventana} segundos. Durante los próximos <b>{minutos} minutos</b> seré más estricto <i>solo</i> con quien llegue ahora.\n\n<i>No cierro el grupo ni silencio a nadie por entrar: en una avalancha siempre hay gente normal que pasaba por ahí.</i>"
+  "antiraid.aviso": "🌊 <b>Avalancha de entradas</b>\n📍 Chat: {chat}\n\nHan entrado <b>{n}</b> cuentas en {ventana} segundos. Durante los próximos <b>{minutos} minutos</b> seré más estricto <i>solo</i> con quien llegue ahora.\n\n<i>No cierro el grupo ni silencio a nadie por entrar: en una avalancha siempre hay gente normal que pasaba por ahí.</i>",
+  "reason.cross_post": "Ha publicado el mismo mensaje en {n} de nuestros grupos casi a la vez",
+  "rule.cross_post": "Repartió el mismo mensaje por varios de tus grupos casi a la vez. Una persona escribe donde tiene el problema; un anuncio se reparte por todos.",
+  "quip.cross_post.1": "📣 <b>{name}</b> repartiendo el mismo mensaje por todos los grupos. Aquí también nos hablamos entre nosotros. Hasta lueguito.",
+  "quip.cross_post.2": "📋 Copiar y pegar en cuatro grupos a la vez tiene nombre, <b>{name}</b>, y no es «consulta».",
+  "quip.cross_post.3": "🔁 <b>{name}</b> no tenía una duda, tenía una campaña. Adiós.",
+  "quip.cross_post.4": "📨 El mismo texto en tres grupos en diez minutos. Nos hemos dado cuenta, <b>{name}</b>."
 }

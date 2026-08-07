@@ -1089,5 +1089,11 @@
   "hdl.bot_demoted.borrar": "delete messages",
   "hdl.bot_demoted.restringir": "kick or mute anyone",
   "hdl.bot_demoted.admin": "act at all (no longer an admin)",
-  "antiraid.aviso": "🌊 <b>Flood of joins</b>\n📍 Chat: {chat}\n\n<b>{n}</b> accounts joined within {ventana} seconds. For the next <b>{minutos} minutes</b> I will be stricter <i>only</i> with those arriving now.\n\n<i>I do not lock the group or mute anyone for joining: in a flood there are always ordinary people who happened to walk in.</i>"
+  "antiraid.aviso": "🌊 <b>Flood of joins</b>\n📍 Chat: {chat}\n\n<b>{n}</b> accounts joined within {ventana} seconds. For the next <b>{minutos} minutes</b> I will be stricter <i>only</i> with those arriving now.\n\n<i>I do not lock the group or mute anyone for joining: in a flood there are always ordinary people who happened to walk in.</i>",
+  "reason.cross_post": "Posted the same message in {n} of our groups almost at once",
+  "rule.cross_post": "Spread the same message across several of your groups almost at once. A person writes where their problem is; an advert goes everywhere.",
+  "quip.cross_post.1": "📣 <b>{name}</b> spreading the same message across every group. We talk to each other here too. Bye now.",
+  "quip.cross_post.2": "📋 Pasting into four groups at once has a name, <b>{name}</b>, and it is not «a question».",
+  "quip.cross_post.3": "🔁 <b>{name}</b> did not have a question, they had a campaign. Goodbye.",
+  "quip.cross_post.4": "📨 The same text in three groups within ten minutes. We noticed, <b>{name}</b>."
 }

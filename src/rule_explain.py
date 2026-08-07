@@ -34,6 +34,7 @@ KNOWN_RULES: frozenset[str] = frozenset({
     "non_allowed_script",
     "contact_spam",
     "offplatform_contact",
+    "cross_post",
     "external_quote_channel",
     "emoji_only_first_msg",
     "forward_first_msg",

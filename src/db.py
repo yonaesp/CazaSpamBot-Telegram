@@ -466,6 +466,33 @@ class DB:
                 (chat_id, user_id),
             ).fetchone()
 
+    def chats_con_el_mismo_texto(self, user_id: int, texto_normalizado: str,
+                                 desde_ts: float) -> list[int]:
+        """Chats donde esta persona tiene ese mismo texto como último mensaje.
+
+        Sale de `seen_users`, sin tabla nueva: ahí ya está el último mensaje de cada
+        persona en cada chat. La comparación se hace en Python y no en SQL porque hay
+        que NORMALIZAR los dos lados (el mismo `learning.normalize` del clasificador),
+        y así cambiar mayúsculas o colar caracteres invisibles no sirve para esquivarlo.
+
+        Limitación asumida: si en uno de los chats la persona escribió otra cosa
+        DESPUÉS, ese chat ya no cuenta. Da igual para lo que se usa, porque la
+        comprobación se hace en el momento del mensaje, que es cuando el reparto
+        está recién hecho.
+        """
+        from .learning import normalize
+        objetivo = normalize(texto_normalizado or "")
+        if not objetivo:
+            return []
+        with self._cur() as c:
+            filas = c.execute(
+                "SELECT chat_id, last_msg_text FROM seen_users "
+                "WHERE user_id=? AND last_msg_ts IS NOT NULL AND last_msg_ts>? "
+                "AND last_msg_text IS NOT NULL",
+                (user_id, desde_ts),
+            ).fetchall()
+        return [f["chat_id"] for f in filas if normalize(f["last_msg_text"]) == objetivo]
+
     def recien_llegados_callados(self, desde_ts: float, limite: int = 50) -> list[sqlite3.Row]:
         """Quien entró después de `desde_ts` y todavía NO ha escrito.
 

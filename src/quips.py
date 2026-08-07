@@ -57,6 +57,7 @@ _RULES: tuple[str, ...] = (
     "photos_batch_upload",
     "commercial_ad",
     "offplatform_contact",
+    "cross_post",
     "dormant_bot_mention",
     "bio_spam",
     "personal_channel_spam",

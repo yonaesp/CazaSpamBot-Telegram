@@ -21,6 +21,7 @@ anotado para no volver a proponerlo.
 | Detector de espaciado anómalo (era el 8) | `src/desofuscar.py`. Resuelto **al revés** de como estaba planteado: en vez de puntuar el espaciado, se DESHACE y deciden las reglas de contenido de siempre. Así no hay umbral nuevo que calibrar ni falso positivo que inventar. Medido: 11.560 mensajes reales, 0 tocados |
 | Palabras que mezclan alfabetos | `src/desofuscar.py`. **No estaba en la lista y era el agujero más grave**: cambiar UNA letra por su gemela cirílica dejaba `commercial_ad` en 0 (de 75) sin que saltara `unicode_script`, que mide proporción sobre el total |
 | Antiraid (era el 6) | `src/antiraid.py`. Resuelto como decía la nota: **no se cierra el grupo ni se silencia a nadie por entrar**, solo se bajan los umbrales unos minutos y **solo a quien llegó con la avalancha**. Umbral calibrado sobre las 881 entradas reales registradas: el máximo histórico en 60 s es 2 |
+| Mensaje duplicado entre chats (era el 5) | `src/detectors/cross_post.py`. **No mira el contenido**, así que caza campañas cuyo vocabulario las listas todavía no conocen. Tres chats distintos como mínimo (con dos se equivocaba: quien tiene un problema pregunta en el de Windows 10 y en el de Windows 11) |
 | Meta-checks (contacto, solo-emoji, solo-media) | `contact_spam.py`, `emoji_only.py`, `first_msg_media.py`, `inline_buttons.py` |
 | Reputation graduation | `src/trust.py` + `src/gentle_warning.py`. Trust 0-100 que degrada, anula o manda a revisión |
 | Antiflood por usuario | `flood_state` en `db.py`, graduado por trust (5/8/12 msgs en 10s) |
@@ -101,20 +102,6 @@ fallback al corpus global cuando el chat tiene pocas muestras); lo que hay que
 pensar bien es el criterio, porque partir el corpus con 36 muestras totales deja
 a cada grupo sin nada.
 
-### 5. Detector de mensaje duplicado entre chats
-**Dificultad**: BAJA.
-**Origen**: tg-spam `--duplicates.threshold`.
-
-El mismo texto publicado en varios grupos federados en poco tiempo es spam de
-cadena casi por definición, y hoy se le trata como mensajes independientes. Ya
-tenemos `learning.text_hash()` y federación: hace falta una tabla
-`recent_msgs(hash, user_id, chat_id, ts)` con ventana de una hora.
-
-Señal de una limpieza notable y con muy pocos falsos positivos, porque exige
-identidad exacta del texto normalizado. Es lo más rentable que queda por hacer.
-
----
-
 ## P2. Útil, pero sin urgencia
 
 ### 7. Soft-ban (mute permanente en vez de expulsar)
@@ -186,4 +173,4 @@ es un cambio pequeño.
 - **Soporte Postgres**: SQLite WAL sobra de largo para este volumen.
 - **Filtro de palabrotas**: antispam no es moderación de lenguaje.
 
-*Actualizado: 2026-08-02. 1196 tests en verde, 24 detectores.*
+*Actualizado: 2026-08-02. 1206 tests en verde, 25 detectores.*
