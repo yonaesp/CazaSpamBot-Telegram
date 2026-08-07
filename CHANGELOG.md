@@ -4,6 +4,37 @@ Cambios relevantes de CazaSpamBot, lo más reciente arriba. Se anotan hitos, no
 cada commit: para el detalle está el historial de git. Sin números de versión
 porque el bot es un servicio en producción continua, no un paquete que se libera.
 
+## 2026-08 · A dónde lleva el enlace
+
+Un enlace `t.me` a otro chat era una señal **a ciegas**: el bot sabía que existía,
+no adónde iba. Con esa duda solo se puede ser blando, y por ahí se coló un caso
+real que estuvo dos semanas a la vista de todos.
+
+- **Lo que pasó** (24/07, grupo de domótica): una cuenta con dos años y 34 mensajes
+  publica un enlace a un canal de packs. El bot **sí lo detectó**
+  (`external_mention_or_link`, 50 puntos), pero al ser su autor un veterano aplicó
+  el **aviso suave**: recordatorio de normas que se autoborra a los 5 minutos y el
+  enlace intacto en el grupo. Una hora más tarde otro miembro escribía «este se le
+  ha escapado al bot». Ni ban fallido ni detector ciego: una decisión deliberada
+  que no contemplaba la **cuenta robada**.
+- **`link_reader.py`** va a ver el destino antes de juzgarlo: título y descripción
+  públicas del chat enlazado. Incluye los **enlaces privados** (`t.me/+HASH`), que
+  se leen con `messages.checkChatInvite` **sin entrar** al chat. Mismo principio
+  que `story_reader`: se juzga la evidencia, no el indicio.
+- Detector **`link_target`**: si ese destino se anuncia solo con vocabulario de
+  spam, el enlace deja de ser borderline. Lista editable
+  `config/blacklist/link_target_keywords.txt`, que **suma** la de `personal_channel`
+  (mismo criterio, una sola lista que mantener). Verificado contra Telegram real:
+  el canal del caso puntúa 100 y los canales legítimos de control, cero.
+- Es **regla dura**, así que el trust ya no puede taparla. Era justo el agujero:
+  una cuenta veterana robada seguía spameando con toda la protección del historial.
+- **El aviso suave deja de ser un silencio.** Ahora se avisa al admin por privado
+  con los mismos botones que el atajo por trust alto (nada / avisar / banear).
+  Antes, el bot veía spam, decidía no tocarlo y no se enteraba nadie.
+- Topes pensados para que no congele el bot (los updates se procesan de uno en
+  uno): 5 s por llamada, 6 s en total, 2 enlaces por mensaje y caché de 6 h que
+  guarda también los resultados negativos.
+
 ## 2026-08 · Historias, avisos que llegan y bienvenidas que se van
 
 Dos días largos a raíz de un spam que se coló: publicidad de cripto compartida

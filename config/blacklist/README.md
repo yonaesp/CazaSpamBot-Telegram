@@ -87,6 +87,7 @@ es casi siempre más seguro que una palabra suelta.
 | `bio_illegal_services.txt` | `bio_spam` | servicios de hacking/piratería declarados en la bio |
 | `bio_cta.txt` | `bio_spam` | llamadas a la acción promocionales en la bio (escríbeme, DM me...) |
 | `personal_channel_keywords.txt` | `personal_channel` | vocabulario ilícito en el **título del canal** enlazado en el perfil. **Se carga sin `\b(?:...)\b`** (el chino no separa palabras): pon tú los `\b` en los patrones latinos. No se gestiona desde el panel de Telegram |
+| `link_target_keywords.txt` | `link_target` | vocabulario del **chat al que lleva un enlace `t.me`**, leído de su título y su descripción públicas. Se le SUMAN los de `personal_channel_keywords.txt`. **Se carga sin `\b(?:...)\b`**: pon tú los `\b`. Ojo: aquí no se juzga el mensaje de nadie, sino el escaparate que ha escrito quien monta el canal |
 | `classifier_excluded_tokens.txt` | clasificador `/spam` `/legal` | (al revés: palabras NEUTRAS de tu temática que se ignoran para no ensuciar el aprendizaje) |
 
 ## `classifier_excluded_tokens.txt`: el vocabulario de TU grupo

@@ -1062,5 +1062,12 @@
   "quienfue.st_fuera": "left the group",
   "quienfue.st_ninguno": "no previous state",
   "reason.bio_no_latina": "bio entirely in another script, with a channel link",
-  "admin.resolve.alias_cambiado": "The name <code>@{pedido}</code> is no longer theirs: that person is now <code>@{actual}</code>. Retry with the new name, or reply to one of their messages."
+  "admin.resolve.alias_cambiado": "The name <code>@{pedido}</code> is no longer theirs: that person is now <code>@{actual}</code>. Retry with the new name, or reply to one of their messages.",
+  "reason.link_target_spam": "The link leads to a chat advertising itself as «{title}»",
+  "rule.link_target_spam": "Not just any link: the chat it leads to advertises itself with spam wording in its title or description.",
+  "quip.link_target_spam.1": "🔗 <b>{name}</b> shared a very friendly link. I checked where it went. Bye now.",
+  "quip.link_target_spam.2": "🕵️ Before letting a link through I like to see what is on the other side. <b>{name}</b>'s was not it.",
+  "quip.link_target_spam.3": "🚪 <b>{name}</b> was opening a door to a place that describes itself. Out.",
+  "quip.link_target_spam.4": "📎 <b>{name}</b>'s link did not go where it said it did. Goodbye.",
+  "quip.link_target_spam.5": "🧭 I followed <b>{name}</b>'s link all the way. Better not say what was there."
 }

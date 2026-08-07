@@ -1,0 +1,24 @@
+# Vocabulario del DESTINO de un enlace t.me, en INGLES (detector `link_target`).
+# Se SUMAN a los del archivo generico ../link_target_keywords.txt y a los de
+# personal_channel_keywords.txt.
+#
+# OJO: se compila SIN el envoltorio \b(?:...)\b (ver el archivo generico). Cada
+# patron debe traer sus propios \b.
+#
+# Criterio: expresiones COMPUESTAS e inequivocas, tal y como las escribe quien
+# anuncia su canal. Nada de palabras sueltas (packs, leaks, videos, free) que se
+# llevarian por delante canales legitimos.
+
+# --- Venta de contenido sexual ---
+\bleaked?\s+(?:nudes?|packs?|content)\b
+\bnudes?\s+(?:leaks?|packs?|for\s+free)\b
+\bteen\s+(?:packs?|leaks?|nudes?)\b
+\bhomemade\s+(?:packs?|porn)\b
+\bporn\s+(?:packs?|leaks?|channel)\b
+\bsell(?:ing)?\s+packs?\b
+\badult\s+content\s+(?:channel|group)\b
+
+# --- Cuentas y tarjetas robadas ---
+\b(?:free|cracked)\s+premium\s+accounts?\b
+\b(?:stolen|cloned)\s+(?:cards?|credit\s+cards?)\b
+\bcc\s+(?:shop|dumps?)\b

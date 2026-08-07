@@ -184,4 +184,4 @@ Telegram ya restringe bastante los usernames.
 - **Soporte Postgres**: SQLite WAL sobra de largo para este volumen.
 - **Filtro de palabrotas**: antispam no es moderación de lenguaje.
 
-*Actualizado: 2026-08-02. 1018 tests en verde, 22 detectores.*
+*Actualizado: 2026-08-02. 1117 tests en verde, 23 detectores.*

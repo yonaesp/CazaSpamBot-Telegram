@@ -17,6 +17,7 @@ from telegram.error import TelegramError
 from telegram.ext import ContextTypes
 
 from . import borrado_diferido
+from . import link_reader
 from . import admin_report, gentle_warning, greetings, learning, notify_prefs, quips, rule_explain, story_reader, trust as _trust, user_signals, verification
 from .config import Config
 from .db import DB
@@ -38,6 +39,7 @@ from .detectors import personal_channel as personal_channel_det
 from .detectors import dormant_bot_mention as dormant_bot_det
 from .detectors import emoji_only as emoji_only_det
 from .detectors import jfm_delta as jfm_det
+from .detectors import link_target as link_target_det
 from .detectors import lols_bot as lols_det
 from .detectors import premium_new_link as premium_det
 from .detectors import reaction_farming as react_det
@@ -98,6 +100,21 @@ def _apply_money_guard(hit: Hit, mode: str) -> Hit:
     if mode == "soft" and hit.score < _MONEY_SOFT_MIN_SCORE:
         return Hit.none()
     return hit
+
+
+def _enlaces_tg_de(hits: list[Hit]) -> list[str]:
+    """URLs t.me que ya han disparado un hit, para ir a mirar a dónde llevan.
+
+    Se leen del payload de `external_mention_or_link` en vez de volver a recorrer
+    el mensaje: así el destino solo se consulta cuando el enlace YA es sospechoso,
+    y nunca por un t.me al propio grupo (que ese detector ya descarta).
+    """
+    urls: list[str] = []
+    for hit in hits:
+        for url in (hit.payload or {}).get("external_tg_links") or []:
+            if url not in urls:
+                urls.append(url)
+    return urls
 
 
 def _can_restrict(member) -> bool:
@@ -1196,6 +1213,21 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         log.info("Hits suprimidos para user %s", user.id)
         return
 
+    # 5) ¿A DÓNDE lleva el enlace? Un t.me a un chat externo es una señal ciega: no
+    # sabe distinguir un canal de domótica de uno de packs, y con esa duda solo se
+    # puede ser blando. El destino, en cambio, se presenta solo. Se mira únicamente
+    # cuando ya hay un hit de enlace, así que son unas pocas consultas al día.
+    enlaces_tg = _enlaces_tg_de(real)
+    if enlaces_tg:
+        destino = await link_reader.leer(context, enlaces_tg, es_moderado=cfg.is_moderated)
+        destino_hit = link_target_det.check(destino)
+        if destino_hit:
+            log.info(
+                "link_target_spam user=%s chat=%s destino=%r → el enlace deja de ser borderline",
+                user.id, chat_id, (destino.titulo or "")[:60],
+            )
+            real.append(destino_hit)
+
     # Trust graduation: si solo dispararon reglas "borderline" (mención/link)
     # Y el user tiene >10 msgs + >10 días en el grupo → aviso suave en vez de ban
     BORDERLINE = {"external_mention_or_link", "url_blocklist", "tg_deeplink"}
@@ -1213,6 +1245,18 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
             mode=("shadow" if cfg.shadow else "active"),
             payload={"reason": reason, "trust": "granted"},
         )
+        # Y se le cuenta al admin. El aviso suave se autoborra a los 5 min y el
+        # mensaje del veterano se queda: si nadie mira, el bot ha visto spam, ha
+        # decidido no tocarlo y no se ha enterado nadie. Pasó de verdad (24/07/2026:
+        # un enlace a un canal de packs sobrevivió porque su autor llevaba dos años
+        # en el grupo, y quien avisó fue otro miembro). Mismo aviso y mismos botones
+        # que el atajo por trust alto: nada / avisar / banear.
+        await _send_trust_notice(
+            context, db, cfg, msg, user,
+            rules=[h.rule for h in real], reason=reason,
+            proposed_action="gentle_warn",
+            trust=_trust_score_cached(context, db, chat_id, user.id),
+        )
         return
 
     is_first_attack = is_first and any(
@@ -1225,7 +1269,12 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
     # Trust score genérico (0-100): degradar acción para users de confianza.
     # Excepciones: reglas de severidad máxima nunca se degradan.
-    HARD_RULES = {"cas_match", "lols_match", "federation_known_ban", "reaction_farming"}
+    # `link_target_spam` entra aquí porque no es una heurística sobre el mensaje:
+    # es lo que el chat enlazado dice de sí mismo. Justo el caso que el trust dejaba
+    # escapar (cuenta veterana, probablemente robada, publicando un canal de packs):
+    # con el atajo por trust alto el enlace se quedaba en el grupo.
+    HARD_RULES = {"cas_match", "lols_match", "federation_known_ban", "reaction_farming",
+                  "link_target_spam"}
     has_hard_rule = any(h.rule in HARD_RULES for h in real)
     if not has_hard_rule and decision.action != "noop":
         trust = _trust_score_cached(context, db, chat_id, user.id)

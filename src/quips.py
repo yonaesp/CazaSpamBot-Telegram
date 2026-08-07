@@ -66,6 +66,7 @@ _RULES: tuple[str, ...] = (
     "jfm_fast",
     "jfm_cron",
     "tg_deeplink",
+    "link_target_spam",
     "premium_new_link",
     "lols_match",
     "learned_similarity",

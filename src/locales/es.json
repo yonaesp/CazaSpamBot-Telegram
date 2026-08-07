@@ -1062,5 +1062,12 @@
   "quienfue.st_fuera": "fuera del grupo",
   "quienfue.st_ninguno": "sin estado previo",
   "reason.bio_no_latina": "bio entera en otro alfabeto con enlace a un canal",
-  "admin.resolve.alias_cambiado": "El nombre <code>@{pedido}</code> ya no es suyo: esa persona ahora es <code>@{actual}</code>. Repite el comando con el nombre nuevo, o responde a un mensaje suyo."
+  "admin.resolve.alias_cambiado": "El nombre <code>@{pedido}</code> ya no es suyo: esa persona ahora es <code>@{actual}</code>. Repite el comando con el nombre nuevo, o responde a un mensaje suyo.",
+  "reason.link_target_spam": "El enlace lleva a un chat que se anuncia como «{title}»",
+  "rule.link_target_spam": "El enlace no era un enlace cualquiera: el chat al que lleva se anuncia a sí mismo con vocabulario de spam en su título o su descripción.",
+  "quip.link_target_spam.1": "🔗 <b>{name}</b> compartía un enlace muy simpático. He mirado a dónde llevaba. Hasta lueguito.",
+  "quip.link_target_spam.2": "🕵️ Antes de dejar pasar un enlace me gusta ver qué hay al otro lado. Lo de <b>{name}</b> no era domótica precisamente.",
+  "quip.link_target_spam.3": "🚪 <b>{name}</b> abría la puerta a un sitio que se describe solito. Fuera.",
+  "quip.link_target_spam.4": "📎 El enlace de <b>{name}</b> no iba donde decía ir. Adiós.",
+  "quip.link_target_spam.5": "🧭 He seguido el enlace de <b>{name}</b> hasta el final. Mejor no cuento lo que había."
 }

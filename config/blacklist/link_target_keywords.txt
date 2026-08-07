@@ -1,0 +1,37 @@
+# Vocabulario que delata al DESTINO de un enlace t.me (detector `link_target`).
+#
+# Esto NO se compara con el mensaje del usuario, sino con el TITULO y la
+# DESCRIPCION del chat enlazado, escritos por quien monta ese canal para atraer
+# clientes. Por eso el liston es distinto al de las demas listas: en un grupo de
+# informatica o domotica se habla de dinero, de trabajo y de fotos a todas horas,
+# pero nadie enlaza un canal titulado «Jovencitas / Colegialas».
+#
+# A estos patrones se SUMAN los de `personal_channel_keywords.txt` (blanqueo,
+# apuestas, documentos falsos, accesos robados): mismo criterio, misma lista.
+#
+# OJO: esta lista se compila SIN el envoltorio \b(?:...)\b, porque el chino y el
+# japones no separan palabras con espacios y el \b dejaria muertos todos sus
+# patrones. Consecuencia: los patrones LATINOS deben traer sus propios \b.
+#
+# Un patron por linea (palabra o regex). # = comentario. Usa (?:...) no (...).
+
+# --- Venta de contenido sexual ---
+# Caso real (24/07/2026, grupo de domotica): un veterano publico
+# `t.me/EromeVideosPacks`, un canal titulado «Mujeres / Packs / Caseros / Videos /
+# Videos Caseros / Erome / Jovencitas / Colegialas» y descrito como «Mejor grupo de
+# packs y videos exclusivos». El separador flexible esta por eso: estos canales
+# encadenan reclamos con barras, y «Packs» y «Caseros» no van pegados.
+\bpacks?\b[\s/|,·+-]{0,3}\b(?:caseros?|exclusivos?|filtrados?|premium)\b
+\b(?:caseros?|exclusivos?|filtrados?)\b[\s/|,·+-]{0,3}\bpacks?\b
+\bpacks?\s+(?:y\s+)?(?:videos?|fotos?)\s+exclusivos?\b
+\b(?:vendo|venta\s+de)\s+packs?\b
+\bjovencitas\b
+\bcolegialas\b
+\bcontenido\s*\+?\s*18\b
+\bpack\s+de\s+(?:chicas|nenas|pibas)\b
+\bvideos?\s+porno\b
+\bporno\s+(?:gratis|amateur|casero)\b
+
+# --- Cuentas y tarjetas robadas ---
+\bcuentas\s+(?:premium|hackeadas)\s+gratis\b
+\btarjetas\s+(?:clonadas|robadas)\b
