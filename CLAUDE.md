@@ -220,6 +220,22 @@ Usa **`VACUUM INTO`, no una copia del fichero**, por dos motivos medidos en prod
 
 `data/` es gitignored, así que las copias nunca llegan al repo, pero **sí van al N6005** en el rsync semanal (ese bloque no excluye nada). Si la copia falla, se avisa en el log y el mantenimiento continúa: nunca aborta el job.
 
+### Lo mismo vale para ANALIZAR la base, no solo para respaldarla
+
+`cp data/antispam.db /tmp/copia.db` da una foto **incompleta**, y no avisa de nada: se lee sin errores y con datos que parecen buenos. Error cometido el 2026-08-09 investigando un caso: la copia decía que un usuario **no estaba registrado**, y de ahí salió un diagnóstico entero equivocado sobre joins que el bot no anotaba. La fila existía; estaba en el WAL. Faltaban además **27 usuarios** del censo de recién llegados, que se quedaron sin revisar en el primer barrido.
+
+Para trabajar sobre una copia, dos formas correctas:
+
+```bash
+# íntegra, aunque el bot esté escribiendo
+sudo -n docker exec cazaspam-bot python -c \
+  "import sqlite3; sqlite3.connect('/app/data/antispam.db').execute(\"VACUUM INTO '/tmp/copia.db'\")"
+# o consultar en el sitio, sin copiar nada
+sudo -n docker exec cazaspam-bot python -c "import sqlite3; ..."
+```
+
+Si aun así se copia a pelo, hay que llevarse **los tres ficheros** (`.db`, `.db-wal`, `.db-shm`). Y ante un resultado sorprendente («este usuario no existe», «no hay registro de esto»), sospechar primero de la copia y comprobarlo contra la base viva antes de construir una explicación encima.
+
 ## Reglas críticas de diseño (lecciones de producción)
 
 1. **NUNCA acciones masivas sin dry-run.** `seen_users.msg_count` NO refleja historial previo al bot: para "nunca escribió" usar Telethon `iter_messages` filtrando service messages (`m.action is None`).
