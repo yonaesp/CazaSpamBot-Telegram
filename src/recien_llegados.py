@@ -58,7 +58,21 @@ RECHEQUEO_S = 3600
 # Personas por vuelta. Con el trabajo cada 15 min son 100 a la hora como techo.
 MAX_POR_CICLO = 25
 
+# Perfiles que se leen por Telethon en cada vuelta. Muy por debajo de MAX_POR_CICLO
+# a propósito: leer un perfil son varias llamadas MTProto con la cuenta secundaria,
+# y quemar su reputación por adelantar un ban unas horas es un mal negocio (regla 9
+# del proyecto). Con 8 cada cuarto de hora se cubre de sobra el ritmo real de
+# entradas medido (881 joins en el histórico, máximo 2 por minuto).
+MAX_PERFILES_POR_CICLO = 8
+
+# Cada cuánto se vuelve a leer el perfil COMPLETO de la misma persona. Mucho más
+# espaciado que RECHEQUEO_S porque un canal personal no aparece y desaparece: con
+# mirarlo un par de veces en la ventana basta.
+RELECTURA_PERFIL_S = 6 * 3600
+
 _CLAVE_CACHE = "_recien_llegados_visto"
+_CLAVE_PERFILES = "_recien_llegados_perfil"
+_CLAVE_PRESUPUESTO = "_recien_llegados_presupuesto"
 
 
 def _toca_mirar(context, chat_id: int, user_id: int) -> bool:
@@ -93,6 +107,8 @@ async def revisar_job(context) -> None:
 
     mirados = 0
     saltados = 0
+    # Presupuesto de lecturas de perfil, que se renueva en cada vuelta.
+    context.bot_data[_CLAVE_PRESUPUESTO] = MAX_PERFILES_POR_CICLO
     for fila in candidatos:
         if mirados >= MAX_POR_CICLO:
             break
@@ -168,15 +184,43 @@ async def _actuar(context, db: DB, cfg: Config, fila, hit, espera: int, origen: 
     return True
 
 
+def _toca_leer_perfil(context, chat_id: int, user_id: int) -> bool:
+    """¿Toca gastar una lectura de perfil por Telethon en esta persona?
+
+    Dos frenos: el presupuesto de la vuelta y una espera larga por persona. Sin
+    ellos, 25 revisiones por ciclo serían 25 lecturas de perfil cada cuarto de
+    hora contra la cuenta secundaria, que es justo la forma de ganarse un
+    FloodWait y quedarse sin ninguna señal.
+    """
+    if context.bot_data.get(_CLAVE_PRESUPUESTO, 0) <= 0:
+        return False
+    cache = context.bot_data.setdefault(_CLAVE_PERFILES, {})
+    ahora = time.time()
+    if ahora - cache.get((chat_id, user_id), 0.0) < RELECTURA_PERFIL_S:
+        return False
+    cache[(chat_id, user_id)] = ahora
+    for clave, visto in list(cache.items()):
+        if ahora - visto > VENTANA_S:
+            del cache[clave]
+    context.bot_data[_CLAVE_PRESUPUESTO] -= 1
+    return True
+
+
 async def _revisar_perfil(context, db: DB, cfg: Config, fila, espera: int) -> bool:
-    """¿Se ha puesto un nombre que al entrar le habría costado la entrada?
+    """¿Hay algo en el perfil que al entrar le habría costado la entrada?
 
     Se pregunta a Telegram por el nombre ACTUAL (`get_chat_member`, una llamada
-    barata de la Bot API). Solo si ese nombre ya dispara por sí solo se paga el
-    coste de leer el perfil por Telethon, que es lo que decide entre banear y
-    dejar mudo: el salvoconducto de «cuenta antigua con foto» tiene que valer aquí
-    exactamente igual que en el join, o estaríamos siendo más duros por la puerta
-    de atrás con un chino-hablante legítimo que se cambió el nombre.
+    barata de la Bot API). Si ese nombre ya dispara por sí solo, se lee el perfil
+    por Telethon para decidir entre banear y dejar mudo: el salvoconducto de
+    «cuenta antigua con foto» tiene que valer aquí exactamente igual que en el
+    join, o estaríamos siendo más duros por la puerta de atrás con un
+    chino-hablante legítimo que se cambió el nombre.
+
+    Y aunque el nombre esté limpio se lee el perfil de vez en cuando (con
+    presupuesto, ver `_toca_leer_perfil`), porque el nombre no es el único
+    escaparate: el CANAL enlazado en el perfil se puede poner después de entrar y
+    no se ve desde la Bot API. Caso medido: «Vickycat46», nombre latino y foto
+    normal, con un canal chino reclutando mulas de blanqueo.
     """
     from . import user_signals, verification
     from .handlers import _apply_action
@@ -194,7 +238,7 @@ async def _revisar_perfil(context, db: DB, cfg: Config, fila, espera: int) -> bo
     obvio, _razones = verification._is_obvious_spam_profile(
         None, usuario.username, usuario.first_name, usuario.last_name,
     )
-    if not obvio:
+    if not obvio and not _toca_leer_perfil(context, chat_id, user_id):
         return False
 
     sig = None
@@ -206,6 +250,15 @@ async def _revisar_perfil(context, db: DB, cfg: Config, fila, espera: int) -> bo
                                            first_name=usuario.first_name)
         except Exception as exc:  # noqa: BLE001
             log.debug("recien_llegados: sin señales de %s: %s", user_id, exc)
+
+    # El canal del perfil, que es lo que no se ve desde la Bot API. Va antes que
+    # el resto porque puede disparar con el nombre completamente limpio.
+    if sig is not None and sig.personal_channel_title:
+        if await _revisar_canal(context, db, cfg, fila, usuario, sig, client, espera):
+            return True
+
+    if not obvio:
+        return False
 
     obvio, razones = verification._is_obvious_spam_profile(
         sig, usuario.username, usuario.first_name, usuario.last_name,
@@ -251,3 +304,41 @@ async def _revisar_perfil(context, db: DB, cfg: Config, fila, espera: int) -> bo
             await verification.avisar_han_mudo(context, db, cfg, chat, usuario, sig)
         return True
     return False
+
+
+async def _revisar_canal(context, db: DB, cfg: Config, fila, usuario, sig, client,
+                         espera: int) -> bool:
+    """El canal enlazado en el perfil, con los MISMOS criterios que en el join.
+
+    Se reutiliza el helper del handler entero (título primero, y solo si no basta
+    se lee lo que publica el canal) para que no haya dos varas de medir: lo que
+    aquí se banea es exactamente lo que se habría baneado al entrar.
+    """
+    from .handlers import _apply_action, _chat_allowed_scripts, _mirar_canal_personal
+    chat_id, user_id = fila["chat_id"], fila["user_id"]
+    try:
+        hit = await _mirar_canal_personal(
+            client, sig, usuario,
+            allowed_scripts=_chat_allowed_scripts(db, chat_id, cfg),
+        )
+    except Exception as exc:  # noqa: BLE001 — un trabajo de fondo nunca tumba el bot
+        log.debug("recien_llegados: canal de %s ilegible: %s", user_id, exc)
+        return False
+    if not hit:
+        return False
+
+    log.info(
+        "recien_llegados: user=%s tenía un canal de spam en el perfil (%ds sin escribir) → ban",
+        user_id, espera,
+    )
+    from .scoring import Decision
+    await _apply_action(
+        context, db, cfg, chat_id=chat_id, chat_title=fila["chat_title"],
+        user_id=user_id, username=usuario.username, message_id=None,
+        decision=Decision(
+            action="ban", score=hit.score, rule=hit.rule, reason=hit.reason,
+            payload={**(hit.payload or {}), "via": "recien_llegados", "espera_s": espera},
+        ),
+        original_text=None, first_name=usuario.first_name,
+    )
+    return True

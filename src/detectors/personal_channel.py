@@ -46,6 +46,12 @@ SCORE_FOREIGN_TITLE = 40   # el escaparate está en un alfabeto ajeno al chat
 SCORE_NAME_MISMATCH = 45   # ...y el nombre NO. Es la señal más fuerte del caso real
 SCORE_KEYWORDS = 75        # el título dice a qué se dedica
 SCORE_HIDDEN_PROFILE = 25  # sin foto ni bio: el canal es su único contenido
+# Lo que PUBLICA el canal (descripción y últimos posts, vía `channel_reader`).
+# Mismo peso que el título porque es la misma evidencia en mejor sitio: el rótulo
+# lo elige el spammer sabiendo que se ve, los posts son donde dice a qué se
+# dedica. Caso que lo motivó: título `恒泰招聘车队高速结算` (85 pts, no bastaba)
+# con un primer post que era una confesión entera de blanqueo.
+SCORE_CHANNEL_CONTENT = 75
 
 # Umbral de emisión. Coincide con BAN_SCORE por defecto porque el enganche del
 # join banea directo: si no hay evidencia para banear, mejor no devolver nada y
@@ -133,9 +139,16 @@ def check(
     has_photo: bool = True,
     has_bio: bool = True,
     bio: str | None = None,
+    channel_text: str | None = None,
     ratio_threshold: float = TITLE_FOREIGN_RATIO,
 ) -> Hit:
-    """Analiza el título del canal personal. Sin canal (o sin Telethon) no dispara."""
+    """Analiza el canal personal. Sin canal (o sin Telethon) no dispara.
+
+    `channel_text` es lo que publica el canal (descripción y últimos posts, lo
+    trae `channel_reader`). Es opcional a propósito: leerlo cuesta una llamada de
+    red, así que el handler solo la paga cuando el título por sí solo no ha
+    bastado para decidir.
+    """
     title = (channel_title or "").strip()
     if not title:
         return Hit.none()
@@ -158,10 +171,23 @@ def check(
             reasons.append(t("reason.personal_channel_mismatch"))
             payload["name_mismatch"] = True
 
-    if _keywords_re().search(title):
+    keywords_re = _keywords_re()
+    if keywords_re.search(title):
         score += SCORE_KEYWORDS
         reasons.append(t("reason.personal_channel_keywords"))
         payload["keywords"] = True
+
+    # Lo que publica el canal. Se puntúa aparte del título: un canal puede
+    # llamarse de forma anodina y publicar el reclamo completo, que es justo lo
+    # que hacía la red del caso real. Sigue sin decidir sola (75 < MIN_SCORE).
+    contenido = (channel_text or "").strip()
+    if contenido:
+        casa = keywords_re.search(contenido)
+        if casa:
+            score += SCORE_CHANNEL_CONTENT
+            reasons.append(t("reason.personal_channel_content"))
+            payload["channel_content"] = True
+            payload["channel_match"] = casa.group(0)[:60]
 
     # Una bio de ruido generado equivale a no tener bio: no dice nada de la persona.
     bio_real = has_bio and not _parece_generada(bio)

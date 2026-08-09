@@ -18,6 +18,7 @@ from telegram.ext import ContextTypes
 
 from . import borrado_diferido
 from . import antiraid
+from . import channel_reader
 from . import desofuscar
 from . import link_reader
 from . import llm_veto
@@ -196,6 +197,38 @@ def _enlaces_tg_de(hits: list[Hit]) -> list[str]:
             if url not in urls:
                 urls.append(url)
     return urls
+
+
+async def _mirar_canal_personal(client, sig, user, *, allowed_scripts) -> Hit:
+    """El canal enlazado en el perfil, juzgado primero por el rótulo y, si hace
+    falta, por lo que publica.
+
+    En dos pasadas a propósito. La primera es gratis: el título ya viene con las
+    señales del perfil, sin ninguna llamada de red. Solo cuando el título NO ha
+    bastado para decidir se paga la lectura del canal, que es una llamada más
+    contra Telegram en la ruta caliente del join.
+
+    El motivo de existir de la segunda pasada: el título lo elige el spammer
+    sabiendo que se ve, y esta red lo renombra en cuanto se le caza. Los posts
+    son donde de verdad dice a qué se dedica. Caso medido: un título que sumaba
+    85 de 100 puntos y se libraba por tener foto de perfil, con un primer post
+    que era una confesión completa de blanqueo.
+    """
+    comun = dict(
+        first_name=user.first_name, last_name=user.last_name, username=user.username,
+        allowed_scripts=allowed_scripts,
+        has_photo=sig.photo_count > 0, has_bio=bool(sig.bio), bio=sig.bio,
+    )
+    hit = personal_channel_det.check(sig.personal_channel_title, **comun)
+    if hit:
+        return hit
+
+    texto = await channel_reader.leer(
+        client, sig.personal_channel_entity, sig.personal_channel_id or 0)
+    if not texto:
+        return Hit.none()
+    return personal_channel_det.check(
+        sig.personal_channel_title, channel_text=texto, **comun)
 
 
 def _can_restrict(member) -> bool:
@@ -663,12 +696,9 @@ async def on_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         # Solo dispara cuando hay varias señales a la vez (ver MIN_SCORE).
         if sig_pre is not None and sig_pre.personal_channel_title:
             try:
-                pchan_hit = personal_channel_det.check(
-                    sig_pre.personal_channel_title,
-                    first_name=user.first_name, last_name=user.last_name,
-                    username=user.username, allowed_scripts=_chat_allowed_scripts(db, cmu.chat.id, cfg),
-                    has_photo=sig_pre.photo_count > 0, has_bio=bool(sig_pre.bio),
-                    bio=sig_pre.bio,
+                pchan_hit = await _mirar_canal_personal(
+                    client_pre, sig_pre, user,
+                    allowed_scripts=_chat_allowed_scripts(db, cmu.chat.id, cfg),
                 )
             except Exception as exc:  # noqa: BLE001
                 # Mismo motivo que sus vecinos: el usuario YA tiene el mute

@@ -312,3 +312,105 @@ def test_titulos_chinos_legitimos_no_disparan_por_keyword(titulo):
 ])
 def test_titulos_de_la_red_si_disparan(titulo):
     assert pc._keywords_re().search(titulo)
+
+
+# ---------------------------------------------------------------------------
+# La red renombra sus canales, y el rótulo deja de valer
+#
+# Medido el 2026-08-08 en Windows 11: «Vickycat46», nombre latino y foto de
+# perfil normal, con el canal `恒泰招聘车队高速结算`. Sumaba 85 de 100 y se
+# libraba JUSTO por tener foto (los 25 de «perfil sin nada que mirar» no
+# aplicaban). Ninguna palabra de la lista casaba: la red había cambiado
+# `洗钱车队结账` por `招聘车队...结算`.
+#
+# De ahí las dos costuras nuevas: vocabulario al día y, sobre todo, mirar lo que
+# el canal PUBLICA, que es donde dice a qué se dedica de verdad.
+# ---------------------------------------------------------------------------
+
+_POST_REAL = (
+    "洗米来有码就要 无风险 日3-8k\n\n接受一切方式有微信支付宝就来\n\n"
+    "飞哥客服：@Dl88o 认准ID私信\n担保公群 https://t.me/+yQ_Y6e7TJP85ZTQx"
+)
+
+
+def test_el_caso_vickycat_ya_no_se_escapa_por_tener_foto():
+    h = pc.check("恒泰招聘车队高速结算", first_name="Vickycat46",
+                 has_photo=True, has_bio=False, allowed_scripts=("latin",))
+    assert h, "con foto de perfil seguía colándose"
+    assert h.rule == "personal_channel_spam"
+
+
+def test_aunque_renombren_el_canal_lo_delata_lo_que_publica():
+    """La defensa de fondo: el título lo elige el spammer sabiendo que se ve."""
+    sin_contenido = pc.check("Mi canal personal", first_name="Vickycat46",
+                             has_photo=True, has_bio=False, allowed_scripts=("latin",))
+    assert not sin_contenido, "un título anodino no debe bastar por sí solo"
+    # Con un título ajeno pero limpio, lo que publica cierra el caso.
+    con_contenido = pc.check("每日更新频道", first_name="Vickycat46",
+                             has_photo=True, has_bio=False, allowed_scripts=("latin",),
+                             channel_text=_POST_REAL)
+    assert con_contenido, "el contenido del canal debería haberlo cazado"
+    assert (con_contenido.payload or {}).get("channel_content") is True
+
+
+def test_el_contenido_del_canal_no_decide_solo():
+    """Regla del proyecto: ninguna señal suelta llega al umbral. Un canal en el
+    alfabeto del grupo, con nombre normal y foto, no cae por una frase."""
+    h = pc.check("Ofertas de curro", first_name="Ana", has_photo=True, has_bio=True,
+                 bio="Vivo en Madrid", allowed_scripts=("latin",),
+                 channel_text="money laundering para todos")
+    assert not h, "75 puntos no pueden alcanzar MIN_SCORE=100"
+
+
+def test_un_canal_legitimo_con_posts_normales_no_dispara():
+    h = pc.check("Fotos de montaña", first_name="Ana", has_photo=False, has_bio=False,
+                 allowed_scripts=("latin",),
+                 channel_text="Ruta de ayer por Peñalara, 14 km y mucho barro")
+    assert not h
+
+
+def test_sin_contenido_se_comporta_igual_que_antes():
+    """El parámetro es opcional a propósito: leer el canal cuesta una llamada de
+    red y solo se paga cuando el título no ha bastado."""
+    args = dict(first_name="Witte", has_photo=False, has_bio=False, allowed_scripts=("latin",))
+    a = pc.check("财天下集团飞机加群结账通知频道", **args)
+    b = pc.check("财天下集团飞机加群结账通知频道", channel_text=None, **args)
+    assert a.score == b.score
+
+
+@pytest.mark.parametrize("titulo", [
+    "恒泰招聘车队高速结算",          # Vickycat46
+    "恒泰集团招聘车队高效结算",      # otras dos cuentas de la misma red
+])
+def test_los_titulos_renombrados_de_la_red_ya_casan(titulo):
+    assert pc._keywords_re().search(titulo)
+
+
+@pytest.mark.parametrize("texto", [
+    "招聘车队司机，五险一金",        # oferta de trabajo REAL para conductores
+    "北京招聘会 3月15日",            # feria de empleo
+    "今日结算完成",                  # "liquidación de hoy completada"
+    "车队出发了",                    # "la flota ha salido"
+])
+def test_chino_laboral_normal_no_casa(texto):
+    """Anti falso positivo: reclutar conductores es una actividad legítima. Lo
+    que delata a la red es el compuesto entero, no `车队` ni `招聘` sueltos."""
+    casa = pc._keywords_re().search(texto)
+    assert not casa or casa.group(0) not in ("车队", "招聘", "结算")
+
+
+@pytest.mark.parametrize("texto", [
+    "日3-8k",                        # el post de Vickycat46
+    "日结500-2000",                  # variante habitual
+])
+def test_ingresos_diarios_con_cifra_pegada_si_casan(texto):
+    assert pc._keywords_re().search(texto)
+
+
+@pytest.mark.parametrize("texto", [
+    "8月9日 10-12点 直播",           # una FECHA con horario: no es una oferta
+    "生日快乐",
+])
+def test_fechas_y_texto_corriente_no_casan_como_ingresos(texto):
+    casa = pc._keywords_re().search(texto)
+    assert not casa, f"falso positivo: {casa.group(0) if casa else ''}"

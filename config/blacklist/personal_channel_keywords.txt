@@ -46,4 +46,25 @@
 飞机加群
 加群带走
 车队结账
+# Ampliacion 2026-08-09, tras ver que la red renombra sus canales para esquivar
+# la lista: `恒泰招聘车队高速结算` y `恒泰集团招聘车队高效结算` no casaban con
+# ninguno de los de arriba. Reclutar una "flota" (车队) es su forma de pedir
+# mulas, y va SIEMPRE acompañado de "liquidacion rapida".
+招聘车队
+车队高[效速]结算
+# "Grupo publico de garantia": el aval falso con el que cierran el trato.
+担保公群
+# Prestar la cuenta de Telegram para estafar, literalmente "hacer de actor con
+# un numero de avion" (飞机 = Telegram en su jerga). Compuesto a proposito: 演员
+# suelto es "actor" y sale en cualquier conversacion sobre cine.
+号做演员
+# Ingresos diarios con la cifra PEGADA: 日3-8k, 日结500-2000. Nunca decide solo
+# (75 < MIN_SCORE).
+#
+# OJO con el espacio: la primera version era `日\s*\d+\s*[-~]\s*\d+` y casaba con
+# "8月9日 10-12点 直播" (una fecha con su horario, texto perfectamente normal).
+# Lo pillo un test. Por eso ahora hacen falta las DOS cosas: cifra pegada al 日, y
+# o bien el 结 de "liquidacion diaria" o bien la k de los miles.
+日结\s?\d{2,4}\s*[-~至]\s*\d{2,4}
+日\d+\s*[-~]\s*\d+\s*[kK]\b
 

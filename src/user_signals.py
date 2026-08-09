@@ -10,7 +10,7 @@ from __future__ import annotations
 import asyncio
 import datetime as _dt
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
 
 from .i18n import t
@@ -62,6 +62,12 @@ class UserSignals:
     # «Matthew», sin foto ni bio, con un canal chino de blanqueo de dinero.
     personal_channel_title: Optional[str] = None
     personal_channel_id: Optional[int] = None
+    # La entidad `Channel` tal cual la devuelve Telegram, guardada para que
+    # `channel_reader` pueda leer el canal SIN volver a resolverlo: resolver por
+    # @username dispara `contacts.ResolveUsername`, la llamada más propensa a
+    # FloodWait de todas. `repr=False` porque es un objeto de Telethon y no tiene
+    # ninguna gracia que aparezca entero en un log.
+    personal_channel_entity: object = field(default=None, repr=False, compare=False)
 
     @property
     def account_age_days(self) -> Optional[int]:
@@ -206,6 +212,9 @@ async def _fetch(client, user_id: int, chat_id: Optional[int] = None,
                 ch = next((c for c in (full.chats or []) if getattr(c, "id", None) == ch_id), None)
                 titulo = (getattr(ch, "title", "") or "").strip()
                 sig.personal_channel_title = titulo[:200] or None
+                # Se guarda la entidad, no solo el título: es lo que permite
+                # después leer lo que PUBLICA el canal sin pagar un ResolveUsername.
+                sig.personal_channel_entity = ch
         except Exception as exc:  # noqa: BLE001
             log.debug("GetFullUser %s fallo: %s", user_id, exc)
         sig.is_premium = bool(getattr(entity, "premium", False))

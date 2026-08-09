@@ -29,7 +29,7 @@ cuando solo queda el código. No hace falta leerlo entero, salta a lo que toques
 
 Bot de moderación antispam para Telegram, multi-grupo y federado, en producción 24/7.
 
-- **18.117 líneas** en `src/` (68 módulos), **11.016** en `tests/` (89 ficheros, 1238 tests).
+- **18.117 líneas** en `src/` (68 módulos), **11.016** en `tests/` (90 ficheros, 1273 tests).
 - **25 detectores**, tres capas de listas negras, clasificador propio, panel de ajustes
   por chat, i18n con autodescubrimiento de idiomas.
 - Un solo proceso Python, una sola base SQLite, un contenedor Docker.
@@ -644,6 +644,40 @@ deliberado. Los pesos están calibrados para que **ninguna señal suelta llegue 
 La lección del caso: el bot ya cazaba a los de esa red que usaban nombre chino; los que se
 colaban eran justo los que se ponían nombre occidental.
 
+#### El rótulo no basta: hay que leer lo que el canal publica
+
+Juzgar el canal por su título es juzgarlo por la parte que el spammer elige sabiendo que se ve,
+y esa red **renombra sus canales en cuanto se les caza**. Medido el 2026-08-08 en Windows 11:
+«Vickycat46», nombre latino y foto de perfil normal, con el canal `恒泰招聘车队高速结算`.
+Sumaba **85 de los 100 puntos** necesarios y se libraba justo por tener foto (no le tocaban los
+25 de «perfil sin nada que mirar»). Su primer post era una confesión entera:
+
+```
+洗米来有码就要 无风险 日3-8k ... 担保公群 https://t.me/+...
+```
+
+Nótese `洗米` («lavar arroz») donde la lista esperaba `洗钱` («lavar dinero»): jerga hecha para
+esquivar filtros de palabras.
+
+`channel_reader.py` lee la descripción y los últimos posts del canal, y ese texto pasa por las
+mismas listas (`SCORE_CHANNEL_CONTENT`, 75 puntos, que **siguen sin decidir solos**). Tres
+decisiones de diseño:
+
+- **Solo se paga cuando puede cambiar el veredicto.** Primero se juzga el título, que es gratis
+  porque ya viene con las señales del perfil; la llamada de red solo se hace si el título no ha
+  bastado. Medido: de 131 recién llegados en 14 días, apenas 6 tenían canal.
+- **No delata la cuenta ni se une a nada.** Pedir el historial no cuenta como visualización (el
+  contador solo sube con `messages.getMessagesViews`), y un canal público se lee sin
+  suscribirse. Mismo criterio que ya se aplicó en `story_reader`.
+- **Usa la entidad ya resuelta** que viene en `GetFullUser.chats`, así que no hay
+  `contacts.ResolveUsername` de por medio, que es la llamada más propensa a FloodWait.
+
+El repaso de recién llegados (`recien_llegados.py`) también mira este escaparate, porque el
+canal se puede enlazar **después** de entrar y no se ve desde la Bot API. Como ahí el nombre
+puede estar perfectamente limpio, hay que leer algunos perfiles «por si acaso»: de ahí el
+presupuesto de `MAX_PERFILES_POR_CICLO` lecturas por vuelta y una relectura por persona cada
+6 h, para no quemar la cuenta secundaria.
+
 ### Anti falso positivo
 
 Las guardas más importantes, y el caso real que originó cada una:
@@ -840,7 +874,7 @@ capturaba como error genérico y **el ban se perdía en silencio, sin reintento*
 
 ## 13. Tests
 
-**1238 tests en 8,3 segundos**, sin red ni base real. Cada detector tiene sus casos positivos y
+**1273 tests en 8,3 segundos**, sin red ni base real. Cada detector tiene sus casos positivos y
 negativos, con foco en los negativos: un falso positivo es peor que un falso negativo.
 
 Aparte de los tests de lógica, hay **tests meta que protegen invariantes del proyecto**. Cada uno

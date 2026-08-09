@@ -4,6 +4,36 @@ Cambios relevantes de CazaSpamBot, lo más reciente arriba. Se anotan hitos, no
 cada commit: para el detalle está el historial de git. Sin números de versión
 porque el bot es un servicio en producción continua, no un paquete que se libera.
 
+## 2026-08 · El canal del perfil, leído por dentro
+
+`personal_channel_spam` juzgaba el canal enlazado en el perfil **por su título**, y
+esa red lo renombra en cuanto se le caza. Caso que lo destapó (Windows 11):
+«Vickycat46», nombre latino y **foto de perfil normal**, con el canal
+`恒泰招聘车队高速结算`. Sumaba **85 de los 100 puntos** necesarios y se libraba justo
+por tener foto, que le quitaba los 25 de «perfil sin nada que mirar». Su primer post
+era una confesión entera de blanqueo, con `洗米` («lavar arroz») donde la lista
+esperaba `洗钱` («lavar dinero»): jerga hecha para esquivar filtros de palabras.
+
+- **`channel_reader.py`** lee la descripción y los últimos posts del canal, y ese
+  texto pasa por las mismas listas (75 puntos, que siguen sin decidir solos). Misma
+  decisión que ya se tomó en `story_reader` y `link_reader`: cuando la evidencia
+  existe y se puede leer, se lee. Solo se paga la llamada cuando el título **no** ha
+  bastado para decidir; de 131 recién llegados en 14 días, apenas 6 tenían canal.
+  No se une a ningún canal ni cuenta como visualización, así que la cuenta
+  secundaria no aparece en ninguna parte.
+- **Vocabulario al día** con los compuestos que usa la red ahora (`招聘车队`,
+  `车队高[效速]结算`, `担保公群`, ingresos diarios con la cifra pegada). Un test cazó
+  un falso positivo del primer intento: el patrón de ingresos casaba con
+  `8月9日 10-12点 直播`, que es una fecha con su horario.
+- **`recien_llegados` mira también ese escaparate**, porque el canal se puede
+  enlazar DESPUÉS de entrar y no se ve desde la Bot API. Como ahí el nombre puede
+  estar limpio, se leen algunos perfiles «por si acaso», con presupuesto por vuelta
+  y una relectura cada 6 h para no quemar la cuenta secundaria.
+
+Comprobado sobre los perfiles reales: de 131 recién llegados que aún no habían
+escrito, **7 tenían un canal de esa red y los 7 caen**; los **124 sin canal quedan
+intactos**.
+
 ## 2026-08 · Lo que faltaba del repaso a otros bots
 
 Cuatro piezas que salieron de comparar con `tg-spam` y del propio roadmap, más un

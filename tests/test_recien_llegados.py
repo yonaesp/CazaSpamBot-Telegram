@@ -107,7 +107,7 @@ def _cfg(**extra):
         lols_enabled=True, cas_enabled=False, cas_autoban_min=2, cas_cache_ttl_seconds=3600,
         ban_score=100, kick_score=70, mute_score=40, first_msg_attack_action="ban",
         shadow=False, mode="active", admin_user_id=1, admin_notify_chat_id=None,
-        public_quip_enabled=False, moderated_chat_ids=[],
+        public_quip_enabled=False, moderated_chat_ids=[], allowed_scripts=["latin"],
     )
     base.update(extra)
     return SimpleNamespace(**base)
@@ -211,3 +211,131 @@ async def test_un_fallo_consultando_a_uno_no_deja_sin_mirar_al_resto(tmp_path, m
 
     await rl.revisar_job(ctx)
     assert len(vistos) == 3, "un fallo cortaba el repaso de los demás"
+
+
+# ---------------------------------------------------------------------------
+# El canal del perfil, que la Bot API no enseña
+#
+# Tercera vía por la que se colaban, medida el 2026-08-08 en Windows 11:
+# «Vickycat46», nombre latino, foto de perfil normal y un canal enlazado en el
+# perfil titulado `恒泰招聘车队高速结算`, reclutando mulas de blanqueo.
+#
+# El repaso de recién llegados no lo veía por una razón de diseño: solo leía el
+# perfil por Telethon si el NOMBRE ya era sospechoso de por sí, y ese nombre es
+# perfectamente normal. El canal solo se ve por MTProto, así que había que
+# aceptar leer algunos perfiles limpios (con presupuesto) para llegar a él.
+# ---------------------------------------------------------------------------
+
+class _Sig:
+    """Lo que devuelve `user_signals.fetch`, en lo que aquí importa."""
+    def __init__(self, titulo=None):
+        self.personal_channel_title = titulo
+        self.personal_channel_id = 4412923989
+        self.personal_channel_entity = object()
+        self.photo_count = 1          # tiene foto: por eso se libraba antes
+        self.bio = None
+
+
+def _ctx_con_telethon(db, bot, cfg, sig):
+    ctx = _ctx(db, bot, cfg)
+    ctx.bot_data["reporter"] = SimpleNamespace(get_client=lambda: object())
+    return ctx
+
+
+@pytest.mark.asyncio
+async def test_el_canal_de_spam_se_caza_sin_esperar_a_que_escriba(tmp_path, monkeypatch):
+    db = _db(tmp_path)
+    db.record_join(-100, 8878951888, None, join_ts=time.time() - 7200)
+    ctx = _ctx_con_telethon(db, _Bot(), _cfg(lols_enabled=False), _Sig())
+
+    async def falso_fetch(client, user_id, **kw):
+        return _Sig("恒泰招聘车队高速结算")
+    monkeypatch.setattr("src.user_signals.fetch", falso_fetch)
+
+    aplicado = {}
+
+    async def falso_apply(context, db_, cfg_, **kw):
+        aplicado.update(kw)
+    monkeypatch.setattr("src.handlers._apply_action", falso_apply)
+
+    await rl.revisar_job(ctx)
+    assert aplicado.get("user_id") == 8878951888
+    assert aplicado["decision"].rule == "personal_channel_spam"
+    assert aplicado["decision"].payload["via"] == "recien_llegados"
+
+
+@pytest.mark.asyncio
+async def test_un_perfil_limpio_con_canal_normal_no_se_toca(tmp_path, monkeypatch):
+    """Tener canal personal es legítimo. Lo que delata es la discordancia."""
+    db = _db(tmp_path)
+    db.record_join(-100, 900, None, join_ts=time.time() - 7200)
+    ctx = _ctx_con_telethon(db, _Bot(), _cfg(lols_enabled=False), _Sig())
+
+    async def falso_fetch(client, user_id, **kw):
+        return _Sig("Mis fotos de montaña")
+    monkeypatch.setattr("src.user_signals.fetch", falso_fetch)
+
+    llamado = []
+    monkeypatch.setattr("src.handlers._apply_action",
+                        lambda *a, **k: llamado.append(1))
+
+    await rl.revisar_job(ctx)
+    assert not llamado
+
+
+@pytest.mark.asyncio
+async def test_sin_telethon_el_repaso_sigue_funcionando(tmp_path, monkeypatch):
+    """Quien instale el bot sin cuenta secundaria pierde esta vía, no el bot."""
+    db = _db(tmp_path)
+    db.record_join(-100, 901, None, join_ts=time.time() - 7200)
+    ctx = _ctx(db, _Bot(), _cfg(lols_enabled=False))   # reporter=None
+    llamado = []
+    monkeypatch.setattr("src.handlers._apply_action",
+                        lambda *a, **k: llamado.append(1))
+    await rl.revisar_job(ctx)
+    assert not llamado
+
+
+# ------------------------------------------------------- el freno de las lecturas
+
+def test_se_leen_pocos_perfiles_por_vuelta():
+    """Leer un perfil son varias llamadas MTProto con la cuenta secundaria. Sin
+    presupuesto serían 25 cada cuarto de hora, que es como se gana un FloodWait
+    (regla 9: proteger la reputación de esa cuenta)."""
+    ctx = SimpleNamespace(bot_data={rl._CLAVE_PRESUPUESTO: rl.MAX_PERFILES_POR_CICLO})
+    leidos = sum(1 for uid in range(100) if rl._toca_leer_perfil(ctx, -100, uid))
+    assert leidos == rl.MAX_PERFILES_POR_CICLO
+
+
+def test_el_presupuesto_se_renueva_en_cada_vuelta():
+    ctx = SimpleNamespace(bot_data={rl._CLAVE_PRESUPUESTO: 1})
+    assert rl._toca_leer_perfil(ctx, -100, 1) is True
+    assert rl._toca_leer_perfil(ctx, -100, 2) is False
+    ctx.bot_data[rl._CLAVE_PRESUPUESTO] = rl.MAX_PERFILES_POR_CICLO
+    assert rl._toca_leer_perfil(ctx, -100, 3) is True
+
+
+def test_al_mismo_perfil_no_se_vuelve_enseguida():
+    """Un canal personal no aparece y desaparece: con mirarlo un par de veces en
+    la ventana de un día sobra."""
+    ctx = SimpleNamespace(bot_data={rl._CLAVE_PRESUPUESTO: 50})
+    assert rl._toca_leer_perfil(ctx, -100, 1) is True
+    assert rl._toca_leer_perfil(ctx, -100, 1) is False
+    assert rl._toca_leer_perfil(ctx, -100, 2) is True
+
+
+def test_el_recuerdo_de_perfiles_leidos_no_crece_sin_fin():
+    ctx = SimpleNamespace(bot_data={rl._CLAVE_PRESUPUESTO: 50})
+    rl._toca_leer_perfil(ctx, -100, 1)
+    ctx.bot_data[rl._CLAVE_PERFILES][(-100, 1)] = time.time() - rl.VENTANA_S - 10
+    rl._toca_leer_perfil(ctx, -100, 2)
+    assert (-100, 1) not in ctx.bot_data[rl._CLAVE_PERFILES]
+
+
+def test_el_repaso_usa_el_mismo_criterio_que_el_join():
+    """Sin esto habría dos varas de medir: lo que aquí se banea tiene que ser
+    exactamente lo que se habría baneado al entrar."""
+    from pathlib import Path
+    fuente = Path("src/recien_llegados.py").read_text()
+    assert "_mirar_canal_personal" in fuente, "debe reutilizar el helper del handler"
+    assert "personal_channel_det.check" not in fuente, "no puede tener su propia lógica"

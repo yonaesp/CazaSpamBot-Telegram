@@ -100,6 +100,13 @@ El detector tuvo que ampliarse cuando la misma red volvió con el **nombre tambi
 
 `personal_channel_spam` **no salta por tener canal**: eso es legítimo. La señal es la **discordancia** (nombre en alfabeto latino + canal en otro script), que es un disfraz deliberado. Ninguna señal suelta llega al umbral. Lección del caso: el bot ya cazaba a los de esta red que usaban nombre chino; los que se colaban eran los que se ponían nombre occidental.
 
+**El rótulo del canal es la parte que el spammer elige.** Esa red renombra sus canales en cuanto se les caza, así que perseguir títulos siempre va por detrás. Caso medido (2026-08-08, Windows 11): «Vickycat46», nombre latino y **foto de perfil normal**, con el canal `恒泰招聘车队高速结算`; sumaba **85 de 100** y se libraba justo por tener foto. Su primer post decía `洗米来有码就要 无风险 日3-8k`, con `洗米` («lavar arroz») donde la lista esperaba `洗钱` («lavar dinero»): jerga para esquivar filtros. `channel_reader.py` lee ahora la descripción y los últimos posts, y ese texto pasa por las mismas listas (75 puntos, que siguen sin decidir solos). Tres cosas que no se deben romper:
+- **Solo se paga cuando puede cambiar el veredicto**: primero el título (gratis, ya viene con las señales del perfil) y solo si no basta se hace la llamada de red. De 131 recién llegados en 14 días, 6 tenían canal.
+- **No delata la cuenta ni se une a nada**: pedir el historial no cuenta como visualización (eso es `messages.getMessagesViews`), y un canal público se lee sin suscribirse. Mismo criterio que `story_reader`.
+- **Usa la entidad que ya viene en `GetFullUser.chats`**, sin `contacts.ResolveUsername`, que es lo más propenso a FloodWait.
+
+`recien_llegados` también mira ese escaparate, porque el canal se puede enlazar DESPUÉS de entrar y no se ve desde la Bot API. Allí el nombre puede estar limpio, así que hay que leer algunos perfiles «por si acaso»: de ahí el presupuesto de lecturas por vuelta y la relectura cada 6 h, para no quemar la cuenta secundaria.
+
 ### Listas negras (`config/blacklist/`)
 
 Tres capas que se **acumulan** (el spam llega en cualquier idioma):
