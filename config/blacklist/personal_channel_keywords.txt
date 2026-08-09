@@ -43,9 +43,18 @@
 # grupo) o 飞机 (avion, jerga de Telegram) son corrientes por separado y en un
 # grupo chino legitimo causarian falsos positivos. Juntas ya no son casualidad.
 结账通知
-飞机加群
-加群带走
 车队结账
+# 2026-08-09: cazados en vivo dos canales de la misma red que habian cambiado
+# 加 por 进 (`财天下飞机进群结演员结算频道` vs `财天下集团飞机加群结账通知频道`).
+# Un caracter, y el patron dejaba de casar. Se admiten los dos.
+飞机[加进]群
+[加进]群带走
+# "Cerrar cuentas con el actor": prestar la cuenta de Telegram para estafar. 演员
+# suelto es "actor" y sale en cualquier charla de cine; pegado a 结 no es chino
+# corriente.
+结演员
+# "Operador de pedidos", el puesto que ofrecen a las mulas.
+做单员
 # Ampliacion 2026-08-09, tras ver que la red renombra sus canales para esquivar
 # la lista: `恒泰招聘车队高速结算` y `恒泰集团招聘车队高效结算` no casaban con
 # ninguno de los de arriba. Reclutar una "flota" (车队) es su forma de pedir

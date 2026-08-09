@@ -414,3 +414,40 @@ def test_ingresos_diarios_con_cifra_pegada_si_casan(texto):
 def test_fechas_y_texto_corriente_no_casan_como_ingresos(texto):
     casa = pc._keywords_re().search(texto)
     assert not casa, f"falso positivo: {casa.group(0) if casa else ''}"
+
+
+# ---------------------------------------------------------------------------
+# La red muta el título, y a veces por un solo carácter
+#
+# Cazados en vivo el 2026-08-09, ya con el detector nuevo puesto: dos cuentas
+# («Netta» y «Ronnholm», ambas con nombre occidental) llevaban el canal
+# `财天下飞机进群结演员结算频道`. El patrón de la lista decía `飞机加群` y el
+# canal ponía `飞机进群`: 加 → 进. Un carácter, y se quedaban en 85 de 100.
+#
+# A los dos los acabó cazando lols.bot, pero por otra vía y más tarde.
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("titulo", [
+    "财天下集团飞机加群结账通知频道",   # el de antes
+    "财天下飞机进群结演员结算频道",     # el mutado
+])
+def test_las_dos_grafias_de_la_misma_red_casan(titulo):
+    assert pc._keywords_re().search(titulo)
+
+
+def test_la_cuenta_con_el_titulo_mutado_ya_cae():
+    h = pc.check("财天下飞机进群结演员结算频道", first_name="Netta",
+                 has_photo=True, has_bio=False, allowed_scripts=("latin",))
+    assert h, "se quedaba en 85 de 100 por un solo carácter"
+
+
+@pytest.mark.parametrize("texto", [
+    "我是演员",              # "soy actor": normal
+    "演员表",                # "reparto"
+    "进群聊天",              # "entrar al grupo a charlar"
+    "加群一起玩",            # "únete al grupo, jugamos"
+])
+def test_chino_corriente_no_casa_con_los_patrones_nuevos(texto):
+    """`演员`, `进群` y `加群` sueltos son palabras normales. Lo que delata es el
+    compuesto entero, nunca la pieza."""
+    assert not pc._keywords_re().search(texto)
