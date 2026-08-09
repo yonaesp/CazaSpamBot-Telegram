@@ -4,6 +4,18 @@ Cambios relevantes de CazaSpamBot, lo más reciente arriba. Se anotan hitos, no
 cada commit: para el detalle está el historial de git. Sin números de versión
 porque el bot es un servicio en producción continua, no un paquete que se libera.
 
+## 2026-08 · El canal se mira antes de molestar al admin
+
+Salió al comprobar si un perfil como el de «李大哥» se banearía ya sin llegar a
+escribir. Sí, salvo en un caso: un nombre en Han que se libra por el salvoconducto
+de «cuenta antigua con foto» acababa **mudo esperando decisión humana** aunque su
+canal ya cantara, porque `han_requiere_decision` cortaba el flujo antes de llegar
+al canal. El admin decidía a mano algo que el bot ya sabía, y aquí un aviso que se
+acaba ignorando es peor que no tenerlo.
+
+Orden nuevo en el join: perfil obvio → **canal** → decisión humana → bio → fotos.
+Al privado del admin ya solo llega lo que de verdad es dudoso.
+
 ## 2026-08 · El nombre es gratis; las listas externas no
 
 Los dos frenos del repaso de recién llegados eran el mismo (una hora), y no

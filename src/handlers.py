@@ -655,6 +655,41 @@ async def on_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             )
             return
 
+        # El canal enlazado en el perfil usado como escaparate de spam.
+        #
+        # Va ANTES de mandar nada a decisión humana a propósito: un nombre en Han
+        # que se libra por el salvoconducto de «cuenta antigua con foto» acababa
+        # mudo esperando al admin aunque su canal ya cantara. El admin decidía a
+        # mano algo que el bot sabía, y un aviso que se acaba ignorando es peor
+        # que no tenerlo. Ahora solo llega a su privado lo que de verdad es
+        # dudoso.
+        # Caso real: cuenta «Matthew», nombre latino, sin foto, sin username y con
+        # la bio VACÍA (por eso pasó los filtros anteriores), con un canal chino
+        # reclutando mulas de blanqueo. Aprovecha sig_pre: cero llamadas extra.
+        # Solo dispara cuando hay varias señales a la vez (ver MIN_SCORE).
+        if sig_pre is not None and sig_pre.personal_channel_title:
+            try:
+                pchan_hit = await _mirar_canal_personal(
+                    client_pre, sig_pre, user,
+                    allowed_scripts=_chat_allowed_scripts(db, cmu.chat.id, cfg),
+                )
+            except Exception as exc:  # noqa: BLE001
+                # Mismo motivo que sus vecinos: el usuario YA tiene el mute
+                # provisional puesto; una excepción aquí escaparía de
+                # on_chat_member y lo dejaría muteado para siempre.
+                log.debug("personal_channel check user=%s exc: %s", user.id, exc)
+                pchan_hit = None
+            if pchan_hit:
+                log.info(
+                    "personal_channel_spam user=%s score=%d canal=%r → ban directo",
+                    user.id, pchan_hit.score, sig_pre.personal_channel_title[:60],
+                )
+                await _ban_join_direct(
+                    context, db, cfg, cmu, user, score=pchan_hit.score,
+                    rule=pchan_hit.rule, reason=pchan_hit.reason, payload=pchan_hit.payload,
+                )
+                return
+
         # Nombre con ideogramas Han que SOLO se libra por el salvoconducto de
         # «cuenta antigua con foto». No se banea (podría ser un chino-hablante
         # real) pero tampoco se le deja pasar por la verificación de botón, que un
@@ -686,34 +721,6 @@ async def on_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 await _ban_join_direct(
                     context, db, cfg, cmu, user, score=bio_hit.score,
                     rule=bio_hit.rule, reason=bio_hit.reason, payload=bio_hit.payload,
-                )
-                return
-
-        # NUEVO: el canal enlazado en el perfil usado como escaparate de spam.
-        # Caso real: cuenta «Matthew», nombre latino, sin foto, sin username y con
-        # la bio VACÍA (por eso pasó los filtros anteriores), con un canal chino
-        # reclutando mulas de blanqueo. Aprovecha sig_pre: cero llamadas extra.
-        # Solo dispara cuando hay varias señales a la vez (ver MIN_SCORE).
-        if sig_pre is not None and sig_pre.personal_channel_title:
-            try:
-                pchan_hit = await _mirar_canal_personal(
-                    client_pre, sig_pre, user,
-                    allowed_scripts=_chat_allowed_scripts(db, cmu.chat.id, cfg),
-                )
-            except Exception as exc:  # noqa: BLE001
-                # Mismo motivo que sus vecinos: el usuario YA tiene el mute
-                # provisional puesto; una excepción aquí escaparía de
-                # on_chat_member y lo dejaría muteado para siempre.
-                log.debug("personal_channel check user=%s exc: %s", user.id, exc)
-                pchan_hit = None
-            if pchan_hit:
-                log.info(
-                    "personal_channel_spam user=%s score=%d canal=%r → ban directo",
-                    user.id, pchan_hit.score, sig_pre.personal_channel_title[:60],
-                )
-                await _ban_join_direct(
-                    context, db, cfg, cmu, user, score=pchan_hit.score,
-                    rule=pchan_hit.rule, reason=pchan_hit.reason, payload=pchan_hit.payload,
                 )
                 return
 

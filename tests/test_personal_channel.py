@@ -451,3 +451,49 @@ def test_chino_corriente_no_casa_con_los_patrones_nuevos(texto):
     """`演员`, `进群` y `加群` sueltos son palabras normales. Lo que delata es el
     compuesto entero, nunca la pieza."""
     assert not pc._keywords_re().search(texto)
+
+
+# ---------------------------------------------------------------------------
+# El canal se mira ANTES de molestar al admin
+#
+# Un nombre en Han que se libra por el salvoconducto de «cuenta antigua con
+# foto» acababa mudo esperando decisión humana, aunque su canal ya cantara: el
+# bloque de `han_requiere_decision` hacía `return` antes de llegar al canal. El
+# admin decidía a mano algo que el bot ya sabía, y en este proyecto un aviso que
+# se acaba ignorando es peor que no tenerlo.
+# ---------------------------------------------------------------------------
+
+def _orden_del_join() -> list[str]:
+    """Los hitos del join, en el orden en que aparecen en el código."""
+    from pathlib import Path
+    fuente = Path("src/handlers.py").read_text()
+    i = fuente.index("async def on_chat_member(")
+    cuerpo = fuente[i:fuente.index("\nasync def ", i + 10)]
+    hitos = ["_is_obvious_spam_profile", "_mirar_canal_personal",
+             "han_requiere_decision", "bio_spam_det.check"]
+    return sorted(hitos, key=cuerpo.index)
+
+
+def test_el_canal_se_evalua_antes_de_pedir_decision_humana():
+    orden = _orden_del_join()
+    assert orden.index("_mirar_canal_personal") < orden.index("han_requiere_decision"), (
+        "con el canal después, un nombre Han con salvoconducto se queda mudo "
+        "esperando al admin aunque su canal sea de una red de blanqueo")
+
+
+def test_el_perfil_obvio_sigue_siendo_lo_primero():
+    """No hace falta pagar una llamada de red para lo que ya está decidido."""
+    assert _orden_del_join()[0] == "_is_obvious_spam_profile"
+
+
+def test_ese_caso_concreto_lo_decide_el_canal():
+    """Nombre Han + cuenta de tres años con foto: el salvoconducto lo salva del
+    ban por nombre, pero el canal puntúa de sobra por sí solo."""
+    from src.verification import han_requiere_decision
+    from types import SimpleNamespace as NS
+    sig = NS(photo_count=1, account_age_days=1100, bio=None,
+             personal_channel_title="财天下飞机进群结演员结算频道")
+    assert han_requiere_decision(sig, None, "李大哥", None), "premisa: el nombre no basta"
+    h = pc.check(sig.personal_channel_title, first_name="李大哥",
+                 has_photo=True, has_bio=False, allowed_scripts=("latin",))
+    assert h, "el canal tendría que decidirlo sin preguntar a nadie"
