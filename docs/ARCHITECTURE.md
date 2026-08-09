@@ -29,7 +29,7 @@ cuando solo queda el código. No hace falta leerlo entero, salta a lo que toques
 
 Bot de moderación antispam para Telegram, multi-grupo y federado, en producción 24/7.
 
-- **18.117 líneas** en `src/` (68 módulos), **11.016** en `tests/` (90 ficheros, 1280 tests).
+- **18.117 líneas** en `src/` (68 módulos), **11.016** en `tests/` (91 ficheros, 1291 tests).
 - **25 detectores**, tres capas de listas negras, clasificador propio, panel de ajustes
   por chat, i18n con autodescubrimiento de idiomas.
 - Un solo proceso Python, una sola base SQLite, un contenedor Docker.
@@ -627,6 +627,37 @@ ese fichero aunque el texto viva en otro sitio.
 detector. El motivo que lee el admin nunca puede quedar vacío: explicación mapeada, si no la
 razón del detector, y si no un genérico.
 
+### El perfil se mira en los TRES momentos, no solo al entrar
+
+Había una asimetría que se cobró varios casos: el perfil se revisaba al entrar y (desde
+el 2026-08-09) en el repaso de recién llegados, pero **al escribir se juzgaba solo el
+texto**. Quien entra con el perfil limpio y lo cambia justo antes de hablar cabía entero
+por ahí, porque entre la última pasada del repaso y el mensaje van minutos y contra eso
+ninguna cadencia de repaso sirve.
+
+Caso medido (9-ago-2026, Domótica): «李大哥», nombre 100 % Han y con el canal
+`财天下飞机进群结演员结算频道` en el perfil. Entró a las 00:39 pasando los filtros, se
+verificó **en 4 segundos** y escribió 15 horas después. Lo cazó `non_allowed_script`, o
+sea **por el idioma del texto**: con un «hola buenas» habría pasado limpio, igual que
+habría pasado «Vickycat46», de la misma red pero con nombre latino.
+
+Ahora `on_message` aplica en el primer mensaje los **mismos** criterios del join
+(`_is_obvious_spam_profile` + `personal_channel`), sin umbrales propios: si con ese perfil
+no habría entrado, tampoco habla. Dos guardas:
+
+- **Solo si el bot presenció el join** (`join_ts IS NOT NULL`). Con `join_ts` a NULL el
+  usuario ya estaba en el grupo antes que el bot y esto no es su primer mensaje: podría
+  llevar años participando. Es la misma guarda de `first_msg_media`, puesta ahí tras un
+  falso positivo real.
+- **Un solo `fetch` por mensaje.** Antes había hasta tres consumidores del perfil en el
+  mismo mensaje (premium, media y ahora este), cada uno con su llamada y su tope de 12 s,
+  en una ruta donde PTB procesa los updates de uno en uno. El ayudante `_senales()` lo
+  pide una vez y lo reparte.
+
+Lo que esto **no** puede hacer: evitar que el mensaje llegue a publicarse. Telegram no
+tiene moderación previa; el bot borra y banea un segundo después. Lo que se gana es cazar
+al que el texto no delata.
+
 ### El perfil tiene más de un escaparate
 
 Durante mucho tiempo solo se leía `about`, la bio. El **canal personal**
@@ -874,7 +905,7 @@ capturaba como error genérico y **el ban se perdía en silencio, sin reintento*
 
 ## 13. Tests
 
-**1280 tests en 8,3 segundos**, sin red ni base real. Cada detector tiene sus casos positivos y
+**1291 tests en 8,3 segundos**, sin red ni base real. Cada detector tiene sus casos positivos y
 negativos, con foco en los negativos: un falso positivo es peor que un falso negativo.
 
 Aparte de los tests de lógica, hay **tests meta que protegen invariantes del proyecto**. Cada uno

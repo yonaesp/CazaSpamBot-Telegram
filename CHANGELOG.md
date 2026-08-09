@@ -4,6 +4,35 @@ Cambios relevantes de CazaSpamBot, lo más reciente arriba. Se anotan hitos, no
 cada commit: para el detalle está el historial de git. Sin números de versión
 porque el bot es un servicio en producción continua, no un paquete que se libera.
 
+## 2026-08 · El perfil también se mira al escribir
+
+Faltaba el tercer momento. El perfil se revisaba al entrar y en el repaso de
+recién llegados, pero **al hablar se juzgaba solo el texto**, así que quien entra
+con el perfil limpio y lo cambia justo antes de escribir cabía entero por ahí:
+entre la última pasada del repaso y el mensaje van minutos, y contra eso ninguna
+cadencia de repaso sirve.
+
+Caso medido (Domótica): «李大哥», nombre 100 % Han y con el canal
+`财天下飞机进群结演员结算频道` en el perfil. Entró a las 00:39 pasando los filtros,
+se verificó **en 4 segundos** y escribió 15 horas después. Lo cazó
+`non_allowed_script`, o sea **por el idioma del texto**: con un «hola buenas»
+habría pasado limpio, igual que habría pasado «Vickycat46», de la misma red pero
+con nombre latino.
+
+- En el primer mensaje se aplican los **mismos** criterios del join, sin umbrales
+  propios: si con ese perfil no habría entrado, tampoco habla.
+- **Guarda de usuario pre-bot**: solo si el bot presenció el join. Con `join_ts` a
+  NULL el usuario ya estaba antes que el bot y esto no es su primer mensaje.
+- **Un solo `fetch` por mensaje**: había hasta tres consumidores del perfil en el
+  mismo mensaje, cada uno con su llamada y su tope de 12 s, en una ruta donde PTB
+  procesa los updates de uno en uno.
+
+Medido antes de tocar nada y **descartado**: usar el tiempo que tardan en pulsar
+el botón de verificación. Suena a señal perfecta (los tres spammers del mes
+pulsaron en 3, 4 y 5 segundos), pero sobre las 18 verificaciones registradas los
+baneados tardaron 3,5-5,1 s y el resto 2,6-4,1 s: **no separa**. Cortar por ahí
+habría echado a gente por ser rápida con el móvil.
+
 ## 2026-08 · El canal del perfil, leído por dentro
 
 `personal_channel_spam` juzgaba el canal enlazado en el perfil **por su título**, y

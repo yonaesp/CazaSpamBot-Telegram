@@ -70,6 +70,8 @@ nativa; se itera `banChatMember` sobre los chats donde el bot es admin.
    - `bajo`: cualquier indicio, incluido no tener @usuario.
    Todo por chat vía `/config`.
 
+**El perfil se mira en los TRES momentos**: al entrar, en el repaso de recién llegados y **en el primer mensaje**. Este último faltaba y se cobró casos: al hablar se juzgaba solo el texto, así que quien entraba con el perfil limpio y lo cambiaba justo antes de escribir pasaba. Caso medido (2026-08-09): «李大哥», nombre 100 % Han y canal `财天下飞机进群结演员结算频道`, entró limpio, se verificó en 4 segundos y escribió 15 h después; lo cazó `non_allowed_script`, o sea por el IDIOMA DEL TEXTO, y con un «hola buenas» habría pasado. En el primer mensaje se aplican los **mismos** criterios del join, sin umbrales propios. Dos guardas: solo si el bot presenció el join (`join_ts IS NOT NULL`, si no podría llevar años en el grupo) y **un solo `user_signals.fetch` por mensaje** (`_senales()`), porque había tres consumidores pidiéndolo por separado con 12 s de tope cada uno.
+
 **`on_message`** — recolecta hits, `decide()`, luego trust score:
 - trust ≥70 → SKIP (excepto HARD_RULES: `cas_match`, `lols_match`, `federation_known_ban`, `reaction_farming`)
 - trust 40-69 + acción severa → review-with-buttons al admin DM (✅Legítimo/❌Spam, aprende)

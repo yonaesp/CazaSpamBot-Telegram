@@ -1136,6 +1136,28 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     # neutralizar homoglyphs (а cirílica vs a latina), ZW evasion, etc.
     normalized_text = learning.normalize(text) if text else ""
 
+    # Señales de perfil por MTProto. Se piden como mucho UNA vez por mensaje y
+    # solo si algo las necesita: hasta tres sitios distintos las querían y cada
+    # uno hacía su propia llamada (dos `fetch` seguidos en un primer mensaje con
+    # foto de un usuario premium), con un tope de 12 s cada una en una ruta donde
+    # PTB procesa los updates de uno en uno.
+    _perfil: dict = {}
+
+    async def _senales():
+        """(sig, client). Best-effort: sin Telethon devuelve (None, None)."""
+        if "sig" not in _perfil:
+            reporter_ = context.bot_data.get("reporter")
+            cli = reporter_.get_client() if reporter_ else None
+            valor = None
+            if cli is not None:
+                try:
+                    valor = await user_signals.fetch(
+                        cli, user.id, chat_id=chat_id, first_name=user.first_name)
+                except Exception as exc:  # noqa: BLE001
+                    log.debug("user_signals en on_message user=%s: %s", user.id, exc)
+            _perfil["sig"], _perfil["client"] = valor, cli
+        return _perfil["sig"], _perfil["client"]
+
     hits: list[Hit] = []
     # 1) Unicode script (sobre texto normalizado)
     hits.append(script_det.check(
@@ -1160,18 +1182,13 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     hits.append(tgdeep_det.check(msg, is_first_msg=is_first))
     # 3c) Premium + nueva cuenta + link en primer msg (señales via Telethon)
     if is_first and user.is_premium:
-        reporter = context.bot_data.get("reporter")
-        client = reporter.get_client() if reporter else None
-        if client is not None:
-            try:
-                sig = await user_signals.fetch(client, user.id, chat_id=chat_id, first_name=user.first_name)
-                hits.append(premium_det.check(
-                    msg, is_first_msg=is_first, user_is_premium=True,
-                    user_signals_age_days=(sig.account_age_days if sig else None),
-                    user_signals_photo_count=(sig.photo_count if sig else 0),
-                ))
-            except Exception as exc:
-                log.debug("premium_new_link signals fallo: %s", exc)
+        sig, _ = await _senales()
+        if sig is not None:
+            hits.append(premium_det.check(
+                msg, is_first_msg=is_first, user_is_premium=True,
+                user_signals_age_days=sig.account_age_days,
+                user_signals_photo_count=sig.photo_count,
+            ))
     # 3d) Join-to-First-Message delta
     if is_first:
         seen_row = db.get_seen(chat_id, user.id)
@@ -1304,6 +1321,52 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
                 except Exception as exc:  # noqa: BLE001
                     log.debug("CAS en primer mensaje falló user=%s: %s", user.id, exc)
 
+    # 3d bis) EL PERFIL en el primer mensaje, no solo el texto.
+    #
+    # El bot miraba el perfil al entrar y (desde 2026-08-09) en el repaso de
+    # recién llegados, pero al hablar juzgaba SOLO el texto. El hueco lo aprovecha
+    # quien entra con el perfil limpio y lo cambia justo antes de escribir: entre
+    # la última pasada del repaso y el mensaje puede haber minutos, y contra eso
+    # ninguna cadencia de repaso sirve.
+    #
+    # Caso medido (9-ago-2026, Domótica): «李大哥», nombre 100% Han y con el canal
+    # `财天下飞机进群结演员结算频道` en el perfil. Entró a las 00:39 pasando los
+    # filtros, se verificó en 4 segundos y escribió 15 horas después. Lo cazó
+    # `non_allowed_script` porque escribió en chino, o sea por el idioma del texto:
+    # con un «hola buenas» habría pasado entero, igual que habría pasado
+    # «Vickycat46», que tenía nombre latino.
+    #
+    # Se aplican EXACTAMENTE los mismos criterios del join, sin umbrales propios:
+    # si con ese perfil no habría entrado, tampoco habla.
+    #
+    # GUARDA (misma que `first_msg_media`): solo si el bot presenció el join. Con
+    # `join_ts` a NULL el usuario ya estaba en el grupo antes que el bot y esto no
+    # es su primer mensaje: podría llevar años participando.
+    if is_first:
+        _seen_perfil = db.get_seen(chat_id, user.id)
+        if _seen_perfil is not None and _seen_perfil["join_ts"] is not None:
+            sig_perfil, client_perfil = await _senales()
+            _obvio, _razones = verification._is_obvious_spam_profile(
+                sig_perfil, user.username, user.first_name, user.last_name,
+            )
+            if _obvio:
+                log.info("perfil de spam en el primer mensaje user=%s razones=%s",
+                         user.id, _razones)
+                hits.append(Hit(
+                    rule="obvious_spam_profile", score=200,
+                    reason=t("alert.obvious_spam") + " | ".join(
+                        verification.render_reason_list(_razones)[:3]),
+                    payload={"reasons": _razones, "via": "primer_mensaje"},
+                ))
+            if sig_perfil is not None and sig_perfil.personal_channel_title:
+                try:
+                    hits.append(await _mirar_canal_personal(
+                        client_perfil, sig_perfil, user,
+                        allowed_scripts=_chat_allowed_scripts(db, chat_id, cfg),
+                    ))
+                except Exception as exc:  # noqa: BLE001
+                    log.debug("canal personal en primer mensaje user=%s: %s", user.id, exc)
+
     # 3e) Primer mensaje es media + cuenta sospechosa (patrón spam 2025).
     # GUARD anti-falso-positivo: solo aplicar si el bot presenció el JOIN del user.
     # Si join_ts IS NULL, el user ya estaba en el grupo antes que el bot → NO sabemos
@@ -1320,14 +1383,7 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         )
         if has_media and bot_saw_join:
             # Calcular sospecha: reusamos verification._is_suspicious_profile
-            sig_local = None
-            reporter = context.bot_data.get("reporter")
-            client = reporter.get_client() if reporter else None
-            if client is not None:
-                try:
-                    sig_local = await user_signals.fetch(client, user.id, chat_id=chat_id, first_name=user.first_name)
-                except Exception:
-                    pass
+            sig_local, _ = await _senales()
             # Si Telethon no pudo dar señales, NO marcar suspicious por defecto
             # (provocaba falsos positivos cuando el reporter estaba desconectado)
             if sig_local is None:
