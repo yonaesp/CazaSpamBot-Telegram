@@ -109,6 +109,8 @@ El detector tuvo que ampliarse cuando la misma red volvió con el **nombre tambi
 
 `recien_llegados` también mira ese escaparate, porque el canal se puede enlazar DESPUÉS de entrar y no se ve desde la Bot API. Allí el nombre puede estar limpio, así que hay que leer algunos perfiles «por si acaso»: de ahí el presupuesto de lecturas por vuelta y la relectura cada 6 h, para no quemar la cuenta secundaria.
 
+**Lo gratis no lleva el freno de lo caro.** En ese repaso hay dos ritmos distintos a propósito: el **nombre** se mira en CADA vuelta (`get_chat_member` es Bot API: gratis, sin límite práctico y sin tocar la cuenta secundaria), y las **listas externas** (CAS, lols) mantienen su espera de una hora porque son APIs de terceros. Estuvieron igualados y era regalarle al spammer una hora a cambio de nada: el nombre es justo lo que cambia, ya que el truco consiste en entrar con uno que pasa los filtros y ponerse el de verdad poco antes de hablar. Si alguien vuelve a igualar `MAX_NOMBRES_POR_CICLO` con `MAX_POR_CICLO`, ha perdido el porqué (hay test).
+
 ### Listas negras (`config/blacklist/`)
 
 Tres capas que se **acumulan** (el spam llega en cualquier idioma):

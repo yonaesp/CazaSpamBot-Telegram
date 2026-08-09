@@ -55,8 +55,15 @@ log = logging.getLogger(__name__)
 VENTANA_S = 24 * 3600
 # Espera mínima entre dos consultas sobre la misma persona.
 RECHEQUEO_S = 3600
-# Personas por vuelta. Con el trabajo cada 15 min son 100 a la hora como techo.
+# Consultas a listas externas (CAS, lols) por vuelta. Con el trabajo cada 15 min
+# son 100 a la hora como techo.
 MAX_POR_CICLO = 25
+
+# Nombres leídos por vuelta. Muy por encima del anterior porque esto es Bot API:
+# gratis, sin límite práctico y sin tocar la cuenta secundaria. El tope existe
+# solo para que una avalancha de entradas no convierta una vuelta en cien
+# llamadas seguidas.
+MAX_NOMBRES_POR_CICLO = 100
 
 # Perfiles que se leen por Telethon en cada vuelta. Muy por debajo de MAX_POR_CICLO
 # a propósito: leer un perfil son varias llamadas MTProto con la cuenta secundaria,
@@ -106,21 +113,39 @@ async def revisar_job(context) -> None:
         return
 
     mirados = 0
+    nombres = 0
     saltados = 0
     # Presupuesto de lecturas de perfil, que se renueva en cada vuelta.
     context.bot_data[_CLAVE_PRESUPUESTO] = MAX_PERFILES_POR_CICLO
     for fila in candidatos:
-        if mirados >= MAX_POR_CICLO:
-            break
         chat_id, user_id = fila["chat_id"], fila["user_id"]
         if db.is_banned(user_id) or db.is_whitelisted(chat_id, user_id):
+            continue
+        espera = int(time.time() - float(fila["join_ts"]))
+
+        # 1) EL NOMBRE, en cada vuelta. `get_chat_member` es Bot API: gratis, sin
+        # límite práctico y sin tocar la cuenta secundaria. Es además lo que más
+        # cambia, porque el truco consiste justo en entrar con un nombre que pasa
+        # los filtros y ponerse el de verdad poco antes de hablar. Tenía la misma
+        # espera de una hora que las listas externas, que son APIs de terceros, y
+        # eso era regalarle esa hora a cambio de nada: la llamada no cuesta.
+        if nombres < MAX_NOMBRES_POR_CICLO:
+            nombres += 1
+            try:
+                if await _revisar_perfil(context, db, cfg, fila, espera):
+                    continue
+            except Exception as exc:  # noqa: BLE001
+                log.warning("recien_llegados: fallo con el perfil de %s: %s", user_id, exc)
+
+        # 2) Las listas externas, que sí son APIs de terceros y conviene espaciar.
+        if mirados >= MAX_POR_CICLO:
             continue
         if not _toca_mirar(context, chat_id, user_id):
             saltados += 1
             continue
         mirados += 1
         try:
-            if await _revisar_uno(context, db, cfg, session, fila):
+            if await _revisar_listas(context, db, cfg, session, fila, espera):
                 continue
         except Exception as exc:  # noqa: BLE001
             log.warning("recien_llegados: fallo revisando user=%s: %s", user_id, exc)
@@ -129,17 +154,14 @@ async def revisar_job(context) -> None:
     # que «no hay líneas en el log» no distinguía entre «corrió y no había nada» y
     # «lleva días sin correr». Sale como mucho una línea por vuelta, y solo cuando
     # de verdad ha consultado a alguien.
-    if mirados:
-        log.info("recien_llegados: %d revisados, %d aún en espera, %d en la ventana",
-                 mirados, saltados, len(candidatos))
+    if nombres or mirados:
+        log.info("recien_llegados: %d nombres, %d en listas, %d en espera, %d en la ventana",
+                 nombres, mirados, saltados, len(candidatos))
 
 
-async def _revisar_uno(context, db: DB, cfg: Config, session, fila) -> bool:
-    """True si se actuó sobre esa persona."""
+async def _revisar_listas(context, db: DB, cfg: Config, session, fila, espera: int) -> bool:
+    """CAS y lols.bot, que es lo que más tarde en ponerse al día."""
     user_id = fila["user_id"]
-    espera = int(time.time() - float(fila["join_ts"]))
-
-    # 1) Las listas externas, que es lo que más tarde en ponerse al día.
     if cfg.lols_enabled and session is not None:
         hit = await lols_det.check(user_id, session)
         if hit and await _actuar(context, db, cfg, fila, hit, espera, "lols"):
@@ -149,9 +171,7 @@ async def _revisar_uno(context, db: DB, cfg: Config, session, fila) -> bool:
         if hit and (hit.payload or {}).get("offenses", 0) >= cfg.cas_autoban_min:
             if await _actuar(context, db, cfg, fila, hit, espera, "cas"):
                 return True
-
-    # 2) El perfil, que puede haber cambiado después de verificarse.
-    return await _revisar_perfil(context, db, cfg, fila, espera)
+    return False
 
 
 async def _actuar(context, db: DB, cfg: Config, fila, hit, espera: int, origen: str) -> bool:

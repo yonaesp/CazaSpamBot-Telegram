@@ -204,10 +204,10 @@ async def test_un_fallo_consultando_a_uno_no_deja_sin_mirar_al_resto(tmp_path, m
     ctx = _ctx(db, _Bot(), _cfg())
     vistos = []
 
-    async def revienta(context, db_, cfg_, session, fila):
+    async def revienta(context, db_, cfg_, session, fila, espera):
         vistos.append(fila["user_id"])
         raise RuntimeError("la API no responde")
-    monkeypatch.setattr(rl, "_revisar_uno", revienta)
+    monkeypatch.setattr(rl, "_revisar_listas", revienta)
 
     await rl.revisar_job(ctx)
     assert len(vistos) == 3, "un fallo cortaba el repaso de los demás"
@@ -339,3 +339,112 @@ def test_el_repaso_usa_el_mismo_criterio_que_el_join():
     fuente = Path("src/recien_llegados.py").read_text()
     assert "_mirar_canal_personal" in fuente, "debe reutilizar el helper del handler"
     assert "personal_channel_det.check" not in fuente, "no puede tener su propia lógica"
+
+
+# ---------------------------------------------------------------------------
+# El nombre es gratis; las listas externas no
+#
+# Los dos frenos eran el mismo (una hora), y no tienen por qué serlo:
+#
+#   - `get_chat_member` es **Bot API**: gratis, sin límite práctico y sin tocar
+#     la cuenta secundaria de Telethon. Y el nombre es justo lo que cambia,
+#     porque el truco consiste en entrar con uno que pasa los filtros y ponerse
+#     el de verdad poco antes de hablar.
+#   - CAS y lols.bot son **APIs de terceros**, y ahí sí conviene espaciar.
+#
+# Ponerle a lo gratis el freno de lo caro era regalarle al spammer una hora a
+# cambio de nada. Caso que lo destapó: «李大哥» entró a las 00:39 con el perfil
+# limpio y escribió a las 15:29 con nombre 100 % Han.
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_el_nombre_se_mira_en_cada_vuelta(tmp_path, monkeypatch):
+    """Sin espera: dos vueltas seguidas tienen que leer el nombre las dos veces."""
+    db = _db(tmp_path)
+    db.record_join(-100, 700, None, join_ts=time.time() - 600)
+    leidos = []
+
+    class BotQueCuenta(_Bot):
+        async def get_chat_member(self, chat_id, user_id):
+            leidos.append(user_id)
+            return SimpleNamespace(user=SimpleNamespace(
+                id=user_id, is_bot=False, first_name="Ana", last_name=None, username=None))
+
+    ctx = _ctx(db, BotQueCuenta(), _cfg(lols_enabled=False, cas_enabled=False))
+    await rl.revisar_job(ctx)
+    await rl.revisar_job(ctx)
+    assert leidos == [700, 700], "el nombre solo se miró una vez: vuelve a haber espera"
+
+
+@pytest.mark.asyncio
+async def test_las_listas_externas_si_esperan(tmp_path, monkeypatch):
+    """La contrapartida: lo caro se sigue espaciando."""
+    db = _db(tmp_path)
+    db.record_join(-100, 701, None, join_ts=time.time() - 600)
+    consultas = []
+
+    async def falso_lols(user_id, session):
+        consultas.append(user_id)
+        return None
+    monkeypatch.setattr(rl.lols_det, "check", falso_lols)
+
+    ctx = _ctx(db, _Bot(), _cfg())
+    await rl.revisar_job(ctx)
+    await rl.revisar_job(ctx)
+    assert consultas == [701], "se estaría preguntando a lols en cada vuelta"
+
+
+@pytest.mark.asyncio
+async def test_un_cambio_de_nombre_se_caza_en_la_vuelta_siguiente(tmp_path, monkeypatch):
+    """El caso entero: entra con nombre limpio y se pone el chino más tarde. Antes
+    había que esperar a que venciera la espera de una hora; ahora cae a los 15 min."""
+    db = _db(tmp_path)
+    db.record_join(-100, 702, None, join_ts=time.time() - 600)
+    nombre = ["Carlos"]
+
+    class BotQueCambia(_Bot):
+        async def get_chat_member(self, chat_id, user_id):
+            return SimpleNamespace(chat=SimpleNamespace(id=chat_id, title="Domótica"),
+                                   user=SimpleNamespace(
+                                       id=user_id, is_bot=False, first_name=nombre[0],
+                                       last_name=None, username=None))
+
+    ctx = _ctx(db, BotQueCambia(), _cfg(lols_enabled=False, cas_enabled=False))
+    aplicado = {}
+
+    async def falso_apply(context, db_, cfg_, **kw):
+        aplicado.update(kw)
+    monkeypatch.setattr("src.handlers._apply_action", falso_apply)
+
+    await rl.revisar_job(ctx)
+    assert not aplicado, "con nombre latino no debe pasar nada"
+
+    nombre[0] = "李大哥"                      # se lo cambia estando ya dentro
+    await rl.revisar_job(ctx)
+    assert aplicado.get("user_id") == 702
+    assert aplicado["decision"].rule == "obvious_spam_profile"
+
+
+@pytest.mark.asyncio
+async def test_una_avalancha_no_convierte_una_vuelta_en_mil_llamadas(tmp_path, monkeypatch):
+    db = _db(tmp_path)
+    ahora = time.time()
+    for uid in range(1000, 1000 + rl.MAX_NOMBRES_POR_CICLO + 40):
+        db.record_join(-100, uid, None, join_ts=ahora - 600)
+    leidos = []
+
+    class BotQueCuenta(_Bot):
+        async def get_chat_member(self, chat_id, user_id):
+            leidos.append(user_id)
+            return SimpleNamespace(user=SimpleNamespace(
+                id=user_id, is_bot=False, first_name="Ana", last_name=None, username=None))
+
+    ctx = _ctx(db, BotQueCuenta(), _cfg(lols_enabled=False, cas_enabled=False))
+    await rl.revisar_job(ctx)
+    assert len(leidos) == rl.MAX_NOMBRES_POR_CICLO
+
+
+def test_el_tope_de_nombres_es_mucho_mayor_que_el_de_listas():
+    """Si alguien los vuelve a igualar, es que ha perdido el porqué: uno es una
+    llamada gratis de la Bot API y el otro una consulta a un tercero."""
+    assert rl.MAX_NOMBRES_POR_CICLO > rl.MAX_POR_CICLO * 2

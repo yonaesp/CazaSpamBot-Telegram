@@ -4,6 +4,23 @@ Cambios relevantes de CazaSpamBot, lo más reciente arriba. Se anotan hitos, no
 cada commit: para el detalle está el historial de git. Sin números de versión
 porque el bot es un servicio en producción continua, no un paquete que se libera.
 
+## 2026-08 · El nombre es gratis; las listas externas no
+
+Los dos frenos del repaso de recién llegados eran el mismo (una hora), y no
+tienen por qué serlo:
+
+- **`get_chat_member` es Bot API**: gratis, sin límite práctico y sin tocar la
+  cuenta secundaria de Telethon. Y el nombre es justo lo que cambia, porque el
+  truco consiste en entrar con uno que pasa los filtros y ponerse el de verdad
+  poco antes de hablar.
+- **CAS y lols.bot son APIs de terceros**, y ahí sí conviene espaciar.
+
+Ponerle a lo gratis el freno de lo caro era regalarle al spammer esa hora a
+cambio de nada. Ahora el nombre se mira **en cada vuelta** (cada 15 min, tope de
+100 por vuelta para que una avalancha no se convierta en mil llamadas seguidas) y
+las listas externas mantienen su espera. El presupuesto de lecturas de perfil por
+Telethon, que es lo caro de verdad, no cambia.
+
 ## 2026-08 · El perfil también se mira al escribir
 
 Faltaba el tercer momento. El perfil se revisaba al entrar y en el repaso de
