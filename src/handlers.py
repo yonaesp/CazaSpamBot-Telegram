@@ -639,6 +639,18 @@ async def on_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 sig_pre = await user_signals.fetch(client_pre, user.id, chat_id=cmu.chat.id, first_name=user.first_name)
             except Exception as exc:  # noqa: BLE001
                 log.debug("user_signals fetch user=%s exc: %s", user.id, exc)
+            # Qué se pudo ver del perfil AL ENTRAR. Sin esta línea no hay forma de
+            # saber, después, si alguien pasó porque su perfil estaba limpio o
+            # porque Telethon no llegó a leerlo: el join es justo el peor momento
+            # para resolver una entidad recién creada (de ahí los reintentos de
+            # `_resolve_entity`). Con esto, ante el próximo caso que se cuele se
+            # puede distinguir «se lo puso después» de «no lo miramos».
+            log.info(
+                "join user=%s chat=%s señales=%s canal=%s",
+                user.id, cmu.chat.id, "sí" if sig_pre else "NO",
+                (sig_pre.personal_channel_title[:40]
+                 if sig_pre and sig_pre.personal_channel_title else "-"),
+            )
         obvious_spam, obv_reasons = verification._is_obvious_spam_profile(
             sig_pre, user.username, user.first_name, user.last_name,
         )

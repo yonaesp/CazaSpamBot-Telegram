@@ -448,3 +448,55 @@ def test_el_tope_de_nombres_es_mucho_mayor_que_el_de_listas():
     """Si alguien los vuelve a igualar, es que ha perdido el porqué: uno es una
     llamada gratis de la Bot API y el otro una consulta a un tercero."""
     assert rl.MAX_NOMBRES_POR_CICLO > rl.MAX_POR_CICLO * 2
+
+
+# ---------------------------------------------------------------------------
+# El canal aparece cuando al spammer le conviene
+#
+# `RELECTURA_PERFIL_S` estuvo en 6 horas con este razonamiento: «un canal
+# personal no aparece y desaparece, con mirarlo un par de veces basta». Es falso.
+#
+# Caso medido (10-ago-2026, Windows 10): «Simongirl40», nombre latino y foto de
+# perfil normal, entró a las 09:49 y escribió a las 15:32 con el canal
+# `财天下飞机进群结演员结算频道` en el perfil, que puntúa 160 de los 100
+# necesarios. Su nombre es latino, así que la lectura del perfil dependía del
+# presupuesto, y con relectura de 6 h cayó justo en la ventana muerta: se le
+# cazó al escribir, no antes. El hueco no era del detector.
+# ---------------------------------------------------------------------------
+
+def test_el_perfil_se_relee_dentro_de_la_hora():
+    assert rl.RELECTURA_PERFIL_S <= 3600, (
+        "con relecturas más espaciadas, quien enlaza el canal después de entrar "
+        "tiene horas de barra libre hasta que le toque")
+
+
+def test_el_presupuesto_cubre_a_todos_los_de_la_ventana():
+    """La cuenta que hace que lo anterior funcione: con el trabajo cada 15 min,
+    el presupuesto por vuelta tiene que dar para releer a toda la ventana dentro
+    del plazo. Medido en producción: 16-23 personas en la ventana."""
+    vueltas_por_relectura = rl.RELECTURA_PERFIL_S / (15 * 60)
+    capacidad = rl.MAX_PERFILES_POR_CICLO * vueltas_por_relectura
+    assert capacidad >= 40, (
+        f"solo caben {capacidad:.0f} lecturas por ciclo de relectura: "
+        "no alcanza para la ventana real")
+
+
+@pytest.mark.asyncio
+async def test_al_mismo_perfil_se_vuelve_pasada_la_hora(tmp_path):
+    """Comprobación de comportamiento: pasado el plazo, se relee."""
+    ctx = SimpleNamespace(bot_data={rl._CLAVE_PRESUPUESTO: 50})
+    assert rl._toca_leer_perfil(ctx, -100, 1) is True
+    assert rl._toca_leer_perfil(ctx, -100, 1) is False
+    ctx.bot_data[rl._CLAVE_PERFILES][(-100, 1)] = time.time() - rl.RELECTURA_PERFIL_S - 1
+    assert rl._toca_leer_perfil(ctx, -100, 1) is True
+
+
+def test_el_join_deja_constancia_de_lo_que_pudo_ver():
+    """Sin esta traza no hay forma de saber, después, si alguien pasó porque su
+    perfil estaba limpio o porque Telethon no llegó a leerlo. El join es el peor
+    momento para resolver una entidad recién creada."""
+    from pathlib import Path
+    fuente = Path("src/handlers.py").read_text()
+    i = fuente.index("async def on_chat_member(")
+    cuerpo = fuente[i:fuente.index("\nasync def ", i + 10)]
+    assert 'señales=%s canal=%s' in cuerpo

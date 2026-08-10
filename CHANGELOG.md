@@ -4,6 +4,29 @@ Cambios relevantes de CazaSpamBot, lo más reciente arriba. Se anotan hitos, no
 cada commit: para el detalle está el historial de git. Sin números de versión
 porque el bot es un servicio en producción continua, no un paquete que se libera.
 
+## 2026-08 · El canal aparece cuando al spammer le conviene
+
+`RELECTURA_PERFIL_S` estaba en 6 horas, con este razonamiento escrito: «un canal
+personal no aparece y desaparece, con mirarlo un par de veces en la ventana
+basta». Es falso.
+
+Caso medido (Windows 10): «Simongirl40», nombre latino y foto de perfil normal,
+entró a las 09:49 y escribió a las 15:32 con el canal
+`财天下飞机进群结演员结算频道` en el perfil, que puntúa **160 de los 100**
+necesarios. Como su nombre es latino, verle el canal dependía del presupuesto de
+lecturas, y con relectura de 6 h cayó justo en la ventana muerta: se le cazó al
+escribir (por el detector nuevo del primer mensaje), no antes. En cualquier
+momento de esas casi seis horas se le habría echado.
+
+- **Relectura del perfil: 6 h → 1 h**, y presupuesto de 8 → 12 por vuelta. Con
+  las 16-23 personas que hay de media en la ventana salen 4-6 lecturas por
+  vuelta, que entran holgadas. Hay test que comprueba que la capacidad por ciclo
+  cubre la ventana real.
+- **El join deja constancia de lo que pudo ver** (`señales=sí|NO canal=...`).
+  Sin esa traza no había forma de saber, después, si alguien pasó porque su
+  perfil estaba limpio o porque Telethon no llegó a leerlo, y el join es
+  justamente el peor momento para resolver una entidad recién creada.
+
 ## 2026-08 · El canal se mira antes de molestar al admin
 
 Salió al comprobar si un perfil como el de «李大哥» se banearía ya sin llegar a

@@ -65,17 +65,27 @@ MAX_POR_CICLO = 25
 # llamadas seguidas.
 MAX_NOMBRES_POR_CICLO = 100
 
-# Perfiles que se leen por Telethon en cada vuelta. Muy por debajo de MAX_POR_CICLO
-# a propósito: leer un perfil son varias llamadas MTProto con la cuenta secundaria,
-# y quemar su reputación por adelantar un ban unas horas es un mal negocio (regla 9
-# del proyecto). Con 8 cada cuarto de hora se cubre de sobra el ritmo real de
-# entradas medido (881 joins en el histórico, máximo 2 por minuto).
-MAX_PERFILES_POR_CICLO = 8
+# Perfiles que se leen por Telethon en cada vuelta. Acotado porque leer un perfil
+# son varias llamadas MTProto con la cuenta secundaria, y quemar su reputación es
+# un mal negocio (regla 9 del proyecto). Con 12 por vuelta y el trabajo cada 15
+# min salen 48 lecturas a la hora, que cubren de sobra las 16-23 personas que hay
+# de media en la ventana.
+MAX_PERFILES_POR_CICLO = 12
 
-# Cada cuánto se vuelve a leer el perfil COMPLETO de la misma persona. Mucho más
-# espaciado que RECHEQUEO_S porque un canal personal no aparece y desaparece: con
-# mirarlo un par de veces en la ventana basta.
-RELECTURA_PERFIL_S = 6 * 3600
+# Cada cuánto se vuelve a leer el perfil COMPLETO de la misma persona.
+#
+# Estuvo en 6 horas, con el razonamiento de que «un canal personal no aparece y
+# desaparece». Es falso: aparece cuando al spammer le conviene. Caso medido
+# (10-ago-2026, Windows 10): «Simongirl40», nombre latino y foto normal, entró a
+# las 09:49 y escribió a las 15:32 con el canal `财天下飞机进群结演员结算频道` en
+# el perfil, que puntúa 160 de los 100 necesarios. En cualquier momento de esas
+# casi seis horas se le habría cazado; el hueco no era del detector, era de esta
+# constante.
+#
+# Con una hora y 16-23 candidatos hacen falta 4-6 lecturas por vuelta: entra
+# holgado en el presupuesto de arriba. Si la ventana creciera mucho, el
+# presupuesto la degrada sola y algunos esperan un poco más.
+RELECTURA_PERFIL_S = 3600
 
 _CLAVE_CACHE = "_recien_llegados_visto"
 _CLAVE_PERFILES = "_recien_llegados_perfil"
