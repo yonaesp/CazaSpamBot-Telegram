@@ -43,7 +43,9 @@ def _mentions_a_bot(msg: Message) -> str | None:
     text = msg.text or msg.caption or ""
     candidatos: list[str] = []
     # 1) Por entidades MENTION (texto @username)
-    for ent in (msg.entities or []) + (msg.caption_entities or []):
+    # `list(...)` en los DOS lados: en PTB 22 las entidades son TUPLAS y el
+    # `or []` de un caption vacío devuelve una lista. Ver el meta-test.
+    for ent in list(msg.entities or []) + list(msg.caption_entities or []):
         if ent.type == MessageEntity.MENTION:
             candidatos.append(trozo_entidad(text, ent.offset, ent.length).lstrip("@"))
     # 2) Fallback regex sobre el texto plano

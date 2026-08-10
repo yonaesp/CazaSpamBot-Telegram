@@ -4,6 +4,37 @@ Cambios relevantes de CazaSpamBot, lo más reciente arriba. Se anotan hitos, no
 cada commit: para el detalle está el historial de git. Sin números de versión
 porque el bot es un servicio en producción continua, no un paquete que se libera.
 
+## 2026-08 · Un detector roto dejaba el mensaje sin moderar
+
+Publicidad de servicios de hackeo entró en Windows 11 y **el bot no hizo nada**:
+lo borró y baneó un admin a mano doce minutos después. En el log, a la hora exacta
+del mensaje:
+
+```
+File "/app/src/detectors/premium_new_link.py", line 20, in _has_link
+  for ent in (msg.entities or []) + (msg.caption_entities or []):
+TypeError: can only concatenate tuple (not "list") to tuple
+```
+
+En python-telegram-bot 22 las entidades son **tuplas**; un `caption_entities`
+vacío hace que `or []` devuelva una **lista**, y `tuple + list` no existe. El
+error subió hasta el handler global y **abortó `on_message` entero**, así que el
+mensaje no pasó por ninguno de los otros veinte detectores. Comprobado después:
+ese texto puntúa **120 en `commercial_ad`**, o sea que el bot lo habría baneado
+solo. No hacía falta vocabulario nuevo; hacía falta que el pipeline no se cayera.
+
+Lo peor no fue el TypeError sino cuánto llevaba ahí: el detector vivía dentro de
+un `try/except` que lo tragaba con `log.debug`, así que llevaba **meses muerto en
+silencio** desde la actualización de la librería, y solo se destapó al sacarlo de
+ese `try` en una refactorización.
+
+- Arreglados los **dos** sitios con ese patrón (`premium_new_link`,
+  `dormant_bot_mention`) y **meta-test** que barre todo `src/`.
+- **Los 16 detectores del pipeline van aislados**: uno que reviente no puede
+  llevarse por delante a los otros quince, y el mensaje se sigue evaluando.
+- Pero su fallo se registra con **WARNING y traza**, nunca en `debug`. Tragárselo
+  en silencio es exactamente lo que dejó el detector roto tanto tiempo.
+
 ## 2026-08 · El canal aparece cuando al spammer le conviene
 
 `RELECTURA_PERFIL_S` estaba en 6 horas, con este razonamiento escrito: «un canal

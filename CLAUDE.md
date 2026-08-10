@@ -262,6 +262,42 @@ Si aun así se copia a pelo, hay que llevarse **los tres ficheros** (`.db`, `.db
 - Migraciones de BD: `ALTER TABLE` blando en `_migrate()`, y añadir el campo a `ALLOWED` de `update_chat_setting`.
 - Commits convencionales. Co-Author: `Claude Opus`.
 
+## Cuando llega un aviso del bot pegado sin ninguna orden
+
+El admin reenvía a menudo un aviso del bot (un ban, un error interno, una captura
+de un perfil) **sin decir qué hacer**. Eso no es «solo para tu información»: es un
+encargo. Hay que **deducir el trabajo y hacerlo entero**, no preguntar qué se
+quiere ni limitarse a explicar lo que se ve.
+
+El guion, en este orden:
+
+1. **Reproducir el hecho contra los datos reales.** Nunca de memoria ni por lo
+   que parece: `moderation_log`, `seen_users` y `docker logs` del contenedor. Y
+   siempre sobre la base VIVA, que copiarla a pelo se deja el WAL fuera (ver
+   arriba).
+2. **Distinguir las dos causas posibles**, porque llevan a arreglos opuestos:
+   - **el bot no lo detectó** → falta cobertura: vocabulario, umbral, o un
+     escaparate del perfil que no se estaba mirando;
+   - **lo detectó y se rompió** → hay un bug, y es más urgente, porque un fallo
+     así no afecta a un mensaje sino a todos los que pasen por ahí.
+   El log lo dice: un `Traceback` con la hora del mensaje es la segunda.
+3. **Arreglar la causa raíz, y también la clase entera.** Si un detector tenía
+   un `tuple + list`, buscar ese patrón en TODO `src/` (había otro igual) y
+   dejar un meta-test que impida que vuelva.
+4. **Comprobar qué habría pasado sin el fallo.** Pasar el texto real por los
+   detectores. Si ya puntuaba para ban, el problema era el bug y **no hay que
+   tocar las listas**; añadir vocabulario «por si acaso» solo sube el riesgo de
+   falsos positivos.
+5. **Cerrar el ciclo**: tests que fijen el caso real con su fecha y su medida,
+   docs, `docker compose restart`, commit y push.
+6. **Contar qué se hizo y qué no se pudo saber.** Si un dato no está registrado,
+   decirlo y **añadir la traza** que lo responda la próxima vez, en vez de
+   elegir la hipótesis que mejor suena.
+
+Un ban manual de otro admin en el aviso es una **pista de que el bot falló**, no
+el final de la historia: el admin tuvo que hacer a mano lo que debía ser
+automático. Hay que averiguar por qué.
+
 ## Flujo de trabajo típico
 
 ```bash

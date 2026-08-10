@@ -1178,53 +1178,78 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         return _perfil["sig"], _perfil["client"]
 
     hits: list[Hit] = []
+
+    def _sin_tumbar(fn, que: str):
+        """Ejecuta un detector sin que su fallo aborte la moderación del mensaje.
+
+        Lección de un caso real (10-ago-2026, Windows 11): `premium_new_link`
+        arrastraba un `tuple + list` desde que python-telegram-bot pasó las
+        entidades a tuplas. Vivía dentro de un `try/except` que lo tragaba con un
+        `log.debug`, así que el detector llevaba meses muerto sin que se notara.
+        Al sacarlo de ese `try` en una refactorización, el TypeError empezó a
+        propagarse y **abortó `on_message` entero**: el mensaje —publicidad de
+        servicios de hackeo— no pasó por NINGÚN detector y lo tuvo que borrar un
+        admin a mano doce minutos después.
+
+        Las dos mitades de la lección, y por eso esto es como es:
+        - un detector que revienta no puede llevarse por delante a los otros
+          veinte, así que se aísla y el mensaje se sigue evaluando;
+        - pero se registra con **WARNING y traza**, nunca con `debug`. Tragarse
+          el fallo en silencio es lo que dejó el detector roto tanto tiempo.
+        """
+        try:
+            return fn()
+        except Exception:  # noqa: BLE001
+            log.warning("detector %s falló; se sigue sin él", que, exc_info=True)
+            return Hit.none()
+
     # 1) Unicode script (sobre texto normalizado)
-    hits.append(script_det.check(
+    hits.append(_sin_tumbar(lambda: script_det.check(
         normalized_text or text, is_first_msgs=is_first,
         allowed_scripts=_chat_allowed_scripts(db, chat_id, cfg),
         threshold=cfg.non_latin_ratio_threshold,
-    ))
+    ), "script"))
     # 2) External mentions / t.me links (con username del propio chat para
     # distinguir enlaces internos al propio grupo)
     own_username = db.chat_username(chat_id)
-    hits.append(ext_det.check(
+    hits.append(_sin_tumbar(lambda: ext_det.check(
         msg, chat_id=chat_id, is_first_msg=is_first,
         detect_user_mentions=cfg.detect_external_mentions,
         detect_tg_links=cfg.detect_external_tg_links,
         is_user_in_chat=db.known_user_in_chat,
         resolve_username=db.resolve_username,
         own_chat_username=own_username,
-    ))
+    ), "ext"))
     # 3) URL blocklist
-    hits.append(url_det.check(msg, cfg.url_blocklist, is_first_msg=is_first))
+    hits.append(_sin_tumbar(lambda: url_det.check(msg, cfg.url_blocklist, is_first_msg=is_first), "url"))
     # 3b) tg:// deeplinks phishing
-    hits.append(tgdeep_det.check(msg, is_first_msg=is_first))
+    hits.append(_sin_tumbar(lambda: tgdeep_det.check(msg, is_first_msg=is_first), "tgdeep"))
     # 3c) Premium + nueva cuenta + link en primer msg (señales via Telethon)
     if is_first and user.is_premium:
         sig, _ = await _senales()
         if sig is not None:
-            hits.append(premium_det.check(
+            hits.append(_sin_tumbar(lambda: premium_det.check(
                 msg, is_first_msg=is_first, user_is_premium=True,
                 user_signals_age_days=sig.account_age_days,
                 user_signals_photo_count=sig.photo_count,
-            ))
+            ), "premium_new_link"))
     # 3d) Join-to-First-Message delta
     if is_first:
         seen_row = db.get_seen(chat_id, user.id)
         if seen_row and seen_row["join_ts"] and seen_row["first_msg_ts"]:
             delta = float(seen_row["first_msg_ts"]) - float(seen_row["join_ts"])
-            hits.append(jfm_det.check(is_first_msg=True, delta_seconds=delta))
+            hits.append(_sin_tumbar(lambda: jfm_det.check(is_first_msg=True, delta_seconds=delta), "jfm"))
     # 3d-pre) Mensaje con botones inline → users normales no pueden enviarlos.
     # Casi siempre es forward desde canal/bot promocional.
-    hits.append(buttons_det.check(msg))
+    hits.append(_sin_tumbar(lambda: buttons_det.check(msg), "buttons"))
     # 3d-ter) Contacto compartido cuyo nombre/vCard es el reclamo de spam (el texto
     # va en msg.contact, no en msg.text, así que el resto de detectores no lo ven).
-    hits.append(contact_det.check(
+    hits.append(_sin_tumbar(lambda: contact_det.check(
         msg, _chat_allowed_scripts(db, chat_id, cfg), cfg.non_latin_ratio_threshold, is_first_msg=is_first,
-    ))
+    ), "contact"))
     # 3d-ter2) Promoción de canal externo mediante cita a otro chat (external_reply):
     # el reclamo va en la cita y el texto visible es un CTA mínimo ("Please Join").
-    hits.append(extreply_det.check(msg, is_first_msg=is_first, is_moderated_chat=cfg.is_moderated))
+    hits.append(_sin_tumbar(lambda: extreply_det.check(msg, is_first_msg=is_first, is_moderated_chat=cfg.is_moderated), "extreply"))
     # 3d-quat) Detectores de dinero/trabajo (anuncio comercial + testimonio de
     # estafa de inversión). Su agresividad la modula el ajuste money_guard del chat:
     # 'normal' (defecto), 'soft' (solo casos muy claros) u 'off'. Es lo que pediste
@@ -1240,26 +1265,26 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         log.info("texto disfrazado (%s) user=%s chat=%s → se evalúa el texto limpio",
                  "+".join(_trucos), user.id, chat_id)
     _money_guard = (_chat_money_guard(db, chat_id))
-    hits.append(_apply_money_guard(comad_det.check(msg_txt, is_first_msg=is_first), _money_guard))
+    hits.append(_sin_tumbar(lambda: _apply_money_guard(comad_det.check(msg_txt, is_first_msg=is_first), _money_guard), "comad"))
     # Testimonio "di X, me devolvieron Y mayor" con elogio y llamada a contactar.
     # Sin este detector se colaba cuando no ponían @usuario final (lo único que lo
     # cazaba era external_mention).
-    hits.append(_apply_money_guard(invscam_det.check(msg_txt, is_first_msg=is_first), _money_guard))
+    hits.append(_sin_tumbar(lambda: _apply_money_guard(invscam_det.check(msg_txt, is_first_msg=is_first), _money_guard), "invscam"))
     # 3d-quint) Primer mensaje dominado por emojis sin texto real (captación
     # de atención típica de spam, ej. "🍭🍄🌟").
-    hits.append(emoji_only_det.check(msg, is_first_msg=is_first))
+    hits.append(_sin_tumbar(lambda: emoji_only_det.check(msg, is_first_msg=is_first), "emoji_only"))
     # 3d-cinq) El MISMO texto, a la vez, en varios de nuestros grupos. Aprovecha la
     # federación: quien modera un solo grupo no puede ver esto. No mira el
     # contenido, así que caza campañas cuyo vocabulario las listas todavía no
     # conocen. El texto ya viene normalizado, así que cambiar mayúsculas o meter
     # caracteres invisibles no sirve para esquivarlo.
     if not texto_ajeno:
-        hits.append(crosspost_det.check(db, chat_id, user.id, normalized_text or text))
+        hits.append(_sin_tumbar(lambda: crosspost_det.check(db, chat_id, user.id, normalized_text or text), "crosspost"))
 
     # 3d-sext) "Este es mi número de <otra app>, escríbeme ahí". Sin enlace, sin
     # mención y en español correcto, así que ningún otro detector lo veía: hubo que
     # borrarlo a mano tras hora y cuarto en el grupo.
-    hits.append(offplat_det.check(msg_txt, is_first_msg=is_first))
+    hits.append(_sin_tumbar(lambda: offplat_det.check(msg_txt, is_first_msg=is_first), "offplat"))
     # 3d-bis) Forward desde canal/bot en primer mensaje o primeros 3 min → ban directo
     seen_row_fwd = db.get_seen(chat_id, user.id)
     secs_since_first = None
@@ -1269,9 +1294,9 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         # aquí solo desviaría el delta tras un backlog (hacia falso negativo).
         now_evt = msg.date.timestamp() if msg.date else time.time()
         secs_since_first = max(0.0, now_evt - float(seen_row_fwd["first_seen_ts"]))
-    hits.append(fwd_det.check(
+    hits.append(_sin_tumbar(lambda: fwd_det.check(
         msg, is_first_msg=is_first, seconds_since_first_seen=secs_since_first,
-    ))
+    ), "fwd"))
     # 3d bis) HISTORIA compartida recién entrado. Va aquí, y NO dentro del bloque de
     # `is_first`, porque también cubre al que ya habló una vez. Solo Bot API: es la
     # única defensa de quien instale el bot sin Telethon, que no puede leer el
@@ -1280,7 +1305,7 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     if getattr(msg, "story", None) is not None:
         _seen_st = db.get_seen(chat_id, user.id)
         _join_ts = _seen_st["join_ts"] if _seen_st is not None else None
-        hits.append(story_det.check(
+        hits.append(_sin_tumbar(lambda: story_det.check(
             msg,
             user_id=user.id,
             is_first_msg=is_first,
@@ -1289,7 +1314,7 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
             # Cuántos mensajes ha escrito AQUÍ: distingue al que participa de
             # verdad del que lleva meses callado y de repente planta una historia.
             msg_count=(_seen_st["msg_count"] if _seen_st is not None else None),
-        ))
+        ), "story"))
 
     # 3d ter) LISTAS EXTERNAS en los primeros mensajes, no solo al entrar.
     #
@@ -1411,11 +1436,11 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
                 suspicious, susp_reasons = verification._is_suspicious_profile(
                     sig_local, user.username, user.first_name, user.last_name,
                 )
-            hits.append(media_det.check(
+            hits.append(_sin_tumbar(lambda: media_det.check(
                 msg, is_first_msg=True, is_suspicious=suspicious,
                 # el detector solo los muestra: se le pasan ya traducidos
                 suspicious_reasons=verification.render_reason_list(susp_reasons),
-            ))
+            ), "media"))
         elif has_media and not bot_saw_join:
             log.info(
                 "first_msg_media SKIP user=%s chat=%s: join no presenciado (user pre-existente)",

@@ -17,7 +17,10 @@ def _has_link(msg: Message) -> bool:
     text = msg.text or msg.caption or ""
     if "://" in text or "t.me/" in text:
         return True
-    for ent in (msg.entities or []) + (msg.caption_entities or []):
+    # `list(...)` en los DOS lados a propósito: en python-telegram-bot 22 las
+    # entidades son TUPLAS, y `msg.caption_entities or []` devuelve una lista
+    # cuando viene vacía. `tuple + list` lanza TypeError. Ver el meta-test.
+    for ent in list(msg.entities or []) + list(msg.caption_entities or []):
         if ent.type in (MessageEntity.URL, MessageEntity.TEXT_LINK):
             return True
     return False
