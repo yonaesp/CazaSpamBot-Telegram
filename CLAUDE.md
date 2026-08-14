@@ -178,9 +178,22 @@ Salvaguardas para que el bot no aprenda a castigar el vocabulario normal de su g
 
 Todo ajuste por chat se toca **desde el panel visual y por comando en paralelo**. Con `/sync` ON (por defecto) cada cambio se aplica a TODOS los grupos y el panel no pide grupo.
 
-Panel: sincronización · verificación · revisión de sospechosos · recordatorios · acción al no verificar · tiempos · **Bienvenida ▸** (texto, botones, autoborrado) · reglas · limpiar servicio · **Warns ▸** · top semanal · **Alfabetos permitidos ▸** · **Rigor trabajo/dinero ▸** (`money_guard`) · **Palabras bloqueadas ▸** · **Frases al banear ▸** (con ejemplo real antes de activar) · avisos informativos.
+Panel: sincronización · verificación · revisión de sospechosos · recordatorios · acción al no verificar · tiempos · **Bienvenida ▸** (texto, botones, autoborrado) · reglas · limpiar servicio · **Warns ▸** (límite, castigo, quién puede warnear, alcance del ban) · top semanal · **Alfabetos permitidos ▸** · **Rigor trabajo/dinero ▸** (`money_guard`) · **Palabras bloqueadas ▸** · **Frases al banear ▸** (con ejemplo real antes de activar) · avisos informativos.
 
 - **Moderación**: `/ban` `/unban` (aceptan @username o reply), `/whitelist`, `/warn` `/warns` `/rmwarn` `/resetwarns` `/warnlimit` `/warnaction`
+
+### Quién puede warnear (`/config` ▸ Warns)
+
+Los grupos tienen **varios admins** y poner un warn es moderación del día a día, así que no puede depender de que esté el dueño del bot delante. La línea se traza entre aplicar el castigo y decidirlo:
+
+- **`/warn` `/warns` `/rmwarn` `/resetwarns`** → los admins **de ese grupo** (`chat_settings.warn_quien`, defecto `'chat_admins'`; `'bot_admin'` lo deja como estaba). Se comprueba en el chat DONDE se escribe: ser admin de Windows 10 no da derecho a warnear en Domótica.
+- **`/warnlimit` `/warnaction`** y todo lo demás → solo el dueño. Cambian el castigo, no lo aplican.
+
+Un warn que llega al límite puede acabar en **ban federado a los cuatro grupos**, así que el alcance también es ajustable: `chat_settings.warn_ban_federado` (defecto **1**, federado, que es lo que el bot ha hecho siempre; **0** = solo ese grupo). Es lo prudente si no todos los admins son de la misma confianza.
+
+Dos guardas que no se deben quitar: un ajuste **ilegible** cae al lado restrictivo (no abre la mano) salvo el de federación, que cae al comportamiento de siempre; y en **privado** no se abre nada, porque un ajuste por chat no significa nada en un DM.
+
+**Un comando sin permiso NO puede ser silencioso.** La limpieza de comandos borra en los grupos cualquier mensaje que invoque un comando del bot, sin mirar quién lo escribe. Si además el comando se ignora en silencio, el admin ve desaparecer su `/warn` y cree que se aplicó: reportado como «el mensaje se borra pero no pone el warn», y es peor que no hacer nada. A quien es admin de algún grupo se le contesta que no se ha aplicado nada (aviso que se borra solo a los 45 s, sin repetirse en media hora); al usuario normal se le sigue ignorando, porque contestarle sería enseñarle qué comandos existen.
 - **Aprendizaje**: `/spam` `/legal` (alias `/ham`)
 - **Info** (chat_admin read-only): `/help` `/comandos` `/stats` `/chats` `/recent` `/samples` `/top` `/topweekly` `/quips` `/scan`
 - **Config**: `/config` `/verificacion` `/welcome` `/setwelcome` `/rules` `/setrules` `/cleanservice` `/setwelcomebutton` `/limpieza` `/idioma` `/alertas` `/sync`

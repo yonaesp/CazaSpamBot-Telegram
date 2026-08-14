@@ -859,7 +859,7 @@
   "cfg.wb.err_space": "❌ El enlace no puede llevar espacios.",
   "cfg.wb.err_scheme": "❌ Ese tipo de enlace no vale para un botón. Solo <code>http://</code>, <code>https://</code> o <code>t.me</code>. Con otro, Telegram rechazaría el mensaje entero y el grupo se quedaría sin bienvenida.",
   "cfg.wb.err_host": "❌ Ese enlace no parece válido. Ejemplo: <code>https://t.me/tugrupo</code>. Si lo guardase, Telegram rechazaría el mensaje entero y el grupo se quedaría sin bienvenida.",
-  "cfg.warns_text": "⚠️ <b>Warns · {title}</b>\n\nAvisos que aguanta un usuario antes de que el bot actúe.\n\nLímite: <b>{limit}</b>\nAl llegar al límite: <b>{action}</b>",
+  "cfg.warns_text": "⚠️ <b>Warns · {title}</b>\n\nAvisos que aguanta un usuario antes de que el bot actúe.\n\nLímite: <b>{limit}</b>\nAl llegar al límite: <b>{action}</b>\nQuién puede warnear: <b>{quien}</b>\nAlcance del ban: <b>{alcance}</b>\n\n<i>Los admins del grupo pueden poner y quitar warns. Cambiar el límite y el castigo sigue siendo solo tuyo.</i>",
   "cfg.warns.ban": "Banear",
   "cfg.warns.kick": "Expulsar",
   "cfg.warns.mute": "Silenciar",
@@ -1099,5 +1099,9 @@
   "quip.cross_post.4": "📨 El mismo texto en tres grupos en diez minutos. Nos hemos dado cuenta, <b>{name}</b>.",
   "cfg.b.softban": "🔇 Silenciar en vez de expulsar: {state}",
   "reason.soft_ban": "Silenciado en vez de expulsado (modo suave del grupo)",
-  "perm.solo_admin_del_bot": "🔒 Ese comando solo lo puede usar el administrador del bot. Tu mensaje se ha borrado por la limpieza de comandos, pero <b>no se ha aplicado nada</b>."
+  "perm.solo_admin_del_bot": "🔒 Ese comando solo lo puede usar el administrador del bot. Tu mensaje se ha borrado por la limpieza de comandos, pero <b>no se ha aplicado nada</b>.",
+  "cfg.warns.quien.chat_admins": "👮 Admins del grupo",
+  "cfg.warns.quien.bot_admin": "🔒 Solo tú",
+  "cfg.warns.fed": "🌐 Todos los grupos",
+  "cfg.warns.local": "📍 Solo este grupo"
 }

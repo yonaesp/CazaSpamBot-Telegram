@@ -4,6 +4,36 @@ Cambios relevantes de CazaSpamBot, lo más reciente arriba. Se anotan hitos, no
 cada commit: para el detalle está el historial de git. Sin números de versión
 porque el bot es un servicio en producción continua, no un paquete que se libera.
 
+## 2026-08 · Los admins del grupo ya pueden warnear
+
+Consecuencia del reporte anterior. El `CLAUDE.md` preveía este momento desde el
+principio («hardcoded check, no role-based hasta que haya >1 admin»), y ya hay
+varios admins por grupo.
+
+La línea se traza entre **aplicar** el castigo y **decidirlo**:
+
+- `/warn`, `/warns`, `/rmwarn`, `/resetwarns` → los admins **de ese grupo**. Es
+  moderación del día a día y no puede depender de que el dueño esté delante.
+- `/warnlimit`, `/warnaction` y todo lo demás → solo el dueño. Cambian el
+  castigo, no lo aplican.
+
+Se comprueba en el chat **donde se escribe**: ser admin de Windows 10 no da
+derecho a warnear en Domótica.
+
+Dos ajustes nuevos en **`/config` ▸ Warns ▸**, los dos por chat y respetando
+`/sync`:
+
+- **Quién puede warnear**: admins del grupo (defecto) o solo el dueño, que deja
+  el comportamiento anterior.
+- **Alcance del ban** al llegar al límite: todos los grupos (defecto, que es lo
+  que el bot ha hecho siempre) o solo ese grupo. Existe porque un warn puede
+  acabar en un ban federado a los cuatro, y eso es mucho poder si no todos los
+  admins son de la misma confianza.
+
+Guardas: un ajuste **ilegible** cae al lado restrictivo (no abre la mano), salvo
+el de federación, que cae al comportamiento de siempre; y en **privado** no se
+abre nada, porque un ajuste por chat no significa nada en un DM.
+
 ## 2026-08 · Un comando sin permiso parecía una avería
 
 Reportado por un admin de grupo: «he usado `/warn`, el mensaje se borra pero no

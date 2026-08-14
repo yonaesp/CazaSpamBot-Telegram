@@ -859,7 +859,7 @@
   "cfg.wb.err_space": "❌ The link cannot contain spaces.",
   "cfg.wb.err_scheme": "❌ That kind of link does not work in a button. Only <code>http://</code>, <code>https://</code> or <code>t.me</code>. With anything else Telegram would reject the whole message and the group would be left with no welcome.",
   "cfg.wb.err_host": "❌ That link does not look valid. Example: <code>https://t.me/yourgroup</code>. If I saved it, Telegram would reject the whole message and the group would be left with no welcome.",
-  "cfg.warns_text": "⚠️ <b>Warns · {title}</b>\n\nHow many warnings a user gets before the bot acts.\n\nLimit: <b>{limit}</b>\nOn reaching the limit: <b>{action}</b>",
+  "cfg.warns_text": "⚠️ <b>Warns · {title}</b>\n\nWarnings a user gets before the bot acts.\n\nLimit: <b>{limit}</b>\nOn reaching the limit: <b>{action}</b>\nWho can warn: <b>{quien}</b>\nBan scope: <b>{alcance}</b>\n\n<i>Group admins can add and remove warns. Changing the limit and the punishment stays yours alone.</i>",
   "cfg.warns.ban": "Ban",
   "cfg.warns.kick": "Kick",
   "cfg.warns.mute": "Mute",
@@ -1099,5 +1099,9 @@
   "quip.cross_post.4": "📨 The same text in three groups within ten minutes. We noticed, <b>{name}</b>.",
   "cfg.b.softban": "🔇 Mute instead of removing: {state}",
   "reason.soft_ban": "Muted instead of removed (group's soft mode)",
-  "perm.solo_admin_del_bot": "🔒 That command can only be used by the bot administrator. Your message was removed by the command cleanup, but <b>nothing was applied</b>."
+  "perm.solo_admin_del_bot": "🔒 That command can only be used by the bot administrator. Your message was removed by the command cleanup, but <b>nothing was applied</b>.",
+  "cfg.warns.quien.chat_admins": "👮 Group admins",
+  "cfg.warns.quien.bot_admin": "🔒 Only you",
+  "cfg.warns.fed": "🌐 All groups",
+  "cfg.warns.local": "📍 This group only"
 }

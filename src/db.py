@@ -131,6 +131,13 @@ CREATE TABLE IF NOT EXISTS chat_settings (
     rules_text                    TEXT,
     warns_limit                   INTEGER NOT NULL DEFAULT 3,
     warns_action                  TEXT NOT NULL DEFAULT 'ban',
+    -- Quién puede poner y quitar warns: 'chat_admins' (los admins del grupo) o
+    -- 'bot_admin' (solo el dueño del bot). Los ajustes (/warnlimit, /warnaction)
+    -- y los comandos destructivos siguen siendo SIEMPRE del dueño.
+    warn_quien                    TEXT NOT NULL DEFAULT 'chat_admins',
+    -- Si el ban que dispara el límite de warns se replica a todos los grupos
+    -- (1, el defecto) o se queda solo en este (0).
+    warn_ban_federado             INTEGER NOT NULL DEFAULT 1,
     -- Default LIMPIO: verificación/bienvenida OFF, revisión de sospechosos por
     -- privado ON. El grupo no se molesta con welcomes ni botón SOY HUMANO; solo
     -- llega aviso privado al admin (Permitir/Banear) cuando entra un perfil dudoso.
@@ -304,6 +311,14 @@ class DB:
         if "reminder_sent_at" not in pv_cols:
             self._conn.execute("ALTER TABLE pending_verifications ADD COLUMN reminder_sent_at REAL")
         cs_cols = {r[1] for r in self._conn.execute("PRAGMA table_info(chat_settings)").fetchall()}
+        if "warn_quien" not in cs_cols:
+            self._conn.execute(
+                "ALTER TABLE chat_settings ADD COLUMN warn_quien TEXT NOT NULL DEFAULT 'chat_admins'"
+            )
+        if "warn_ban_federado" not in cs_cols:
+            self._conn.execute(
+                "ALTER TABLE chat_settings ADD COLUMN warn_ban_federado INTEGER NOT NULL DEFAULT 1"
+            )
         if "verification_reminder_hours" not in cs_cols:
             self._conn.execute(
                 "ALTER TABLE chat_settings ADD COLUMN verification_reminder_hours INTEGER NOT NULL DEFAULT 6"
@@ -1090,7 +1105,7 @@ class DB:
         ALLOWED = {
             "welcome_text", "welcome_enabled", "welcome_button_text", "welcome_button_url",
             "welcome_delete_after_s",
-            "rules_text", "warns_limit", "warns_action",
+            "rules_text", "warns_limit", "warns_action", "warn_quien", "warn_ban_federado",
             "verification_enabled", "verification_suspicious_kick_h",
             "verification_suspicious_kick_minutes",
             "verification_reminder_hours", "verification_kick_after_reminder_hours",

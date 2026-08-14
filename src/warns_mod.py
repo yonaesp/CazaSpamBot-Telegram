@@ -30,6 +30,19 @@ from .federation import federate_ban
 log = logging.getLogger(__name__)
 
 
+def _warn_admin(func):
+    """Poner y quitar warns: los admins del grupo si ese chat lo permite.
+
+    Es moderación del día a día en grupos con varios admins, así que no puede
+    depender de que esté el dueño del bot delante. Lo decide el ajuste
+    `warn_quien` de cada chat (panel: Warns ▸ Quién puede warnear).
+
+    Los ajustes de warns (`/warnlimit`, `/warnaction`) NO llevan esto: siguen
+    siendo del dueño, porque cambian el castigo, no lo aplican.
+    """
+    return permissions.warn_admin_only(func)
+
+
 def _admin_only(func):
     """Delega en `permissions.bot_admin_only`, que es la implementación canónica.
 
@@ -39,6 +52,23 @@ def _admin_only(func):
     último que quieres que pase sin enterarte.
     """
     return permissions.bot_admin_only(func)
+
+
+def _ban_federado(db: DB, chat_id: int) -> bool:
+    """¿El ban por límite de warns se replica a los demás grupos? Defecto: sí.
+
+    Ante cualquier problema leyendo el ajuste se devuelve el defecto: la
+    federación es el comportamiento que este bot lleva desde el principio, y un
+    ajuste ilegible no puede cambiarlo en silencio.
+    """
+    try:
+        s = db.get_chat_settings(chat_id)
+        if s is None:
+            return True
+        return bool(s["warn_ban_federado"])
+    except Exception as exc:  # noqa: BLE001
+        log.debug("warn_ban_federado ilegible chat=%s: %s", chat_id, exc)
+        return True
 
 
 async def _get_target(update: Update, context, db) -> tuple[int | None, str | None]:
@@ -60,7 +90,7 @@ async def _get_target(update: Update, context, db) -> tuple[int | None, str | No
     return uid, nombre or str(uid)
 
 
-@_admin_only
+@_warn_admin
 async def cmd_warn(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Warna a un usuario. Acepta:
     - /warn [razón]  responding a un mensaje
@@ -198,12 +228,28 @@ async def aplicar_warn(
 
     if n >= limit:
         if action == "ban":
-            results = await federate_ban(
-                context.bot, db, user_id=target_id,
-                reason=t("reason.warns_limit", n=n, limit=limit,
-                         last_reason=reason or t("reason.no_reason")),
-                rule="warns_limit", triggered_in_chat=chat_id, shadow=cfg.shadow,
-            )
+            motivo_ban = t("reason.warns_limit", n=n, limit=limit,
+                           last_reason=reason or t("reason.no_reason"))
+            # ¿El ban sale de este grupo? Por defecto sí: quien acumula warns por
+            # spam los acumularía igual en los demás. Se puede dejar en local
+            # desde el panel (Warns ▸ Alcance del ban), que es lo prudente si los
+            # admins de los grupos pueden warnear y no todos son de tu confianza.
+            if _ban_federado(db, chat_id):
+                results = await federate_ban(
+                    context.bot, db, user_id=target_id, reason=motivo_ban,
+                    rule="warns_limit", triggered_in_chat=chat_id, shadow=cfg.shadow,
+                )
+            else:
+                results = {chat_id: "shadow"}
+                if not cfg.shadow:
+                    try:
+                        await context.bot.ban_chat_member(chat_id=chat_id, user_id=target_id)
+                        results = {chat_id: "ok"}
+                        db.add_ban(user_id=target_id, reason=motivo_ban, rule="warns_limit",
+                                   banned_in_chat=chat_id, federated=False)
+                    except TelegramError as exc:
+                        log.warning("warn ban local fallo chat=%s: %s", chat_id, exc)
+                        results = {chat_id: f"error: {exc}"}
             ok = sum(1 for v in results.values() if v == "ok")
             sancion_ok = ok > 0
             text = t("warn.limit_ban", mention=mention, n=n, limit=limit, ok=ok)
@@ -264,7 +310,7 @@ async def aplicar_warn(
     return n
 
 
-@_admin_only
+@_warn_admin
 async def cmd_warns(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     msg = update.effective_message
     target_id, target_name = await _get_target(update, context, context.bot_data["db"])
@@ -288,7 +334,7 @@ async def cmd_warns(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await msg.reply_text("\n".join(lines), parse_mode="HTML")
 
 
-@_admin_only
+@_warn_admin
 async def cmd_rmwarn(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     msg = update.effective_message
     target_id, _ = await _get_target(update, context, context.bot_data["db"])
@@ -303,7 +349,7 @@ async def cmd_rmwarn(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         await msg.reply_text(t("rmwarn.none"))
 
 
-@_admin_only
+@_warn_admin
 async def cmd_resetwarns(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     msg = update.effective_message
     target_id, _ = await _get_target(update, context, context.bot_data["db"])

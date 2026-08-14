@@ -164,10 +164,16 @@ def test_el_docstring_ya_no_promete_silencio():
     assert "silenciosamente" not in doc
 
 
-def test_los_comandos_que_modifican_siguen_siendo_del_admin_del_bot():
-    """El aviso NO abre la mano: quién puede warnear no cambia. Con la federación,
-    un warn puede acabar en un ban en los cuatro grupos, así que ampliar esto es
-    una decisión del dueño del bot, no un efecto secundario."""
+def test_los_ajustes_de_warns_siguen_siendo_del_dueno_del_bot():
+    """La línea que se decidió trazar: poner un warn es moderación del día a día
+    y la hacen los admins del grupo; cambiar el CASTIGO (cuántos warns y qué pasa
+    al llegar) sigue siendo del dueño, porque decide el alcance del daño."""
     fuente = Path("src/warns_mod.py").read_text()
-    i = fuente.index("async def cmd_warn(")
-    assert "@_admin_only" in fuente[max(0, i - 200):i]
+    for cmd, espera in (("cmd_warn", "@_warn_admin"),
+                        ("cmd_warns", "@_warn_admin"),
+                        ("cmd_rmwarn", "@_warn_admin"),
+                        ("cmd_resetwarns", "@_warn_admin"),
+                        ("cmd_warnlimit", "@_admin_only"),
+                        ("cmd_warnaction", "@_admin_only")):
+        i = fuente.index(f"async def {cmd}(")
+        assert espera in fuente[max(0, i - 120):i], f"{cmd} debería llevar {espera}"

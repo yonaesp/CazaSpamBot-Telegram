@@ -59,6 +59,8 @@ _WELCOME_TTL_PRESETS = [0, 300, 900, 3600]
 # Warns: presets del límite y acciones válidas (las mismas que acepta /warnaction).
 _WARN_LIMITS = [1, 3, 5, 10]
 _WARN_ACTIONS = ("ban", "kick", "mute")
+# Quién puede poner y quitar warns en ese chat.
+_WARN_QUIEN = ("chat_admins", "bot_admin")
 # Rigor de los detectores de dinero/trabajo (commercial_ad, investment_scam).
 _REVIEW_LEVELS = ("alto", "medio", "bajo")
 _MONEY_MODES = ("normal", "soft", "off")
@@ -553,6 +555,22 @@ def _warn_action(s) -> str:
         return "ban"
 
 
+def _warn_quien(s) -> str:
+    """Quién puede poner warns en ese chat. Defecto: los admins del grupo."""
+    try:
+        return (s["warn_quien"] or "chat_admins").lower()
+    except (KeyError, IndexError, TypeError):
+        return "chat_admins"
+
+
+def _warn_federado(s) -> bool:
+    """¿El ban por límite sale a los demás grupos? Defecto: sí."""
+    try:
+        return bool(s["warn_ban_federado"])
+    except (KeyError, IndexError, TypeError):
+        return True
+
+
 def build_warns_keyboard(chat_id: int, s) -> InlineKeyboardMarkup:
     """Submenú de warns: fila de límites y fila de acción al alcanzarlo."""
     cid = chat_id
@@ -568,8 +586,20 @@ def build_warns_keyboard(chat_id: int, s) -> InlineKeyboardMarkup:
                              callback_data=f"{PREFIX}:wact:{a}:{cid}")
         for a in _WARN_ACTIONS
     ]
+    quien = _warn_quien(s)
+    quienes = [
+        InlineKeyboardButton(("✅ " if q == quien else "") + t(f"cfg.warns.quien.{q}"),
+                             callback_data=f"{PREFIX}:wquien:{q}:{cid}")
+        for q in _WARN_QUIEN
+    ]
+    fed = _warn_federado(s)
+    alcance = [
+        InlineKeyboardButton(("✅ " if v == fed else "") + t("cfg.warns.fed" if v else "cfg.warns.local"),
+                             callback_data=f"{PREFIX}:wfed:{int(v)}:{cid}")
+        for v in (True, False)
+    ]
     return InlineKeyboardMarkup([
-        limits, actions,
+        limits, actions, quienes, alcance,
         [InlineKeyboardButton(t("cfg.b.back"), callback_data=f"{PREFIX}:open:{cid}")],
     ])
 
@@ -932,6 +962,8 @@ async def _show_warns(msg_edit, db: DB, chat_id: int) -> None:
     s = db.get_chat_settings(chat_id)
     accion = _warn_action(s)
     txt = t("cfg.warns_text",
+            quien=t(f"cfg.warns.quien.{_warn_quien(s)}"),
+            alcance=t("cfg.warns.fed" if _warn_federado(s) else "cfg.warns.local"),
             title=html.escape(_panel_title(db, chat_id)),
             limit=_num(s, "warns_limit", 3),
             action=t(f"cfg.warns.{accion}") if accion in _WARN_ACTIONS else accion)
@@ -1406,6 +1438,35 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         n = settings_sync.apply_setting(db, cid, "warns_action", accion_warn)
         etiqueta = f"✅ {t('cfg.warns.' + accion_warn)}"
         await q.answer(etiqueta + (t("cfg.dot_n", n=n) if n > 1 else ""))
+        await _show_warns(q.edit_message_text, db, cid)
+        return
+
+    if action == "wquien":
+        val = parts[2] if len(parts) > 2 else ""
+        cid = _cid(3)
+        if cid is None or val not in _WARN_QUIEN:
+            await q.answer(t("cfg.invalid_opt"))
+            return
+        db.ensure_chat_settings(cid)
+        n = settings_sync.apply_setting(db, cid, "warn_quien", val)
+        await q.answer(f"✅ {t('cfg.warns.quien.' + val)}" + (t("cfg.dot_n", n=n) if n > 1 else ""))
+        await _show_warns(q.edit_message_text, db, cid)
+        return
+
+    if action == "wfed":
+        try:
+            val = int(parts[2]) if len(parts) > 2 else None
+        except ValueError:
+            await q.answer(t("cfg.invalid_val"))
+            return
+        cid = _cid(3)
+        if cid is None or val not in (0, 1):
+            await q.answer(t("cfg.invalid_opt"))
+            return
+        db.ensure_chat_settings(cid)
+        n = settings_sync.apply_setting(db, cid, "warn_ban_federado", val)
+        await q.answer(f"✅ {t('cfg.warns.fed' if val else 'cfg.warns.local')}"
+                       + (t("cfg.dot_n", n=n) if n > 1 else ""))
         await _show_warns(q.edit_message_text, db, cid)
         return
 

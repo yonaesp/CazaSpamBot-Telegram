@@ -77,7 +77,11 @@ async def _avisar_sin_permiso(update, context) -> None:
     msg = update.effective_message
     if not u or not msg:
         return
-    if not await is_chat_admin_any(context, u.id):
+    try:
+        if not await is_chat_admin_any(context, u.id):
+            return
+    except Exception as exc:  # noqa: BLE001 — un aviso decorativo jamás propaga
+        log.debug("no se pudo saber si %s es admin: %s", u.id, exc)
         return
     cache = context.bot_data.setdefault("_aviso_sin_permiso", {})
     ahora = time.time()
@@ -107,6 +111,55 @@ def bot_admin_only(func):
             await _avisar_sin_permiso(update, context)
             return
         return await func(update, context)
+    return wrapper
+
+
+async def _es_admin_de_este_chat(context, chat_id: int, user_id: int) -> bool:
+    """Admin del chat DONDE se escribe, no de cualquiera.
+
+    `is_chat_admin_any` recorre todos los grupos, y para moderar aquí lo que
+    importa es mandar aquí: ser admin del grupo de Windows 10 no da derecho a
+    warnear en Domótica.
+    """
+    try:
+        member = await context.bot.get_chat_member(chat_id=chat_id, user_id=user_id)
+    except TelegramError:
+        return False
+    return member.status in (ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER)
+
+
+def warn_admin_only(func):
+    """Comandos de warn: los admins del grupo, si ese chat lo permite.
+
+    El ajuste `chat_settings.warn_quien` decide ('chat_admins' por defecto,
+    'bot_admin' para dejarlo como estaba). Se mira SIEMPRE en el chat donde se
+    escribe el comando.
+
+    Por qué esto existe aparte de `bot_admin_only`: los grupos tienen varios
+    admins y poner un warn es moderación del día a día, no configuración. Lo que
+    NO se abre son los ajustes (`/warnlimit`, `/warnaction`) ni los comandos
+    destructivos: ahí el reparto de siempre.
+    """
+    async def wrapper(update, context):
+        u = update.effective_user
+        msg = update.effective_message
+        if not u:
+            return
+        if is_bot_admin(context, u.id):
+            return await func(update, context)
+        if msg is not None and msg.chat_id < 0:      # solo en grupos
+            db = context.bot_data.get("db")
+            quien = "chat_admins"
+            if db is not None:
+                try:
+                    s = db.get_chat_settings(msg.chat_id)
+                    quien = (s["warn_quien"] if s is not None else None) or "chat_admins"
+                except Exception as exc:  # noqa: BLE001 — un ajuste ilegible no abre la mano
+                    log.debug("warn_quien ilegible chat=%s: %s", msg.chat_id, exc)
+                    quien = "bot_admin"
+            if quien == "chat_admins" and await _es_admin_de_este_chat(context, msg.chat_id, u.id):
+                return await func(update, context)
+        await _avisar_sin_permiso(update, context)
     return wrapper
 
 
