@@ -1098,5 +1098,6 @@
   "quip.cross_post.3": "🔁 <b>{name}</b> no tenía una duda, tenía una campaña. Adiós.",
   "quip.cross_post.4": "📨 El mismo texto en tres grupos en diez minutos. Nos hemos dado cuenta, <b>{name}</b>.",
   "cfg.b.softban": "🔇 Silenciar en vez de expulsar: {state}",
-  "reason.soft_ban": "Silenciado en vez de expulsado (modo suave del grupo)"
+  "reason.soft_ban": "Silenciado en vez de expulsado (modo suave del grupo)",
+  "perm.solo_admin_del_bot": "🔒 Ese comando solo lo puede usar el administrador del bot. Tu mensaje se ha borrado por la limpieza de comandos, pero <b>no se ha aplicado nada</b>."
 }

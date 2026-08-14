@@ -54,11 +54,57 @@ def is_bot_admin(context: ContextTypes.DEFAULT_TYPE, user_id: int) -> bool:
 
 # --- Decorators ---
 
+# Cada cuánto se le repite a la misma persona que no puede usar estos comandos.
+# Es un aviso, no un regaño: quien insiste ya lo ha leído.
+_AVISO_CADA_S = 30 * 60
+# Cuánto dura el aviso en el grupo antes de borrarse solo. Lo justo para leerlo.
+_AVISO_TTL_S = 45
+
+
+async def _avisar_sin_permiso(update, context) -> None:
+    """Le dice a un admin DEL GRUPO que ese comando es solo del admin del bot.
+
+    Existe porque el silencio era indistinguible de una avería. Un admin de grupo
+    escribía `/warn`, **su mensaje desaparecía** (lo borra la limpieza de comandos,
+    que no mira quién lo escribe) y no pasaba nada más: desde fuera parecía que el
+    bot lo había procesado y había perdido el warn. Reportado por un admin real.
+
+    Solo se avisa a quien es admin de algún grupo, que es quien tiene una
+    expectativa legítima de que el comando funcione. A un usuario normal se le
+    sigue ignorando en silencio: contestarle sería enseñarle qué comandos existen.
+    """
+    u = update.effective_user
+    msg = update.effective_message
+    if not u or not msg:
+        return
+    if not await is_chat_admin_any(context, u.id):
+        return
+    cache = context.bot_data.setdefault("_aviso_sin_permiso", {})
+    ahora = time.time()
+    if ahora - cache.get((msg.chat_id, u.id), 0.0) < _AVISO_CADA_S:
+        return
+    cache[(msg.chat_id, u.id)] = ahora
+    from .i18n import t
+    try:
+        aviso = await context.bot.send_message(
+            chat_id=msg.chat_id, text=t("perm.solo_admin_del_bot"), parse_mode="HTML")
+    except TelegramError as exc:
+        log.debug("aviso de permisos chat=%s: %s", msg.chat_id, exc)
+        return
+    from . import borrado_diferido
+    borrado_diferido.programar(context, msg.chat_id, aviso.message_id, _AVISO_TTL_S)
+
+
 def bot_admin_only(func):
-    """Solo el bot admin (ADMIN_USER_ID) puede ejecutar. Otros se ignoran silenciosamente."""
+    """Solo el bot admin (ADMIN_USER_ID) puede ejecutar.
+
+    A un admin de grupo se le avisa (ver `_avisar_sin_permiso`); a un usuario
+    normal se le ignora en silencio.
+    """
     async def wrapper(update, context):
         u = update.effective_user
         if not u or not is_bot_admin(context, u.id):
+            await _avisar_sin_permiso(update, context)
             return
         return await func(update, context)
     return wrapper

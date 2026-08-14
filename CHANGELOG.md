@@ -4,6 +4,31 @@ Cambios relevantes de CazaSpamBot, lo más reciente arriba. Se anotan hitos, no
 cada commit: para el detalle está el historial de git. Sin números de versión
 porque el bot es un servicio en producción continua, no un paquete que se libera.
 
+## 2026-08 · Un comando sin permiso parecía una avería
+
+Reportado por un admin de grupo: «he usado `/warn`, el mensaje se borra pero no
+pone el warn». No había ningún bug. Eran dos comportamientos correctos por
+separado que juntos engañan:
+
+1. la limpieza de comandos borra en los grupos **cualquier** mensaje que invoque
+   un comando del bot, sin mirar quién lo escribe;
+2. `/warn` lleva `@bot_admin_only`, cuyo docstring decía «Otros se ignoran
+   silenciosamente».
+
+Desde fuera: escribes `/warn`, tu mensaje desaparece —como si el bot lo hubiera
+procesado— y no pasa nada. Peor que no hacer nada, porque el admin se queda
+creyendo que el warn está puesto.
+
+Ahora, a quien es **admin de algún grupo** se le contesta que ese comando es solo
+del administrador del bot y que **no se ha aplicado nada**. El aviso se borra solo
+a los 45 s y no se repite en media hora. A un usuario normal se le sigue
+ignorando en silencio: contestarle sería enseñarle qué comandos existen.
+
+**Lo que NO cambia**: quién puede warnear. Con la federación, un warn que alcanza
+el límite puede acabar en un ban en los cuatro grupos, así que ampliar eso es una
+decisión del dueño del bot, no un efecto secundario de arreglar un mensaje
+confuso.
+
 ## 2026-08 · Un detector roto dejaba el mensaje sin moderar
 
 Publicidad de servicios de hackeo entró en Windows 11 y **el bot no hizo nada**:
