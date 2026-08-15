@@ -38,7 +38,9 @@ def test_solo_los_que_entraron_hace_poco_y_no_han_escrito(tmp_path):
     db.record_join(-100, 1, "recien", join_ts=ahora - 600)          # candidato
     db.record_join(-100, 2, "hablador", join_ts=ahora - 600)
     db.record_message(-100, 2, "hablador")                          # ya escribió
-    db.record_join(-100, 3, "antiguo", join_ts=ahora - 40 * 3600)   # fuera de ventana
+    # Fuera de ventana: 8 días. Las 40 h de antes quedaron DENTRO cuando la
+    # ventana pasó de 24 h a 7 días (el 7688429577 esperó a las 29,6 h).
+    db.record_join(-100, 3, "antiguo", join_ts=ahora - 8 * 86400)
 
     ids = {f["user_id"] for f in db.recien_llegados_callados(ahora - rl.VENTANA_S)}
     assert ids == {1}
@@ -500,3 +502,100 @@ def test_el_join_deja_constancia_de_lo_que_pudo_ver():
     i = fuente.index("async def on_chat_member(")
     cuerpo = fuente[i:fuente.index("\nasync def ", i + 10)]
     assert 'señales=%s canal=%s' in cuerpo
+
+
+# ---------------------------------------------------------------------------
+# La red midió nuestra ventana y esperó a que venciera
+#
+# Caso medido (15-ago-2026, Windows 10): el 7688429577 entró el 14-ago a las
+# 08:26 CON EL PERFIL LIMPIO (la traza del join lo prueba: `señales=sí canal=-`,
+# y con nombre Han el join banea o silencia, que no pasó). Dejó pasar la ventana
+# de 24 h entera, se puso el nombre `六o0壹天` y el canal
+# `财天下飞机进群结演员结算频道` ya FUERA de vigilancia, y escribió a las
+# **29,6 h** de entrar. Lo cazó el chequeo del primer mensaje (440 pts), o sea
+# la última línea de defensa: todo lo anterior había prescrito.
+#
+# Los tres casos de la misma red, en orden: 5,7 h → 15 h → 29,6 h. Se adaptan a
+# lo que medimos. Contra eso, cualquier ventana corta es un plazo que se puede
+# esperar; una semana obliga a mantener la cuenta dormida tanto que deja de
+# salirles a cuenta. El coste se paga con dos cadencias, no con más llamadas.
+# ---------------------------------------------------------------------------
+
+def test_la_ventana_cubre_al_que_espero_a_que_venciera():
+    assert rl.VENTANA_S >= 3 * 86400, (
+        "el 7688429577 escribió a las 29,6 h justo porque la ventana era de 24: "
+        "recortarla vuelve a regalar el truco de esperar")
+
+
+def test_el_primer_dia_se_vigila_a_ritmo_caliente():
+    """Dentro del primer día nada se espacia más que antes del cambio."""
+    assert rl.FRESCO_S == 24 * 3600
+    assert rl.RECHEQUEO_S <= 3600
+    assert rl.RELECTURA_PERFIL_S <= 3600
+
+
+@pytest.mark.asyncio
+async def test_en_frio_el_nombre_se_sigue_mirando_en_cada_vuelta(tmp_path, monkeypatch):
+    """La clave de que la semana entera sea vigilancia real: el nombre es gratis
+    (Bot API), así que NO tiene ritmo frío. Quien se pone el nombre chino el
+    día 3 cae en ≤15 min igual que si fuera el día 1."""
+    db = _db(tmp_path)
+    db.record_join(-100, 800, None, join_ts=time.time() - 3 * 86400)   # día 3
+    nombre = ["Carlos"]
+
+    class BotQueCambia(_Bot):
+        async def get_chat_member(self, chat_id, user_id):
+            return SimpleNamespace(chat=SimpleNamespace(id=chat_id, title="Domótica"),
+                                   user=SimpleNamespace(
+                                       id=user_id, is_bot=False, first_name=nombre[0],
+                                       last_name=None, username=None))
+
+    ctx = _ctx(db, BotQueCambia(), _cfg(lols_enabled=False, cas_enabled=False))
+    aplicado = {}
+
+    async def falso_apply(context, db_, cfg_, **kw):
+        aplicado.update(kw)
+    monkeypatch.setattr("src.handlers._apply_action", falso_apply)
+
+    await rl.revisar_job(ctx)
+    assert not aplicado, "con nombre latino no debe pasar nada"
+    nombre[0] = "六o0壹天"
+    await rl.revisar_job(ctx)
+    assert aplicado.get("user_id") == 800, "en frío el nombre dejó de vigilarse"
+
+
+def test_en_frio_las_lecturas_caras_se_espacian():
+    """La contrapartida que hace sostenible la semana: Telethon y las listas
+    van a ritmo frío pasado el primer día."""
+    ctx = SimpleNamespace(bot_data={rl._CLAVE_PRESUPUESTO: 50})
+    frio = int(rl.FRESCO_S + 3600)
+
+    assert rl._toca_leer_perfil(ctx, -100, 1, frio) is True
+    # A la media hora NO toca aún (en caliente sí tocaría a la hora)
+    ctx.bot_data[rl._CLAVE_PERFILES][(-100, 1)] = time.time() - rl.RELECTURA_PERFIL_S - 1
+    assert rl._toca_leer_perfil(ctx, -100, 1, frio) is False, \
+        "en frío debe esperar RELECTURA_PERFIL_FRIA_S, no la caliente"
+    ctx.bot_data[rl._CLAVE_PERFILES][(-100, 1)] = time.time() - rl.RELECTURA_PERFIL_FRIA_S - 1
+    assert rl._toca_leer_perfil(ctx, -100, 1, frio) is True
+
+    assert rl._toca_mirar(ctx, -100, 2, frio) is True
+    ctx.bot_data[rl._CLAVE_CACHE][(-100, 2)] = time.time() - rl.RECHEQUEO_S - 1
+    assert rl._toca_mirar(ctx, -100, 2, frio) is False
+    ctx.bot_data[rl._CLAVE_CACHE][(-100, 2)] = time.time() - rl.RECHEQUEO_FRIO_S - 1
+    assert rl._toca_mirar(ctx, -100, 2, frio) is True
+
+
+def test_los_nombres_cubren_la_ventana_entera_medida():
+    """142 callados medidos en 7 días: si el tope de nombres queda por debajo,
+    los más antiguos (que son justo los que juegan a esperar) quedan sin mirar."""
+    assert rl.MAX_NOMBRES_POR_CICLO >= 150
+
+
+def test_el_presupuesto_aguanta_las_dos_cadencias():
+    """La cuenta con la población medida: ~27 calientes (cada 1 h) + ~115 fríos
+    (cada 6 h) ≈ 46 lecturas/h. El presupuesto por hora tiene que cubrirlo."""
+    por_hora = rl.MAX_PERFILES_POR_CICLO * 4
+    necesarias = 27 * (3600 / rl.RELECTURA_PERFIL_S) + 115 * (3600 / rl.RELECTURA_PERFIL_FRIA_S)
+    assert por_hora >= necesarias * 0.9, (
+        f"presupuesto {por_hora}/h para {necesarias:.0f} lecturas/h: el frío "
+        "se degradaría mucho más de lo calculado")

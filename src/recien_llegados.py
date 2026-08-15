@@ -50,20 +50,38 @@ from .scoring import decide
 
 log = logging.getLogger(__name__)
 
-# Cuánto tiempo se vigila a alguien que acaba de entrar. Un día cubre de sobra los
-# casos medidos (el peor tardó 27 h en escribir, pero ya estaba fichado a las 24).
-VENTANA_S = 24 * 3600
-# Espera mínima entre dos consultas sobre la misma persona.
+# Cuánto tiempo se vigila a alguien que acaba de entrar.
+#
+# Estuvo en 24 h con el razonamiento de que «el peor caso medido tardó 27 h en
+# escribir, y ya estaba fichado a las 24». La red respondió midiéndonos: el
+# 7688429577 entró con el perfil limpio (la traza del join lo prueba: señales
+# leídas, sin canal), dejó pasar la ventana entera, se puso el nombre
+# `六o0壹天` y el canal de la red YA FUERA de vigilancia, y escribió a las
+# **29,6 h** de entrar. Contra un adversario que se adapta, cualquier ventana
+# corta es un plazo que se puede esperar; una semana obliga a mantener la
+# cuenta dormida tanto tiempo que deja de salirles a cuenta.
+#
+# El coste se mantiene a raya con DOS cadencias (abajo): el primer día se mira
+# a ritmo caliente, y del segundo al séptimo a ritmo frío. Medido al cambiarlo:
+# 142 personas calladas en 7 días (27 de ellas en el primer día).
+VENTANA_S = 7 * 24 * 3600
+# El primer día tras entrar: vigilancia a ritmo caliente. Es cuando escriben
+# casi todos los que van a escribir.
+FRESCO_S = 24 * 3600
+# Espera mínima entre dos consultas a listas externas sobre la misma persona.
 RECHEQUEO_S = 3600
+RECHEQUEO_FRIO_S = 6 * 3600
 # Consultas a listas externas (CAS, lols) por vuelta. Con el trabajo cada 15 min
 # son 100 a la hora como techo.
 MAX_POR_CICLO = 25
 
-# Nombres leídos por vuelta. Muy por encima del anterior porque esto es Bot API:
-# gratis, sin límite práctico y sin tocar la cuenta secundaria. El tope existe
-# solo para que una avalancha de entradas no convierta una vuelta en cien
-# llamadas seguidas.
-MAX_NOMBRES_POR_CICLO = 100
+# Nombres leídos por vuelta. Cubre la ventana ENTERA en cada vuelta porque esto
+# es Bot API: gratis, sin límite práctico y sin tocar la cuenta secundaria
+# (142 nombres cada 15 min son ~0,16 llamadas/s). El tope existe solo para que
+# una avalancha no convierta una vuelta en mil llamadas seguidas. Ojo: la
+# consulta ordena por join más reciente, así que si la ventana superara este
+# tope, los más antiguos serían los que quedasen sin mirar.
+MAX_NOMBRES_POR_CICLO = 200
 
 # Perfiles que se leen por Telethon en cada vuelta. Acotado porque leer un perfil
 # son varias llamadas MTProto con la cuenta secundaria, y quemar su reputación es
@@ -82,28 +100,39 @@ MAX_PERFILES_POR_CICLO = 12
 # casi seis horas se le habría cazado; el hueco no era del detector, era de esta
 # constante.
 #
-# Con una hora y 16-23 candidatos hacen falta 4-6 lecturas por vuelta: entra
-# holgado en el presupuesto de arriba. Si la ventana creciera mucho, el
-# presupuesto la degrada sola y algunos esperan un poco más.
+# Con una hora y ~27 candidatos en el primer día salen ~27 lecturas a la hora,
+# que entran en el presupuesto. Si la ventana creciera mucho, el presupuesto la
+# degrada sola y algunos esperan un poco más.
 RELECTURA_PERFIL_S = 3600
+# Pasado el primer día, ritmo frío: el perfil completo se relee cada 6 h. El
+# NOMBRE se sigue mirando en cada vuelta (es gratis), así que el cambio de
+# nombre se caza en ≤15 min también en frío; lo que se espacia es solo la
+# lectura por Telethon (canal, bio, fotos). Con ~115 personas frías salen ~19
+# lecturas/h, que sumadas a las calientes rozan el presupuesto justo.
+RELECTURA_PERFIL_FRIA_S = 6 * 3600
 
 _CLAVE_CACHE = "_recien_llegados_visto"
 _CLAVE_PERFILES = "_recien_llegados_perfil"
 _CLAVE_PRESUPUESTO = "_recien_llegados_presupuesto"
 
 
-def _toca_mirar(context, chat_id: int, user_id: int) -> bool:
+def _toca_mirar(context, chat_id: int, user_id: int, espera: int = 0) -> bool:
     """¿Ha pasado ya el tiempo mínimo desde la última consulta sobre esta persona?
+
+    `espera` son los segundos que lleva dentro: el primer día se consulta cada
+    hora, después cada 6 (las listas son APIs de terceros y la ventana es de una
+    semana; sin el ritmo frío seríamos su mayor cliente).
 
     En memoria a propósito: perderlo al reiniciar solo cuesta unas consultas de
     más, y no merece una columna nueva en la base de datos.
     """
     cache = context.bot_data.setdefault(_CLAVE_CACHE, {})
     ahora = time.time()
-    if ahora - cache.get((chat_id, user_id), 0.0) < RECHEQUEO_S:
+    plazo = RECHEQUEO_S if espera <= FRESCO_S else RECHEQUEO_FRIO_S
+    if ahora - cache.get((chat_id, user_id), 0.0) < plazo:
         return False
     cache[(chat_id, user_id)] = ahora
-    # La ventana es de un día, así que nada anterior a eso vuelve a hacer falta.
+    # Nada anterior a la ventana vuelve a hacer falta.
     for clave, visto in list(cache.items()):
         if ahora - visto > VENTANA_S:
             del cache[clave]
@@ -150,7 +179,7 @@ async def revisar_job(context) -> None:
         # 2) Las listas externas, que sí son APIs de terceros y conviene espaciar.
         if mirados >= MAX_POR_CICLO:
             continue
-        if not _toca_mirar(context, chat_id, user_id):
+        if not _toca_mirar(context, chat_id, user_id, espera):
             saltados += 1
             continue
         mirados += 1
@@ -214,7 +243,7 @@ async def _actuar(context, db: DB, cfg: Config, fila, hit, espera: int, origen: 
     return True
 
 
-def _toca_leer_perfil(context, chat_id: int, user_id: int) -> bool:
+def _toca_leer_perfil(context, chat_id: int, user_id: int, espera: int = 0) -> bool:
     """¿Toca gastar una lectura de perfil por Telethon en esta persona?
 
     Dos frenos: el presupuesto de la vuelta y una espera larga por persona. Sin
@@ -226,7 +255,8 @@ def _toca_leer_perfil(context, chat_id: int, user_id: int) -> bool:
         return False
     cache = context.bot_data.setdefault(_CLAVE_PERFILES, {})
     ahora = time.time()
-    if ahora - cache.get((chat_id, user_id), 0.0) < RELECTURA_PERFIL_S:
+    plazo = RELECTURA_PERFIL_S if espera <= FRESCO_S else RELECTURA_PERFIL_FRIA_S
+    if ahora - cache.get((chat_id, user_id), 0.0) < plazo:
         return False
     cache[(chat_id, user_id)] = ahora
     for clave, visto in list(cache.items()):
@@ -268,7 +298,7 @@ async def _revisar_perfil(context, db: DB, cfg: Config, fila, espera: int) -> bo
     obvio, _razones = verification._is_obvious_spam_profile(
         None, usuario.username, usuario.first_name, usuario.last_name,
     )
-    if not obvio and not _toca_leer_perfil(context, chat_id, user_id):
+    if not obvio and not _toca_leer_perfil(context, chat_id, user_id, espera):
         return False
 
     sig = None

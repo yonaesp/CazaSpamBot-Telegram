@@ -4,6 +4,33 @@ Cambios relevantes de CazaSpamBot, lo más reciente arriba. Se anotan hitos, no
 cada commit: para el detalle está el historial de git. Sin números de versión
 porque el bot es un servicio en producción continua, no un paquete que se libera.
 
+## 2026-08 · La red midió nuestra ventana y esperó a que venciera
+
+Tercer asalto de la red 财天下/恒泰, y esta vez el hueco no era un detector: era
+el **calendario**. El 7688429577 entró en Windows 10 el 14-ago a las 08:26 con el
+perfil limpio (la traza del join lo prueba: `señales=sí canal=-`; con nombre Han
+el join banea o silencia, y no pasó ninguna de las dos). Dejó pasar entera la
+ventana de vigilancia de 24 h, se puso el nombre `六o0壹天` y el canal
+`财天下飞机进群结演员结算频道` ya fuera de vigilancia, y escribió a las
+**29,6 h** de entrar. Lo cazó el chequeo del primer mensaje con 440 puntos: la
+última línea de defensa, porque todas las anteriores habían prescrito.
+
+La secuencia de los tres casos lo dice todo: escribieron a las **5,7 h → 15 h →
+29,6 h** de entrar. Se están adaptando a lo que medimos.
+
+- **Ventana de vigilancia: 24 h → 7 días.** Contra un adversario que espera,
+  cualquier plazo corto es un plazo que se puede esperar; una semana obliga a
+  mantener la cuenta dormida tanto tiempo que deja de salirles a cuenta.
+- El coste no se paga con más llamadas sino con **dos cadencias**: el primer día
+  todo a ritmo caliente (nombre cada vuelta, perfil cada 1 h, listas cada 1 h);
+  del segundo al séptimo, el perfil por Telethon y las listas pasan a cada 6 h.
+- **El nombre no tiene ritmo frío**: es Bot API, gratis, y se mira en cada
+  vuelta los 7 días (medido: 142 callados en la ventana ≈ 0,16 llamadas/s).
+  Quien se pone el nombre chino el día 5 cae en ≤15 minutos igual que el día 1.
+- Población medida al calibrar: 142 callados en 7 días, 27 de ellos del primer
+  día. Presupuesto Telethon: ~46 lecturas/h necesarias contra 48 disponibles.
+  Hay test con esta cuenta para que nadie mueva una constante sin rehacerla.
+
 ## 2026-08 · Los admins del grupo ya pueden warnear
 
 Consecuencia del reporte anterior. El `CLAUDE.md` preveía este momento desde el
