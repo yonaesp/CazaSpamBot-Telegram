@@ -402,3 +402,80 @@ async def _revisar_canal(context, db: DB, cfg: Config, fila, usuario, sig, clien
         original_text=None, first_name=usuario.first_name,
     )
     return True
+
+
+# ---------------------------------------------------------------------------
+# Disparador: alguien se ha cambiado el nombre AHORA MISMO
+# ---------------------------------------------------------------------------
+# El repaso de arriba es un barrido periódico, o sea que siempre llega con un
+# retraso de hasta 15 minutos. Pero MTProto tiene `updateUserName`, que avisa en
+# el momento. La Bot API NO lo entrega (sus `chat_member` son cambios de ESTADO:
+# entrar, salir, ban, promote; un cambio de perfil no genera ninguno), así que
+# esta vía solo existe con Telethon conectado.
+#
+# La documentación oficial no dice para QUÉ usuarios llega ese update, así que
+# esto es a la vez la defensa y el experimento: si Telegram lo entrega para
+# miembros de un supergrupo, el cambio de nombre se caza en segundos en lugar de
+# en minutos; si no lo entrega, no se dispara nunca y el barrido periódico sigue
+# siendo la defensa. No se pierde nada por tenerlo.
+#
+# El update NO decide nada: solo dice «mira a este ya». Toda la lógica sigue en
+# `_revisar_perfil`, para que no haya dos varas de medir.
+
+_CLAVE_DISPARO = "_recien_llegados_disparo"
+# Ventana mínima entre dos revisiones disparadas por la misma persona. Un cambio
+# de nombre puede llegar repetido (o en ráfaga si juegan con ello) y no vamos a
+# leerle el perfil por Telethon en bucle.
+DISPARO_CADA_S = 120
+
+
+async def revisar_ahora(context, user_id: int, motivo: str = "cambio de nombre") -> bool:
+    """Revisa a una persona concreta fuera de turno. True si se actuó.
+
+    Best-effort de principio a fin: esto lo llama un handler de Telethon, y un
+    fallo aquí no puede tumbar el listener ni el bot.
+    """
+    db: DB = context.bot_data.get("db")
+    cfg: Config = context.bot_data.get("cfg")
+    if db is None or cfg is None:
+        return False
+    if db.is_banned(user_id):
+        return False
+
+    cache = context.bot_data.setdefault(_CLAVE_DISPARO, {})
+    ahora = time.time()
+    if ahora - cache.get(user_id, 0.0) < DISPARO_CADA_S:
+        return False
+    cache[user_id] = ahora
+    for clave, visto in list(cache.items()):
+        if ahora - visto > VENTANA_S:
+            del cache[clave]
+
+    try:
+        filas = db.vigilancia_de(user_id, ahora - VENTANA_S)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("revisar_ahora: no se pudo consultar a %s: %s", user_id, exc)
+        return False
+    if not filas:
+        return False
+
+    # El barrido periódico tiene sus propios frenos por persona; aquí se saltan a
+    # propósito, porque el disparo ya es la prueba de que algo cambió.
+    for fila in filas:
+        clave = (fila["chat_id"], user_id)
+        context.bot_data.setdefault(_CLAVE_PERFILES, {}).pop(clave, None)
+    if context.bot_data.get(_CLAVE_PRESUPUESTO, 0) <= 0:
+        context.bot_data[_CLAVE_PRESUPUESTO] = 1
+
+    actuado = False
+    for fila in filas:
+        espera = int(ahora - float(fila["join_ts"]))
+        try:
+            if await _revisar_perfil(context, db, cfg, fila, espera):
+                actuado = True
+                log.info("revisar_ahora: user=%s cazado por %s (%ds dentro)",
+                         user_id, motivo, espera)
+        except Exception as exc:  # noqa: BLE001
+            log.warning("revisar_ahora: fallo con user=%s chat=%s: %s",
+                        user_id, fila["chat_id"], exc)
+    return actuado

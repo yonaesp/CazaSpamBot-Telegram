@@ -4,6 +4,28 @@ Cambios relevantes de CazaSpamBot, lo más reciente arriba. Se anotan hitos, no
 cada commit: para el detalle está el historial de git. Sin números de versión
 porque el bot es un servicio en producción continua, no un paquete que se libera.
 
+## 2026-08 · Cazar el cambio de nombre en el momento, no en el siguiente barrido
+
+Pregunta del admin: si un cambio de nombre dejara algún registro, se podría
+revisar al vuelo en vez de esperar al barrido. La respuesta tiene dos mitades:
+
+- **Por Bot API, no.** Sus `chat_member` son cambios de ESTADO (entrar, salir,
+  ban, promote); un cambio de perfil no genera ningún update. Por eso hasta ahora
+  la única vía era preguntar cada 15 minutos.
+- **Por MTProto, existe `updateUserName`**, con `user_id`, `first_name`,
+  `last_name` y `usernames`: justo lo que hace falta. La documentación oficial
+  **no dice para qué usuarios se entrega**, así que esto es defensa y experimento
+  a la vez. Si Telegram lo manda para miembros de un supergrupo, el disfraz se
+  caza en segundos; si no, el handler no se dispara jamás y el barrido sigue
+  siendo la defensa. No se pierde nada por tenerlo, y el log lo dirá.
+
+El update **no decide nada**: invalida las cachés de esa persona y lanza la
+revisión normal (`revisar_ahora` → `_revisar_perfil`), para que no haya dos varas
+de medir. Guardas: solo para gente bajo vigilancia y que aún no ha escrito, un
+freno de 2 min por persona (si juegan a cambiarse el nombre en bucle, no vamos a
+leerles el perfil por Telethon en cada cambio), y todo dentro de un `except` que
+no puede tumbar el listener.
+
 ## 2026-08 · La red midió nuestra ventana y esperó a que venciera
 
 Tercer asalto de la red 财天下/恒泰, y esta vez el hueco no era un detector: era

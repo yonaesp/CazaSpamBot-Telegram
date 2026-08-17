@@ -113,7 +113,13 @@ async def _post_init(app: Application) -> None:
     client = reporter.get_client()
     if client is not None:
         try:
-            telethon_bridge.attach(client, app.bot, app.bot_data["db"])
+            # Se le pasa un contexto mínimo para que el listener de cambios de
+            # nombre pueda lanzar la revisión: necesita `bot`, `bot_data` y la
+            # cola de trabajos, exactamente lo mismo que usa el barrido.
+            from types import SimpleNamespace
+            _ctx_bridge = SimpleNamespace(
+                bot=app.bot, bot_data=app.bot_data, application=app)
+            telethon_bridge.attach(client, app.bot, app.bot_data["db"], context=_ctx_bridge)
             logging.getLogger("antispam").info("Telethon bridge MessageDeleted listener atachado")
         except Exception as exc:
             logging.getLogger("antispam").warning("Telethon bridge falló: %s", exc)

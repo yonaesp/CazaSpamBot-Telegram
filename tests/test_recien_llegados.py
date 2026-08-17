@@ -599,3 +599,126 @@ def test_el_presupuesto_aguanta_las_dos_cadencias():
     assert por_hora >= necesarias * 0.9, (
         f"presupuesto {por_hora}/h para {necesarias:.0f} lecturas/h: el frío "
         "se degradaría mucho más de lo calculado")
+
+
+# ---------------------------------------------------------------------------
+# Disparador: alguien se cambia el nombre AHORA MISMO
+#
+# El barrido siempre llega con hasta 15 min de retraso. MTProto tiene
+# `updateUserName`, que avisa en el momento; la Bot API NO entrega nada de eso
+# (sus `chat_member` son cambios de ESTADO: entrar, salir, ban, promote).
+#
+# La documentación oficial NO dice para qué usuarios se entrega ese update, así
+# que esto es defensa y experimento a la vez: si llega, el cambio de nombre se
+# caza en segundos; si no llega, no se dispara nunca y el barrido sigue siendo
+# la defensa. Lo que estos tests garantizan es que, llegue o no, no rompa nada
+# y no invente criterios propios.
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_el_disparo_caza_sin_esperar_al_barrido(tmp_path, monkeypatch):
+    db = _db(tmp_path)
+    db.record_join(-100, 900, None, join_ts=time.time() - 30 * 3600)   # día 2
+    ctx = _ctx(db, _Bot(), _cfg(lols_enabled=False, cas_enabled=False))
+
+    class BotChino(_Bot):
+        async def get_chat_member(self, chat_id, user_id):
+            return SimpleNamespace(chat=SimpleNamespace(id=chat_id, title="Domótica"),
+                                   user=SimpleNamespace(
+                                       id=user_id, is_bot=False, first_name="六o0壹天",
+                                       last_name=None, username=None))
+
+    ctx.bot = BotChino()
+    aplicado = {}
+
+    async def falso_apply(context, db_, cfg_, **kw):
+        aplicado.update(kw)
+    monkeypatch.setattr("src.handlers._apply_action", falso_apply)
+
+    assert await rl.revisar_ahora(ctx, 900) is True
+    assert aplicado["decision"].rule == "obvious_spam_profile"
+
+
+@pytest.mark.asyncio
+async def test_a_quien_no_vigilamos_no_se_le_toca(tmp_path):
+    """Llegarán updates de gente que no está en ningún grupo nuestro."""
+    db = _db(tmp_path)
+    ctx = _ctx(db, _Bot(), _cfg())
+    assert await rl.revisar_ahora(ctx, 12345) is False
+
+
+@pytest.mark.asyncio
+async def test_quien_ya_escribio_no_entra_por_esta_via(tmp_path):
+    """La vigilancia es para los callados; al que participa lo juzgan sus
+    mensajes, no un cambio de nombre."""
+    db = _db(tmp_path)
+    db.record_join(-100, 901, None, join_ts=time.time() - 3600)
+    db.record_message(-100, 901, None)
+    ctx = _ctx(db, _Bot(), _cfg())
+    assert await rl.revisar_ahora(ctx, 901) is False
+
+
+@pytest.mark.asyncio
+async def test_una_rafaga_de_cambios_no_dispara_una_rafaga_de_lecturas(tmp_path):
+    """Si juegan a cambiarse el nombre en bucle, no vamos a leerles el perfil
+    por Telethon una vez por cambio."""
+    db = _db(tmp_path)
+    db.record_join(-100, 902, None, join_ts=time.time() - 3600)
+    ctx = _ctx(db, _Bot(), _cfg(lols_enabled=False, cas_enabled=False))
+    leidos = []
+
+    class BotQueCuenta(_Bot):
+        async def get_chat_member(self, chat_id, user_id):
+            leidos.append(user_id)
+            return SimpleNamespace(chat=SimpleNamespace(id=chat_id, title="Domótica"),
+                                   user=SimpleNamespace(id=user_id, is_bot=False,
+                                                        first_name="Ana", last_name=None,
+                                                        username=None))
+
+    ctx.bot = BotQueCuenta()
+    for _ in range(10):
+        await rl.revisar_ahora(ctx, 902)
+    assert len(leidos) == 1, "el freno por persona no está funcionando"
+
+
+@pytest.mark.asyncio
+async def test_un_baneado_no_se_revisa_otra_vez(tmp_path):
+    db = _db(tmp_path)
+    db.record_join(-100, 903, None, join_ts=time.time() - 3600)
+    db.add_ban(user_id=903, reason="x", rule="y", banned_in_chat=-100)
+    ctx = _ctx(db, _Bot(), _cfg())
+    assert await rl.revisar_ahora(ctx, 903) is False
+
+
+@pytest.mark.asyncio
+async def test_un_fallo_no_propaga_al_listener(tmp_path):
+    """Lo llama un handler de Telethon: si esto lanza, se cae el listener."""
+    class DBRota:
+        def is_banned(self, uid):
+            return False
+
+        def vigilancia_de(self, uid, desde):
+            raise RuntimeError("base caída")
+
+    ctx = _ctx(DBRota(), _Bot(), _cfg())
+    assert await rl.revisar_ahora(ctx, 904) is False
+
+
+def test_el_disparo_no_tiene_criterios_propios():
+    """Reutiliza `_revisar_perfil`: si tuviera su propia lógica, habría dos
+    varas de medir y la del disparo se quedaría atrás en cada cambio."""
+    from pathlib import Path
+    fuente = Path("src/recien_llegados.py").read_text()
+    i = fuente.index("async def revisar_ahora(")
+    cuerpo = fuente[i:]
+    assert "_revisar_perfil" in cuerpo
+    for propio in ("_is_obvious_spam_profile", "personal_channel", "Decision("):
+        assert propio not in cuerpo, f"el disparo no puede decidir por su cuenta ({propio})"
+
+
+def test_el_listener_no_puede_tumbar_el_bot():
+    from pathlib import Path
+    fuente = Path("src/telethon_bridge.py").read_text()
+    i = fuente.index("async def _on_user_name(")
+    bloque = fuente[i:i + 900]
+    assert "except Exception" in bloque

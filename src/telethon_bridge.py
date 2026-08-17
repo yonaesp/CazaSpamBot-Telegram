@@ -41,13 +41,20 @@ def _marked_chat_id(telethon_chat_id: int) -> int:
     return int(f"-100{telethon_chat_id}")
 
 
-def attach(client, bot: Bot, db: DB) -> None:
-    """Registra el handler MessageDeleted en el cliente Telethon."""
+def attach(client, bot: Bot, db: DB, context=None) -> None:
+    """Registra los handlers de Telethon: MessageDeleted y cambios de nombre.
+
+    `context` es opcional para no romper a quien llame con la firma antigua; sin
+    él simplemente no se engancha el aviso de cambio de nombre.
+    """
     try:
         from telethon import events
     except ImportError:
         log.warning("telethon no disponible para attach()")
         return
+
+    if context is not None:
+        _attach_cambio_de_nombre(client, events, context)
 
     @client.on(events.MessageDeleted)
     async def _on_deleted(event: Any) -> None:
@@ -227,3 +234,51 @@ async def _notify_manual_delete(client, bot: Bot, db: DB, chat_id: int, msg_id: 
         )
     except TelegramError as exc:
         log.debug("manual_delete notif send fallo: %s", exc)
+
+
+def _attach_cambio_de_nombre(client, events, context) -> None:
+    """Escucha `updateUserName`: alguien se ha cambiado el nombre AHORA.
+
+    Por qué esto existe: el truco de esta red es entrar con un nombre que pasa
+    los filtros y ponerse el de verdad justo antes de escribir. El repaso
+    periódico lo caza, pero con hasta 15 minutos de retraso; este update lo caza
+    en segundos.
+
+    **La Bot API no entrega nada de esto.** Sus `chat_member` son cambios de
+    ESTADO (entrar, salir, ban, promote); un cambio de perfil no genera ninguno.
+    Solo MTProto tiene `updateUserName`.
+
+    Y aquí va la parte honesta: la documentación oficial **no dice para qué
+    usuarios se entrega** ese update, así que esto es a la vez defensa y
+    experimento. Si Telegram lo manda para miembros de un supergrupo, cerramos
+    el hueco de raíz; si no lo manda, este handler no se dispara jamás y el
+    barrido periódico sigue siendo la defensa. No se pierde nada por tenerlo, y
+    el log lo dirá.
+
+    El update **no decide nada**: solo invalida las cachés y lanza la revisión
+    normal, para que no haya dos varas de medir.
+    """
+    try:
+        from telethon.tl.types import UpdateUserName
+    except ImportError:
+        log.warning("telethon sin UpdateUserName: no se vigilan cambios de nombre")
+        return
+
+    from . import recien_llegados
+
+    @client.on(events.Raw(UpdateUserName))
+    async def _on_user_name(update: Any) -> None:  # noqa: ANN401
+        try:
+            user_id = getattr(update, "user_id", None)
+            if not user_id:
+                return
+            nombre = " ".join(
+                p for p in (getattr(update, "first_name", None),
+                            getattr(update, "last_name", None)) if p
+            )
+            log.info("updateUserName: user=%s se ha puesto %r", user_id, nombre[:60])
+            await recien_llegados.revisar_ahora(context, user_id, motivo="cambio de nombre")
+        except Exception as exc:  # noqa: BLE001 — un handler suelto jamás tumba el bot
+            log.warning("updateUserName handler exc: %s", exc)
+
+    log.info("Telethon: vigilando también los cambios de nombre (updateUserName)")

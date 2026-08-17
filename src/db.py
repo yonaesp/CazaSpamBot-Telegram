@@ -516,6 +516,27 @@ class DB:
             ).fetchall()
         return [f["chat_id"] for f in filas if normalize(f["last_msg_text"]) == objetivo]
 
+    def vigilancia_de(self, user_id: int, desde_ts: float) -> list[sqlite3.Row]:
+        """Los chats donde ESA persona está bajo vigilancia y aún no ha escrito.
+
+        Misma población que `recien_llegados_callados` pero para un solo usuario:
+        la usa el disparador de cambio de nombre, que sabe a quién mirar y no
+        quiere recorrer la ventana entera.
+        """
+        with self._cur() as c:
+            return c.execute(
+                """SELECT s.chat_id, s.user_id, s.username, s.first_name, s.join_ts,
+                          b.title AS chat_title
+                     FROM seen_users s
+                     LEFT JOIN bot_chats b ON b.chat_id = s.chat_id
+                    WHERE s.user_id = ?
+                      AND s.join_ts IS NOT NULL
+                      AND s.join_ts > ?
+                      AND s.msg_count = 0
+                      AND s.whitelisted = 0""",
+                (user_id, desde_ts),
+            ).fetchall()
+
     def recien_llegados_callados(self, desde_ts: float, limite: int = 50) -> list[sqlite3.Row]:
         """Quien entró después de `desde_ts` y todavía NO ha escrito.
 
