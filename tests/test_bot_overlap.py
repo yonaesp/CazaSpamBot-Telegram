@@ -236,3 +236,75 @@ async def test_el_job_nocturno_lo_llama(tmp_path):
     ctx, db, enviados = _mk(tmp_path, [_bot_member(200, "Rose", "MissRose_bot")])
     await maintenance.cleanup_nightly_job(ctx)
     assert len(enviados) == 1
+
+
+# ---------------------------------------------------------------------------
+# El aviso llevaba desde siempre sin avisar
+#
+# Encontrado el 2026-08-21 investigando por qué `@noarab_bot` baneaba en Windows
+# 10 sin que el admin hubiera recibido nunca un aviso de solape.
+#
+# `getChatAdministrators` devuelve la lista de admins **excluyendo a los demás
+# bots**, que es justo lo único que este aviso busca. Medido en los cuatro grupos
+# reales: sin `return_bots` → 0 bots; con él → 7 (AlexaESPAli_bot,
+# AlexaDomoChollosBot, noarab_bot, xxdamage2bot…). El parámetro llegó con Bot API
+# 10.0, así que hasta entonces esto era inviable: la función corría cada noche,
+# recorría los grupos y no encontraba nada. Cero avisos, cero logs.
+#
+# Los tests de arriba pasaban porque sus dobles devolvían bots sin filtrar, que
+# NO es lo que hace Telegram. De ahí el doble de abajo.
+# ---------------------------------------------------------------------------
+
+def test_se_piden_los_bots_explicitamente():
+    """La costura del arreglo: si alguien quita esto, el aviso vuelve a ser mudo."""
+    from pathlib import Path
+    fuente = Path("src/maintenance.py").read_text()
+    i = fuente.index("async def notify_bot_overlap(")
+    cuerpo = fuente[i:fuente.index("\nasync def ", i + 10)]
+    assert "return_bots" in cuerpo
+
+
+def test_el_soporte_se_mira_por_firma_no_con_un_except():
+    """Un `except TypeError` alrededor de la llamada se tragaría también un error
+    de tipos de verdad, y volveríamos a tener la función muda sin enterarnos."""
+    from pathlib import Path
+    fuente = Path("src/maintenance.py").read_text()
+    i = fuente.index("async def notify_bot_overlap(")
+    cuerpo = fuente[i:fuente.index("\nasync def ", i + 10)]
+    assert "inspect.signature" in cuerpo
+    assert "except TypeError:" not in cuerpo
+
+
+@pytest.mark.asyncio
+async def test_con_un_telegram_que_filtra_bots_como_el_real(tmp_path):
+    """El doble se comporta como Telegram DE VERDAD: sin `return_bots` no
+    devuelve otros bots. Con el código anterior, este test daría 0 avisos."""
+    vistos = []
+
+    class _BotQueFiltra:
+        id = 1
+
+        async def get_chat_administrators(self, chat_id, return_bots=False):
+            # Firma REAL, no un AsyncMock: así `inspect.signature` ve el
+            # parámetro y el código bajo prueba lo usa de verdad.
+            humanos = [SimpleNamespace(
+                user=SimpleNamespace(id=99, is_bot=False, first_name="Ana", username="ana"))]
+            if not return_bots:
+                return humanos
+            return humanos + [SimpleNamespace(
+                user=SimpleNamespace(id=2, is_bot=True, first_name="NoArab",
+                                     username="noarab_bot"))]
+
+        async def send_message(self, chat_id, text, **kw):
+            vistos.append(text)
+            return SimpleNamespace(message_id=1)
+
+    from src.db import DB
+    db = DB(str(tmp_path / "filtra.db"))
+    db.upsert_bot_chat(CHAT, "Windows 10", "supergroup", True, True, True)
+    cfg = SimpleNamespace(admin_notify_chat_id=NOTIFY_CHAT, admin_user_id=ADMIN)
+    ctx = SimpleNamespace(bot=_BotQueFiltra(), bot_data={"db": db, "cfg": cfg})
+
+    assert await maintenance.notify_bot_overlap(ctx) == 1, (
+        "con un Telegram que filtra bots (el real), el aviso no encontró nada")
+    assert "NoArab" in vistos[0]

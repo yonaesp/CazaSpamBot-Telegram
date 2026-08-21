@@ -338,10 +338,37 @@ async def notify_bot_overlap(context: ContextTypes.DEFAULT_TYPE) -> int:
         return 0
     yo = getattr(context.bot, "id", None)
     enviados = 0
+    # `return_bots=True` NO es opcional aquí: sin él, `getChatAdministrators`
+    # devuelve la lista de admins **excluyendo a los demás bots**, que es justo lo
+    # único que este aviso busca. El parámetro llegó con Bot API 10.0; hasta
+    # entonces esto era inviable, y por eso la función llevaba desde que se
+    # escribió sin avisar ni una vez, en silencio y sin log. Medido el 2026-08-21
+    # en los cuatro grupos: sin el parámetro 0 bots, con él 7.
+    #
+    # El soporte se mira por FIRMA y no con un `except TypeError`, que se tragaría
+    # también un error de tipos de verdad y volvería a dejar esto mudo.
+    extra = {}
+    try:
+        import inspect
+        if "return_bots" in inspect.signature(
+                context.bot.get_chat_administrators).parameters:
+            extra["return_bots"] = True
+        else:
+            log.warning("bot_overlap: esta librería no admite return_bots; "
+                        "los bots ajenos serán invisibles")
+    except (TypeError, ValueError) as exc:
+        log.debug("bot_overlap: no se pudo inspeccionar la firma (%s)", exc)
     for c in chats:
         cid = c["chat_id"]
+        # `return_bots=True` NO es opcional aquí: sin él, `getChatAdministrators`
+        # devuelve la lista de admins **excluyendo a los demás bots**, que es
+        # justo lo único que este aviso busca. El parámetro llegó con Bot API
+        # 10.0; hasta entonces esto era inviable, y por eso la función llevaba
+        # desde que se escribió sin avisar ni una vez, en silencio y sin log.
+        # Medido el 2026-08-21 en los cuatro grupos: sin el parámetro, 0 bots;
+        # con él, 7 (uno de ellos baneando por su cuenta).
         try:
-            admins = await context.bot.get_chat_administrators(chat_id=cid)
+            admins = await context.bot.get_chat_administrators(chat_id=cid, **extra)
         except Exception as exc:  # noqa: BLE001 — un chat que falla no frena a los demás
             log.debug("bot_overlap: get_chat_administrators falló chat=%s: %s", cid, exc)
             continue

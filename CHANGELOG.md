@@ -4,6 +4,32 @@ Cambios relevantes de CazaSpamBot, lo más reciente arriba. Se anotan hitos, no
 cada commit: para el detalle está el historial de git. Sin números de versión
 porque el bot es un servicio en producción continua, no un paquete que se libera.
 
+## 2026-08 · El aviso de «otro bot admin» no había avisado nunca
+
+Salió de una pregunta del admin: por qué `@noarab_bot` baneaba en Windows 10 sin
+que él hubiera recibido jamás un aviso de solape.
+
+La causa: **`getChatAdministrators` devuelve la lista de admins excluyendo a los
+demás bots**, que es justo lo único que este aviso busca. La función existía,
+corría cada noche, recorría los cuatro grupos y no encontraba nada. Cero avisos,
+cero logs, cero pistas: el mismo patrón que el detector con `tuple + list`.
+
+Medido en los cuatro grupos reales:
+
+```
+sin return_bots → 0 bots
+con return_bots → 7  (AlexaESPAli_bot, AlexaDomoChollosBot, noarab_bot, xxdamage2bot…)
+```
+
+El parámetro `return_bots` llegó con **Bot API 10.0**, así que hasta esa versión
+esto era inviable; ahora es una palabra. Se cae con elegancia (`except TypeError`)
+en instalaciones con librería anterior, para no llevarse por delante el job
+nocturno entero.
+
+De paso, el censo de lo que hacen esos bots (últimos 500 eventos por grupo):
+CazaSpamBot 143 bans y 33 borrados; `@noarab_bot` 1 ban y 1 borrado; el resto,
+ninguna acción de moderación.
+
 ## 2026-08 · Cazar el cambio de nombre en el momento, no en el siguiente barrido
 
 Pregunta del admin: si un cambio de nombre dejara algún registro, se podría

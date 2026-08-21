@@ -229,6 +229,8 @@ Un bot con botones inline **no es sospechoso**: es su forma normal de trabajar. 
 
 A un bot que es **admin** Telegram no permite banearlo, así que ahí no hay nada que hacer salvo avisar: `maintenance.notify_bot_overlap` manda **un solo aviso por pareja chat+bot** (dedupe en `bot_prefs`, prefijo `botoverlap_`) contando que puede haber solape en bienvenida, verificación y warns. No afirma qué hace el otro bot, porque no se puede saber. Silenciable desde `/alertas` (tipo `bot_overlap`).
 
+**`getChatAdministrators` NO devuelve otros bots** salvo que se le pase `return_bots=True` (Bot API 10.0). Sin ese parámetro el aviso de solape recorría los cuatro grupos y no encontraba nada: cero avisos y cero logs desde que se escribió. Medido el 2026-08-21: sin él 0 bots, con él **7**, uno de ellos (`@noarab_bot`) baneando por su cuenta. Si alguna comprobación sobre bots ajenos «no encuentra nada», sospechar de esto antes que del grupo.
+
 **Los warns NO salen en `/recent`**: viven en `user_warns` y `/recent` solo lee `moderation_log`. Se consultan con `/warns` respondiendo al usuario.
 
 ### Copia de seguridad de la BD
