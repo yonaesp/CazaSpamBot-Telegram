@@ -1,6 +1,7 @@
 """Comandos admin del bot. Solo accesibles desde ADMIN_USER_ID."""
 from __future__ import annotations
 
+from . import fechas
 import html
 import logging
 
@@ -306,11 +307,10 @@ async def cmd_samples(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     if not rows:
         await update.effective_message.reply_text(t("samples.empty", label=label))
         return
-    import datetime as _dt
     import html as _html
     lines = [t("samples.list_header", n=n, label=label)]
     for r in rows:
-        ts = _dt.datetime.fromtimestamp(r["ts"]).strftime("%m-%d %H:%M")
+        ts = fechas.cuando(r["ts"], "%m-%d %H:%M")
         txt = (r["text_norm"] or "")[:80]
         lines.append(f"<code>#{r['id']}</code> [{ts}] {_html.escape(txt)}")
     await update.effective_message.reply_text("\n".join(lines), parse_mode="HTML")
@@ -439,9 +439,8 @@ async def cmd_recent(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         await update.effective_message.reply_text(t("recent.empty"))
         return
     lines = [t("recent.header", n=n)]
-    import datetime as _dt
     for r in rows:
-        ts = _dt.datetime.fromtimestamp(r["ts"]).strftime("%m-%d %H:%M")
+        ts = fechas.cuando(r["ts"], "%m-%d %H:%M")
         lines.append(
             f"[{ts}] <code>{r['action']}</code> user=<code>{r['user_id']}</code> "
             f"chat=<code>{r['chat_id']}</code> rule={html.escape(r['rule'])} "

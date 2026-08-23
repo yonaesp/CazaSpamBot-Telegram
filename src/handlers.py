@@ -1,6 +1,7 @@
 """Handlers PTB v21: mensajes, joins, reacciones, my_chat_member."""
 from __future__ import annotations
 
+from . import fechas
 import asyncio
 import html as _h
 import logging
@@ -868,10 +869,9 @@ async def _notify_manual_ban(
     last_msg_text = (seen["last_msg_text"] if seen else None) or t("hdl.no_messages_logged")
     last_msg_ts = seen["last_msg_ts"] if seen else None
 
-    import datetime as _dt
     last_msg_when = ""
     if last_msg_ts:
-        last_msg_when = " (" + _dt.datetime.fromtimestamp(last_msg_ts).strftime("%Y-%m-%d %H:%M") + ")"
+        last_msg_when = " (" + fechas.cuando(last_msg_ts, "%Y-%m-%d %H:%M") + ")"
 
     new_status_label = t(
         "hdl.manual_ban_status_ban"

@@ -4,6 +4,27 @@ Cambios relevantes de CazaSpamBot, lo más reciente arriba. Se anotan hitos, no
 cada commit: para el detalle está el historial de git. Sin números de versión
 porque el bot es un servicio en producción continua, no un paquete que se libera.
 
+## 2026-08 · Las horas de Telethon salían dos horas atrasadas
+
+El bot mezcla dos orígenes de fechas y cada uno viene en una zona distinta: la
+base y los logs guardan `time.time()` (zona del proceso, Madrid), y **Telethon
+devuelve UTC**. Al formatearlos a pelo, `/quienfue` mostraba las horas del
+registro de administración **dos horas antes** que `/recent`, sin que nadie lo
+notara porque las dos parecen plausibles.
+
+Costó tiempo real investigando la queja de un usuario: los logs decían 11:16 y el
+registro de Telegram 09:16, y parecían eventos distintos cuando eran el mismo.
+
+Nuevo módulo `fechas.py`: **toda fecha que ve una persona** pasa por
+`cuando()` o `dia()`. Aceptan epoch, `datetime` con o sin zona y `date`, y
+devuelven `?` ante cualquier basura, porque esto se usa dentro de avisos y una
+fecha rara no puede tumbar el mensaje. Aplicado en `/quienfue`, `/warns`,
+`/recent`, `/scanuser` y las señales de perfil.
+
+Meta-test que barre `src/` buscando `.strftime(` a mano. Las dos excepciones
+—`maintenance` usa UTC para un nombre de fichero, `topweekly` ya fija Madrid—
+llevan el porqué al lado, y otro test comprueba que ese porqué sigue escrito.
+
 ## 2026-08 · Salir y volver a entrar no borra el nivel ganado
 
 Un miembro **desde julio de 2022**, con 14 mensajes y trust 74, intentó borrar un

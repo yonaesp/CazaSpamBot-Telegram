@@ -23,6 +23,7 @@ Tres cosas que conviene saber al leerlo:
 """
 from __future__ import annotations
 
+from . import fechas
 import html as _h
 
 from telegram import Update
@@ -98,7 +99,7 @@ async def _consultar(context, chat_id: int, user_id: int) -> list[str] | None:
             continue
         lineas.append(t(
             "quienfue.linea",
-            fecha=ev.date.strftime("%d/%m %H:%M"),
+            fecha=fechas.cuando(ev.date),
             actor=_h.escape(str(actores.get(ev.user_id, ev.user_id))),
             antes=_estado(antes), despues=_estado(despues),
         ))

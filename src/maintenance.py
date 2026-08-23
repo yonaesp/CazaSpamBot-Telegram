@@ -55,6 +55,9 @@ def backup_database(db_path: str | Path, keep: int = BACKUP_KEEP) -> Path | None
         log.warning("backup: la base %s no existe, no se copia nada", origen)
         return None
     destino_dir = origen.parent / BACKUP_DIRNAME
+    # UTC a propósito: esto es un NOMBRE DE FICHERO, no algo que lea una
+    # persona. En UTC no hay saltos de hora que generen dos copias el mismo día
+    # ni un hueco al cambiar la hora. Todo lo que SÍ ve alguien va por `fechas`.
     fecha = datetime.now(timezone.utc).strftime("%Y%m%d")
     destino = destino_dir / f"antispam-{fecha}.db"
     try:

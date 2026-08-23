@@ -274,6 +274,28 @@ Si aun así se copia a pelo, hay que llevarse **los tres ficheros** (`.db`, `.db
 9. **Reportes a Telegram con criterio**: whitelist de reglas + score alto + rate limit. Protege la reputación de la cuenta secundaria.
 10. **Ajustes nuevos que hereden del `.env`**: usar columna NULLable donde NULL = «hereda» (ver `quips.quips_on`). Con default `0`, quien lo tuviera activo por `.env` se queda sin ello al actualizar, en silencio.
 
+## Horas: una sola zona para todo lo que ve una persona
+
+El bot mezcla dos orígenes de fechas y **cada uno viene en una zona distinta**:
+la base de datos y los logs guardan `time.time()` (zona del proceso,
+`Europe/Madrid` aquí), y **Telethon devuelve UTC** con `tzinfo` puesto
+(admin_log, fotos de perfil, creación de cuenta).
+
+Formatearlos a pelo con `.strftime()` los mezcla en la misma pantalla: `/quienfue`
+mostraba las horas del registro de administración **dos horas atrasadas** respecto
+a `/recent`, y nadie lo había notado porque las dos parecen horas plausibles.
+Costó tiempo real el 2026-08-23 investigando la queja de un usuario: los logs
+decían 11:16 y el registro de Telegram 09:16, y parecían eventos distintos cuando
+eran el mismo.
+
+**Regla: toda fecha que se le muestre a una persona pasa por `fechas.cuando()` o
+`fechas.dia()`.** Aceptan epoch, `datetime` (con o sin zona) y `date`, y devuelven
+`?` ante cualquier basura, porque esto se usa dentro de avisos y una fecha rara no
+puede tumbar el mensaje. Hay meta-test que barre `src/` buscando `.strftime(` a
+mano; las dos excepciones (`maintenance`, que usa UTC para un NOMBRE DE FICHERO, y
+`topweekly`, que ya fija Madrid) llevan el porqué escrito al lado y el test
+comprueba que sigue ahí.
+
 ## Convenciones de código
 
 - Type hints en funciones públicas. `async def` para todo lo que toque Telegram API.

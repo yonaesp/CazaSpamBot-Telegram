@@ -25,6 +25,7 @@ Cuatro decisiones de diseño:
 """
 from __future__ import annotations
 
+from . import fechas
 import datetime as _dt
 import html as _h
 import time
@@ -46,11 +47,11 @@ ESPERA_TTL_S = 300
 
 
 def _fecha(ts: float | None) -> str:
-    return _dt.datetime.fromtimestamp(ts).strftime("%d/%m/%Y") if ts else "?"
+    return fechas.dia(ts)
 
 
 def _fecha_dt(d) -> str:
-    return d.strftime("%d/%m/%Y") if d else "?"
+    return fechas.dia(d)
 
 
 def _humano(dias) -> str:
@@ -131,7 +132,7 @@ async def _componer(context, cfg: Config, db: DB, chat_id: int, user_id: int) ->
     else:
         fecha, precision = est
         dias = (_dt.date.today() - fecha).days
-        L.append(t("scanuser.created", date=fecha.strftime("%d/%m/%Y"),
+        L.append(t("scanuser.created", date=fechas.dia(fecha),
                    age=_humano(dias),
                    note=(t("scanuser.created_rough") if precision == "baja" else "")))
 

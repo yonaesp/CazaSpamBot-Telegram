@@ -7,6 +7,7 @@ la edad de la foto más antigua.
 """
 from __future__ import annotations
 
+from . import fechas
 import asyncio
 import datetime as _dt
 import logging
@@ -231,9 +232,9 @@ def render_markup(sig: Optional[UserSignals]) -> str:
     parts = [t("signals.profile", verdict=sig.verdict)]
     parts.append(t("signals.photos", count=sig.photo_count))
     if sig.oldest_photo:
-        parts.append(t("signals.oldest_photo", date=sig.oldest_photo.strftime("%Y-%m-%d")))
+        parts.append(t("signals.oldest_photo", date=fechas.dia(sig.oldest_photo, "%Y-%m-%d")))
     if sig.newest_photo and sig.newest_photo != sig.oldest_photo:
-        parts.append(t("signals.newest_photo", date=sig.newest_photo.strftime("%Y-%m-%d")))
+        parts.append(t("signals.newest_photo", date=fechas.dia(sig.newest_photo, "%Y-%m-%d")))
     if sig.is_premium:
         parts.append(t("signals.premium"))
     if sig.bio:

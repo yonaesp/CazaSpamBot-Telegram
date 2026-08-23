@@ -10,6 +10,7 @@ Comandos:
 """
 from __future__ import annotations
 
+from . import fechas
 import asyncio
 import html
 import logging
@@ -326,9 +327,8 @@ async def cmd_warns(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     settings = db.get_chat_settings(msg.chat_id)
     limit = settings["warns_limit"] or 3
     lines = [f"⚠️ <b>{html.escape(target_name or str(target_id))}</b>: {len(warns)}/{limit} warns"]
-    import datetime as _dt
     for w in warns:
-        ts = _dt.datetime.fromtimestamp(w["ts"]).strftime("%Y-%m-%d %H:%M")
+        ts = fechas.cuando(w["ts"], "%Y-%m-%d %H:%M")
         r = w["reason"] or "(sin razón)"
         lines.append(f"  [{ts}] {html.escape(r)}")
     await msg.reply_text("\n".join(lines), parse_mode="HTML")
