@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS seen_users (
     reaction_count INTEGER NOT NULL DEFAULT 0,
     reputation     INTEGER NOT NULL DEFAULT 0,
     whitelisted    INTEGER NOT NULL DEFAULT 0,
+    verified_ts    REAL,
     last_msg_id    INTEGER,
     last_msg_text  TEXT,
     last_msg_ts    REAL,
@@ -310,6 +311,13 @@ class DB:
         pv_cols = {r[1] for r in self._conn.execute("PRAGMA table_info(pending_verifications)").fetchall()}
         if "reminder_sent_at" not in pv_cols:
             self._conn.execute("ALTER TABLE pending_verifications ADD COLUMN reminder_sent_at REAL")
+        su_cols = {r[1] for r in self._conn.execute("PRAGMA table_info(seen_users)").fetchall()}
+        if "verified_ts" not in su_cols:
+            # Cuándo pasó la verificación en ESTE chat. Antes no se guardaba en
+            # ninguna parte: `pending_verifications` se limpia al verificar, así
+            # que al reentrar el bot no tenía forma de saber que ya había pasado
+            # por el aro y se la volvía a pedir.
+            self._conn.execute("ALTER TABLE seen_users ADD COLUMN verified_ts REAL")
         cs_cols = {r[1] for r in self._conn.execute("PRAGMA table_info(chat_settings)").fetchall()}
         if "warn_quien" not in cs_cols:
             self._conn.execute(
@@ -582,6 +590,29 @@ class DB:
                 """,
                 (chat_id, user_id, username, ts, ts),
             )
+
+    def marcar_verificado(self, chat_id: int, user_id: int, ts: float | None = None) -> None:
+        """Deja constancia de que esta persona pasó la verificación en este chat.
+
+        Existe porque `pending_verifications` se vacía al verificar: sin esto, el
+        bot no tenía ningún sitio donde mirar y volvía a pedir el botón a quien ya
+        lo había pulsado. Caso real (23-ago-2026): un miembro desde 2022 con 14
+        mensajes borró un foro sin querer, se salió del grupo al hacerlo, y al
+        volver se encontró la verificación otra vez «sin saber dónde ni cómo».
+        """
+        with self._cur() as c:
+            c.execute(
+                "UPDATE seen_users SET verified_ts=? WHERE chat_id=? AND user_id=?",
+                (ts if ts is not None else time.time(), chat_id, user_id),
+            )
+
+    def ya_verificado(self, chat_id: int, user_id: int) -> bool:
+        with self._cur() as c:
+            row = c.execute(
+                "SELECT verified_ts FROM seen_users WHERE chat_id=? AND user_id=?",
+                (chat_id, user_id),
+            ).fetchone()
+        return bool(row and row["verified_ts"])
 
     def record_topweekly_msg(self, chat_id: int, user_id: int, length: int, cooldown_s: int = 10) -> None:
         """Inserta un mensaje en weekly_msg_log si el último del mismo user fue

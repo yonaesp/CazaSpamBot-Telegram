@@ -56,6 +56,8 @@ nativa; se itera `banChatMember` sobre los chats donde el bot es admin.
 
 ## Arquitectura del flujo
 
+**Salir y volver a entrar no borra el nivel ganado.** El gate de verificación miraba el perfil de TELEGRAM (`_is_very_legit_profile`: foto, antigüedad de la cuenta) y nunca el historial EN EL GRUPO, así que a un miembro desde 2022 con 14 mensajes y trust 74 se le trataba como a un desconocido al reentrar. Caso real (2026-08-23): borró un foro sin saber que van integrados, se salió del grupo entero y se encontró la verificación otra vez «sin saber dónde ni cómo hacerlo». Ahora `_ya_es_de_casa()` salta el botón si ya se verificó aquí (`seen_users.verified_ts`, que antes no se guardaba en ninguna parte porque `pending_verifications` se vacía al verificar) **o** si tiene ≥`MIN_MSGS_DE_CASA` mensajes previos, que cubre a quien se verificó antes de existir esa marca. El historial (`first_seen_ts`, `msg_count`) ya sobrevivía al reingreso: `record_join` lo conserva con COALESCE. **Solo se salta el botón**: los detectores de perfil y de mensaje se aplican enteros, y un baneado en federación se resuelve antes de llegar aquí.
+
 **`on_chat_member` (join)** — orden de evaluación, cada uno con `return` al actuar:
 1. `is_banned` federado → re-ban
 2. trust precalculado (`rejoin_trust`) — si ≥70 salta verificación y protege de CAS/lols

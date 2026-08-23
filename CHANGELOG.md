@@ -4,6 +4,32 @@ Cambios relevantes de CazaSpamBot, lo más reciente arriba. Se anotan hitos, no
 cada commit: para el detalle está el historial de git. Sin números de versión
 porque el bot es un servicio en producción continua, no un paquete que se libera.
 
+## 2026-08 · Salir y volver a entrar no borra el nivel ganado
+
+Un miembro **desde julio de 2022**, con 14 mensajes y trust 74, intentó borrar un
+foro de Domótica, resultó que los foros van integrados en el grupo y se salió
+entero sin querer. Al volver a unirse se encontró la verificación otra vez:
+*«el bot me está pidiendo que verifique todo el tiempo o me banea y ya no sé
+dónde ni cómo hacerlo»*.
+
+El bot no le baneó nunca —verificó en 2 min 40 s— pero la queja era justa. La
+causa: `on_join` miraba el perfil de **Telegram** (foto, antigüedad de la cuenta)
+y **nunca el historial en el grupo**. Y la marca de «este ya se verificó» no
+existía en ninguna parte, porque `pending_verifications` se vacía al verificar.
+
+- Nueva columna `seen_users.verified_ts`, puesta al superar la verificación.
+- `_ya_es_de_casa()` salta el botón si esa marca existe **o** si hay ≥3 mensajes
+  previos en el chat, que cubre a quien se verificó antes de que la marca
+  existiera y a quien ya estaba cuando llegó el bot.
+- El historial (`first_seen_ts`, `msg_count`) ya sobrevivía al reingreso;
+  `record_join` lo conserva con COALESCE. Hay test que lo fija.
+
+**Lo que no se relaja:** solo se salta el botón. Los detectores de perfil
+(`obvious_spam_profile`, canal personal, bio, fotos en ráfaga) y los de mensaje
+se aplican enteros a quien reentra, y un baneado en federación se resuelve antes
+de llegar a la verificación. El botón, además, no protege de bots: en esta misma
+instalación se pulsa en 3 segundos.
+
 ## 2026-08 · El aviso de «otro bot admin» no había avisado nunca
 
 Salió de una pregunta del admin: por qué `@noarab_bot` baneaba en Windows 10 sin
@@ -22,9 +48,9 @@ con return_bots → 7  (AlexaESPAli_bot, AlexaDomoChollosBot, noarab_bot, xxdama
 ```
 
 El parámetro `return_bots` llegó con **Bot API 10.0**, así que hasta esa versión
-esto era inviable; ahora es una palabra. Se cae con elegancia (`except TypeError`)
-en instalaciones con librería anterior, para no llevarse por delante el job
-nocturno entero.
+esto era inviable; ahora es una palabra. El soporte se comprueba por **firma**
+(`inspect.signature`) y no con un `except TypeError` alrededor de la llamada, que
+se tragaría también un error de tipos de verdad y volvería a dejar esto mudo.
 
 De paso, el censo de lo que hacen esos bots (últimos 500 eventos por grupo):
 CazaSpamBot 143 bans y 33 borrados; `@noarab_bot` 1 ban y 1 borrado; el resto,

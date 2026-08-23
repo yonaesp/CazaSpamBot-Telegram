@@ -812,6 +812,48 @@ async def _send_clean_welcome(context, db, chat, user, settings) -> None:
             )
 
 
+# Mensajes previos que bastan para considerar que alguien «ya es de casa».
+#
+# Lo pidió el admin tras el caso de arriba: salir y volver a entrar no puede
+# borrar el nivel ganado. Tres es deliberadamente bajo porque el gate de
+# verificación NO es lo que protege del spam (un bot pulsa el botón en 3
+# segundos, medido); lo que protege son los detectores de perfil y de mensaje,
+# que siguen aplicándose enteros a quien reentra. Lo único que se ahorra aquí es
+# molestar a alguien que ya demostró estar.
+MIN_MSGS_DE_CASA = 3
+
+
+def _ya_es_de_casa(db: DB, chat_id: int, user_id: int) -> tuple[bool, str]:
+    """¿Es alguien que ya estuvo aquí y se ganó su sitio? (motivo para el log)
+
+    Dos vías, y basta con una:
+      - ya pasó la verificación en este chat alguna vez (`verified_ts`);
+      - tiene historial de mensajes previos en este chat.
+
+    La segunda cubre a quien se verificó ANTES de que se guardara esa marca, y a
+    quien nunca pasó por el gate porque ya estaba en el grupo cuando llegó el bot.
+
+    El historial (`first_seen_ts`, `msg_count`) sobrevive a salir y volver:
+    `record_join` conserva ambos, así que aquí no hay nada que restaurar.
+    """
+    try:
+        row = db.get_seen(chat_id, user_id)
+    except Exception as exc:  # noqa: BLE001 — ante la duda, verificación normal
+        log.debug("no se pudo leer el historial de %s: %s", user_id, exc)
+        return False, ""
+    if row is None:
+        return False, ""
+    try:
+        if row["verified_ts"]:
+            return True, "ya se verificó aquí antes"
+    except (KeyError, IndexError):
+        pass                                   # base sin migrar todavía
+    n = int(row["msg_count"] or 0)
+    if n >= MIN_MSGS_DE_CASA:
+        return True, f"{n} mensajes previos en el grupo"
+    return False, ""
+
+
 async def on_join(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
@@ -877,6 +919,24 @@ async def on_join(
     # activa en el grupo, se le saluda (sin botón SOY HUMANO ni mute; se autoborra).
     if not verification_on:
         await _unmute("modo limpio")
+        if welcome_on:
+            await _send_clean_welcome(context, db, chat, user, settings)
+        return
+
+    # Quien ya estuvo aquí no vuelve a pasar por el aro. El gate mira el perfil de
+    # TELEGRAM (foto, antigüedad de la cuenta), y eso deja fuera a gente que lleva
+    # años en el grupo pero tiene el perfil vacío: al reentrar se les trataba como
+    # a un desconocido. Caso real: un miembro desde 2022 con 14 mensajes y trust
+    # 74 se salió sin querer al borrar un foro y se encontró la verificación otra
+    # vez, «sin saber dónde ni cómo hacerlo».
+    #
+    # Esto NO relaja la detección: los detectores de perfil (`obvious_spam_profile`,
+    # canal personal, bio, fotos en ráfaga) y los de mensaje se le aplican enteros,
+    # igual que a cualquiera. Lo único que se salta es el botón.
+    de_casa, motivo_casa = _ya_es_de_casa(db, chat.id, user.id)
+    if de_casa:
+        log.info("verification SKIP user=%s chat=%s: %s", user.id, chat.id, motivo_casa)
+        await _unmute("ya es de casa")
         if welcome_on:
             await _send_clean_welcome(context, db, chat, user, settings)
         return
@@ -1075,6 +1135,13 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         except Exception as exc:  # noqa: BLE001 — catálogo mal formado, etc.
             # No romper la verificación: el user ya está desmuteado y verificado.
             log.warning("welcome tras verificar falló chat=%s: %s", chat_id, exc)
+    # Queda constancia de que esta persona ya pasó el aro AQUÍ: si vuelve a
+    # entrar (se salió sin querer, borró un foro, cambió de móvil…), no se le
+    # vuelve a pedir. Ver `_ya_es_de_casa`.
+    try:
+        db.marcar_verificado(chat_id, target_user_id)
+    except Exception as exc:  # noqa: BLE001 — cosmético: nunca rompe la verificación
+        log.debug("no se pudo marcar verificado user=%s: %s", target_user_id, exc)
     log.info("verification OK user=%s chat=%s", target_user_id, chat_id)
 
 
