@@ -83,110 +83,131 @@ def attach(client, bot: Bot, db: DB, context=None) -> None:
                     await ar_mod.on_reported_message_deleted(bot, db, full_chat_id, msg_id)
                 except Exception as exc:
                     log.warning("admin_report cascade exc: %s", exc)
-                # 3) Notif manual delete: si el bot NO borró este msg recientemente
-                # y tenemos su contenido en seen_users, avisar al admin.
-                try:
-                    await _notify_manual_delete(client, bot, db, full_chat_id, msg_id)
-                except Exception as exc:
-                    log.warning("notify_manual_delete exc msg=%s: %s", msg_id, exc)
+            # 3) Notif manual delete: UN solo aviso por lote. Telegram entrega
+            # los borrados de una tacada en un mismo update, y mandar un mensaje
+            # por cada uno era confuso: el admin veía «se borró 1» cuando había
+            # borrado ocho.
+            try:
+                await _notificar_borrados(client, bot, db, full_chat_id,
+                                          list(event.deleted_ids))
+            except Exception as exc:  # noqa: BLE001
+                log.warning("notificar_borrados exc chat=%s: %s", full_chat_id, exc)
         except Exception as exc:
             log.warning("on_deleted exc: %s", exc)
 
 
-async def _notify_manual_delete(client, bot: Bot, db: DB, chat_id: int, msg_id: int) -> None:
-    """Si un msg fue borrado y el bot NO lo borró (no aparece en moderation_log
-    como acción reciente), notifica al admin con el contenido guardado en
-    seen_users y, si Telethon puede, quién lo borró según admin_log del chat.
+def _bots_a_ignorar(bot: Bot) -> set:
+    """Bots cuyos borrados NO son moderación y no merecen aviso (ruido):
+    el propio bot, y los de automatización listados en `SKIP_DELETE_NOTIF_BOTS`
+    (CSV de user_ids en `.env`). Ejemplo: un bot que reemplaza enlaces de Amazon
+    por referidos borra y repone el mensaje; es su función normal.
     """
-    # 1) Saltar si el bot ya actuó sobre ese msg en los últimos 60s
-    now = _t.time()
-    with db._cur() as c:
-        recent = c.execute(
-            "SELECT action FROM moderation_log "
-            "WHERE chat_id=? AND message_id=? AND ts > ? "
-            "AND action IN ('ban','kick','mute','delete') "
-            "ORDER BY ts DESC LIMIT 1",
-            (chat_id, msg_id, now - 60),
-        ).fetchone()
-    if recent:
-        log.debug("manual_delete skip msg=%s: bot ya hizo %s", msg_id, recent["action"])
-        return
+    own_id = getattr(bot, "id", None)
+    extra = {
+        int(x) for x in os.getenv("SKIP_DELETE_NOTIF_BOTS", "").replace(" ", "").split(",")
+        if x.strip().lstrip("-").isdigit()
+    }
+    return ({own_id} if own_id else set()) | extra
 
-    # 2) Recuperar contenido y autor desde seen_users.last_msg_*
+
+def _borrados_por_el_bot(db: DB, chat_id: int, msg_ids: list[int]) -> set:
+    """Los que el propio bot acaba de borrar moderando: de esos no se avisa."""
+    if not msg_ids:
+        return set()
+    marcas = ",".join("?" * len(msg_ids))
     with db._cur() as c:
-        seen = c.execute(
+        filas = c.execute(
+            f"SELECT DISTINCT message_id FROM moderation_log "
+            f"WHERE chat_id=? AND message_id IN ({marcas}) AND ts > ? "
+            f"AND action IN ('ban','kick','mute','delete')",
+            (chat_id, *msg_ids, _t.time() - 60),
+        ).fetchall()
+    return {r["message_id"] for r in filas}
+
+
+async def _quien_borro(client, chat_id: int, msg_ids: set):
+    """(actor_info, actor_id) según el registro de administración del chat.
+
+    Una SOLA pasada para todo el lote. Antes se recorría el admin_log una vez por
+    mensaje: al borrar diez de golpe eran diez recorridos idénticos. Los borrados
+    de una tacada son una misma acción, así que el actor es el mismo para todos.
+    """
+    try:
+        entity = await client.get_entity(chat_id)
+        async for entry in client.iter_admin_log(entity, limit=50, delete=True):
+            action = getattr(entry, "action", None)
+            borrado = getattr(action, "message", None) if action else None
+            if borrado is None or getattr(borrado, "id", None) not in msg_ids:
+                continue
+            actor = getattr(entry, "user", None)
+            if actor is None and getattr(entry, "user_id", None):
+                actor = await client.get_entity(entry.user_id)
+            if actor is not None:
+                nombre = getattr(actor, "first_name", None) or "?"
+                uname = getattr(actor, "username", None)
+                aid = getattr(actor, "id", "?")
+                tag = f"@{uname}" if uname else nombre
+                return t("tb.actor_info", tag=_h.escape(tag), uid=aid), aid
+            break
+    except Exception as exc:  # noqa: BLE001
+        log.debug("manual_delete admin_log lookup fallo chat=%s: %s", chat_id, exc)
+    return "?", None
+
+
+def _contenido_de(db: DB, chat_id: int, msg_id: int):
+    """(autor_id, autor_nombre, texto) de un mensaje borrado, o None.
+
+    OJO: `seen_users` guarda solo el ÚLTIMO mensaje de cada persona, así que de un
+    lote de diez borrados normalmente solo uno tiene texto recuperable. Los demás
+    NO se descartan: se listan por su id, que es justo lo que faltaba y confundía
+    al admin («borré ocho y el bot me avisó de uno»).
+    """
+    with db._cur() as c:
+        fila = c.execute(
             "SELECT user_id, first_name, last_msg_text FROM seen_users "
             "WHERE chat_id=? AND last_msg_id=?",
             (chat_id, msg_id),
         ).fetchone()
-    if not seen or not seen["last_msg_text"]:
-        # Sin contenido guardado, no merece la pena notificar (sería ruido)
+    if not fila or not fila["last_msg_text"]:
+        return None
+    return fila["user_id"], (fila["first_name"] or "?"), fila["last_msg_text"]
+
+
+async def _notificar_borrados(client, bot: Bot, db: DB, chat_id: int,
+                              msg_ids: list[int]) -> None:
+    """UN aviso por lote de borrados, con TODOS los mensajes mencionados.
+
+    Antes se mandaba un aviso por mensaje y solo salían los que tenían texto
+    guardado, o sea casi siempre uno: el admin borraba ocho y recibía un aviso de
+    uno, sin manera de saber que faltaban siete.
+
+    Se sigue callando cuando no hay NADA que enseñar (ningún texto recuperable):
+    una lista de ids pelados no informa de nada y sería ruido puro.
+    """
+    ids = [m for m in msg_ids if m]
+    if not ids:
         return
-    text = seen["last_msg_text"] or "(sin texto)"
-    author_id = seen["user_id"]
-    author_name = seen["first_name"] or "?"
-
-    # 3) Identificar al admin que borró via admin_log de Telethon
-    # Bots cuyos borrados NO son moderación y NO merecen aviso (ruido):
-    #   - el propio bot (su id se obtiene en runtime, no se hardcodea),
-    #   - los bots de automatización listados en SKIP_DELETE_NOTIF_BOTS (CSV de
-    #     user_ids en .env). Ej: un bot que reemplaza enlaces de Amazon por
-    #     referidos borra y repone el mensaje; es su función normal, no spam.
-    own_id = getattr(bot, "id", None)
-    skip_extra = {
-        int(x) for x in os.getenv("SKIP_DELETE_NOTIF_BOTS", "").replace(" ", "").split(",")
-        if x.strip().lstrip("-").isdigit()
-    }
-    SKIP_DELETE_NOTIF_BOTS = ({own_id} if own_id else set()) | skip_extra
-    actor_info = "?"
-    actor_id_found = None
-    try:
-        entity = await client.get_entity(chat_id)
-        async for entry in client.iter_admin_log(entity, limit=20, delete=True):
-            action = getattr(entry, "action", None)
-            deleted_msg = getattr(action, "message", None) if action else None
-            if deleted_msg is not None and getattr(deleted_msg, "id", None) == msg_id:
-                actor = getattr(entry, "user", None)
-                if actor is None and getattr(entry, "user_id", None):
-                    actor = await client.get_entity(entry.user_id)
-                if actor is not None:
-                    name = getattr(actor, "first_name", None) or "?"
-                    uname = getattr(actor, "username", None)
-                    aid = getattr(actor, "id", "?")
-                    actor_id_found = aid
-                    tag = f"@{uname}" if uname else name
-                    actor_info = t("tb.actor_info", tag=_h.escape(tag), uid=aid)
-                break
-    except Exception as exc:  # noqa: BLE001
-        log.debug("manual_delete admin_log lookup fallo chat=%s: %s", chat_id, exc)
-
-    # Si el borrado lo hizo el PROPIO bot o un bot de automatización conocido
-    # (referidos Amazon, etc.), NO notificar: no es moderación, es ruido.
-    if actor_id_found in SKIP_DELETE_NOTIF_BOTS:
-        log.debug("manual_delete skip: borrado por bot conocido %s msg=%s", actor_id_found, msg_id)
+    ya_nuestros = _borrados_por_el_bot(db, chat_id, ids)
+    ids = [m for m in ids if m not in ya_nuestros]
+    if not ids:
+        log.debug("manual_delete: el lote de chat=%s lo borró el propio bot", chat_id)
         return
 
-    # Si NO se pudo atribuir el borrado a un admin (actor "?"), casi siempre es el
-    # propio usuario borrando su mensaje (self-delete); admin_log solo registra
-    # borrados de admins. Para algunos es ruido, para otros es info útil. Se
-    # controla con NOTIFY_SELF_DELETES (default false → no avisar de self-deletes).
-    # Default desde el .env; se puede silenciar/reactivar en runtime (botón /alertas).
+    actor_info, actor_id = await _quien_borro(client, chat_id, set(ids))
+    if actor_id in _bots_a_ignorar(bot):
+        log.debug("manual_delete skip: borrado por bot conocido %s", actor_id)
+        return
+
+    # Actor desconocido = casi siempre el propio autor borrando lo suyo
+    # (el admin_log solo registra borrados de admins). Para algunos es ruido.
     from . import notify_prefs
-    env_default = os.getenv("NOTIFY_SELF_DELETES", "false").strip().lower() in (
-        "1", "true", "yes", "on",
-    )
-    if actor_id_found is None and not notify_prefs.is_enabled(db, "self_delete", env_default):
-        log.debug("manual_delete skip: self-delete y avisos silenciados msg=%s", msg_id)
-        return
+    if actor_id is None:
+        env_default = os.getenv("NOTIFY_SELF_DELETES", "false").strip().lower() in (
+            "1", "true", "yes", "on")
+        if not notify_prefs.is_enabled(db, "self_delete", env_default):
+            log.debug("manual_delete skip: self-delete y avisos silenciados")
+            return
 
-    # 4) Título del chat
-    chat_title = str(chat_id)
-    with db._cur() as c:
-        row = c.execute("SELECT title FROM bot_chats WHERE chat_id=?", (chat_id,)).fetchone()
-        if row and row["title"]:
-            chat_title = row["title"]
-
-    # 5) Notif al admin via el propio bot (DM directo, mismo flujo que admin_report)
     admin_id_env = os.getenv("ADMIN_USER_ID", "0")
     try:
         admin_id = int(admin_id_env)
@@ -194,44 +215,72 @@ async def _notify_manual_delete(client, bot: Bot, db: DB, chat_id: int, msg_id: 
         admin_id = 0
     if admin_id <= 0:
         return
-    # Perfil del autor clicable (DM privado al admin, sin riesgo de visibilidad)
-    author_link = (
-        f'<a href="tg://user?id={author_id}">{_h.escape(author_name)}</a>'
-        if author_id else _h.escape(author_name)
-    )
-    # ¿Sigue el autor baneado/en el grupo? (informa de su estado actual)
-    estado = ""
-    if author_id:
+
+    chat_title = str(chat_id)
+    with db._cur() as c:
+        fila = c.execute("SELECT title FROM bot_chats WHERE chat_id=?", (chat_id,)).fetchone()
+        if fila and fila["title"]:
+            chat_title = fila["title"]
+
+    con_texto, sin_texto = [], []
+    for m in sorted(ids):
+        datos = _contenido_de(db, chat_id, m)
+        (con_texto if datos else sin_texto).append((m, datos))
+    if not con_texto:
+        # Nada que enseñar: una lista de ids pelados no informa de nada.
+        log.debug("manual_delete: %d borrados en chat=%s sin contenido guardado",
+                  len(ids), chat_id)
+        return
+
+    def _estado_de(author_id):
+        if not author_id:
+            return ""
         try:
-            row = None
             with db._cur() as c:
                 row = c.execute(
                     "SELECT 1 FROM banned_users WHERE user_id=? AND revoked_at IS NULL",
                     (author_id,),
                 ).fetchone()
-            estado = t("tb.del_state_banned") if row else t("tb.del_state_in_group")
+            return t("tb.del_state_banned") if row else t("tb.del_state_in_group")
         except Exception:  # noqa: BLE001
-            pass
-    notif = t(
-        "tb.manual_delete",
-        chat=_h.escape(chat_title),
-        actor=actor_info,
-        author_link=author_link,
-        author_id=author_id or "?",
-        state=estado,
-        msg_id=msg_id,
-        content=_h.escape(text[:600]),
-    )
-    # En self-deletes (actor desconocido), botón para silenciar este tipo de aviso.
+            return ""
+
+    if len(ids) == 1:
+        # Uno solo: el aviso de siempre, que ya estaba bien.
+        msg_id, datos = con_texto[0]
+        author_id, author_name, texto = datos
+        enlace = (f'<a href="tg://user?id={author_id}">{_h.escape(author_name)}</a>'
+                  if author_id else _h.escape(author_name))
+        notif = t("tb.manual_delete", chat=_h.escape(chat_title), actor=actor_info,
+                  author_link=enlace, author_id=author_id or "?",
+                  state=_estado_de(author_id), msg_id=msg_id,
+                  content=_h.escape(texto[:600]))
+    else:
+        partes = [t("tb.manual_delete_multi", chat=_h.escape(chat_title),
+                    actor=actor_info, n=len(ids))]
+        # Se reparte el espacio: Telegram corta en 4096 caracteres y perder el
+        # final del aviso sería volver al problema de origen.
+        por_msg = max(120, 2800 // max(1, len(con_texto)))
+        for msg_id, datos in con_texto:
+            author_id, author_name, texto = datos
+            enlace = (f'<a href="tg://user?id={author_id}">{_h.escape(author_name)}</a>'
+                      if author_id else _h.escape(author_name))
+            partes.append(t("tb.manual_delete_item", msg_id=msg_id, author_link=enlace,
+                            author_id=author_id or "?", state=_estado_de(author_id),
+                            content=_h.escape(texto[:por_msg])))
+        if sin_texto:
+            partes.append(t("tb.manual_delete_sin_texto",
+                            n=len(sin_texto),
+                            ids=", ".join(str(m) for m, _ in sin_texto[:30])))
+        notif = "\n".join(partes)[:4000]
+
     kb = None
-    if actor_id_found is None:
+    if actor_id is None:
         from telegram import InlineKeyboardMarkup
         kb = InlineKeyboardMarkup([[notify_prefs.mute_button("self_delete")]])
     try:
-        await bot.send_message(
-            chat_id=admin_id, text=notif, parse_mode="HTML",
-            reply_markup=kb, disable_web_page_preview=True,
-        )
+        await bot.send_message(chat_id=admin_id, text=notif, parse_mode="HTML",
+                               reply_markup=kb, disable_web_page_preview=True)
     except TelegramError as exc:
         log.debug("manual_delete notif send fallo: %s", exc)
 

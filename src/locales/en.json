@@ -1103,5 +1103,8 @@
   "cfg.warns.quien.chat_admins": "👮 Group admins",
   "cfg.warns.quien.bot_admin": "🔒 Only you",
   "cfg.warns.fed": "🌐 All groups",
-  "cfg.warns.local": "📍 This group only"
+  "cfg.warns.local": "📍 This group only",
+  "tb.manual_delete_multi": "🗑️ <b>{n} messages deleted manually</b>\n📍 Chat: {chat}\n👮 Deleted by: {actor}",
+  "tb.manual_delete_item": "\n🆔 <code>{msg_id}</code> · 👤 {author_link} (<code>{author_id}</code>){state}\n<pre>{content}</pre>",
+  "tb.manual_delete_sin_texto": "\n<i>Another {n} with no stored content (only each person's last message is kept): {ids}</i>"
 }

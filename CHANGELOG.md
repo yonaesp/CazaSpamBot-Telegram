@@ -4,6 +4,26 @@ Cambios relevantes de CazaSpamBot, lo más reciente arriba. Se anotan hitos, no
 cada commit: para el detalle está el historial de git. Sin números de versión
 porque el bot es un servicio en producción continua, no un paquete que se libera.
 
+## 2026-08 · Un lote de borrados es UN aviso, y con todos dentro
+
+Reportado por el admin: «cuando un admin borra varios mensajes de golpe, solo
+llega el aviso de que se ha borrado uno de ellos… confunde». Dos causas sumadas:
+
+1. La notificación se lanzaba **una vez por cada `msg_id`** del evento.
+2. El contenido sale de `seen_users`, que guarda **solo el último mensaje de cada
+   persona**. De ocho borrados, siete no tenían texto y se descartaban con un
+   `return` silencioso.
+
+Ahora sale un solo aviso con los que tienen texto y, debajo, los ids de los que
+no, para que no falte ninguno. Se sigue callando cuando NINGUNO tiene contenido
+(una lista de ids pelados no informa de nada), y se respetan igual los filtros de
+siempre: lo que borra el propio bot moderando, los bots de automatización
+conocidos y el ajuste de autoborrados.
+
+De paso, el registro de administración se recorre **una sola vez por lote** en
+vez de una por mensaje: los borrados de una tacada son una misma acción, así que
+el actor es el mismo para todos.
+
 ## 2026-08 · Las horas de Telethon salían dos horas atrasadas
 
 El bot mezcla dos orígenes de fechas y cada uno viene en una zona distinta: la
