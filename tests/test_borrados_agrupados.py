@@ -228,3 +228,73 @@ def test_el_handler_avisa_una_vez_por_lote_no_por_mensaje():
                   if isinstance(n, ast.Call)
                   and getattr(n.func, "id", None) == "_notificar_borrados"]
         assert not dentro, "la notificación volvió a estar dentro del bucle"
+
+
+# ---------------------------------------------------------------------------
+# La raíz: guardar más de un mensaje por persona
+#
+# `seen_users` retiene solo el ÚLTIMO. Por eso de ocho borrados llegaban siete
+# sin texto y el aviso salía casi vacío. `mensajes_recientes` guarda los últimos
+# de cada persona en cada chat, y el aviso ya puede enseñarlos todos.
+# ---------------------------------------------------------------------------
+
+def test_se_guardan_varios_mensajes_por_persona(tmp_path):
+    db = _db(tmp_path)
+    db.record_join(CHAT, 1, "Ana", join_ts=time.time())
+    for i in range(5):
+        db.update_last_message(CHAT, 1, 100 + i, f"mensaje {i}")
+    for i in range(5):
+        assert db.mensaje_reciente(CHAT, 100 + i) == (1, f"mensaje {i}")
+
+
+def test_el_historial_no_crece_sin_freno(tmp_path):
+    db = _db(tmp_path)
+    db.record_join(CHAT, 1, "Ana", join_ts=time.time())
+    for i in range(40):
+        db.update_last_message(CHAT, 1, 200 + i, f"m{i}")
+    with db._cur() as c:
+        n = c.execute("SELECT COUNT(*) n FROM mensajes_recientes WHERE user_id=1").fetchone()["n"]
+    assert n == db.MAX_RECIENTES_POR_USUARIO
+    # Se conservan los ÚLTIMOS, que son los que se van a borrar.
+    assert db.mensaje_reciente(CHAT, 239) is not None
+    assert db.mensaje_reciente(CHAT, 200) is None
+
+
+def test_lo_viejo_se_purga(tmp_path):
+    db = _db(tmp_path)
+    db.record_join(CHAT, 1, "Ana", join_ts=time.time())
+    db.update_last_message(CHAT, 1, 300, "antiguo")
+    with db._cur() as c:
+        c.execute("UPDATE mensajes_recientes SET ts=? WHERE msg_id=300",
+                  (time.time() - (db.RECIENTES_DIAS + 1) * 86400,))
+    assert db.purgar_mensajes_recientes() == 1
+    assert db.mensaje_reciente(CHAT, 300) is None
+
+
+@pytest.mark.asyncio
+async def test_ahora_el_lote_sale_completo(tmp_path):
+    """El caso reportado, de punta a punta: se borran cuatro mensajes de la misma
+    persona y el aviso los enseña los cuatro, no solo el último."""
+    db = _db(tmp_path)
+    db.record_join(CHAT, 1, "Ana", join_ts=time.time())
+    for i, txt in enumerate(["uno", "dos", "tres", "cuatro"]):
+        db.update_last_message(CHAT, 1, 400 + i, txt)
+    bot = _Bot()
+    ids = [400, 401, 402, 403]
+    await tb._notificar_borrados(_Cliente(ids=ids), bot, db, CHAT, ids)
+    aviso = bot.enviados[0]
+    for txt in ("uno", "dos", "tres", "cuatro"):
+        assert txt in aviso, f"falta «{txt}»: el aviso vuelve a salir incompleto"
+    assert "sin contenido guardado" not in aviso
+
+
+def test_el_respaldo_cubre_lo_escrito_antes_del_cambio(tmp_path):
+    """Quien actualice el bot no pierde el contenido de lo que ya había: si no
+    está en el historial corto, se sigue mirando `seen_users`."""
+    db = _db(tmp_path)
+    db.record_join(CHAT, 1, "Ana", join_ts=time.time())
+    db.update_last_message(CHAT, 1, 500, "de antes")
+    with db._cur() as c:                      # se simula que no existía la tabla
+        c.execute("DELETE FROM mensajes_recientes")
+    datos = tb._contenido_de(db, CHAT, 500)
+    assert datos and datos[2] == "de antes"

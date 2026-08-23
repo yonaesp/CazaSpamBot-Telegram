@@ -4,6 +4,20 @@ Cambios relevantes de CazaSpamBot, lo más reciente arriba. Se anotan hitos, no
 cada commit: para el detalle está el historial de git. Sin números de versión
 porque el bot es un servicio en producción continua, no un paquete que se libera.
 
+## 2026-08 · Guardar más de un mensaje por persona
+
+La raíz de lo anterior: `seen_users` retiene **solo el último mensaje** de cada
+persona, así que de ocho borrados siete no tenían texto que enseñar y el aviso
+salía casi vacío aunque los listara todos.
+
+Nueva tabla `mensajes_recientes` con los últimos 10 por persona y chat (texto
+recortado a 500 caracteres), purgada a los 7 días en el job nocturno. El recorte
+por usuario se hace **al escribir**, no en la purga, para que la tabla no crezca
+entre limpiezas con quien escribe mucho.
+
+El aviso de borrado la consulta primero y cae a `seen_users` como respaldo, así
+que quien actualice no pierde el contenido de lo que ya tenía guardado.
+
 ## 2026-08 · Un lote de borrados es UN aviso, y con todos dentro
 
 Reportado por el admin: «cuando un admin borra varios mensajes de golpe, solo

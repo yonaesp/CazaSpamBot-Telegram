@@ -162,6 +162,14 @@ def _contenido_de(db: DB, chat_id: int, msg_id: int):
     NO se descartan: se listan por su id, que es justo lo que faltaba y confundía
     al admin («borré ocho y el bot me avisó de uno»).
     """
+    # 1) El historial corto, que guarda los últimos de cada persona. Es lo que
+    # permite que un borrado en tanda salga completo.
+    reciente = db.mensaje_reciente(chat_id, msg_id)
+    if reciente:
+        user_id, texto = reciente
+        return user_id, _nombre_de(db, chat_id, user_id), texto
+    # 2) Respaldo: el último mensaje en `seen_users`. Cubre lo escrito ANTES de que
+    # existiera el historial corto, que si no se perdería al actualizar.
     with db._cur() as c:
         fila = c.execute(
             "SELECT user_id, first_name, last_msg_text FROM seen_users "
@@ -171,6 +179,17 @@ def _contenido_de(db: DB, chat_id: int, msg_id: int):
     if not fila or not fila["last_msg_text"]:
         return None
     return fila["user_id"], (fila["first_name"] or "?"), fila["last_msg_text"]
+
+
+def _nombre_de(db: DB, chat_id: int, user_id: int) -> str:
+    with db._cur() as c:
+        fila = c.execute(
+            "SELECT first_name, username FROM seen_users WHERE chat_id=? AND user_id=?",
+            (chat_id, user_id),
+        ).fetchone()
+    if not fila:
+        return str(user_id)
+    return fila["first_name"] or fila["username"] or str(user_id)
 
 
 async def _notificar_borrados(client, bot: Bot, db: DB, chat_id: int,

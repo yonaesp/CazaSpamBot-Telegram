@@ -94,6 +94,17 @@ CREATE TABLE IF NOT EXISTS cas_cache (
     checked_at     REAL NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS mensajes_recientes (
+    chat_id  INTEGER NOT NULL,
+    user_id  INTEGER NOT NULL,
+    msg_id   INTEGER NOT NULL,
+    texto    TEXT,
+    ts       REAL NOT NULL,
+    PRIMARY KEY (chat_id, msg_id)
+);
+CREATE INDEX IF NOT EXISTS idx_msgrec_user ON mensajes_recientes(chat_id, user_id, ts DESC);
+CREATE INDEX IF NOT EXISTS idx_msgrec_ts   ON mensajes_recientes(ts);
+
 CREATE TABLE IF NOT EXISTS username_map (
     username_lower TEXT PRIMARY KEY,
     user_id        INTEGER NOT NULL,
@@ -311,6 +322,16 @@ class DB:
         pv_cols = {r[1] for r in self._conn.execute("PRAGMA table_info(pending_verifications)").fetchall()}
         if "reminder_sent_at" not in pv_cols:
             self._conn.execute("ALTER TABLE pending_verifications ADD COLUMN reminder_sent_at REAL")
+        self._conn.execute(
+            "CREATE TABLE IF NOT EXISTS mensajes_recientes ("
+            " chat_id INTEGER NOT NULL, user_id INTEGER NOT NULL,"
+            " msg_id INTEGER NOT NULL, texto TEXT, ts REAL NOT NULL,"
+            " PRIMARY KEY (chat_id, msg_id))")
+        self._conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_msgrec_user "
+            "ON mensajes_recientes(chat_id, user_id, ts DESC)")
+        self._conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_msgrec_ts ON mensajes_recientes(ts)")
         su_cols = {r[1] for r in self._conn.execute("PRAGMA table_info(seen_users)").fetchall()}
         if "verified_ts" not in su_cols:
             # Cuándo pasó la verificación en ESTE chat. Antes no se guardaba en
@@ -670,6 +691,53 @@ class DB:
                 (msg_id, (text or "")[:500], time.time(), (text or "")[:500] or None,
                  chat_id, user_id),
             )
+        # Historial corto aparte: `seen_users` solo guarda el ÚLTIMO, y eso dejaba
+        # los avisos de borrado en tanda sin nada que enseñar.
+        self.guardar_mensaje_reciente(chat_id, user_id, msg_id, text)
+
+    # Cuántos mensajes se guardan por persona y chat. `seen_users` solo retiene el
+    # ÚLTIMO, y eso hacía que un lote de borrados llegara casi vacío: de ocho
+    # mensajes borrados, siete no tenían texto que enseñar. Diez cubre de sobra un
+    # borrado en tanda sin engordar la base (texto recortado a 500 caracteres).
+    MAX_RECIENTES_POR_USUARIO = 10
+    # Se purgan a la semana en el job nocturno: pasado ese plazo ya no hay nada
+    # que investigar y el sitio se recupera.
+    RECIENTES_DIAS = 7
+
+    def guardar_mensaje_reciente(self, chat_id: int, user_id: int, msg_id: int,
+                                 texto: str | None) -> None:
+        """Añade el mensaje al historial corto de esa persona en ese chat."""
+        with self._cur() as c:
+            c.execute(
+                "INSERT INTO mensajes_recientes (chat_id, user_id, msg_id, texto, ts) "
+                "VALUES (?, ?, ?, ?, ?) ON CONFLICT(chat_id, msg_id) DO UPDATE SET "
+                "  texto=excluded.texto, ts=excluded.ts",
+                (chat_id, user_id, msg_id, (texto or "")[:500] or None, time.time()),
+            )
+            # Se recorta aquí y no en la purga nocturna para que la tabla no crezca
+            # entre limpiezas con quien escribe mucho.
+            c.execute(
+                "DELETE FROM mensajes_recientes WHERE chat_id=? AND user_id=? AND msg_id NOT IN ("
+                "  SELECT msg_id FROM mensajes_recientes WHERE chat_id=? AND user_id=? "
+                "  ORDER BY ts DESC LIMIT ?)",
+                (chat_id, user_id, chat_id, user_id, self.MAX_RECIENTES_POR_USUARIO),
+            )
+
+    def mensaje_reciente(self, chat_id: int, msg_id: int):
+        """(user_id, texto) de un mensaje guardado, o None si ya no se tiene."""
+        with self._cur() as c:
+            fila = c.execute(
+                "SELECT user_id, texto FROM mensajes_recientes WHERE chat_id=? AND msg_id=?",
+                (chat_id, msg_id),
+            ).fetchone()
+        return (fila["user_id"], fila["texto"]) if fila and fila["texto"] else None
+
+    def purgar_mensajes_recientes(self) -> int:
+        with self._cur() as c:
+            return c.execute(
+                "DELETE FROM mensajes_recientes WHERE ts < ?",
+                (time.time() - self.RECIENTES_DIAS * 86400,),
+            ).rowcount
 
     def record_message(
         self, chat_id: int, user_id: int, username: str | None,

@@ -136,6 +136,10 @@ async def cleanup_nightly_job(context: ContextTypes.DEFAULT_TYPE) -> None:
         ).rowcount
         stats["pending_verifications_stale"] = n
 
+        # historial corto de mensajes (el que hace que un borrado en tanda salga
+        # completo): a la semana ya no hay nada que investigar
+        stats["mensajes_recientes"] = db.purgar_mensajes_recientes()
+
         # suppressions expiradas
         n = c.execute(
             "DELETE FROM suppressions WHERE suppressed_until < ?", (now,),
