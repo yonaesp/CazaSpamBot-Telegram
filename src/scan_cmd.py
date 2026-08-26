@@ -18,9 +18,13 @@ from __future__ import annotations
 import html as _h
 import time
 
+import logging
+
 from telegram import Update
 from telegram.ext import ContextTypes
 
+from . import user_signals
+from . import verification
 from .config import Config
 from .db import DB
 from .detectors import trozo_entidad
@@ -34,11 +38,16 @@ from .detectors import forward_first_msg as fwd_det
 from .detectors import inline_buttons as buttons_det
 from .detectors import offplatform_contact as offplat_det
 from .detectors import tg_deeplink as tgdeep_det
+from .detectors import lols_bot as lols_det
+from .detectors import cas as cas_det
+from .detectors import bio_spam as bio_spam_det
 from .detectors import unicode_script as script_det
 from .detectors import url_blocklist as url_det
 from .i18n import t
 from . import desofuscar
 from . import story_reader
+
+log = logging.getLogger(__name__)
 
 
 def _entity_urls(msg) -> list[str]:
@@ -209,6 +218,119 @@ async def _entregar(context, msg, texto: str, cfg) -> None:
                                        parse_mode="HTML", disable_web_page_preview=True)
 
 
+def _autor_de(target):
+    """(user, motivo_si_no_hay). El autor REAL del mensaje escaneado.
+
+    No siempre se puede saber, y decirlo importa: si el admin **reenvía** un
+    mensaje al privado, `from_user` es él mismo, no quien lo escribió. Telegram
+    solo da el autor original en `forward_origin`, y **únicamente si esa persona
+    no oculta su cuenta** en los reenvíos. Inventarse un veredicto sobre el
+    remitente equivocado sería peor que no dar ninguno.
+    """
+    origen = getattr(target, "forward_origin", None)
+    if origen is not None:
+        u = getattr(origen, "sender_user", None)
+        if u is not None:
+            return u, None
+        # Reenvío con la cuenta oculta o desde un canal: no hay a quién mirar.
+        return None, t("scan.autor_oculto")
+    u = getattr(target, "from_user", None)
+    if u is None:
+        return None, t("scan.autor_desconocido")
+    return u, None
+
+
+async def _revisar_autor(context, cfg: Config, db: DB, target) -> list[str]:
+    """Qué se sabe de QUIEN escribió el mensaje escaneado.
+
+    El informe de `/scan` cubría solo el contenido y avisaba en una nota de que
+    las reglas de perfil y de listas dependen de quién lo envía. Esa nota estaba
+    bien, pero dejaba el trabajo a medias: lo pidió el admin y tiene razón, porque
+    el mismo texto es inocuo de un vecino y sospechoso de una cuenta recién hecha.
+
+    Se aplican los MISMOS criterios que en el join, sin umbrales propios.
+    """
+    lineas: list[str] = []
+    autor, motivo = _autor_de(target)
+    if autor is None:
+        return [t("scan.autor_titulo"), motivo]
+    if getattr(autor, "is_bot", False):
+        return [t("scan.autor_titulo"), t("scan.autor_es_bot")]
+
+    hallazgos: list[str] = []
+    chat_id = target.chat_id if getattr(target, "chat", None) else 0
+
+    # 1) Federación: lo más barato y lo más concluyente.
+    try:
+        if db.is_banned(autor.id):
+            hallazgos.append(t("scan.autor_baneado"))
+    except Exception as exc:  # noqa: BLE001
+        log.debug("scan autor is_banned: %s", exc)
+
+    # 2) Señales del perfil por MTProto (nombre, canal, bio, fotos).
+    sig = None
+    reporter = context.bot_data.get("reporter")
+    client = reporter.get_client() if reporter else None
+    if client is not None:
+        try:
+            sig = await user_signals.fetch(client, autor.id, chat_id=chat_id or None,
+                                           first_name=autor.first_name)
+        except Exception as exc:  # noqa: BLE001
+            log.debug("scan autor señales: %s", exc)
+
+    obvio, razones = verification._is_obvious_spam_profile(
+        sig, autor.username, autor.first_name, autor.last_name)
+    if obvio:
+        hallazgos.append(t("scan.autor_perfil",
+                           motivos=", ".join(verification.render_reason_list(razones)[:3])))
+
+    if sig is not None and sig.personal_channel_title:
+        try:
+            from .handlers import _mirar_canal_personal
+            hit = await _mirar_canal_personal(
+                client, sig, autor,
+                allowed_scripts=(db.get_chat_settings(chat_id) and cfg.allowed_scripts)
+                or cfg.allowed_scripts)
+            if hit:
+                hallazgos.append(t("scan.autor_canal",
+                                   canal=_h.escape(sig.personal_channel_title[:50])))
+        except Exception as exc:  # noqa: BLE001
+            log.debug("scan autor canal: %s", exc)
+        if sig.bio:
+            try:
+                if bio_spam_det.check(sig.bio):
+                    hallazgos.append(t("scan.autor_bio"))
+            except Exception as exc:  # noqa: BLE001
+                log.debug("scan autor bio: %s", exc)
+
+    # 3) Listas externas.
+    session = context.bot_data.get("http")
+    if session is not None:
+        if cfg.lols_enabled:
+            try:
+                if await lols_det.check(autor.id, session):
+                    hallazgos.append(t("scan.autor_lols"))
+            except Exception as exc:  # noqa: BLE001
+                log.debug("scan autor lols: %s", exc)
+        if cfg.cas_enabled:
+            try:
+                if await cas_det.check(autor.id, session, db, cfg.cas_cache_ttl_seconds):
+                    hallazgos.append(t("scan.autor_cas"))
+            except Exception as exc:  # noqa: BLE001
+                log.debug("scan autor cas: %s", exc)
+
+    quien = _h.escape(autor.first_name or autor.username or str(autor.id))
+    if hallazgos:
+        lineas.append(t("scan.autor_hallazgos", quien=quien, uid=autor.id))
+        lineas += [t("scan.autor_item", detalle=x) for x in hallazgos]
+    else:
+        # Sin Telethon no se ha podido mirar el perfil: se dice, no se firma en
+        # verde algo que no se ha comprobado.
+        clave = "scan.autor_ok" if sig is not None else "scan.autor_ok_parcial"
+        lineas.append(t(clave, quien=quien, uid=autor.id))
+    return lineas
+
+
 async def _responder_scan(context, msg, target, cfg: Config, db: DB) -> None:
     """Corre los detectores sobre `target` y contesta el informe a `msg`.
 
@@ -269,7 +391,6 @@ async def _responder_scan(context, msg, target, cfg: Config, db: DB) -> None:
         lines.append(t("scan.trust_note"))
     elif not es_historia:
         lines.append(t("scan.not_detected"))
-        lines.append(t("scan.profile_note"))
     if es_historia:
         # El /scan solo corre detectores de CONTENIDO: `story_share` necesita saber
         # quién manda el mensaje (si es su primer mensaje, si el bot vio su entrada,
@@ -306,5 +427,16 @@ async def _responder_scan(context, msg, target, cfg: Config, db: DB) -> None:
         # un análisis que el bot no ha podido hacer.
         lines.append("")
         lines.append(t("scan.story_blind"))
+
+    # El autor, que es la otra mitad del veredicto: el mismo texto es inocuo de un
+    # vecino y sospechoso de una cuenta recién hecha con un canal de spam.
+    try:
+        autor_lineas = await _revisar_autor(context, cfg, db, target)
+    except Exception as exc:  # noqa: BLE001 — el informe nunca se queda sin enviar
+        log.warning("scan: fallo revisando al autor: %s", exc, exc_info=True)
+        autor_lineas = [t("scan.autor_titulo"), t("scan.autor_error")]
+    if autor_lineas:
+        lines.append("")
+        lines += autor_lineas
 
     await _entregar(context, msg, "\n".join(lines), cfg)

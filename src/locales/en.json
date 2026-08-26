@@ -1106,5 +1106,20 @@
   "cfg.warns.local": "📍 This group only",
   "tb.manual_delete_multi": "🗑️ <b>{n} messages deleted manually</b>\n📍 Chat: {chat}\n👮 Deleted by: {actor}",
   "tb.manual_delete_item": "\n🆔 <code>{msg_id}</code> · 👤 {author_link} (<code>{author_id}</code>){state}\n<pre>{content}</pre>",
-  "tb.manual_delete_sin_texto": "\n<i>Another {n} with no stored content (only each person's last message is kept): {ids}</i>"
+  "tb.manual_delete_sin_texto": "\n<i>Another {n} with no stored content (only each person's last message is kept): {ids}</i>",
+  "scan.autor_titulo": "👤 <b>User</b>",
+  "scan.autor_ok": "👤 <b>User:</b> ✅ {quien} (<code>{uid}</code>) — nothing found in profile or lists",
+  "scan.autor_ok_parcial": "👤 <b>User:</b> ✅ {quien} (<code>{uid}</code>) — nothing found in lists\n<i>The profile could not be read (Telethon unavailable), so that part is unchecked.</i>",
+  "scan.autor_hallazgos": "👤 <b>User:</b> ⚠️ {quien} (<code>{uid}</code>) — this does stand out:",
+  "scan.autor_item": "   • {detalle}",
+  "scan.autor_baneado": "is <b>banned</b> across the federation",
+  "scan.autor_perfil": "obvious spam profile ({motivos})",
+  "scan.autor_canal": "spam channel on their profile: «{canal}»",
+  "scan.autor_bio": "their bio has clear spam signals",
+  "scan.autor_lols": "listed on <b>lols.bot</b>",
+  "scan.autor_cas": "listed on <b>CAS</b>",
+  "scan.autor_es_bot": "it's a bot: profile criteria don't apply",
+  "scan.autor_oculto": "<i>Can't tell who wrote it: the forward hides the original account. Use it on the message in the group to analyse the author too.</i>",
+  "scan.autor_desconocido": "<i>This message has no author (channel or service), so there's no profile to check.</i>",
+  "scan.autor_error": "<i>Could not check the author.</i>"
 }

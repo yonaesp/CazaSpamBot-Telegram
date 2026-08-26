@@ -4,6 +4,27 @@ Cambios relevantes de CazaSpamBot, lo más reciente arriba. Se anotan hitos, no
 cada commit: para el detalle está el historial de git. Sin números de versión
 porque el bot es un servicio en producción continua, no un paquete que se libera.
 
+## 2026-08 · `/scan` mira también a quien escribió
+
+El informe cubría el contenido y avisaba en una nota de que «no cubre reglas por
+perfil/listas (CAS, lols, obvious_profile) que dependen de quién lo envía». Era
+honesto, pero dejaba el trabajo a medias: el mismo «Buenos día guapa» es inocuo
+de un vecino y sospechoso de una cuenta recién hecha con un canal de spam.
+
+Ahora el informe acaba con una línea de usuario: **✅ si no hay nada**, o el
+detalle de lo encontrado (baneado en la federación, perfil de spam evidente,
+canal o bio de spam, CAS, lols). Mismos criterios que en el join, sin umbrales
+propios.
+
+Tres detalles que importan:
+
+- **En un reenvío se analiza al autor ORIGINAL**, no a quien reenvía. Si Telegram
+  no lo da porque esa persona oculta su cuenta, se dice en vez de firmar un
+  veredicto sobre el remitente equivocado.
+- **Sin Telethon no se firma en verde lo que no se ha comprobado**: se avisa de
+  que el perfil quedó sin mirar.
+- Un fallo analizando al autor no impide enviar el informe del contenido.
+
 ## 2026-08 · Guardar más de un mensaje por persona
 
 La raíz de lo anterior: `seen_users` retiene **solo el último mensaje** de cada

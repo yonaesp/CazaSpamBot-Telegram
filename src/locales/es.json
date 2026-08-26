@@ -1106,5 +1106,20 @@
   "cfg.warns.local": "📍 Solo este grupo",
   "tb.manual_delete_multi": "🗑️ <b>{n} mensajes borrados manualmente</b>\n📍 Chat: {chat}\n👮 Borrado por: {actor}",
   "tb.manual_delete_item": "\n🆔 <code>{msg_id}</code> · 👤 {author_link} (<code>{author_id}</code>){state}\n<pre>{content}</pre>",
-  "tb.manual_delete_sin_texto": "\n<i>Otros {n} sin contenido guardado (solo se guarda el último mensaje de cada persona): {ids}</i>"
+  "tb.manual_delete_sin_texto": "\n<i>Otros {n} sin contenido guardado (solo se guarda el último mensaje de cada persona): {ids}</i>",
+  "scan.autor_titulo": "👤 <b>Usuario</b>",
+  "scan.autor_ok": "👤 <b>Usuario:</b> ✅ {quien} (<code>{uid}</code>) — sin hallazgos en perfil ni listas",
+  "scan.autor_ok_parcial": "👤 <b>Usuario:</b> ✅ {quien} (<code>{uid}</code>) — sin hallazgos en listas\n<i>El perfil no se ha podido leer (Telethon no disponible), así que esta parte queda sin comprobar.</i>",
+  "scan.autor_hallazgos": "👤 <b>Usuario:</b> ⚠️ {quien} (<code>{uid}</code>) — esto sí llama la atención:",
+  "scan.autor_item": "   • {detalle}",
+  "scan.autor_baneado": "está <b>baneado</b> en la federación",
+  "scan.autor_perfil": "perfil de spam evidente ({motivos})",
+  "scan.autor_canal": "canal de spam en el perfil: «{canal}»",
+  "scan.autor_bio": "la bio tiene señales claras de spam",
+  "scan.autor_lols": "aparece en la lista negra <b>lols.bot</b>",
+  "scan.autor_cas": "aparece en <b>CAS</b>",
+  "scan.autor_es_bot": "es un bot: los criterios de perfil no se le aplican",
+  "scan.autor_oculto": "<i>No se puede saber quién lo escribió: el reenvío oculta la cuenta original. Úsalo sobre el mensaje en el grupo para analizar también al autor.</i>",
+  "scan.autor_desconocido": "<i>Este mensaje no trae autor (canal o servicio), así que no hay perfil que mirar.</i>",
+  "scan.autor_error": "<i>No se ha podido comprobar al autor.</i>"
 }
