@@ -46,3 +46,8 @@ daily\s+payouts?
 weekly\s+payouts?
 crypto\s+(?:investment|trading)\s+(?:platform|opportunit(?:y|ies)|program)
 investment\s+(?:opportunit(?:y|ies)|plan|scheme)
+
+# Reclutamiento directo, sin la jerga de oferta de empleo formal. Del mismo caso:
+# «come for work» no casaba con nada («now hiring», «job vacancy», etc.).
+come\s+(?:for|to)\s+work\b
+(?:people|persons?)\s+from\s+(?:europe|uk|usa|us|spain)\b

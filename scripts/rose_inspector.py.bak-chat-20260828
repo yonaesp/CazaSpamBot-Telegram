@@ -1,0 +1,353 @@
+"""Inspecciona configuración de @MissRose_bot en cada grupo vía Telethon.
+
+Como Telegram bloquea bot-to-bot, usamos la cuenta usuario la cuenta Telethon para:
+1. Enviar comandos a Rose en cada grupo
+2. Esperar la respuesta de Rose
+3. Reenviar todo al chat destino con el bot de notificaciones externo
+4. Borrar los mensajes recién enviados (CMD + respuesta) — máximo 3 por chat,
+   solo los del momento, nunca tocar nada antiguo
+5. Opcionalmente: añade entries de blacklist como samples spam para el clasificador
+
+Uso:
+    python -m scripts.rose_inspector              # solo lee, reenvía y borra
+    python -m scripts.rose_inspector --learn      # además, añade blacklist a learning_samples
+    python -m scripts.rose_inspector --chat <id>  # solo un chat (default: todos)
+    python -m scripts.rose_inspector --dry-run    # no borra mensajes
+"""
+from __future__ import annotations
+
+import argparse
+import asyncio
+import html
+import json
+import logging
+import os
+import sys
+import time
+import urllib.request
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Optional
+
+from dotenv import load_dotenv
+from telethon import TelegramClient
+from telethon.tl.types import Message, PeerUser, User
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from src import learning  # noqa: E402
+from src.db import DB  # noqa: E402
+
+load_dotenv()
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s — %(message)s")
+log = logging.getLogger("rose_inspector")
+
+
+ROSE_BOT_USERNAME = "MissRose_bot"
+SESSION = "/app/data/telethon.session"
+
+# Comandos a ejecutar. (cmd, descripción, ¿es candidato a aprender en learning_samples?)
+# Fuente: missrose.org/docs (verificado 2026-05-23)
+ROSE_COMMANDS = [
+    ("/filters",          "Filters: respuestas automáticas configuradas",     False),
+    ("/blocklist",        "Blocklist: palabras prohibidas",                   True),
+    ("/blocklistmode",    "Modo de la blocklist (del/warn/mute/kick/ban)",    False),
+    ("/welcome",          "Mensaje de bienvenida",                            False),
+    ("/welcome noformat", "Welcome raw markdown",                             False),
+    ("/goodbye",          "Mensaje de despedida",                             False),
+    ("/rules",            "Reglas del grupo",                                 False),
+    ("/adminlist",        "Lista de admins reales",                           False),
+    ("/approved",         "Usuarios approved (whitelisted en Rose)",          False),
+    ("/locks",            "Locks activos (anti-channel/anti-forward/etc.)",   False),
+    ("/flood",            "Configuración antiflood",                          False),
+    ("/warnings",         "Config de warns (límite + modo)",                  False),
+    ("/cleanservice",     "Cleaner de mensajes de servicio",                  False),
+    ("/disabled",         "Comandos deshabilitados en este chat",             False),
+]
+
+
+def _send_telegram_msg(token: str, chat_id: str, text: str) -> bool:
+    """Envía mensaje vía el bot de notificaciones externo al chat destino."""
+    data = json.dumps({
+        "chat_id": chat_id, "text": text,
+        "parse_mode": "HTML", "disable_web_page_preview": True,
+        "disable_notification": True,
+    }).encode()
+    req = urllib.request.Request(
+        f"https://api.telegram.org/bot{token}/sendMessage",
+        data=data,
+        headers={"Content-Type": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as r:
+            d = json.loads(r.read())
+            return bool(d.get("ok"))
+    except Exception as exc:
+        log.warning("notificación externa send falló: %s", exc)
+        return False
+
+
+def _load_external_notify() -> tuple[str, str]:
+    env_path = os.getenv("EXTERNAL_NOTIFY_ENV_PATH", "/home/.env.telegram")
+    token = ""
+    chat = ""
+    if Path(env_path).exists():
+        for line in Path(env_path).read_text().splitlines():
+            line = line.strip()
+            if line.startswith("TG_BOT_TOKEN="):
+                token = line.split("=", 1)[1].strip().strip('"').strip("'")
+            elif line.startswith("TG_CHAT_CASATG="):
+                chat = line.split("=", 1)[1].strip().strip('"').strip("'")
+    return token, chat
+
+
+@dataclass
+class CapturedReply:
+    command: str
+    cmd_msg_id: int
+    rose_msg_ids: list[int]
+    rose_text: str
+    chat_title: str
+    chat_id: int
+
+
+async def _capture_rose_reply(
+    client: TelegramClient,
+    chat,
+    rose_user: User,
+    cmd: str,
+    timeout_s: int = 6,
+) -> Optional[CapturedReply]:
+    """Envía cmd y espera respuesta de Rose hasta timeout_s segundos."""
+    sent = await client.send_message(chat, cmd)
+    cmd_msg_id = sent.id
+    log.info("[%s] enviado %s (msg_id=%s)", getattr(chat, "title", chat.id), cmd, cmd_msg_id)
+
+    deadline = time.time() + timeout_s
+    rose_msgs: list[Message] = []
+    last_seen_id = cmd_msg_id
+
+    while time.time() < deadline:
+        await asyncio.sleep(1.0)
+        # Iterar mensajes posteriores al comando enviado
+        async for m in client.iter_messages(chat, min_id=last_seen_id, limit=10, reverse=True):
+            if m.id <= last_seen_id:
+                continue
+            last_seen_id = m.id
+            sender = await m.get_sender()
+            if sender and getattr(sender, "username", None) and \
+               sender.username.lower() == rose_user.username.lower():
+                rose_msgs.append(m)
+        if rose_msgs:
+            # Esperar un poco más por si Rose envía varios mensajes
+            await asyncio.sleep(1.5)
+            async for m in client.iter_messages(chat, min_id=last_seen_id, limit=10, reverse=True):
+                if m.id <= last_seen_id:
+                    continue
+                last_seen_id = m.id
+                sender = await m.get_sender()
+                if sender and getattr(sender, "username", None) and \
+                   sender.username.lower() == rose_user.username.lower():
+                    rose_msgs.append(m)
+            break
+
+    if not rose_msgs:
+        log.info("  ↳ sin respuesta de Rose para %s", cmd)
+        return CapturedReply(
+            command=cmd, cmd_msg_id=cmd_msg_id, rose_msg_ids=[],
+            rose_text="(sin respuesta de Rose o Rose no está en este grupo)",
+            chat_title=getattr(chat, "title", str(chat.id)), chat_id=chat.id,
+        )
+
+    text = "\n\n".join((m.text or "(media/buttons)") for m in rose_msgs)
+    log.info("  ↳ Rose respondió %d msg(s), %d chars", len(rose_msgs), len(text))
+    return CapturedReply(
+        command=cmd, cmd_msg_id=cmd_msg_id,
+        rose_msg_ids=[m.id for m in rose_msgs],
+        rose_text=text,
+        chat_title=getattr(chat, "title", str(chat.id)), chat_id=chat.id,
+    )
+
+
+def _post_to_casa(token: str, chat_casatg: str, captured: CapturedReply, chat_title: str) -> None:
+    if not token or not chat_casatg:
+        return
+    text = (
+        f"🌹 <b>Rose en {html.escape(chat_title)}</b>\n"
+        f"📋 Comando: <code>{html.escape(captured.command)}</code>\n\n"
+        f"<pre>{html.escape(captured.rose_text[:3500])}</pre>"
+    )
+    _send_telegram_msg(token, chat_casatg, text)
+
+
+async def _learn_blacklist(db: DB, captured: CapturedReply, admin_id: int) -> int:
+    """Extrae patterns de la blocklist de Rose y los añade como spam samples.
+
+    Formato Rose: `*pattern*` __{action}__  (glob con * como wildcard).
+    Convertimos a sample limpiando wildcards y backticks. char-ngram cosine
+    los matcheará como "contiene".
+    """
+    import re
+    if captured.command != "/blocklist":
+        return 0
+    text = captured.rose_text
+    if not text or "no blocklist" in text.lower() or "no filters" in text.lower():
+        return 0
+    added = 0
+    pattern_re = re.compile(r"`([^`]+)`\s*__\{([^}]+)\}__")
+    backtick_re = re.compile(r"`([^`]+)`")
+    matches = pattern_re.findall(text)
+    if not matches:
+        matches = [(m, "") for m in backtick_re.findall(text)]
+    for raw_pattern, action in matches:
+        pattern = raw_pattern.strip().strip("*").strip()
+        if not pattern or len(pattern) < 4:
+            continue
+        norm = learning.normalize(pattern)
+        if not norm or len(norm) < 4:
+            continue
+        h = learning.text_hash(norm)
+        if db.add_sample(text_norm=norm, text_hash=h, label="spam",
+                         added_by=admin_id, chat_id=captured.chat_id, source_user=None):
+            log.info("    + spam sample: '%s' (action: %s)", norm[:50], action or "?")
+            added += 1
+    return added
+
+
+async def _learn_blacklist_OLD(db: DB, captured: CapturedReply, admin_id: int) -> int:
+    """DEPRECATED. Ver _learn_blacklist."""
+    text = captured.rose_text
+    if not text:
+        return 0
+    added = 0
+    # Heurística: cada línea no vacía que no sea cabecera puede ser un blacklist entry
+    for line in text.splitlines():
+        line = line.strip().strip("-•·").strip()
+        if not line or len(line) < 4:
+            continue
+        if line.lower().startswith(("current", "the following", "blacklist", "filters")):
+            continue
+        # Quitar prefijos comunes
+        if ":" in line and len(line.split(":", 1)[0]) < 20:
+            line = line.split(":", 1)[1].strip()
+        if not line:
+            continue
+        norm = learning.normalize(line)
+        if not norm:
+            continue
+        h = learning.text_hash(norm)
+        if db.add_sample(text_norm=norm, text_hash=h, label="spam",
+                         added_by=admin_id, chat_id=captured.chat_id, source_user=None):
+            added += 1
+    return added
+
+
+async def _delete_recent(client: TelegramClient, chat, msg_ids: list[int], dry_run: bool) -> int:
+    """Borra IDs específicos. NUNCA toca otros. Cap explícito 3."""
+    msg_ids = msg_ids[:3]
+    if not msg_ids:
+        return 0
+    if dry_run:
+        log.info("  [dry-run] Borraría %d msgs: %s", len(msg_ids), msg_ids)
+        return 0
+    try:
+        await client.delete_messages(chat, msg_ids)
+        log.info("  ✓ borrados %d mensajes (cap 3): %s", len(msg_ids), msg_ids)
+        return len(msg_ids)
+    except Exception as exc:
+        log.warning("  delete fallo: %s", exc)
+        return 0
+
+
+async def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--learn", action="store_true", help="Añade blacklist a learning_samples")
+    parser.add_argument("--chat", type=int, default=None, help="Solo procesar este chat_id")
+    parser.add_argument("--dry-run", action="store_true", help="No borrar mensajes")
+    parser.add_argument("--timeout", type=int, default=6, help="Timeout por comando (s)")
+    args = parser.parse_args()
+
+    api_id = int(os.getenv("TG_API_ID", "0"))
+    api_hash = os.getenv("TG_API_HASH", "")
+    admin_id = int(os.getenv("ADMIN_USER_ID", "0"))
+    if not api_id or not api_hash:
+        log.error("Faltan TG_API_ID/TG_API_HASH en .env")
+        return 1
+
+    ext_token, ext_chat = _load_external_notify()
+    db = DB(os.getenv("DB_PATH", "/app/data/antispam.db"))
+
+    chats_filter = {args.chat} if args.chat else set(db.admin_chats())
+    if not chats_filter:
+        log.error("No hay chats donde el bot sea admin")
+        return 1
+
+    client = TelegramClient(SESSION, api_id, api_hash)
+    await client.connect()
+    if not await client.is_user_authorized():
+        log.error("Sesión Telethon no autenticada. Corre telethon_login.py")
+        return 1
+    me = await client.get_me()
+    log.info("Autenticado como %s (@%s)", me.first_name, me.username)
+
+    rose = await client.get_entity(ROSE_BOT_USERNAME)
+    log.info("Rose: @%s id=%s", rose.username, rose.id)
+
+    total_learned = 0
+    for chat_id in chats_filter:
+        try:
+            chat = await client.get_entity(chat_id)
+        except Exception as exc:
+            log.warning("get_entity chat=%s falló: %s", chat_id, exc)
+            continue
+        chat_title = getattr(chat, "title", str(chat_id))
+        log.info("==== %s (%s) ====", chat_title, chat_id)
+
+        # Verificar que Rose esté en el chat
+        try:
+            await client.get_permissions(chat, rose)
+            rose_in_chat = True
+        except Exception:
+            rose_in_chat = False
+            log.warning("Rose NO está en %s. Saltando.", chat_title)
+            _send_telegram_msg(
+                ext_token, ext_chat,
+                f"⚠️ Rose no está en <b>{html.escape(chat_title)}</b> — sin info a copiar.",
+            )
+            continue
+
+        for cmd, desc, is_learnable in ROSE_COMMANDS:
+            try:
+                cap = await _capture_rose_reply(client, chat, rose, cmd, timeout_s=args.timeout)
+                if cap is None:
+                    continue
+                # Reenviar a casa_tg
+                _post_to_casa(ext_token, ext_chat, cap, chat_title)
+                # Aprender si aplica
+                if args.learn and is_learnable:
+                    n = await _learn_blacklist(db, cap, admin_id)
+                    if n:
+                        log.info("  ↳ añadidas %d samples spam de %s", n, cmd)
+                        total_learned += n
+                # Borrar — máximo 3 mensajes (cmd + hasta 2 respuestas de Rose)
+                to_delete = [cap.cmd_msg_id] + cap.rose_msg_ids
+                await _delete_recent(client, chat, to_delete, dry_run=args.dry_run)
+            except Exception as exc:
+                log.warning("cmd %s en %s exc: %s", cmd, chat_title, exc)
+                continue
+            await asyncio.sleep(1.5)  # ratelimit entre comandos
+
+    await client.disconnect()
+    db.close()
+    if args.learn:
+        log.info("Total samples aprendidos: %d", total_learned)
+    if ext_token and ext_chat:
+        _send_telegram_msg(
+            ext_token, ext_chat,
+            f"✅ <b>Inspección Rose completada</b> en {len(chats_filter)} chat(s).\n"
+            f"📚 Samples nuevos en clasificador: <b>{total_learned}</b>",
+        )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(asyncio.run(main()))

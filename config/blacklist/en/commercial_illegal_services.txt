@@ -37,3 +37,18 @@ personal\s+(?:info|information|data)\s+of\s+(?:any(?:one|body)|someone)
 # --- marcadores de anuncio turbio ---
 anonymous\s+services?
 serious\s+(?:clients?|buyers?|inquiries)\s+only
+
+# --- Reclutamiento de mulas: comprar o usar documentos de identidad ajenos ---
+# Caso real (29-ago-2026, Windows 10): «People from Europe, uk, usa, come for
+# work / Have Passport or id i pay you 500$ / Only one person i need». Ninguna
+# señal casaba: ni el trabajo (la lista esperaba «now hiring», «job vacancy») ni
+# el dinero (el `\b` rompía «500$», ver `_wrap`).
+#
+# Lo inequívoco NO es «passport» —preguntar por trámites es normal— sino pedirlo
+# JUNTO A un pago o para uso de otro. De ahí que todos sean compuestos.
+(?:have|got|with|need|send|bring)\s+(?:a\s+|your\s+|the\s+)?passports?\b
+passports?\s+(?:or|and|\+)\s*(?:id|dni|document)
+(?:id|passport)\s+(?:card\s+)?(?:and|or|\+)\s*(?:selfie|photo|picture)
+(?:rent|buy|sell|need)\s+(?:your\s+)?(?:bank\s+)?(?:account|card|passport|id)\b
+i\s+pay\s+you\b
+(?:only|just)\s+(?:one|1|two|2)\s+person\s+(?:i\s+)?need

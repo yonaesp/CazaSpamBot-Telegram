@@ -174,7 +174,27 @@ def load_terms(
 
 
 def _wrap(body: str, *, boundaries: bool) -> str:
-    return rf"\b(?:{body})\b" if boundaries else rf"(?:{body})"
+    r"""Envuelve la alternancia exigiendo que no quede pegada a otra palabra.
+
+    Se usa `(?<!\w)…(?!\w)` y **no** `\b…\b`, que es lo que había. Para un
+    término normal («bet») las dos formas hacen lo mismo: no casan dentro de
+    «Roberto». La diferencia aparece cuando una alternativa empieza o acaba en
+    algo que NO es carácter de palabra, como los símbolos de moneda:
+
+        \b(?:…|\d+\s*[€$]|[€$]\s*\d+|…)\b
+
+    Ahí `\b` exige una frontera de palabra pegada al símbolo, y esa frontera no
+    existe: `$` no es carácter de palabra, así que junto a un espacio o al final
+    de la línea no hay transición. Resultado medido el 2026-08-29: **ni `$500`
+    ni `500€` casaban**. La señal de dinero de `commercial_ad` llevaba muerta en
+    silencio quién sabe cuánto, y el `CLAUDE.md` documentaba lo contrario
+    («ambas formas soportadas»), porque los tests usaban importes escritos en
+    palabra («500 euros», «500 USD») que sí pasan el `\b`.
+
+    Los lookarounds no exigen transición: solo prohíben que haya letra o dígito
+    pegados, que es lo que de verdad se quiere.
+    """
+    return rf"(?<!\w)(?:{body})(?!\w)" if boundaries else rf"(?:{body})"
 
 
 def _valid_terms(terms: list[str], flags: int) -> list[str]:

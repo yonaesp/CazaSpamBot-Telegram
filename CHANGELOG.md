@@ -4,6 +4,31 @@ Cambios relevantes de CazaSpamBot, lo más reciente arriba. Se anotan hitos, no
 cada commit: para el detalle está el historial de git. Sin números de versión
 porque el bot es un servicio en producción continua, no un paquete que se libera.
 
+## 2026-08 · Ningún importe con símbolo de moneda se detectaba
+
+Salió investigando por qué se coló «People from Europe, uk, usa, come for work /
+Have Passport or id i pay you 500$ / Only one person i need» (autor con trust
+**11 de 100**, primer mensaje a los **43 segundos** de entrar, y ya expulsado de
+otro grupo en mayo por no verificarse). Ninguna señal casaba, y al mirarlas una
+por una apareció algo mayor.
+
+`compile_alternation` envolvía las listas en `\b(?:…)\b`, y eso mata toda
+alternativa que empiece o acabe en algo que no sea carácter de palabra: `\b`
+exige una frontera pegada al símbolo, y junto a `$` o `€` no la hay. **Ni `$500`
+ni `500€` casaban.** La señal de dinero de `commercial_ad` llevaba muerta en
+silencio, y el `CLAUDE.md` afirmaba lo contrario porque los tests usaban importes
+en palabra («500 euros»), que sí pasan el `\b`.
+
+- Envoltorio con lookarounds `(?<!\w)…(?!\w)`: para una palabra se comporta
+  igual (`bet` sigue sin casar en «Roberto»), pero no exige una transición
+  imposible junto a un símbolo.
+- Comprobado sobre **164 mensajes reales**: cero cambios de puntuación salvo el
+  spam que lo destapó. No introduce falsos positivos.
+- Vocabulario nuevo en inglés para el reclutamiento de mulas: pedir pasaporte o
+  DNI **junto a un pago**. Todos compuestos: «passport» a secas es una palabra
+  normal y preguntar por trámites no es spam. El mensaje pasa de 0 a **105
+  puntos**.
+
 ## 2026-08 · `/scan` mira también a quien escribió
 
 El informe cubría el contenido y avisaba en una nota de que «no cubre reglas por

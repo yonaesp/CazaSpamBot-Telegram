@@ -129,6 +129,19 @@ Cada línea es un **regex**, salvo en `custom/`, donde todo se escapa: es imposi
 
 **Añadir un término desde el panel pasa SIEMPRE por vista previa**: `custom_terms.preview_term()` dice con cuántos mensajes reales y recientes del grupo coincidiría, con ejemplos, antes de guardar. Un término como «oferta» caza 3 de cada 4 mensajes de un grupo de informática.
 
+### El envoltorio de las listas: lookarounds, nunca `\b`
+
+`compile_alternation` envuelve los términos con `(?<!\w)…(?!\w)`. **No es un
+detalle de estilo.** Con el `\b(?:…)\b` que había antes, cualquier alternativa
+que empiece o acabe en algo que no sea carácter de palabra queda muerta: `\b`
+exige una frontera pegada al símbolo y junto a `$`, `€` o un espacio no existe.
+
+Medido el 2026-08-29: **ni `$500` ni `500€` casaban**, o sea que la señal de
+dinero de `commercial_ad` llevaba muerta en silencio. Este mismo fichero afirmaba
+lo contrario porque los tests usaban importes en palabra («500 euros»), que sí
+pasan el `\b`. Comprobado tras el arreglo sobre 164 mensajes reales: **cero
+cambios de puntuación** salvo el spam que lo destapó.
+
 ### Anti falso positivo en los patrones
 
 - Las palabras de moneda que son palabras comunes (`peso`, `real`, `sol`, `libra`, `corona`) **solo cuentan pegadas a una cifra**. Hay tests con «el peso del paquete», «hace un sol», «media libra de harina» para que nadie las añada sueltas.
