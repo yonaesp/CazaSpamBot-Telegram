@@ -15,8 +15,20 @@ def test_no_sig_not_legit():
     assert legit is False
 
 
-def test_few_photos_not_legit():
+def test_una_foto_antigua_ya_es_legit():
+    """Antes se exigían DOS fotos y este test fijaba lo contrario. Lo cambió un
+    caso real (30-ago-2026): «mario», nombre latino, 1 foto de hace 540 días y sin
+    username, acabó con «verifica en 30 min o serás expulsado». Medido después
+    sobre 20 usuarios asentados del grupo, el 15 % tiene una sola foto.
+
+    Lo que la condición quiere probar es la ANTIGÜEDAD, y esa se calcula con la
+    foto más vieja: una de hace año y medio la demuestra igual que dos."""
     legit, _ = _is_very_legit_profile(_sig(photo_count=1), "user", "Juan", "Pérez")
+    assert legit is True
+
+
+def test_sin_ninguna_foto_sigue_sin_ser_legit():
+    legit, _ = _is_very_legit_profile(_sig(photo_count=0), "user", "Juan", "Pérez")
     assert legit is False
 
 

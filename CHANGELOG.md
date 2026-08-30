@@ -4,6 +4,28 @@ Cambios relevantes de CazaSpamBot, lo más reciente arriba. Se anotan hitos, no
 cada commit: para el detalle está el historial de git. Sin números de versión
 porque el bot es un servicio en producción continua, no un paquete que se libera.
 
+## 2026-08 · Menos fricción para quien no la merece
+
+«mario» entró en Windows 11 con nombre latino, **una foto de hace 540 días** y sin
+@usuario, y se llevó el tier duro: «Cuenta sospechosa (sin username): verifica en
+30 min o serás expulsado». Los dos motivos, medidos sobre el propio grupo:
+
+- **`no_username` bastaba para el plazo de 30 minutos.** El **29 %** de los
+  miembros de Windows 11 (454 de 1554) y el **14 %** de Domótica (479 de 3414) no
+  tienen username. La lista `_STRONG_SUSP_REASONS` ya existía y ya excluía esta
+  señal, pero solo decidía si avisar al admin, no el plazo. Ahora, sin ninguna
+  señal fuerte, se pasa al tier **normal** (3 h + recordatorio): se sigue
+  verificando, sin la prisa.
+- **`_is_very_legit_profile` exigía 2 fotos.** Sobre 20 usuarios asentados del
+  grupo, **el 15 % tiene una sola**. Lo que esa condición quiere probar es la
+  antigüedad de la cuenta, y esa se calcula con la foto más vieja: una de hace año
+  y medio la demuestra igual que dos.
+
+Con los dos cambios, mario se salta la verificación entera; y si no la saltara,
+tampoco iría al plazo corto. Nada de esto relaja la detección: los detectores de
+perfil y de mensaje siguen aplicándose enteros, y el botón no protege de bots
+(se pulsa en 3 segundos, medido aquí).
+
 ## 2026-08 · Ningún importe con símbolo de moneda se detectaba
 
 Salió investigando por qué se coló «People from Europe, uk, usa, come for work /

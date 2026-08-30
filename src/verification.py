@@ -263,15 +263,26 @@ def _is_very_legit_profile(
     """Perfil claramente legítimo: skip verification, welcome amistoso.
 
     Requiere TODAS estas condiciones:
-      - ≥2 fotos de perfil (foto_count)
+      - al menos 1 foto de perfil
       - Cuenta ≥365 días
       - Nombre y username en script latino (sin caracteres no-latín relevantes)
       - Sin marcas Telegram scam/fake/restricted (no se expone aquí, se chequea aparte)
+
+    Exigía **2 fotos**, y eso dejaba fuera a gente evidentemente legítima. Caso
+    medido (30-ago-2026, Windows 11): «mario», nombre latino, **1 foto de hace
+    540 días**, sin username; se le pidió verificación con plazo de 30 minutos.
+    Sobre una muestra de 20 usuarios asentados (≥10 mensajes) del grupo, **el 15 %
+    tiene una sola foto**: no es un caso raro.
+
+    Lo que de verdad prueba la condición es la ANTIGÜEDAD, y esa se calcula con la
+    foto más vieja: una sola foto de hace año y medio la demuestra igual que dos.
+    Pedir la segunda no añadía seguridad, solo fricción — y el botón, además, no
+    protege de bots (se pulsa en 3 segundos, medido aquí).
     """
     if sig is None:
         return False, []
     reasons: list[str] = []
-    if sig.photo_count < 2:
+    if sig.photo_count < 1:
         return False, []
     reasons.append(f"{sig.photo_count} fotos")
     if sig.account_age_days is None or sig.account_age_days < 365:
@@ -903,6 +914,19 @@ async def on_join(
             except Exception as exc:
                 log.debug("user_signals fetch user=%s exc: %s", user.id, exc)
     suspicious, susp_reasons = _is_suspicious_profile(sig, user.username, user.first_name, user.last_name)
+    # El tier «sospechoso» (30 min y fuera) exige al menos una señal FUERTE. Sin
+    # esa criba, no tener @usuario bastaba para el plazo corto, y eso es de lo más
+    # común entre gente legítima: medido el 30-ago-2026, **el 29 % de los miembros
+    # de Windows 11 y el 14 % de los de Domótica no tienen username**. La lista de
+    # señales fuertes ya existía y ya excluía `no_username`; solo se usaba para
+    # decidir si avisar al admin, no para el plazo.
+    #
+    # Quien no trae ninguna señal fuerte SIGUE verificándose: pasa al tier normal
+    # (3 h y recordatorio), que es tiempo de sobra para ver el mensaje.
+    if suspicious and not any(c in _STRONG_SUSP_REASONS for c, _ in susp_reasons):
+        log.info("verification: user=%s sin señales fuertes (%s) → tier normal",
+                 user.id, ", ".join(c for c, _ in susp_reasons))
+        suspicious = False
     review_worthy, review_reasons = _is_review_worthy(
         sig, user.username, user.first_name, user.last_name,
         nivel=nivel_de(settings))
