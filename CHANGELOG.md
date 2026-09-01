@@ -4,6 +4,17 @@ Cambios relevantes de CazaSpamBot, lo más reciente arriba. Se anotan hitos, no
 cada commit: para el detalle está el historial de git. Sin números de versión
 porque el bot es un servicio en producción continua, no un paquete que se libera.
 
+## 2026-09 · Un aviso de confianza no puede repetirse en bucle
+
+El admin escribió «@spam» cuatro veces seguidas probando el bot y recibió
+**cuatro avisos idénticos en 66 segundos**. No era duplicación —eran cuatro
+mensajes reales, y cada `@algo` que no resuelve a nadie del grupo cuenta como
+mención externa— sino ruido: el primero informa y los tres siguientes sobran.
+
+Ahora hay un freno de **media hora por persona, regla y chat**. No se pierde
+información: los `gentle_warn` se siguen registrando todos en `moderation_log`,
+que es donde se consultan. El freno es solo del aviso.
+
 ## 2026-09 · Constancia del nombre en cada repaso
 
 `seen_users.first_name` solo se escribía al **hablar**, así que de quien todavía

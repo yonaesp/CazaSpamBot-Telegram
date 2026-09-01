@@ -167,6 +167,11 @@ async def _avisar_si_le_recortan(context, db: DB, cfg: Config, chat, old, new, a
 # que el chat enlazado dice de sí mismo. Justo el caso que el trust dejaba escapar
 # (cuenta veterana, probablemente robada, publicando un canal de packs): con el
 # atajo por trust alto el enlace se quedaba en el grupo.
+# Cada cuánto se repite el aviso de «algo raro de alguien de confianza» para la
+# misma persona, regla y chat. Ver `_send_trust_notice`.
+_AVISO_TRUST_CADA_S = 30 * 60
+_CLAVE_AVISO_TRUST = "_aviso_trust_visto"
+
 HARD_RULES_BAN = frozenset({
     "cas_match", "lols_match", "federation_known_ban", "reaction_farming",
     "link_target_spam",
@@ -1875,6 +1880,26 @@ async def _send_trust_notice(
     admin_dm = cfg.admin_notify_chat_id
     if not admin_dm:
         return
+    # Un aviso por persona, regla y chat cada media hora. Sin esto, quien escribe
+    # varios mensajes seguidos que rozan la misma regla llena el privado de avisos
+    # idénticos: medido el 1-sep-2026, **cuatro en 66 segundos** por escribir
+    # «@spam» cuatro veces (cada `@algo` que no resuelve a nadie del grupo cuenta
+    # como mención externa). El primero informa; los tres siguientes son ruido, y
+    # un aviso que se acaba ignorando es peor que no tenerlo.
+    #
+    # No se pierde nada: los gentle_warn se siguen registrando TODOS en
+    # `moderation_log`, que es donde se consultan.
+    cache = context.bot_data.setdefault(_CLAVE_AVISO_TRUST, {})
+    clave = (msg.chat_id, user.id, tuple(sorted(rules)))
+    ahora = time.time()
+    if ahora - cache.get(clave, 0.0) < _AVISO_TRUST_CADA_S:
+        log.info("trust_notice: repetido para user=%s (%s), no se reenvía",
+                 user.id, ",".join(sorted(rules)))
+        return
+    cache[clave] = ahora
+    for k, visto in list(cache.items()):
+        if ahora - visto > _AVISO_TRUST_CADA_S * 4:
+            del cache[k]
     texto = msg.text or msg.caption or t("hdl.no_text")
     info = t(
         "hdl.trust_notice_dm",
