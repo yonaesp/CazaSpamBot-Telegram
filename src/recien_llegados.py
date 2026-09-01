@@ -295,6 +295,29 @@ async def _revisar_perfil(context, db: DB, cfg: Config, fila, espera: int) -> bo
     if usuario is None or usuario.is_bot:
         return False
 
+    # ¿Se ha cambiado el nombre desde la última vez que lo vimos? Se registra y se
+    # guarda el nuevo.
+    #
+    # Sin esta traza no había forma de responder «¿lo miramos y no saltó, o es que
+    # cambió justo antes de escribir?». Pasó el 1-sep-2026 con el 8846717922: entró
+    # a las 06:28 con un nombre que no disparaba, escribió a las 09:21 llamándose
+    # `电我煮叶` y lo cazó el chequeo del primer mensaje. Entre medias se le miró el
+    # nombre unas once veces sin que saltara nada, así que el cambio tuvo que ser
+    # de los últimos minutos, pero eso era una deducción, no un dato.
+    #
+    # `seen_users.first_name` solo se escribía al hablar, así que de quien todavía
+    # no ha escrito no teníamos ningún nombre guardado con el que comparar.
+    try:
+        previo = (fila["first_name"] or "") if "first_name" in fila.keys() else ""
+        actual = usuario.first_name or ""
+        if actual and actual != previo:
+            if previo:
+                log.info("recien_llegados: user=%s se ha cambiado el nombre: %r → %r",
+                         user_id, previo[:40], actual[:40])
+            db.actualizar_nombre_visto(chat_id, user_id, actual)
+    except Exception as exc:  # noqa: BLE001 — una traza jamás frena la revisión
+        log.debug("recien_llegados: no se pudo comparar el nombre de %s: %s", user_id, exc)
+
     obvio, _razones = verification._is_obvious_spam_profile(
         None, usuario.username, usuario.first_name, usuario.last_name,
     )

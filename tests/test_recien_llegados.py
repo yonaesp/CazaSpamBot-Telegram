@@ -722,3 +722,91 @@ def test_el_listener_no_puede_tumbar_el_bot():
     i = fuente.index("async def _on_user_name(")
     bloque = fuente[i:i + 900]
     assert "except Exception" in bloque
+
+
+# ---------------------------------------------------------------------------
+# Dejar constancia del cambio de nombre
+#
+# Caso del 1-sep-2026: el 8846717922 entró a las 06:28 con un nombre que no
+# disparaba (la traza del join lo prueba: `señales=sí`, y fue a verificación en
+# vez de a ban), y escribió a las 09:21 llamándose `电我煮叶`. Lo cazó el chequeo
+# del primer mensaje. Entre medias se le miró el nombre unas once veces sin que
+# saltara nada, así que el cambio tuvo que ser de los últimos minutos — pero eso
+# era una DEDUCCIÓN, no un dato: `seen_users.first_name` solo se escribía al
+# hablar, así que de quien aún no ha escrito no había nada con que comparar.
+# ---------------------------------------------------------------------------
+
+def test_se_guarda_el_nombre_de_quien_aun_no_ha_escrito(tmp_path):
+    db = _db(tmp_path)
+    db.record_join(-100, 1, None, join_ts=time.time())
+    assert db.get_seen(-100, 1)["first_name"] is None
+    db.actualizar_nombre_visto(-100, 1, "Carlos")
+    assert db.get_seen(-100, 1)["first_name"] == "Carlos"
+
+
+@pytest.mark.asyncio
+async def test_el_cambio_de_nombre_queda_en_el_log(tmp_path, monkeypatch, caplog):
+    import logging
+    db = _db(tmp_path)
+    db.record_join(-100, 950, None, join_ts=time.time() - 3600)
+    db.actualizar_nombre_visto(-100, 950, "Carlos")
+    nombre = ["Carlos"]
+
+    class BotQueCambia(_Bot):
+        async def get_chat_member(self, chat_id, user_id):
+            return SimpleNamespace(chat=SimpleNamespace(id=chat_id, title="Domótica"),
+                                   user=SimpleNamespace(id=user_id, is_bot=False,
+                                                        first_name=nombre[0],
+                                                        last_name=None, username=None))
+
+    ctx = _ctx(db, BotQueCambia(), _cfg(lols_enabled=False, cas_enabled=False))
+    monkeypatch.setattr("src.handlers._apply_action", lambda *a, **k: None)
+
+    await rl.revisar_job(ctx)
+    nombre[0] = "电我煮叶"
+    with caplog.at_level(logging.INFO):
+        await rl.revisar_job(ctx)
+    assert any("se ha cambiado el nombre" in r.message for r in caplog.records), \
+        "sin esta traza no se puede saber si cambió antes o después de mirarlo"
+    assert db.get_seen(-100, 950)["first_name"] == "电我煮叶"
+
+
+@pytest.mark.asyncio
+async def test_sin_cambio_no_se_ensucia_el_log(tmp_path, monkeypatch, caplog):
+    import logging
+    db = _db(tmp_path)
+    db.record_join(-100, 951, None, join_ts=time.time() - 3600)
+    db.actualizar_nombre_visto(-100, 951, "Juan")
+    ctx = _ctx(db, _Bot(), _cfg(lols_enabled=False, cas_enabled=False))
+    monkeypatch.setattr("src.handlers._apply_action", lambda *a, **k: None)
+    with caplog.at_level(logging.INFO):
+        await rl.revisar_job(ctx)
+    assert not any("se ha cambiado el nombre" in r.message for r in caplog.records)
+
+
+@pytest.mark.asyncio
+async def test_un_fallo_guardando_el_nombre_no_frena_la_revision(tmp_path, monkeypatch):
+    """La traza es cosmética: si falla, la revisión tiene que seguir igual."""
+    db = _db(tmp_path)
+    db.record_join(-100, 952, None, join_ts=time.time() - 3600)
+
+    def revienta(*a, **k):
+        raise RuntimeError("base caída")
+    monkeypatch.setattr(db, "actualizar_nombre_visto", revienta)
+
+    class BotChino(_Bot):
+        async def get_chat_member(self, chat_id, user_id):
+            return SimpleNamespace(chat=SimpleNamespace(id=chat_id, title="Domótica"),
+                                   user=SimpleNamespace(id=user_id, is_bot=False,
+                                                        first_name="电我煮叶",
+                                                        last_name=None, username=None))
+
+    ctx = _ctx(db, BotChino(), _cfg(lols_enabled=False, cas_enabled=False))
+    aplicado = {}
+
+    async def falso_apply(context, db_, cfg_, **kw):
+        aplicado.update(kw)
+    monkeypatch.setattr("src.handlers._apply_action", falso_apply)
+
+    await rl.revisar_job(ctx)
+    assert aplicado.get("user_id") == 952, "el ban por nombre tiene que seguir saliendo"

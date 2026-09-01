@@ -612,6 +612,19 @@ class DB:
                 (chat_id, user_id, username, ts, ts),
             )
 
+    def actualizar_nombre_visto(self, chat_id: int, user_id: int, nombre: str) -> None:
+        """Guarda el nombre con el que se ve ahora mismo a esa persona.
+
+        `first_name` solo se escribía al hablar, así que de quien aún no ha escrito
+        no había con qué comparar: sin esto no se puede saber si alguien se cambió
+        el nombre estando ya dentro, que es justo el truco de esta red.
+        """
+        with self._cur() as c:
+            c.execute(
+                "UPDATE seen_users SET first_name=? WHERE chat_id=? AND user_id=?",
+                (nombre[:100], chat_id, user_id),
+            )
+
     def marcar_verificado(self, chat_id: int, user_id: int, ts: float | None = None) -> None:
         """Deja constancia de que esta persona pasó la verificación en este chat.
 

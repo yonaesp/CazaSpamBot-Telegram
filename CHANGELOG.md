@@ -4,6 +4,20 @@ Cambios relevantes de CazaSpamBot, lo más reciente arriba. Se anotan hitos, no
 cada commit: para el detalle está el historial de git. Sin números de versión
 porque el bot es un servicio en producción continua, no un paquete que se libera.
 
+## 2026-09 · Constancia del nombre en cada repaso
+
+`seen_users.first_name` solo se escribía al **hablar**, así que de quien todavía
+no ha escrito no había ningún nombre guardado con el que comparar. Consecuencia:
+ante un caso como el del 1-sep-2026 (el 8846717922 entró a las 06:28 con un
+nombre que no disparaba y escribió a las 09:21 como `电我煮叶`) no se podía
+responder si se le había mirado y no saltó, o si cambió justo antes de escribir.
+Solo se podía deducir, porque el repaso le miró el nombre unas once veces.
+
+Ahora cada vuelta guarda el nombre actual y registra el cambio cuando lo hay:
+`recien_llegados: user=… se ha cambiado el nombre: 'X' → 'Y'`. La traza es
+cosmética y va dentro de un `except`: si falla, la revisión sigue igual y el ban
+por nombre se aplica de todos modos (hay test).
+
 ## 2026-08 · Menos fricción para quien no la merece
 
 «mario» entró en Windows 11 con nombre latino, **una foto de hace 540 días** y sin
