@@ -21,6 +21,7 @@ NOTIFY_TYPES: dict[str, str] = {
     "bot_demoted": "notify.bot_demoted",
     "bot_overlap": "notify.bot_overlap",
     "trust_skip": "notify.trust_skip",
+    "ocr_review": "notify.ocr_review",
 }
 
 

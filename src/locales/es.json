@@ -1123,5 +1123,11 @@
   "scan.autor_desconocido": "<i>Este mensaje no trae autor (canal o servicio), así que no hay perfil que mirar.</i>",
   "scan.autor_error": "<i>No se ha podido comprobar al autor.</i>",
   "scan.media_sin_join": "ℹ️ <i>Lleva media sin texto. La única regla que cubre eso (<code>first_msg_media</code>) NO se aplica a esta persona: el bot no presenció su entrada, así que podría llevar años en el grupo y este no ser su primer mensaje de verdad. Es una guarda deliberada contra falsos positivos.</i>",
-  "cfg.b.ocr": "🔍 Leer texto en imágenes: {state}"
+  "cfg.b.ocr": "🔍 Leer texto en imágenes: {state}",
+  "notify.ocr_review": "🖼️ Imágenes dudosas (OCR)",
+  "hdl.ocr_review_dm": "🖼️ <b>Imagen que conviene mirar</b>\n\n👤 {name} (<code>{uid}</code>)\n📍 {chat}\n🤔 {motivo}\n\n<b>Texto leído en la imagen:</b>\n<pre>{texto}</pre>\n\nNo he hecho nada: no llega para actuar solo. Tú decides.",
+  "hdl.ocr_sin_texto": "(la imagen no tiene texto legible)",
+  "hdl.ocr_duda_franja": "el texto de la imagen suma {puntos} puntos: algo hay, pero no lo suficiente",
+  "hdl.ocr_duda_sin_texto": "imagen sin una sola letra en el primer mensaje de alguien sin historial (confianza {trust}/100), que es justo la forma de esquivar los detectores de contenido",
+  "hdl.ocr_duda_poco_texto": "primer mensaje con imagen de alguien sin historial (confianza {trust}/100)"
 }

@@ -312,3 +312,157 @@ def test_el_enganche_evalua_dentro_del_modo():
     i = fuente.index("async def _hits_de_la_imagen(")
     cuerpo = fuente[i:fuente.index("\nasync def ", i + 10)]
     assert "with modo_ocr():" in cuerpo
+
+
+# ---------------------------------------------------------------------------
+# Aviso privado cuando el OCR no resuelve pero deja dudas
+#
+# Pedido por el admin: «si el OCR no detecta texto pero tiene sospechas, que
+# mande aviso por privado para revisar si es o no spam». Son los dos casos que el
+# bot no puede resolver solo: el texto puntúa en la franja gris, o no hay texto
+# que leer y quien la manda es un desconocido.
+# ---------------------------------------------------------------------------
+
+def _cfg_min(**extra):
+    from types import SimpleNamespace as NS
+    base = dict(mute_score=40, ban_score=100, admin_notify_chat_id=7,
+                admin_user_id=7, mode="active")
+    base.update(extra)
+    return NS(**base)
+
+
+def _msg_min(chat_id=-100, uid=5):
+    from types import SimpleNamespace as NS
+    return NS(chat_id=chat_id, message_id=1, chat=NS(id=chat_id, title="W11"),
+              text=None, caption=None)
+
+
+class _DBTrust:
+    def __init__(self, trust=0):
+        self._t = trust
+
+    def user_trust_score(self, chat_id, user_id):
+        return self._t
+
+
+def test_una_imagen_sin_texto_de_un_desconocido_genera_duda():
+    from types import SimpleNamespace as NS
+    from src.handlers import _duda_de_la_imagen
+    motivo = _duda_de_la_imagen(_DBTrust(5), _cfg_min(), _msg_min(),
+                                NS(id=5, first_name="X"), "", 0)
+    assert motivo and "sin una sola letra" in motivo
+
+
+def test_la_franja_gris_genera_duda():
+    """Ni limpio ni suficiente: eso es exactamente lo que decide una persona."""
+    from types import SimpleNamespace as NS
+    from src.handlers import _duda_de_la_imagen
+    motivo = _duda_de_la_imagen(_DBTrust(90), _cfg_min(), _msg_min(),
+                                NS(id=5, first_name="X"), "algo de texto", 60)
+    assert motivo and "60" in motivo
+
+
+def test_alguien_asentado_mandando_una_foto_no_es_noticia():
+    """El caso mayoritario: si avisara de esto, el privado sería inservible."""
+    from types import SimpleNamespace as NS
+    from src.handlers import _duda_de_la_imagen
+    assert _duda_de_la_imagen(_DBTrust(80), _cfg_min(), _msg_min(),
+                              NS(id=5, first_name="X"), "", 0) == ""
+
+
+def test_sin_trust_legible_no_se_inventa_una_duda():
+    from types import SimpleNamespace as NS
+    from src.handlers import _duda_de_la_imagen
+
+    class Rota:
+        def user_trust_score(self, c, u):
+            raise RuntimeError("base caída")
+    assert _duda_de_la_imagen(Rota(), _cfg_min(), _msg_min(),
+                              NS(id=5, first_name="X"), "", 0) == ""
+
+
+def test_solo_se_avisa_de_lo_que_NO_llega_a_accion():
+    """Si ya se va a actuar no hay nada que consultar."""
+    from pathlib import Path
+    fuente = Path("src/handlers.py").read_text()
+    i = fuente.index("async def _hits_de_la_imagen(")
+    cuerpo = fuente[i:fuente.index("\ndef _duda_de_la_imagen(", i)]
+    assert "if puntos < cfg.mute_score:" in cuerpo
+
+
+@pytest.mark.asyncio
+async def test_el_aviso_va_solo_por_privado_y_no_actua(monkeypatch):
+    from types import SimpleNamespace as NS
+    from src import handlers
+
+    enviados = []
+
+    class _Bot:
+        async def send_message(self, chat_id, text, **kw):
+            enviados.append((chat_id, text))
+            return NS(message_id=1)
+
+    monkeypatch.setattr(handlers.notify_prefs, "effective", lambda *a, **k: True)
+    ctx = NS(bot=_Bot(), bot_data={}, application=NS(job_queue=None))
+    await handlers._avisar_imagen_dudosa(
+        ctx, _DBTrust(), _cfg_min(), _msg_min(), NS(id=5, first_name="Ana"),
+        "texto del cartel", 60, "motivo de prueba")
+    assert len(enviados) == 1
+    assert enviados[0][0] == 7, "solo al privado del admin"
+    assert "texto del cartel" in enviados[0][1]
+
+
+@pytest.mark.asyncio
+async def test_no_se_repite_el_aviso_de_la_misma_persona(monkeypatch):
+    from types import SimpleNamespace as NS
+    from src import handlers
+
+    enviados = []
+
+    class _Bot:
+        async def send_message(self, chat_id, text, **kw):
+            enviados.append(text)
+            return NS(message_id=1)
+
+    monkeypatch.setattr(handlers.notify_prefs, "effective", lambda *a, **k: True)
+    ctx = NS(bot=_Bot(), bot_data={}, application=NS(job_queue=None))
+    for _ in range(4):
+        await handlers._avisar_imagen_dudosa(
+            ctx, _DBTrust(), _cfg_min(), _msg_min(), NS(id=5, first_name="Ana"),
+            "t", 60, "m")
+    assert len(enviados) == 1
+
+
+@pytest.mark.asyncio
+async def test_se_puede_silenciar(monkeypatch):
+    from types import SimpleNamespace as NS
+    from src import handlers
+
+    enviados = []
+
+    class _Bot:
+        async def send_message(self, chat_id, text, **kw):
+            enviados.append(text)
+            return NS(message_id=1)
+
+    monkeypatch.setattr(handlers.notify_prefs, "effective", lambda *a, **k: False)
+    ctx = NS(bot=_Bot(), bot_data={}, application=NS(job_queue=None))
+    await handlers._avisar_imagen_dudosa(
+        ctx, _DBTrust(), _cfg_min(), _msg_min(), NS(id=5, first_name="Ana"), "t", 60, "m")
+    assert not enviados
+
+
+def test_el_aviso_es_silenciable_desde_alertas():
+    from src import notify_prefs
+    assert "ocr_review" in notify_prefs.TIPOS if hasattr(notify_prefs, "TIPOS") \
+        else "ocr_review" in Path("src/notify_prefs.py").read_text()
+
+
+def test_reutiliza_los_botones_ya_probados():
+    """Nada / avisar / banear del aviso de confianza: una máquina de decisión ya
+    rodada en vez de una nueva."""
+    from pathlib import Path
+    fuente = Path("src/handlers.py").read_text()
+    i = fuente.index("async def _avisar_imagen_dudosa(")
+    cuerpo = fuente[i:fuente.index("\ndef _ocr_activo(", i)]
+    assert "tnote:nada:" in cuerpo and "tnote:ban:" in cuerpo

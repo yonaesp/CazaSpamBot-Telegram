@@ -1123,5 +1123,11 @@
   "scan.autor_desconocido": "<i>This message has no author (channel or service), so there's no profile to check.</i>",
   "scan.autor_error": "<i>Could not check the author.</i>",
   "scan.media_sin_join": "ℹ️ <i>It carries media with no text. The only rule covering that (<code>first_msg_media</code>) does NOT apply to this person: the bot never saw them join, so they could have been here for years and this may not really be their first message. It's a deliberate guard against false positives.</i>",
-  "cfg.b.ocr": "🔍 Read text inside images: {state}"
+  "cfg.b.ocr": "🔍 Read text inside images: {state}",
+  "notify.ocr_review": "🖼️ Dubious images (OCR)",
+  "hdl.ocr_review_dm": "🖼️ <b>An image worth a look</b>\n\n👤 {name} (<code>{uid}</code>)\n📍 {chat}\n🤔 {motivo}\n\n<b>Text read from the image:</b>\n<pre>{texto}</pre>\n\nI did nothing: it isn't enough to act on my own. Your call.",
+  "hdl.ocr_sin_texto": "(no readable text in the image)",
+  "hdl.ocr_duda_franja": "the image text adds up to {puntos} points: something's there, but not enough",
+  "hdl.ocr_duda_sin_texto": "an image without a single letter as the first message of someone with no history (trust {trust}/100), which is exactly how you dodge the content detectors",
+  "hdl.ocr_duda_poco_texto": "first message with an image from someone with no history (trust {trust}/100)"
 }

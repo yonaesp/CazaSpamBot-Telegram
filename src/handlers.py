@@ -263,6 +263,77 @@ def _sin_tumbar(fn, que: str):
         return Hit.none()
 
 
+# Puntuación a partir de la cual una imagen que NO llega a acción merece que la
+# mire una persona. Coincide con `mute_score` a propósito: es la franja que el bot
+# ya considera «algo hay aquí» pero no lo bastante para actuar solo.
+_OCR_DUDA_MIN = 40
+_AVISO_OCR_CADA_S = 30 * 60
+_CLAVE_AVISO_OCR = "_aviso_ocr_visto"
+
+
+async def _avisar_imagen_dudosa(context, db: DB, cfg: Config, msg, user,
+                                texto: str, puntos: int, motivo: str) -> None:
+    """Aviso privado por una imagen que no llegó a acción pero deja dudas.
+
+    Lo pidió el admin: «si el OCR no detecta texto pero tiene sospechas, que mande
+    aviso por privado para revisar si es o no spam». Son los dos casos que el bot
+    no puede resolver solo:
+
+    - el texto del cartel puntúa en la franja gris (ni limpio ni suficiente);
+    - no hay texto que leer, pero quien la manda es un desconocido con el perfil
+      dudoso, y una imagen sin una sola letra en un primer mensaje es justo la
+      forma de esquivar todos los detectores de contenido.
+
+    **Solo avisa, nunca actúa**, y va únicamente por privado: un aviso público
+    sobre alguien a quien el bot ha decidido no tocar haría más daño que la propia
+    imagen. Los botones son los MISMOS del aviso de confianza (nada / avisar /
+    banear), así que la decisión pasa por una máquina ya probada en vez de una
+    nueva.
+    """
+    from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+    if not notify_prefs.effective(db, "ocr_review", cfg):
+        return
+    admin_dm = cfg.admin_notify_chat_id
+    if not admin_dm:
+        return
+    # Mismo freno que el aviso de confianza: quien manda varias imágenes seguidas
+    # no puede convertir el privado en un buzón de repeticiones.
+    cache = context.bot_data.setdefault(_CLAVE_AVISO_OCR, {})
+    ahora = time.time()
+    if ahora - cache.get((msg.chat_id, user.id), 0.0) < _AVISO_OCR_CADA_S:
+        return
+    cache[(msg.chat_id, user.id)] = ahora
+    for k, visto in list(cache.items()):
+        if ahora - visto > _AVISO_OCR_CADA_S * 4:
+            del cache[k]
+
+    info = t(
+        "hdl.ocr_review_dm",
+        uid=user.id,
+        name=_h.escape((user.first_name or "user")[:40]),
+        chat=_h.escape(str(msg.chat.title or msg.chat_id)),
+        # Los puntos ya van dentro del motivo cuando vienen al caso: pasarlos
+        # aparte dejaría un parámetro sin usar en la plantilla.
+        motivo=_h.escape(motivo),
+        # El texto sale de una imagen que elige el spammer: se escapa igual que
+        # todo lo demás, o un cartel con «<b>» dejaría el HTML abierto y Telegram
+        # rechazaría el aviso entero.
+        texto=_h.escape(texto[:500]) if texto else t("hdl.ocr_sin_texto"),
+    )
+    base = f"{msg.chat_id}:{user.id}:{msg.message_id}"
+    kb = InlineKeyboardMarkup([[
+        InlineKeyboardButton(t("hdl.btn.tn_nothing"), callback_data=f"tnote:nada:{base}"),
+        InlineKeyboardButton(t("hdl.btn.tn_warn"), callback_data=f"tnote:warn:{base}"),
+        InlineKeyboardButton(t("hdl.btn.tn_ban"), callback_data=f"tnote:ban:{base}"),
+    ], [notify_prefs.mute_button("ocr_review")]])
+    try:
+        await context.bot.send_message(chat_id=admin_dm, text=info, parse_mode="HTML",
+                                       reply_markup=kb, disable_web_page_preview=True)
+        log.info("OCR: aviso de imagen dudosa user=%s (%s, %d pts)", user.id, motivo, puntos)
+    except TelegramError as exc:
+        log.warning("OCR: no se pudo avisar de la imagen dudosa: %s", exc)
+
+
 def _ocr_activo(db: DB, chat_id: int) -> bool:
     """¿Se leen las imágenes en este chat? Defecto: sí.
 
@@ -325,7 +396,38 @@ async def _hits_de_la_imagen(context, db: DB, cfg: Config, msg, user) -> list[Hi
     if reales:
         log.info("OCR: user=%s la imagen dispara %s", user.id,
                  ", ".join(f"{h.rule}({h.score})" for h in reales))
+    # Si con esto ya se va a actuar, no hay nada que consultar: el aviso es para
+    # lo que el bot NO puede resolver solo.
+    puntos = sum(h.score for h in reales)
+    if puntos < cfg.mute_score:
+        motivo = _duda_de_la_imagen(db, cfg, msg, user, texto, puntos)
+        if motivo:
+            await _avisar_imagen_dudosa(context, db, cfg, msg, user, texto, puntos, motivo)
     return hits
+
+
+def _duda_de_la_imagen(db: DB, cfg: Config, msg, user, texto: str, puntos: int) -> str:
+    """Por qué esta imagen merece que la mire una persona, o cadena vacía.
+
+    Se exige un motivo CONCRETO y se devuelve escrito: un aviso que no dice qué
+    lo ha provocado acaba ignorándose, y en este proyecto eso es peor que no
+    tenerlo.
+    """
+    if puntos >= _OCR_DUDA_MIN:
+        return t("hdl.ocr_duda_franja", puntos=puntos)
+    # Sin texto que leer no hay contenido que juzgar, así que la duda solo puede
+    # venir de QUIÉN la manda. Se usa el trust, que ya pondera mensajes,
+    # antigüedad y si el bot presenció la entrada.
+    try:
+        trust = db.user_trust_score(msg.chat_id, user.id)
+    except Exception as exc:  # noqa: BLE001
+        log.debug("OCR: sin trust para %s: %s", user.id, exc)
+        return ""
+    if trust >= cfg.mute_score:
+        return ""            # alguien asentado mandando una foto no es noticia
+    if not texto:
+        return t("hdl.ocr_duda_sin_texto", trust=trust)
+    return t("hdl.ocr_duda_poco_texto", trust=trust)
 
 
 def _can_restrict(member) -> bool:

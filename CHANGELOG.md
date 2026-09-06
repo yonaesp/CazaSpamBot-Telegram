@@ -31,6 +31,13 @@ nuevo que pasa una foto de un ordenador»):
 - **Los idiomas salen de los que ya usa el bot** para sus listas, filtrando los
   que Tesseract no tenga instalados (pedirle uno que le falta hace fallar la
   llamada entera y no leería nada). `OCR_LANGS` lo fija a mano.
+- **Si no llega para actuar pero deja dudas, avisa por privado** (`ocr_review`,
+  silenciable desde `/alertas`): el texto en la franja gris, o una imagen SIN una
+  sola letra en el primer mensaje de alguien sin historial, que es exactamente la
+  forma de esquivar los detectores de contenido. Solo avisa, nunca actúa, y
+  reutiliza los botones nada/avisar/banear ya probados. Freno de media hora por
+  persona, y quien está asentado no genera aviso: si avisara de cada foto, el
+  privado sería inservible.
 - **El vocabulario es el mismo que el de los mensajes escritos.** Quien quiera
   términos solo para carteles los pone en `config/blacklist/ocr/`, vacía por
   defecto, que se suma. El modo entra en la clave de la caché de patrones: sin
