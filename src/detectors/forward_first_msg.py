@@ -24,6 +24,40 @@ from . import Hit
 EARLY_WINDOW_S = 180
 
 
+def _es_reenvio_de_uno_mismo(
+    msg: Message, origin_type: str, origin_user_id: int | None, origin_name: str | None,
+) -> bool:
+    """¿El mensaje reenviado es SUYO PROPIO?
+
+    Reenviarse algo de uno mismo (desde Mensajes Guardados, o desde otro chat
+    donde escribió) no es traer contenido de fuera, que es justo lo que este
+    detector busca. Es lo que hace cualquiera que rescata una captura o un dato
+    que ya había mandado en otro sitio.
+
+    Caso real (7-sep-2026, Windows 11): «Kleo» entró, se verificó y reenvió un
+    mensaje SUYO con la captura de una compra y 165 caracteres preguntando si su
+    licencia era retail. `origin_name` era su propio usuario. Sumó 80 aquí y 70 en
+    `first_msg_media` (que ya había dictaminado perfil NO sospechoso) = 150, o sea
+    ban federado en los cuatro grupos y reporte a Telegram, sin que una sola regla
+    de contenido hubiera saltado. En los 15 casos del histórico este detector solo
+    ha acertado con origen CANAL (7 de 7); con origen usuario nunca ha cazado nada.
+    """
+    autor = getattr(msg, "from_user", None)
+    if autor is None:
+        return False
+    if origin_type == "user" and origin_user_id is not None:
+        return origin_user_id == autor.id
+    # Con la privacidad de reenvío puesta, Telegram oculta la cuenta y solo deja el
+    # nombre visible: no hay id que comparar, así que se compara ese nombre.
+    if origin_type == "hidden_user" and origin_name:
+        propios = {
+            (autor.first_name or "").strip(),
+            f"{autor.first_name or ''} {autor.last_name or ''}".strip(),
+        }
+        return origin_name.strip() in propios - {""}
+    return False
+
+
 def check(
     msg: Message,
     is_first_msg: bool,
@@ -56,6 +90,7 @@ def check(
 
     origin_type: str = "unknown"
     origin_name: str | None = None
+    origin_user_id: int | None = None
 
     if fwd_chat is not None:
         origin_type = fwd_chat.type or "channel"  # channel, supergroup, group
@@ -63,6 +98,7 @@ def check(
     elif fwd_user is not None:
         origin_type = "bot" if getattr(fwd_user, "is_bot", False) else "user"
         origin_name = fwd_user.username or fwd_user.first_name
+        origin_user_id = getattr(fwd_user, "id", None)
     elif fwd_sender_name:
         origin_type = "hidden_user"
         origin_name = fwd_sender_name
@@ -78,6 +114,7 @@ def check(
             u = getattr(origin, "sender_user", None)
             origin_type = "bot" if (u and getattr(u, "is_bot", False)) else "user"
             origin_name = (u.username or u.first_name) if u else None
+            origin_user_id = getattr(u, "id", None) if u is not None else None
         elif otype == "hidden_user":
             origin_type = "hidden_user"
             origin_name = getattr(origin, "sender_user_name", None)
@@ -85,6 +122,12 @@ def check(
             origin_type = "chat"
             sc = getattr(origin, "sender_chat", None)
             origin_name = (sc.username or sc.title) if sc else None
+
+    # Un reenvío de uno mismo no es contenido traído de fuera: no hay nada que
+    # puntuar. Va ANTES de la severidad para que no dependa del origen ni de la
+    # ventana temprana.
+    if _es_reenvio_de_uno_mismo(msg, origin_type, origin_user_id, origin_name):
+        return Hit.none()
 
     # Severidad:
     # - Forward desde channel en primer msg → BAN directo (score 100)

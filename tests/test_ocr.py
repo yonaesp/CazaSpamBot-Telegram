@@ -387,7 +387,9 @@ def test_solo_se_avisa_de_lo_que_NO_llega_a_accion():
     fuente = Path("src/handlers.py").read_text()
     i = fuente.index("async def _hits_de_la_imagen(")
     cuerpo = fuente[i:fuente.index("\ndef _duda_de_la_imagen(", i)]
-    assert "if puntos < cfg.mute_score:" in cuerpo
+    # Sin anclar al `if` entero: lleva además la guarda `avisar`, que permite a
+    # quien llama silenciar el aviso porque ya manda el suyo.
+    assert "puntos < cfg.mute_score" in cuerpo
 
 
 @pytest.mark.asyncio

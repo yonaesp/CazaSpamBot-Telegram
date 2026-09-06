@@ -1098,6 +1098,7 @@
   "quip.cross_post.3": "🔁 <b>{name}</b> did not have a question, they had a campaign. Goodbye.",
   "quip.cross_post.4": "📨 The same text in three groups within ten minutes. We noticed, <b>{name}</b>.",
   "cfg.b.softban": "🔇 Mute instead of removing: {state}",
+  "reason.solo_forma": "No action: only structural signals ({reglas}) and the text they wrote triggers nothing",
   "reason.soft_ban": "Muted instead of removed (group's soft mode)",
   "perm.solo_admin_del_bot": "🔒 That command can only be used by the bot administrator. Your message was removed by the command cleanup, but <b>nothing was applied</b>.",
   "cfg.warns.quien.chat_admins": "👮 Group admins",

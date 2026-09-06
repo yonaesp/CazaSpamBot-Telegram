@@ -36,9 +36,16 @@ def test_non_allowed_script_alone_NOT_reportable():
     assert _is_reportable(_dec("non_allowed_script", 100)) is False
 
 
-def test_first_msg_media_with_high_score_reportable():
-    """first_msg_media en whitelist + score alto = reportable."""
-    assert _is_reportable(_dec("first_msg_media", 150)) is True
+def test_first_msg_media_sola_NO_reportable_aunque_el_score_llegue():
+    """Una regla de pura FORMA no basta para reportar a Telegram.
+
+    Un reporte oficial quema la reputación de la cuenta secundaria. «Lleva foto»
+    no dice nada de lo que el mensaje diga: hace falta al menos una regla que haya
+    mirado el contenido o el perfil. Con una de contenido al lado, sí se reporta.
+    """
+    assert _is_reportable(_dec("first_msg_media", 150)) is False
+    assert _is_reportable(_dec("first_msg_media", 300)) is False
+    assert _is_reportable(_dec("commercial_ad+first_msg_media", 150)) is True
 
 
 def test_first_msg_media_low_score_NOT_reportable():
@@ -60,9 +67,14 @@ def test_combined_rules_none_in_whitelist():
     assert _is_reportable(_dec("external_mention_or_link+url_blocklist", 300)) is False
 
 
-def test_forward_first_msg_with_high_score_reportable():
+def test_forward_first_msg_solo_NO_reportable():
     assert _is_reportable(_dec("forward_first_msg", 100)) is False  # solo 100, < 150
-    assert _is_reportable(_dec("forward_first_msg", 150)) is True
+    assert _is_reportable(_dec("forward_first_msg", 150)) is False  # pura forma
+    # Caso real (7-sep-2026): «Kleo» sumó forward(80)+media(70) = 150 exactos y se
+    # le reportó DOS VECES a Telegram por una pregunta sobre licencias de Windows.
+    assert _is_reportable(_dec("forward_first_msg+first_msg_media", 150)) is False
+    # Con una señal de contenido al lado vuelve a ser reportable.
+    assert _is_reportable(_dec("non_allowed_script+forward_first_msg", 150)) is True
 
 
 def test_reaction_farming_in_whitelist():

@@ -4,6 +4,41 @@ Cambios relevantes de CazaSpamBot, lo más reciente arriba. Se anotan hitos, no
 cada commit: para el detalle está el historial de git. Sin números de versión
 porque el bot es un servicio en producción continua, no un paquete que se libera.
 
+## 2026-09 · Las señales de forma dejan de castigar solas
+
+Un usuario legítimo acabó **baneado en los cuatro grupos y reportado a Telegram**
+sin que ninguna regla de contenido hubiera disparado. «Kleo» entró en Windows 11,
+se verificó en 10 segundos y reenvió un mensaje **suyo propio** con la captura de
+una compra y 165 caracteres preguntando si la licencia que acababa de comprar era
+retail. Saltaron dos detectores que no leen el mensaje:
+
+| regla | qué mira | puntos |
+|---|---|---|
+| `forward_first_msg` | que sea un reenvío (origen `user`: él mismo) | 80 |
+| `first_msg_media` | que lleve foto (`is_suspicious: false` en su payload) | 70 |
+
+150 exactos, que es a la vez el umbral de ban y el de reporte oficial.
+
+**El histórico daba la respuesta** (`moderation_log`, 15 casos desde mayo):
+`forward_first_msg` había saltado 7 veces y **las 7 con origen CANAL**; con origen
+usuario, nunca nada. Y todos los bans acertados llevaban además una señal de
+contenido o el perfil marcado sospechoso. El de Kleo era el único sin ninguna.
+
+Tres cambios, **ninguno tocando los scores**:
+
+- **Reenviarse algo propio ya no puntúa.** Se compara el id del autor con el del
+  origen; con la privacidad de reenvío puesta, donde no hay id, el nombre visible.
+- **Perdón por contenido limpio.** Si todos los hits son de forma, el reenvío no
+  viene de canal/chat/bot, la persona escribió texto propio suficiente que no
+  dispara nada y **el OCR tampoco encuentra nada dentro de la imagen**, no se
+  castiga: se avisa al admin con los botones de siempre. Es la única vez que se lee
+  una imagen que ya trae texto, y cierra el hueco de «caption inocente + cartel».
+- **No se reporta a Telegram por señales de pura forma**, que quemaban la
+  reputación de la cuenta secundaria sin evidencia.
+
+El perdón **no alcanza al reenvío desde canal, chat o bot**: ese es el patrón
+fuerte y el único que ha acertado. 1524 tests.
+
 ## 2026-09 · Leer el texto que va dentro de una imagen
 
 Un cartel publicitario era, para el bot, un mensaje vacío. Caso real en Windows

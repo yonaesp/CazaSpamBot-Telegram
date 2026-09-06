@@ -75,3 +75,59 @@ def test_forward_origin_ptb21_channel():
     assert hit.score == 100
     assert hit.payload["origin_type"] == "channel"
     assert hit.payload["origin_name"] == "evilch"
+
+
+# --- Reenviarse un mensaje PROPIO no es traer contenido de fuera ---------------
+#
+# Caso real (7-sep-2026, Windows 11): «Kleo» entró, se verificó y reenvió un
+# mensaje SUYO con la captura de una compra y 165 caracteres preguntando si la
+# licencia era retail. Sumó 80 aquí + 70 en `first_msg_media` = 150 → ban federado
+# en los cuatro grupos y reporte a Telegram, sin una sola regla de contenido.
+# Medido en los 15 casos del histórico: este detector solo ha acertado con origen
+# CANAL (7 de 7); con origen usuario no ha cazado nunca nada.
+
+def _msg_de(autor_id: int, nombre: str = "Kleo", **kw):
+    m = _msg(**kw)
+    m.from_user = SimpleNamespace(id=autor_id, first_name=nombre, last_name=None)
+    return m
+
+
+def test_reenvio_de_uno_mismo_no_puntua_legacy():
+    yo = SimpleNamespace(is_bot=False, id=8409186137, username="kakermalicioso",
+                         first_name="Kleo")
+    hit = det.check(_msg_de(8409186137, forward_from=yo), is_first_msg=True)
+    assert hit is None or hit.score == 0
+
+
+def test_reenvio_de_uno_mismo_no_puntua_forward_origin():
+    yo = SimpleNamespace(is_bot=False, id=8409186137, username="kakermalicioso",
+                         first_name="Kleo")
+    origen = SimpleNamespace(type="user", sender_user=yo)
+    hit = det.check(_msg_de(8409186137, forward_origin=origen), is_first_msg=True)
+    assert hit is None or hit.score == 0
+
+
+def test_reenvio_de_OTRO_usuario_sigue_puntuando():
+    otro = SimpleNamespace(is_bot=False, id=999, username="otro", first_name="Otro")
+    hit = det.check(_msg_de(8409186137, forward_from=otro), is_first_msg=True)
+    assert hit is not None and hit.score == 80
+
+
+def test_la_exencion_no_alcanza_a_los_canales():
+    """Aunque el canal se llame como él: el patrón fuerte es el canal, y sigue."""
+    canal = SimpleNamespace(type="channel", username="Kleo", title="Kleo")
+    hit = det.check(_msg_de(8409186137, forward_from_chat=canal), is_first_msg=True)
+    assert hit is not None and hit.score == 100
+
+
+def test_reenvio_propio_con_privacidad_activada_no_puntua():
+    """Sin id que comparar, Telegram solo deja el nombre visible."""
+    hit = det.check(_msg_de(8409186137, "Kleo", forward_sender_name="Kleo"),
+                    is_first_msg=True)
+    assert hit is None or hit.score == 0
+
+
+def test_usuario_oculto_con_OTRO_nombre_sigue_puntuando():
+    hit = det.check(_msg_de(8409186137, "Kleo", forward_sender_name="Otra Persona"),
+                    is_first_msg=True)
+    assert hit is not None and hit.score == 80

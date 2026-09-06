@@ -141,6 +141,53 @@ Cuatro cosas que no se deben romper:
 
 **El vocabulario es la otra mitad, y sin él el OCR no sirve de nada**: el texto extraído puntuaba **0** con las listas de entonces. Al añadir el de venta de software pirata hay que recordar que el contexto son grupos de Windows, donde «activar», «instalación» y «licencia» son palabras del día a día: ninguna va suelta. Se probó `escríbeme por interno` y marcaba «escríbeme por interno y te paso el driver». Lo inequívoco es el CATÁLOGO (cinco programas de pago listados) y la estructura de oferta. Los patrones toleran ruido con `[\s\S]{0,N}` porque el OCR parte las palabras.
 
+### Las señales de FORMA no castigan solas
+
+`forward_first_msg`, `first_msg_media` y los `jfm_*` no miran lo que DICE el
+mensaje, solo su forma o su circunstancia: que sea un reenvío, que lleve foto, que
+se escribiera a los pocos segundos de entrar. **Ninguna es prueba de spam por sí
+misma**, y sumadas de dos en dos llegaban al umbral sin que nadie hubiera leído el
+mensaje.
+
+Caso real (7-sep-2026, Windows 11): «Kleo» entró, se verificó en 10 s y reenvió un
+mensaje **suyo propio** con la captura de una compra y 165 caracteres preguntando
+si la licencia que acababa de comprar era retail. Sumó `forward_first_msg` (80,
+origen `user` = él mismo) + `first_msg_media` (70, con `is_suspicious: false` en su
+propio payload) = **150 exactos**, que es a la vez el umbral de ban y el de
+reporte: acabó **baneado en los cuatro grupos por federación y reportado dos veces
+a Telegram**, sin que una sola regla de contenido disparara. Una pregunta sobre
+licencias de Windows, en un grupo de Windows.
+
+**Lo que dice el histórico** (`moderation_log`, 15 casos desde mayo):
+`forward_first_msg` ha saltado 7 veces y **las 7 con origen CANAL**; con origen
+`user` no ha cazado nunca nada. Y **todos** los bans acertados llevaban además una
+señal de contenido (`commercial_ad`, `non_allowed_script`,
+`external_mention_or_link`, `inline_buttons_from_user`) o el perfil marcado como
+sospechoso. El de Kleo es el único sin ninguna de las dos.
+
+Tres cambios, y ninguno toca los scores (cambiar un umbral sin datos es justo lo
+que se desaconseja aquí):
+
+1. **Reenviarse algo propio no es traer contenido de fuera** y no puntúa
+   (`_es_reenvio_de_uno_mismo`): se compara el id del autor con el del origen, y
+   con la privacidad de reenvío activada —donde no hay id— el nombre visible.
+2. **`_perdon_por_contenido_limpio`**: si TODOS los hits son de forma, el reenvío
+   no viene de canal/chat/bot, la persona escribió texto propio suficiente
+   (≥40 caracteres y ≥6 palabras) que no dispara nada, y **lo que el OCR saca de la
+   imagen tampoco**, no se castiga: se avisa al admin con los botones de siempre.
+   Ese último paso es el que cierra el hueco de «caption inocente + cartel de
+   spam», y **es la única vez que se lee una imagen que ya trae texto**: se paga
+   solo donde puede cambiar el veredicto, igual que en `channel_reader`.
+3. **No se reporta a Telegram por señales de pura forma.** Un reporte oficial quema
+   la reputación de la cuenta secundaria, que es justo lo que `_REPORT_MIN_SCORE`
+   pretendía proteger, y dos señales de forma llegaban a 150 sin evidencia.
+
+⚠️ **El perdón NO alcanza al reenvío desde un canal, un chat o un bot**: ese es el
+patrón fuerte y el único que ha acertado. El caption lo escribe el spammer y le
+sale gratis, así que un texto limpio no puede comprarlo. Si alguien mete en
+`_REGLAS_DE_FORMA` una regla que sí mira el contenido, el perdón deja de exigir
+evidencia y empieza a tapar spam real: hay test que lo impide.
+
 ### Listas negras (`config/blacklist/`)
 
 Tres capas que se **acumulan** (el spam llega en cualquier idioma):

@@ -349,7 +349,8 @@ def _ocr_activo(db: DB, chat_id: int) -> bool:
         return True
 
 
-async def _hits_de_la_imagen(context, db: DB, cfg: Config, msg, user) -> list[Hit]:
+async def _hits_de_la_imagen(context, db: DB, cfg: Config, msg, user,
+                             avisar: bool = True) -> list[Hit]:
     """Pasa el texto que el OCR saca de la imagen por los detectores de contenido.
 
     Devuelve los hits tal cual, sin inventar ninguna regla propia: si el cartel
@@ -399,7 +400,7 @@ async def _hits_de_la_imagen(context, db: DB, cfg: Config, msg, user) -> list[Hi
     # Si con esto ya se va a actuar, no hay nada que consultar: el aviso es para
     # lo que el bot NO puede resolver solo.
     puntos = sum(h.score for h in reales)
-    if puntos < cfg.mute_score:
+    if avisar and puntos < cfg.mute_score:
         motivo = _duda_de_la_imagen(db, cfg, msg, user, texto, puntos)
         if motivo:
             await _avisar_imagen_dudosa(context, db, cfg, msg, user, texto, puntos, motivo)
@@ -428,6 +429,93 @@ def _duda_de_la_imagen(db: DB, cfg: Config, msg, user, texto: str, puntos: int) 
     if not texto:
         return t("hdl.ocr_duda_sin_texto", trust=trust)
     return t("hdl.ocr_duda_poco_texto", trust=trust)
+
+
+# Reglas que NO miran lo que DICE el mensaje, solo su forma o su circunstancia:
+# que sea un reenvío, que lleve una foto, que se escribiera a los pocos segundos
+# de entrar. Ninguna es prueba de spam por sí misma: su valor está en sumarse a
+# una señal de contenido, que es como han cazado todos los casos reales.
+_REGLAS_DE_FORMA = frozenset({
+    "forward_first_msg", "first_msg_media",
+    "jfm_too_fast", "jfm_fast", "jfm_cron",
+})
+
+# Cuánto texto propio hace falta para tomarlo por comunicación de verdad y no por
+# el «mira esto 👇» que acompaña a un cartel publicitario.
+_TEXTO_PROPIO_MIN_CHARS = 40
+_TEXTO_PROPIO_MIN_PALABRAS = 6
+
+
+def _texto_propio_sustantivo(msg_txt) -> str:
+    """El texto que ESCRIBIÓ la persona, si da para juzgarlo. Si no, cadena vacía."""
+    txt = ((getattr(msg_txt, "text", None) or getattr(msg_txt, "caption", None)) or "").strip()
+    if len(txt) < _TEXTO_PROPIO_MIN_CHARS or len(txt.split()) < _TEXTO_PROPIO_MIN_PALABRAS:
+        return ""
+    return txt
+
+
+def _forward_de_fuera(real: list[Hit]) -> bool:
+    """¿El reenvío viene de un canal, un chat o un bot?
+
+    Ese sí es el patrón fuerte del detector, y el único que ha acertado en el
+    histórico (7 de 7). No se perdona por mucho que el texto esté limpio: el
+    caption lo escribe el spammer y le sale gratis.
+    """
+    return any(
+        h.rule == "forward_first_msg"
+        and (h.payload or {}).get("origin_type") in ("channel", "chat", "bot")
+        for h in real
+    )
+
+
+async def _perdon_por_contenido_limpio(
+    context, db: DB, cfg: Config, msg, msg_txt, user, real: list[Hit],
+) -> str:
+    """Motivo por el que NO castigar, o cadena vacía si el castigo se mantiene.
+
+    Dos señales de pura forma se suman hasta el umbral de ban sin que nadie haya
+    mirado lo que dice el mensaje. Caso real que lo destapó (7-sep-2026, Windows
+    11): «Kleo» reenvió un mensaje SUYO con una captura y 165 caracteres
+    preguntando si la licencia que acababa de comprar era retail; sumó
+    `forward_first_msg` (80) + `first_msg_media` (70) = 150 y acabó **baneado en
+    los cuatro grupos y reportado a Telegram**, con `is_suspicious: false` en el
+    propio payload y sin una sola regla de contenido disparada. Una pregunta sobre
+    licencias de Windows, en un grupo de Windows.
+
+    Medido sobre los 15 casos del histórico: **todos** los bans acertados llevaban
+    además una señal de contenido (`commercial_ad`, `non_allowed_script`,
+    `external_mention_or_link`, `inline_buttons_from_user`) o un perfil marcado
+    como sospechoso. El de Kleo es el único sin ninguna de las dos, así que este
+    perdón no habría cambiado ni uno de los aciertos.
+
+    Se exige que se cumpla TODO:
+      - ninguna regla de contenido ni de perfil entre las disparadas;
+      - el reenvío, si lo hay, no viene de canal/chat/bot;
+      - la persona escribió texto propio suficiente para juzgarla, y no disparó nada;
+      - si además hay imagen, lo que el OCR saca de ella tampoco dispara nada. Esto
+        último es lo que cierra el hueco de «caption inocente + cartel de spam»: se
+        paga la lectura solo aquí, que es donde puede cambiar el veredicto.
+    """
+    if any(h.rule not in _REGLAS_DE_FORMA for h in real):
+        return ""
+    if _forward_de_fuera(real):
+        return ""
+    if not _texto_propio_sustantivo(msg_txt):
+        return ""
+    if msg.photo or msg.document:
+        try:
+            # `avisar=False`: el aviso de este perdón ya se manda abajo, con más
+            # contexto. Dos privados por el mismo mensaje son ruido.
+            de_la_imagen = await _hits_de_la_imagen(context, db, cfg, msg, user, avisar=False)
+        except Exception as exc:  # noqa: BLE001
+            # Sin poder mirar dentro de la imagen no se perdona: ante la duda se
+            # mantiene lo que decidieron las reglas.
+            log.warning("perdón por contenido limpio: no se pudo leer la imagen: %s",
+                        exc, exc_info=True)
+            return ""
+        if any(de_la_imagen):
+            return ""
+    return t("reason.solo_forma", reglas=", ".join(h.rule for h in real))
 
 
 def _can_restrict(member) -> bool:
@@ -1724,6 +1812,34 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         cfg.first_msg_attack_action, is_first_msg_attack=is_first_attack,
     )
 
+    # Señales de pura FORMA (reenvío, foto, prisa) sin una sola de contenido: si
+    # además la persona escribió algo que no dispara nada, no hay motivo para
+    # castigar. Va antes del veto del modelo porque es determinista y no depende
+    # de tener clave de API. Ver `_perdon_por_contenido_limpio`.
+    if decision.action in ("ban", "kick", "mute") and not any(
+            h.rule in HARD_RULES_BAN for h in real):
+        _motivo_perdon = await _perdon_por_contenido_limpio(
+            context, db, cfg, msg, msg_txt, user, real)
+        if _motivo_perdon:
+            log.info("acción %s ANULADA sobre user=%s: %s (reglas=%s)",
+                     decision.action, user.id, _motivo_perdon, [h.rule for h in real])
+            db.log_action(
+                chat_id=chat_id, user_id=user.id, username=user.username,
+                message_id=msg.message_id, rule="+".join(h.rule for h in real),
+                action="noop_solo_forma", score=decision.score,
+                mode=("shadow" if cfg.shadow else "active"),
+                payload={"would_be": decision.action, "motivo": _motivo_perdon},
+            )
+            # Se le cuenta al admin con los botones de siempre: el bot ha visto algo
+            # y ha decidido no tocarlo, y eso no puede quedar sin que nadie se entere.
+            await _send_trust_notice(
+                context, db, cfg, msg, user, rules=[h.rule for h in real],
+                reason=decision.reason + " | " + _motivo_perdon,
+                proposed_action=decision.action,
+                trust=_trust_score_cached(context, db, chat_id, user.id),
+            )
+            return
+
     # Segunda opinión de un modelo, y SOLO para TUMBAR la acción. Nunca para
     # crearla: en el peor de los casos deja pasar un spam (el error barato), nunca
     # castiga a alguien legítimo (el error caro). Apagado por defecto, solo en la
@@ -2027,6 +2143,13 @@ def _is_reportable(decision) -> bool:
     single_shot = {"cas_match", "lols_match", "federation_known_ban"}
     if rules & single_shot:
         return True
+    # Un reporte oficial quema la reputación de la cuenta secundaria, que es
+    # justo lo que `_REPORT_MIN_SCORE` quiere proteger. Dos señales de pura forma
+    # llegan a 150 sin que nadie haya mirado el contenido: al caso de Kleo
+    # (7-sep-2026) se le reportó dos veces siendo una pregunta legítima. Se exige
+    # al menos una regla que sí haya mirado lo que el mensaje dice o quién lo manda.
+    if not (rules - _REGLAS_DE_FORMA):
+        return False
     return decision.score >= _REPORT_MIN_SCORE
 
 
