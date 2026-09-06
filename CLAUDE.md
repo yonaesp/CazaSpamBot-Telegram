@@ -333,6 +333,33 @@ mano; las dos excepciones (`maintenance`, que usa UTC para un NOMBRE DE FICHERO,
 `topweekly`, que ya fija Madrid) llevan el porqué escrito al lado y el test
 comprueba que sigue ahí.
 
+## Tests que pasan en verde sin comprobar nada
+
+Dos formas medidas en este repo de tener un test inútil que además da confianza
+falsa. Las dos costaron tiempo real:
+
+**1. Un doble con firma genérica no ejerce el camino de verdad.** Los 18 tests de
+`notify_bot_overlap` estaban en verde mientras la función **no había avisado
+jamás**: sus dobles eran `AsyncMock`, cuya firma acepta cualquier cosa, así que
+`inspect.signature` no veía el parámetro `return_bots` y el código bajo prueba
+tomaba otra rama. Un doble debe imitar **cómo se comporta el servicio real**, no
+solo devolver lo que al test le conviene: el de ahora filtra los bots igual que
+hace Telegram, y con el código anterior falla.
+
+**2. Un `index()` sobre el fuente casa con comentarios y prosa.** Pasó tres
+veces: buscar `verification.on_join` encontró dos comentarios antes que la
+llamada; buscar `JoinChannel` casó dentro del docstring que explica que NO se
+usa; y medir sangría para comprobar que algo está fuera de un bucle falló porque
+estaba dentro de un `try`. Para invariantes de estructura, usar `ast` (como en
+`test_borrados_agrupados`) o anclar a la llamada literal (`await x.y(`), nunca al
+nombre suelto.
+
+Y una regla de trabajo que salió de romperlo: **antes de crear un fichero de
+tests, comprobar si existe.** Un `cat >` sobre `test_bot_overlap.py` borró 18
+tests ya escritos; solo se notó porque el total de la suite BAJÓ en vez de subir.
+El contador de `test_docs_al_dia.py` es la red que lo detecta: si el número no
+cuadra al alza, algo se ha perdido por el camino.
+
 ## Convenciones de código
 
 - Type hints en funciones públicas. `async def` para todo lo que toque Telegram API.
