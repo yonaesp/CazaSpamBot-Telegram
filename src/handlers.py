@@ -263,6 +263,21 @@ def _sin_tumbar(fn, que: str):
         return Hit.none()
 
 
+def _ocr_activo(db: DB, chat_id: int) -> bool:
+    """¿Se leen las imágenes en este chat? Defecto: sí.
+
+    Ante un ajuste ilegible se devuelve el defecto y no el lado restrictivo,
+    porque aquí «restrictivo» sería dejar de mirar: el OCR no castiga a nadie por
+    sí mismo, solo aporta texto a los detectores de siempre.
+    """
+    try:
+        s = db.get_chat_settings(chat_id)
+        return True if s is None else bool(s["ocr_enabled"])
+    except Exception as exc:  # noqa: BLE001
+        log.debug("ocr_enabled ilegible chat=%s: %s", chat_id, exc)
+        return True
+
+
 async def _hits_de_la_imagen(context, db: DB, cfg: Config, msg, user) -> list[Hit]:
     """Pasa el texto que el OCR saca de la imagen por los detectores de contenido.
 
@@ -271,7 +286,7 @@ async def _hits_de_la_imagen(context, db: DB, cfg: Config, msg, user) -> list[Hi
     siempre. Así el OCR no puede banear por su cuenta ni desviarse del resto.
     """
     from . import ocr
-    if not ocr.disponible():
+    if not ocr.disponible() or not _ocr_activo(db, msg.chat_id):
         return []
     foto = msg.photo[-1] if msg.photo else msg.document
     try:
@@ -291,16 +306,21 @@ async def _hits_de_la_imagen(context, db: DB, cfg: Config, msg, user) -> list[Hi
                             reply_to_message=None, chat=msg.chat, chat_id=msg.chat_id,
                             message_id=msg.message_id)
     guard = _chat_money_guard(db, msg.chat_id)
-    hits = [
-        _sin_tumbar(lambda: _apply_money_guard(
-            comad_det.check(leido, is_first_msg=True), guard), "commercial_ad/ocr"),
-        _sin_tumbar(lambda: _apply_money_guard(
-            invscam_det.check(leido, is_first_msg=True), guard), "investment_scam/ocr"),
-        _sin_tumbar(lambda: url_det.check(leido, cfg.url_blocklist, is_first_msg=True),
-                    "url_blocklist/ocr"),
-        _sin_tumbar(lambda: offplat_det.check(leido, is_first_msg=True),
-                    "offplatform_contact/ocr"),
-    ]
+    # Dentro de `modo_ocr` las listas suman la capa `config/blacklist/ocr/`, que
+    # está vacía por defecto: el vocabulario es EL MISMO que el de un mensaje
+    # escrito salvo que alguien añada ahí términos que solo valgan para carteles.
+    from .wordlists import modo_ocr
+    with modo_ocr():
+        hits = [
+            _sin_tumbar(lambda: _apply_money_guard(
+                comad_det.check(leido, is_first_msg=True), guard), "commercial_ad/ocr"),
+            _sin_tumbar(lambda: _apply_money_guard(
+                invscam_det.check(leido, is_first_msg=True), guard), "investment_scam/ocr"),
+            _sin_tumbar(lambda: url_det.check(leido, cfg.url_blocklist, is_first_msg=True),
+                        "url_blocklist/ocr"),
+            _sin_tumbar(lambda: offplat_det.check(leido, is_first_msg=True),
+                        "offplatform_contact/ocr"),
+        ]
     reales = [h for h in hits if h]
     if reales:
         log.info("OCR: user=%s la imagen dispara %s", user.id,

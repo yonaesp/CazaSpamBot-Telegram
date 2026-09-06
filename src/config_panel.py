@@ -43,6 +43,7 @@ _TOGGLE_FIELDS = {
     "cleanservice",
     "topweekly_enabled",
     "soft_ban",
+    "ocr_enabled",
 }
 
 # Presets de tiempos (dentro de los rangos que valida /verificacion).
@@ -329,12 +330,17 @@ def _header(title: str) -> str:
     return t("cfg.header", title=title)
 
 
-def _b(s, field: str) -> bool:
-    """Lee un booleano de un Row/dict de settings tolerando NULL."""
+def _b(s, field: str, default: bool = False) -> bool:
+    """Lee un booleano de un Row/dict de settings tolerando NULL.
+
+    `default` importa para los ajustes que nacen ENCENDIDOS: en una base a la que
+    todavía no se le ha aplicado la migración, devolver False pintaría un OFF que
+    no es verdad y el admin creería que la función está apagada.
+    """
     try:
         return bool(s[field])
     except (KeyError, IndexError, TypeError):
-        return False
+        return default
 
 
 def _num(s, field: str, default: int) -> int:
@@ -420,8 +426,15 @@ def build_panel_keyboard(
                               callback_data=f"{PREFIX}:wsub:{cid}")],
         [InlineKeyboardButton(t("cfg.b.edit_rules"),
                               callback_data=f"{PREFIX}:edit:r:{cid}")],
+        # «Leer texto en imágenes» comparte fila con «limpiar servicio» a
+        # propósito: el panel tiene un test de usabilidad que impide pasar de 14
+        # filas, y esta era la única que iba suelta con un botón del mismo ancho.
+        # El OCR nace ENCENDIDO y su estado no se hereda del `.env`, así que el
+        # ON/OFF del botón siempre dice la verdad.
         [InlineKeyboardButton(t("cfg.b.cleanservice", state=_onoff(_b(s, "cleanservice"))),
-                              callback_data=f"{PREFIX}:tog:cleanservice:{cid}")],
+                              callback_data=f"{PREFIX}:tog:cleanservice:{cid}"),
+         InlineKeyboardButton(t("cfg.b.ocr", state=_onoff(_b(s, "ocr_enabled", True))),
+                              callback_data=f"{PREFIX}:tog:ocr_enabled:{cid}")],
         [InlineKeyboardButton(t("cfg.b.warns"), callback_data=f"{PREFIX}:warns:{cid}"),
          InlineKeyboardButton(t("cfg.b.topweekly", state=_onoff(_b(s, "topweekly_enabled"))),
                               callback_data=f"{PREFIX}:tog:topweekly_enabled:{cid}")],

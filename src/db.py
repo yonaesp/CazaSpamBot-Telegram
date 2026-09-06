@@ -150,6 +150,10 @@ CREATE TABLE IF NOT EXISTS chat_settings (
     -- Si el ban que dispara el límite de warns se replica a todos los grupos
     -- (1, el defecto) o se queda solo en este (0).
     warn_ban_federado             INTEGER NOT NULL DEFAULT 1,
+    -- Leer el texto que va dentro de las imágenes (OCR). Activado por defecto:
+    -- no puede banear por su cuenta, solo aporta texto a los detectores de
+    -- siempre, así que una foto sin letras se comporta igual que antes.
+    ocr_enabled                   INTEGER NOT NULL DEFAULT 1,
     -- Default LIMPIO: verificación/bienvenida OFF, revisión de sospechosos por
     -- privado ON. El grupo no se molesta con welcomes ni botón SOY HUMANO; solo
     -- llega aviso privado al admin (Permitir/Banear) cuando entra un perfil dudoso.
@@ -340,6 +344,9 @@ class DB:
             # por el aro y se la volvía a pedir.
             self._conn.execute("ALTER TABLE seen_users ADD COLUMN verified_ts REAL")
         cs_cols = {r[1] for r in self._conn.execute("PRAGMA table_info(chat_settings)").fetchall()}
+        if "ocr_enabled" not in cs_cols:
+            self._conn.execute(
+                "ALTER TABLE chat_settings ADD COLUMN ocr_enabled INTEGER NOT NULL DEFAULT 1")
         if "warn_quien" not in cs_cols:
             self._conn.execute(
                 "ALTER TABLE chat_settings ADD COLUMN warn_quien TEXT NOT NULL DEFAULT 'chat_admins'"
@@ -1238,7 +1245,7 @@ class DB:
         ALLOWED = {
             "welcome_text", "welcome_enabled", "welcome_button_text", "welcome_button_url",
             "welcome_delete_after_s",
-            "rules_text", "warns_limit", "warns_action", "warn_quien", "warn_ban_federado",
+            "rules_text", "warns_limit", "warns_action", "warn_quien", "warn_ban_federado", "ocr_enabled",
             "verification_enabled", "verification_suspicious_kick_h",
             "verification_suspicious_kick_minutes",
             "verification_reminder_hours", "verification_kick_after_reminder_hours",

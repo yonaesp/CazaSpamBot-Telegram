@@ -44,6 +44,7 @@ from __future__ import annotations
 import logging
 import os
 import re
+from contextlib import contextmanager
 from pathlib import Path
 
 from .i18n import current_lang
@@ -144,8 +145,36 @@ def _custom_stamp(filename: str) -> tuple:
     return (st.st_mtime_ns, st.st_size)
 
 
+# Subcarpeta de vocabulario que se aplica SOLO al texto sacado de imágenes.
+# Por defecto no existe y el OCR usa exactamente las mismas listas que un mensaje
+# escrito, que es lo deseable: el spam es el mismo, venga en texto o en cartel.
+# Quien quiera términos que solo tengan sentido en un cartel (por ejemplo palabras
+# que en una conversación darían falsos positivos) los pone aquí y se SUMAN.
+_OCR_SUBDIR = "ocr"
+
+# Cuando está activo, `load_terms` suma también la capa `ocr/`. Es una bandera de
+# módulo y no un parámetro porque los detectores no deberían tener que enterarse
+# de dónde salió el texto: reciben un mensaje y lo juzgan igual. Se pone y se
+# quita alrededor de la evaluación, sin ningún `await` en medio, así que no hay
+# forma de que dos mensajes se pisen.
+_MODO_OCR = False
+
+
+@contextmanager
+def modo_ocr():
+    """Dentro de este bloque, las listas incluyen el vocabulario de `ocr/`."""
+    global _MODO_OCR
+    anterior = _MODO_OCR
+    _MODO_OCR = True
+    try:
+        yield
+    finally:
+        _MODO_OCR = anterior
+
+
 def load_terms(
     filename: str, defaults: list[str], *, langs: list[str] | None = None,
+    incluir_ocr: bool = False,
 ) -> list[str]:
     """Términos de config/blacklist/<filename> MÁS los de <lang>/<filename>.
 
@@ -162,6 +191,11 @@ def load_terms(
     seen = {term.casefold() for term in terms}
     for lang in (active_langs() if langs is None else langs):
         for term in _read_terms_file(_BLACKLIST_DIR / lang / filename) or []:
+            if term.casefold() not in seen:
+                seen.add(term.casefold())
+                terms.append(term)
+    if incluir_ocr or _MODO_OCR:
+        for term in _read_terms_file(_BLACKLIST_DIR / _OCR_SUBDIR / filename) or []:
             if term.casefold() not in seen:
                 seen.add(term.casefold())
                 terms.append(term)
@@ -259,6 +293,10 @@ def load_and_compile(
     key = (
         filename, str(_BLACKLIST_DIR), boundaries, flags,
         tuple(active_langs()), _custom_stamp(filename),
+        # Sin el modo en la clave, el primer texto de imagen dejaría cacheado un
+        # patrón con vocabulario de `ocr/` que luego se aplicaría a los mensajes
+        # escritos, y al revés.
+        _MODO_OCR,
     )
     rx = _COMPILED.get(key)
     if rx is None:

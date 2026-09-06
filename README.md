@@ -8,7 +8,7 @@
 [![python-telegram-bot](https://img.shields.io/badge/PTB-22.8-26A5E4?logo=telegram&logoColor=white)](https://python-telegram-bot.org/)
 [![Telethon](https://img.shields.io/badge/Telethon-1.44-blueviolet)](https://docs.telethon.dev/)
 [![Languages](https://img.shields.io/badge/languages-es%20%7C%20en%20%7C%20add%20yours-orange)](src/locales/README.md)
-[![Tests](https://img.shields.io/badge/tests-1483%20passing-success)](#-tests)
+[![Tests](https://img.shields.io/badge/tests-1497%20passing-success)](#-tests)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 
 🌍 **English** · [**Español**](README.es.md)
@@ -128,6 +128,32 @@ name only counts if the user also barely participates. The name list
 (`config/blacklist/story_source.txt`) holds **pairs** ("crypto signals", "pump and dump"), never single
 words: plain "insider" matched "Windows Insider Program".
 
+### 🔍 OCR: reading the text inside a picture
+
+A poster with no caption used to be an empty message to the bot. Real case: an image
+reading "Windows, Office, Photoshop, AutoCAD (every version), installation and
+activation, message me privately" carried not one typed character, so nothing scored
+it.
+
+The bot now runs the picture through Tesseract OCR and feeds the extracted text to the
+**same content detectors, with the same thresholds**: it does not decide anything on
+its own. A photo with no letters in it returns empty text and still scores 0, exactly
+as before. That poster goes from 0 to 105 points (an automatic ban); ordinary phrases
+from the same group ("my Windows won't activate", "I use Photoshop and AutoCAD",
+"selling a laptop with Windows and Office, 400 euros") stay at 0.
+
+It only runs on a **first message** that carries an image and **no text of its own**,
+inside a separate thread with an 8 second cap, since the bot handles messages one at a
+time. Measured cost: **0.61s per image, no GPU**, about 50MB added to the Docker
+image; on a real deployment it fires on the first couple of messages a day, around 1
+second of CPU total.
+
+Tesseract already ships in the `Dockerfile` (`tesseract-ocr` plus the Spanish and
+English language packs), nothing to install by hand. If it is missing for any reason,
+the bot logs it once and keeps working exactly as before, without OCR. Languages to
+read are set with `OCR_LANGS` in `.env` (defaults to the bot's own configured
+languages).
+
 ## 🎨 Configuration without touching code
 
 Everything is adjustable **from Telegram itself** with visual button panels, or from files/`.env` — whichever you prefer.
@@ -199,6 +225,7 @@ Per group, from Telegram itself (bot admin only). Run `/verificacion` with no ar
 | CAS strictness | `.env` → `CAS_AUTOBAN_MIN` | `2` = ban only if confirmed in 2+ groups (recommended); `1` = ban on any signal. |
 | Blocked shorteners | `.env` → `URL_BLOCKLIST` | CSV of domains. |
 | Thresholds & actions | `.env` | Ban/kick/mute scores, first-suspicious-message action, etc. |
+| OCR languages | `.env` → `OCR_LANGS` | Tesseract language codes to read inside images, in Tesseract's own format (e.g. `spa+eng`). Empty = derived from the bot's configured languages. |
 
 Each folder has its own `README.md` explaining the format.
 
@@ -213,6 +240,7 @@ Each folder has its own `README.md` explaining the format.
 | Database | SQLite (WAL) |
 | Classifier | Naive Bayes + cosine (stdlib, no sklearn) |
 | Homoglyphs | `confusable-homoglyphs` (UTS#39) |
+| OCR (text inside images) | `Tesseract` (Spanish + English, ships in the Docker image) |
 | Deployment | Docker Compose |
 
 > **Telethon is optional** (but recommended): it needs a secondary user account. Without it, or with `TELETHON_ENABLED=false`, the bot runs on the Bot API alone — the features that depend on it (reading bios, profile photos, **the channel linked on a profile**, official reports) simply don't activate, and everything else works the same.
@@ -331,7 +359,7 @@ Group members can report with **`@admin`** (reply to a message); the bot notifie
 ## 🧪 Tests
 
 ```bash
-.venv/bin/python -m pytest tests/ -q     # 1483 tests
+.venv/bin/python -m pytest tests/ -q     # 1497 tests
 ```
 
 Every detector has **positive and negative** test cases (emphasis on anti-false-positives). Philosophy: *a false positive is worse than a false negative.*
@@ -364,7 +392,7 @@ config/
 ├── welcomes/            # editable greetings (generic + per group)
 └── blacklist/           # editable anti-spam words/regex
 docs/                    # ARCHITECTURE, ROADMAP, ...
-tests/                   # 1483 tests
+tests/                   # 1497 tests
 ```
 
 ---

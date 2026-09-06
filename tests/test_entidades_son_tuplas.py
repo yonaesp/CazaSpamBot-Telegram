@@ -97,8 +97,12 @@ def test_el_fallo_de_un_detector_se_ve_en_el_log():
     detector muerto meses sin que nadie se enterara."""
     fuente = Path("src/handlers.py").read_text()
     i = fuente.index("def _sin_tumbar(")
-    # `_sin_tumbar` vive a nivel de módulo desde que también lo usa el OCR.
-    bloque = fuente[i:fuente.index("\nasync def ", i)]
+    # Solo el cuerpo de `_sin_tumbar`: vive a nivel de módulo desde que también
+    # lo usa el OCR, así que hay que cortar en la siguiente definición, sea `def`
+    # o `async def` (si no, el bloque se come funciones vecinas).
+    import re as _re
+    m = _re.search(r"\n(?:async )?def ", fuente[i + 10:])
+    bloque = fuente[i:i + 10 + (m.start() if m else 1200)]
     assert "log.warning" in bloque, "un detector caído tiene que hacer ruido"
     assert "exc_info=True" in bloque, "sin traza no se puede arreglar"
     assert "log.debug(" not in bloque, "un fallo tragado en debug es lo que pasó aquí"

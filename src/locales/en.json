@@ -1122,5 +1122,6 @@
   "scan.autor_oculto": "<i>Can't tell who wrote it: the forward hides the original account. Use it on the message in the group to analyse the author too.</i>",
   "scan.autor_desconocido": "<i>This message has no author (channel or service), so there's no profile to check.</i>",
   "scan.autor_error": "<i>Could not check the author.</i>",
-  "scan.media_sin_join": "ℹ️ <i>It carries media with no text. The only rule covering that (<code>first_msg_media</code>) does NOT apply to this person: the bot never saw them join, so they could have been here for years and this may not really be their first message. It's a deliberate guard against false positives.</i>"
+  "scan.media_sin_join": "ℹ️ <i>It carries media with no text. The only rule covering that (<code>first_msg_media</code>) does NOT apply to this person: the bot never saw them join, so they could have been here for years and this may not really be their first message. It's a deliberate guard against false positives.</i>",
+  "cfg.b.ocr": "🔍 Read text inside images: {state}"
 }

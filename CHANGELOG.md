@@ -25,6 +25,17 @@ nuevo que pasa una foto de un ordenador»):
 - Corre **en un hilo** con tope duro: PTB procesa los updates de uno en uno.
 - **Solo primeros mensajes con imagen y sin texto propio.**
 - Sin tesseract instalado, el bot funciona exactamente igual.
+- **Se apaga por chat** desde `/config` (defecto encendido). Ante un ajuste
+  ilegible se queda encendido, al revés que los demás: aquí «restrictivo» sería
+  dejar de mirar, y el OCR no castiga por sí mismo.
+- **Los idiomas salen de los que ya usa el bot** para sus listas, filtrando los
+  que Tesseract no tenga instalados (pedirle uno que le falta hace fallar la
+  llamada entera y no leería nada). `OCR_LANGS` lo fija a mano.
+- **El vocabulario es el mismo que el de los mensajes escritos.** Quien quiera
+  términos solo para carteles los pone en `config/blacklist/ocr/`, vacía por
+  defecto, que se suma. El modo entra en la clave de la caché de patrones: sin
+  eso, el primer cartel dejaría cacheado un patrón aplicable a los mensajes
+  normales.
 
 **Y el OCR solo no habría servido**: el texto extraído puntuaba **0** con las
 listas de entonces. Hizo falta añadir el vocabulario de venta de software pirata,

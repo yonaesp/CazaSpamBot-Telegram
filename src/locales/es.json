@@ -1122,5 +1122,6 @@
   "scan.autor_oculto": "<i>No se puede saber quién lo escribió: el reenvío oculta la cuenta original. Úsalo sobre el mensaje en el grupo para analizar también al autor.</i>",
   "scan.autor_desconocido": "<i>Este mensaje no trae autor (canal o servicio), así que no hay perfil que mirar.</i>",
   "scan.autor_error": "<i>No se ha podido comprobar al autor.</i>",
-  "scan.media_sin_join": "ℹ️ <i>Lleva media sin texto. La única regla que cubre eso (<code>first_msg_media</code>) NO se aplica a esta persona: el bot no presenció su entrada, así que podría llevar años en el grupo y este no ser su primer mensaje de verdad. Es una guarda deliberada contra falsos positivos.</i>"
+  "scan.media_sin_join": "ℹ️ <i>Lleva media sin texto. La única regla que cubre eso (<code>first_msg_media</code>) NO se aplica a esta persona: el bot no presenció su entrada, así que podría llevar años en el grupo y este no ser su primer mensaje de verdad. Es una guarda deliberada contra falsos positivos.</i>",
+  "cfg.b.ocr": "🔍 Leer texto en imágenes: {state}"
 }

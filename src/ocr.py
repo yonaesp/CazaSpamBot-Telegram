@@ -48,8 +48,55 @@ TIMEOUT_S = 8.0
 # descargar y procesar algo enorme en la ruta de moderación no compensa.
 MAX_BYTES = 5 * 1024 * 1024
 
-# Idiomas del OCR. El `+` los encadena: el spam llega en español y en inglés.
-IDIOMAS = os.getenv("OCR_LANGS", "spa+eng")
+# Códigos de idioma de Tesseract, que NO son los de dos letras del bot.
+_TESS = {
+    "es": "spa", "en": "eng", "pt": "por", "fr": "fra", "de": "deu", "it": "ita",
+    "ru": "rus", "uk": "ukr", "ar": "ara", "zh": "chi_sim", "ja": "jpn",
+    "ko": "kor", "tr": "tur", "pl": "pol", "nl": "nld", "ro": "ron",
+}
+
+
+def idiomas() -> str:
+    """Idiomas del OCR, derivados de los que ya usa el bot para sus listas.
+
+    Se reutiliza `wordlists.active_langs()` (idioma activo + inglés, o lo que diga
+    `BLACKLIST_LANGS`) en vez de tener una lista aparte: si alguien modera una
+    comunidad en portugués y añade `pt` a sus listas negras, no tiene sentido que
+    el OCR siga leyendo solo en español.
+
+    Se filtran los que Tesseract no tenga instalados: pedirle un idioma que le
+    falta hace que falle la llamada ENTERA y no lea nada, ni siquiera en los
+    idiomas que sí tiene. `OCR_LANGS` lo sustituye por completo para quien quiera
+    fijarlo a mano (formato de Tesseract: `spa+eng`).
+    """
+    fijado = (os.getenv("OCR_LANGS") or "").strip()
+    if fijado:
+        return fijado
+    try:
+        from .wordlists import active_langs
+        quiere = [_TESS.get(c) for c in active_langs()]
+    except Exception:  # noqa: BLE001
+        quiere = ["spa", "eng"]
+    hay = _instalados()
+    usables = [c for c in quiere if c and (not hay or c in hay)]
+    return "+".join(dict.fromkeys(usables)) or "eng"
+
+
+def _instalados() -> set:
+    """Idiomas que Tesseract tiene de verdad. Vacío si no se puede saber."""
+    global _IDIOMAS_INSTALADOS
+    if _IDIOMAS_INSTALADOS is None:
+        try:
+            r = subprocess.run(["tesseract", "--list-langs"],
+                               capture_output=True, timeout=10, text=True)
+            _IDIOMAS_INSTALADOS = {
+                ln.strip() for ln in r.stdout.splitlines()[1:] if ln.strip()}
+        except (OSError, subprocess.SubprocessError):
+            _IDIOMAS_INSTALADOS = set()
+    return _IDIOMAS_INSTALADOS
+
+
+_IDIOMAS_INSTALADOS: set | None = None
 
 # Menos de esto es ruido de bordes y logos, no un texto que juzgar.
 MIN_CARACTERES = 12
@@ -76,7 +123,7 @@ def _leer_sincrono(datos: bytes) -> str:
         salida = os.path.join(tmp, "out")
         try:
             subprocess.run(
-                ["tesseract", entrada, salida, "-l", IDIOMAS, "--psm", "6"],
+                ["tesseract", entrada, salida, "-l", idiomas(), "--psm", "6"],
                 capture_output=True, timeout=TIMEOUT_S, check=False,
             )
             with open(salida + ".txt", encoding="utf-8", errors="replace") as f:
