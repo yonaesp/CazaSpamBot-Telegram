@@ -151,3 +151,53 @@ def test_un_fallo_analizando_al_autor_no_impide_enviar_el_informe():
     fuente = Path("src/scan_cmd.py").read_text()
     i = fuente.index("autor_lineas = await _revisar_autor(")
     assert "except Exception" in fuente[i:i + 400]
+
+
+# ---------------------------------------------------------------------------
+# Por qué una foto sin texto puede no disparar nada
+#
+# Caso del 6-sep-2026: foto sin texto de «LuisTech» en Windows 11. El admin
+# preguntó por qué no se baneaba. El bot tenía razón —esa persona **entró el 28
+# de abril**, antes de que el bot llegara al grupo en mayo, así que no era su
+# primer mensaje de verdad— pero el informe de `/scan` decía «NO dispararía
+# ninguna regla» sin contar que había una regla saltándose por una guarda.
+#
+# La guarda es la que existe desde el falso positivo de un lurker veterano: sin
+# ella, cualquiera que lleve años callado y mande una foto se lleva un ban.
+# ---------------------------------------------------------------------------
+
+def test_una_foto_sin_texto_se_explica_cuando_no_se_vio_el_join():
+    from pathlib import Path
+    fuente = Path("src/scan_cmd.py").read_text()
+    i = fuente.index("async def _responder_scan(")
+    cuerpo = fuente[i:]
+    assert "scan.media_sin_join" in cuerpo
+    assert 'fila["join_ts"] is None' in cuerpo, "debe mirar si se presenció la entrada"
+
+
+def test_la_nota_no_puede_romper_el_informe():
+    from pathlib import Path
+    fuente = Path("src/scan_cmd.py").read_text()
+    i = fuente.index("scan.media_sin_join")
+    assert "except Exception" in fuente[max(0, i - 700):i + 300]
+
+
+def test_la_lista_de_media_es_la_misma_que_usa_la_moderacion():
+    """Si divergen, `/scan` diría una cosa y el bot haría otra: es justo lo que ya
+    pasó una vez con las notas de voz."""
+    from types import SimpleNamespace as NS
+    from src import scan_cmd
+    for campo in ("photo", "video", "animation", "sticker", "voice", "audio",
+                  "document", "video_note"):
+        msg = NS(**{c: (object() if c == campo else None) for c in
+                    ("photo", "video", "animation", "sticker", "voice", "audio",
+                     "document", "video_note")})
+        assert scan_cmd._lleva_media(msg), f"{campo} no cuenta como media"
+
+
+def test_un_mensaje_de_texto_no_lleva_media():
+    from types import SimpleNamespace as NS
+    from src import scan_cmd
+    msg = NS(photo=None, video=None, animation=None, sticker=None, voice=None,
+             audio=None, document=None, video_note=None)
+    assert not scan_cmd._lleva_media(msg)

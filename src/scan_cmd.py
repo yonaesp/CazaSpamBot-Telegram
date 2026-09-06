@@ -218,6 +218,14 @@ async def _entregar(context, msg, texto: str, cfg) -> None:
                                        parse_mode="HTML", disable_web_page_preview=True)
 
 
+def _lleva_media(msg) -> bool:
+    """Misma lista que usan `first_msg_media`, el top semanal y la moderación."""
+    return bool(getattr(msg, "photo", None) or getattr(msg, "video", None)
+                or getattr(msg, "animation", None) or getattr(msg, "sticker", None)
+                or getattr(msg, "voice", None) or getattr(msg, "audio", None)
+                or getattr(msg, "document", None) or getattr(msg, "video_note", None))
+
+
 def _autor_de(target):
     """(user, motivo_si_no_hay). El autor REAL del mensaje escaneado.
 
@@ -427,6 +435,26 @@ async def _responder_scan(context, msg, target, cfg: Config, db: DB) -> None:
         # un análisis que el bot no ha podido hacer.
         lines.append("")
         lines.append(t("scan.story_blind"))
+
+    # Por qué un mensaje con media puede no disparar nada. `first_msg_media` es la
+    # única regla que cubre una foto SIN texto, y se salta a quien el bot no vio
+    # entrar: podría llevar años en el grupo y no ser su primer mensaje de verdad.
+    # Sin esta línea, `/scan` dice «no dispararía» y parece que el bot no mira la
+    # foto, cuando lo que pasa es que la regla no le aplica A ESA PERSONA.
+    #
+    # Caso que lo pidió (6-sep-2026): foto sin texto de «LuisTech». El admin
+    # preguntó por qué no se baneaba; el bot tenía razón —entró en abril, antes de
+    # que el bot llegara al grupo— pero el informe no lo contaba.
+    try:
+        if _lleva_media(target) and not (target.text or target.caption):
+            autor, _ = _autor_de(target)
+            if autor is not None:
+                fila = db.get_seen(target.chat_id if target.chat else 0, autor.id)
+                if fila is not None and fila["join_ts"] is None:
+                    lines.append("")
+                    lines.append(t("scan.media_sin_join"))
+    except Exception as exc:  # noqa: BLE001 — una nota jamás rompe el informe
+        log.debug("scan: no se pudo explicar lo de la media: %s", exc)
 
     # El autor, que es la otra mitad del veredicto: el mismo texto es inocuo de un
     # vecino y sospechoso de una cuenta recién hecha con un canal de spam.

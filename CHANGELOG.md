@@ -4,6 +4,18 @@ Cambios relevantes de CazaSpamBot, lo más reciente arriba. Se anotan hitos, no
 cada commit: para el detalle está el historial de git. Sin números de versión
 porque el bot es un servicio en producción continua, no un paquete que se libera.
 
+## 2026-09 · `/scan` explica por qué una foto sin texto no dispara nada
+
+El admin preguntó por qué no se baneó una foto sin texto de «LuisTech». El bot
+tenía razón: esa persona **entró el 28 de abril**, antes de que el bot llegara al
+grupo en mayo, así que no era su primer mensaje de verdad y la guarda anti falso
+positivo de `first_msg_media` hizo lo suyo. (Comprobado preguntando a Telegram la
+fecha real de entrada, no deduciéndola: iba a «arreglar» la guarda y habría
+reintroducido el FP del lurker veterano que ya costó una vez.)
+
+Lo que faltaba era explicarlo: el informe decía «NO dispararía ninguna regla» sin
+contar que hay una regla que **no se le aplica a esa persona**. Ahora lo dice.
+
 ## 2026-09 · Un aviso de confianza no puede repetirse en bucle
 
 El admin escribió «@spam» cuatro veces seguidas probando el bot y recibió
