@@ -14,3 +14,30 @@ servicios?\s+an[oó]nimos?
 clientes?\s+serios?
 clonar?\s+(?:whatsapp|tarjeta|sim)
 informaci[oó]n\s+(?:personal|privada)\s+de
+
+# --- Venta de software pirateado (2026-09-06) ---
+# Cartel real cazado en Windows 11: «INSTALACIÓN Y ACTIVACIÓN DE SOFTWARE /
+# Windows, Microsoft Office (todas las versiones) / Photoshop, AutoCAD,
+# CorelDRAW / SERVICIO GARANTIZADO / ESCRÍBEME POR INTERNO».
+#
+# DOS trampas que costaron un intento fallido cada una:
+#
+# 1. El contexto es un grupo de Windows: «activar», «instalación» y «licencia»
+#    son palabras del día a día («no me activa el Windows», «instalación
+#    limpia»). Ninguna va suelta, y «escríbeme por interno» tampoco: se probó y
+#    marcaba «escríbeme por interno y te paso el driver», que es conversación
+#    normal.
+# 2. El texto llega por OCR, con saltos de línea y basura entre palabras
+#    («INSTALACIÓN Y *\n_ ACTIVACION\na DE SOFTWARE»). Por eso los patrones
+#    toleran ruido con `[\s\S]{0,N}` en vez de exigir `\s+`.
+#
+# Lo inequívoco es el CATÁLOGO: un cartel lista media docena de programas de
+# pago. Una conversación menciona uno o dos.
+activaci[oó]n[\s\S]{0,25}de[\s\S]{0,25}software
+instalaci[oó]n[\s\S]{0,30}activaci[oó]n
+(?:activo|activamos|instalo|instalamos|vendo|vendemos)\s+(?:tu\s+|su\s+)?(?:windows|office|adobe|autocad|photoshop)
+licencias?\s+(?:de\s+por\s+vida|originales?\s+(?:barat|econ[oó]mic))
+(?:todas\s+las\s+versiones)[\s\S]{0,120}(?:todas\s+las\s+versiones)
+# «Servicio garantizado» es lenguaje de anuncio, no de conversación: nadie
+# pide ayuda con Windows garantizando un servicio.
+servicio[\s\S]{0,15}garantizado

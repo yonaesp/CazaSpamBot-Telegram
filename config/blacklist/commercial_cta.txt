@@ -19,3 +19,9 @@ contactame
 mandame\s+(?:un\s+)?(?:mensaje|dm|md|privado)
 sumate
 aprovech[aá]\s+(?:esta|la)\s+(?:oportunidad|promo(?:ci[oó]n)?)
+
+# Catálogo de programas de pago: cinco marcas distintas en un mismo mensaje es un
+# cartel de venta, no una charla. Se pide una ventana amplia porque el texto puede
+# venir de un OCR con ruido entre líneas. Con menos de cinco no se cuenta: «uso
+# Photoshop y AutoCAD en Windows 11» son tres y es una frase normal.
+(?:windows|office|photoshop|illustrator|autocad|coreldraw|rhinoceros)[\s\S]{0,90}(?:windows|office|photoshop|illustrator|autocad|coreldraw|rhinoceros)[\s\S]{0,90}(?:photoshop|illustrator|autocad|coreldraw|rhinoceros)[\s\S]{0,90}(?:photoshop|illustrator|autocad|coreldraw|rhinoceros)[\s\S]{0,90}(?:photoshop|illustrator|autocad|coreldraw|rhinoceros)

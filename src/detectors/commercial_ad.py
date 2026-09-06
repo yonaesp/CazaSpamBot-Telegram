@@ -212,7 +212,15 @@ def check(msg: Message, is_first_msg: bool = False) -> Hit:
     score = 0
     reasons: list[str] = []
     # Servicios ilegales/scam: señal MUY fuerte. 1 keyword = 35, 2+ = 55.
-    if n_illegal >= 2:
+    if n_illegal >= 3:
+        # Tres señales DISTINTAS de servicio ilegal ya no es una coincidencia: es
+        # un catálogo. Caso que lo motivó (6-sep-2026): el cartel de venta de
+        # software pirata sacado por OCR juntaba «activación de software»,
+        # «servicio garantizado» y el listado de cinco programas de pago, y con el
+        # tope anterior se quedaba en 90 (kick) cuando la evidencia era abrumadora.
+        score += 70
+        reasons.append(t("reason.ad_illegal_multi", n=n_illegal))
+    elif n_illegal >= 2:
         score += 55
         reasons.append(t("reason.ad_illegal_multi", n=n_illegal))
     elif n_illegal == 1:

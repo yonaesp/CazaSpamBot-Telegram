@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from . import fechas
 import asyncio
+from types import SimpleNamespace
 import html as _h
 import logging
 import time
@@ -235,6 +236,76 @@ async def _mirar_canal_personal(client, sig, user, *, allowed_scripts) -> Hit:
         return Hit.none()
     return personal_channel_det.check(
         sig.personal_channel_title, channel_text=texto, **comun)
+
+
+def _sin_tumbar(fn, que: str):
+    """Ejecuta un detector sin que su fallo aborte la moderación del mensaje.
+
+    Lección de un caso real (10-ago-2026, Windows 11): `premium_new_link`
+    arrastraba un `tuple + list` desde que python-telegram-bot pasó las
+    entidades a tuplas. Vivía dentro de un `try/except` que lo tragaba con un
+    `log.debug`, así que el detector llevaba meses muerto sin que se notara.
+    Al sacarlo de ese `try` en una refactorización, el TypeError empezó a
+    propagarse y **abortó `on_message` entero**: el mensaje —publicidad de
+    servicios de hackeo— no pasó por NINGÚN detector y lo tuvo que borrar un
+    admin a mano doce minutos después.
+
+    Las dos mitades de la lección, y por eso esto es como es:
+    - un detector que revienta no puede llevarse por delante a los otros
+      veinte, así que se aísla y el mensaje se sigue evaluando;
+    - pero se registra con **WARNING y traza**, nunca con `debug`. Tragarse
+      el fallo en silencio es lo que dejó el detector roto tanto tiempo.
+    """
+    try:
+        return fn()
+    except Exception:  # noqa: BLE001
+        log.warning("detector %s falló; se sigue sin él", que, exc_info=True)
+        return Hit.none()
+
+
+async def _hits_de_la_imagen(context, db: DB, cfg: Config, msg, user) -> list[Hit]:
+    """Pasa el texto que el OCR saca de la imagen por los detectores de contenido.
+
+    Devuelve los hits tal cual, sin inventar ninguna regla propia: si el cartel
+    dice lo que dice un anuncio, lo caza `commercial_ad` con sus umbrales de
+    siempre. Así el OCR no puede banear por su cuenta ni desviarse del resto.
+    """
+    from . import ocr
+    if not ocr.disponible():
+        return []
+    foto = msg.photo[-1] if msg.photo else msg.document
+    try:
+        fichero = await context.bot.get_file(foto.file_id)
+        datos = bytes(await fichero.download_as_bytearray())
+    except Exception as exc:  # noqa: BLE001
+        log.debug("OCR: no se pudo descargar la imagen: %s", exc)
+        return []
+    texto = await ocr.leer(datos)
+    if not texto:
+        return []
+    log.info("OCR: user=%s imagen con texto (%d caracteres)", user.id, len(texto))
+
+    # El texto va en un objeto con la misma forma que un mensaje, para que los
+    # detectores no tengan que saber de dónde salió.
+    leido = SimpleNamespace(text=texto, caption=None, entities=(), caption_entities=(),
+                            reply_to_message=None, chat=msg.chat, chat_id=msg.chat_id,
+                            message_id=msg.message_id)
+    guard = _chat_money_guard(db, msg.chat_id)
+    hits = [
+        _sin_tumbar(lambda: _apply_money_guard(
+            comad_det.check(leido, is_first_msg=True), guard), "commercial_ad/ocr"),
+        _sin_tumbar(lambda: _apply_money_guard(
+            invscam_det.check(leido, is_first_msg=True), guard), "investment_scam/ocr"),
+        _sin_tumbar(lambda: url_det.check(leido, cfg.url_blocklist, is_first_msg=True),
+                    "url_blocklist/ocr"),
+        _sin_tumbar(lambda: offplat_det.check(leido, is_first_msg=True),
+                    "offplatform_contact/ocr"),
+    ]
+    reales = [h for h in hits if h]
+    if reales:
+        log.info("OCR: user=%s la imagen dispara %s", user.id,
+                 ", ".join(f"{h.rule}({h.score})" for h in reales))
+    return hits
 
 
 def _can_restrict(member) -> bool:
@@ -1184,30 +1255,6 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
     hits: list[Hit] = []
 
-    def _sin_tumbar(fn, que: str):
-        """Ejecuta un detector sin que su fallo aborte la moderación del mensaje.
-
-        Lección de un caso real (10-ago-2026, Windows 11): `premium_new_link`
-        arrastraba un `tuple + list` desde que python-telegram-bot pasó las
-        entidades a tuplas. Vivía dentro de un `try/except` que lo tragaba con un
-        `log.debug`, así que el detector llevaba meses muerto sin que se notara.
-        Al sacarlo de ese `try` en una refactorización, el TypeError empezó a
-        propagarse y **abortó `on_message` entero**: el mensaje —publicidad de
-        servicios de hackeo— no pasó por NINGÚN detector y lo tuvo que borrar un
-        admin a mano doce minutos después.
-
-        Las dos mitades de la lección, y por eso esto es como es:
-        - un detector que revienta no puede llevarse por delante a los otros
-          veinte, así que se aísla y el mensaje se sigue evaluando;
-        - pero se registra con **WARNING y traza**, nunca con `debug`. Tragarse
-          el fallo en silencio es lo que dejó el detector roto tanto tiempo.
-        """
-        try:
-            return fn()
-        except Exception:  # noqa: BLE001
-            log.warning("detector %s falló; se sigue sin él", que, exc_info=True)
-            return Hit.none()
-
     # 1) Unicode script (sobre texto normalizado)
     hits.append(_sin_tumbar(lambda: script_det.check(
         normalized_text or text, is_first_msgs=is_first,
@@ -1415,6 +1462,26 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
                     ))
                 except Exception as exc:  # noqa: BLE001
                     log.debug("canal personal en primer mensaje user=%s: %s", user.id, exc)
+
+    # 3d ter) EL TEXTO QUE VA DENTRO DE LA IMAGEN.
+    #
+    # Un cartel publicitario es, para el bot, un mensaje vacío: sin texto no hay
+    # nada que juzgar. Caso real (6-sep-2026, Windows 11): imagen ofreciendo
+    # «INSTALACIÓN Y ACTIVACIÓN DE SOFTWARE — Windows, Office, Photoshop, AutoCAD
+    # (todas las versiones) — ESCRÍBEME POR INTERNO», sin una sola letra escrita.
+    #
+    # El OCR **no decide nada**: solo aporta el texto, y lo juzgan los MISMOS
+    # detectores con sus mismos umbrales. Una foto de un ordenador sin letras
+    # devuelve vacío y puntúa 0, igual que antes. Ese es justo el criterio que
+    # pidió el admin: cazar el cartel evidente sin tocar a quien comparte una foto.
+    #
+    # Solo en primeros mensajes con imagen y sin texto propio: es donde llega este
+    # spam, y así el coste queda en unos 2 casos al día (~1 s de CPU).
+    if is_first and not (msg.text or msg.caption) and (msg.photo or msg.document):
+        try:
+            hits += await _hits_de_la_imagen(context, db, cfg, msg, user)
+        except Exception as exc:  # noqa: BLE001 — una mejora opcional nunca tumba nada
+            log.warning("OCR: fallo leyendo la imagen: %s", exc, exc_info=True)
 
     # 3e) Primer mensaje es media + cuenta sospechosa (patrón spam 2025).
     # GUARD anti-falso-positivo: solo aplicar si el bot presenció el JOIN del user.

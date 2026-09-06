@@ -123,6 +123,20 @@ El detector tuvo que ampliarse cuando la misma red volvió con el **nombre tambi
 
 **Lo gratis no lleva el freno de lo caro.** En ese repaso hay dos ritmos distintos a propósito: el **nombre** se mira en CADA vuelta (`get_chat_member` es Bot API: gratis, sin límite práctico y sin tocar la cuenta secundaria), y las **listas externas** (CAS, lols) mantienen su espera de una hora porque son APIs de terceros. Estuvieron igualados y era regalarle al spammer una hora a cambio de nada: el nombre es justo lo que cambia, ya que el truco consiste en entrar con uno que pasa los filtros y ponerse el de verdad poco antes de hablar. Si alguien vuelve a igualar `MAX_NOMBRES_POR_CICLO` con `MAX_POR_CICLO`, ha perdido el porqué (hay test).
 
+### El texto que va DENTRO de una imagen (`ocr.py`)
+
+Un cartel publicitario era, para el bot, un mensaje vacío: ningún detector tenía nada que mirar. Caso real (2026-09-06, Windows 11): imagen ofreciendo «INSTALACIÓN Y ACTIVACIÓN DE SOFTWARE — Windows, Office, Photoshop, AutoCAD (todas las versiones) — ESCRÍBEME POR INTERNO», sin una sola letra escrita.
+
+**Tesseract**, no EasyOCR ni PaddleOCR: medido, **0,61 s** por imagen y sin GPU, contra cientos de megas de PyTorch/ONNX que aquí no hacen falta (el texto de un cartel es grande y con contraste, el caso más fácil). Volumen real: **2 primeros mensajes al día**, o sea ~1 s de CPU diario aunque todos llevaran foto.
+
+Cuatro cosas que no se deben romper:
+- **El OCR no decide nada**: solo aporta texto, y lo juzgan los MISMOS detectores con sus umbrales. Una foto de un ordenador sin letras da vacío y puntúa 0. Hay test que prohíbe que `ocr.py` mencione `Hit`, `score` o `rule`.
+- **Corre en un hilo** (`run_in_executor`) con tope duro: PTB procesa los updates de uno en uno y 0,61 s bloqueando el bucle son 0,61 s sin moderar.
+- **Solo primeros mensajes con imagen y SIN texto propio.** Aplicarlo a cada foto serían cientos de descargas diarias.
+- **Sin tesseract el bot funciona igual**: se detecta una vez y no se reintenta.
+
+**El vocabulario es la otra mitad, y sin él el OCR no sirve de nada**: el texto extraído puntuaba **0** con las listas de entonces. Al añadir el de venta de software pirata hay que recordar que el contexto son grupos de Windows, donde «activar», «instalación» y «licencia» son palabras del día a día: ninguna va suelta. Se probó `escríbeme por interno` y marcaba «escríbeme por interno y te paso el driver». Lo inequívoco es el CATÁLOGO (cinco programas de pago listados) y la estructura de oferta. Los patrones toleran ruido con `[\s\S]{0,N}` porque el OCR parte las palabras.
+
 ### Listas negras (`config/blacklist/`)
 
 Tres capas que se **acumulan** (el spam llega en cualquier idioma):

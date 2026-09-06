@@ -97,7 +97,8 @@ def test_el_fallo_de_un_detector_se_ve_en_el_log():
     detector muerto meses sin que nadie se enterara."""
     fuente = Path("src/handlers.py").read_text()
     i = fuente.index("def _sin_tumbar(")
-    bloque = fuente[i:fuente.index("# 1) Unicode script", i)]
+    # `_sin_tumbar` vive a nivel de módulo desde que también lo usa el OCR.
+    bloque = fuente[i:fuente.index("\nasync def ", i)]
     assert "log.warning" in bloque, "un detector caído tiene que hacer ruido"
     assert "exc_info=True" in bloque, "sin traza no se puede arreglar"
     assert "log.debug(" not in bloque, "un fallo tragado en debug es lo que pasó aquí"

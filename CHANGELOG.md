@@ -4,6 +4,40 @@ Cambios relevantes de CazaSpamBot, lo más reciente arriba. Se anotan hitos, no
 cada commit: para el detalle está el historial de git. Sin números de versión
 porque el bot es un servicio en producción continua, no un paquete que se libera.
 
+## 2026-09 · Leer el texto que va dentro de una imagen
+
+Un cartel publicitario era, para el bot, un mensaje vacío. Caso real en Windows
+11: imagen ofreciendo «INSTALACIÓN Y ACTIVACIÓN DE SOFTWARE — Windows, Office,
+Photoshop, AutoCAD (todas las versiones) — ESCRÍBEME POR INTERNO», sin una sola
+letra escrita, y ningún detector tenía nada que mirar.
+
+**Tesseract**, medido: **0,61 s** por imagen, sin GPU, ~50 MB en la imagen Docker.
+Se descartaron EasyOCR y PaddleOCR (PyTorch/ONNX, cientos de megas) porque el
+texto de un cartel es grande y con contraste. Volumen real: 2 primeros mensajes
+al día, o sea **~1 s de CPU diario**.
+
+Lo que lo hace seguro, que era la condición del admin («que no baneemos a alguien
+nuevo que pasa una foto de un ordenador»):
+
+- **El OCR no decide nada.** Solo aporta texto; lo juzgan los detectores de
+  siempre con sus mismos umbrales. Una foto sin letras da vacío y puntúa 0. Hay
+  test que prohíbe que `ocr.py` mencione `Hit`, `score` o `rule`.
+- Corre **en un hilo** con tope duro: PTB procesa los updates de uno en uno.
+- **Solo primeros mensajes con imagen y sin texto propio.**
+- Sin tesseract instalado, el bot funciona exactamente igual.
+
+**Y el OCR solo no habría servido**: el texto extraído puntuaba **0** con las
+listas de entonces. Hizo falta añadir el vocabulario de venta de software pirata,
+con cuidado porque el contexto son grupos de Windows y «activar», «instalación» y
+«licencia» son palabras del día a día. Dos intentos fallidos por el camino:
+`escríbeme por interno` marcaba «escríbeme por interno y te paso el driver», y
+los patrones sin tolerancia a ruido no casaban con lo que devuelve el OCR. Lo
+inequívoco resultó ser el **catálogo**: cinco programas de pago listados.
+
+Resultado medido: el cartel pasa de **0 a 105 puntos** (ban), y las siete frases
+de conversación normal de un grupo de Windows —incluida la venta legítima de un
+portátil con Windows y Office— siguen en **0**.
+
 ## 2026-09 · `/scan` explica por qué una foto sin texto no dispara nada
 
 El admin preguntó por qué no se baneó una foto sin texto de «LuisTech». El bot
