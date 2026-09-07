@@ -157,3 +157,54 @@ def test_el_perdon_se_evalua_ANTES_de_preguntarle_al_modelo():
             if isinstance(n, ast.Call) and getattr(n.func, "attr", "") == "veta"]
     assert perdon and veto, (perdon, veto)
     assert min(perdon) < min(veto)
+
+
+# --- No-regresión: lo que este perdón NO puede dejar pasar ---------------------
+#
+# Encontrado auditando el propio cambio, el mismo día. `jfm_too_fast` (escribir a
+# los pocos segundos de entrar) estuvo en `_REGLAS_DE_FORMA` unas horas, y con él
+# dentro el perdón habría tapado los DOS únicos casos que esa regla ha expulsado
+# como regla única, que eran spam real. Parecía estructural; los datos decían otra
+# cosa. Antes de meter una regla en esa lista hay que mirar qué ha cazado.
+
+SPAM_POPCORN = (  # 1-jun-2026, kick por jfm_too_fast a los 2 s del join
+    "All movies & series available in PopcornTV ⭐🤩\n\n"
+    "Netflix & Disney Plus and more\n\nJoin now: https://astrurl.io/p"
+)
+
+
+def test_los_jfm_no_son_reglas_de_forma():
+    """Han acertado 2 de 2 como regla única. No entran en el perdón."""
+    assert not {"jfm_too_fast", "jfm_fast", "jfm_cron"} & handlers._REGLAS_DE_FORMA
+
+
+def test_el_spam_de_popcorntv_no_se_perdona(monkeypatch):
+    real = [_hit("jfm_too_fast", 80, delta_s=2)]
+    assert _perdon(real, texto=SPAM_POPCORN, con_foto=False, monkeypatch=monkeypatch) == ""
+
+
+def test_un_enlace_en_el_texto_cancela_el_perdon(monkeypatch):
+    """Segunda red: `astrurl.io` no estaba en ninguna lista negra, así que aquel
+    mensaje llegó a la decisión con una sola regla disparada. Un enlace en un
+    primer mensaje es contenido, no forma, aunque nadie lo reconozca."""
+    real = [_hit("forward_first_msg", 80, origin_type="user"),
+            _hit("first_msg_media", 70)]
+    for txt in (TEXTO_KLEO + " https://astrurl.io/p",
+                TEXTO_KLEO + " escríbeme a @canaldeofertas",
+                TEXTO_KLEO + " en t.me/loquesea",
+                TEXTO_KLEO + " en www.ejemplo.com"):
+        assert _perdon(real, texto=txt, monkeypatch=monkeypatch) == "", txt[-30:]
+
+
+def test_el_texto_legitimo_sin_enlaces_sigue_perdonandose(monkeypatch):
+    """La guarda del enlace no puede llevarse por delante el caso que la motivó."""
+    real = [_hit("forward_first_msg", 80, origin_type="user"),
+            _hit("first_msg_media", 70)]
+    assert _perdon(real, monkeypatch=monkeypatch)
+
+
+def test_una_arroba_corriente_no_cuenta_como_mencion(monkeypatch):
+    """`@` suelto o cortísimo no es una mención: no debe anular el perdón."""
+    real = [_hit("first_msg_media", 70)]
+    assert _perdon(real, texto="hola, compré la licencia en la tienda @ las 3 de la tarde y no sé si es retail",
+                   monkeypatch=monkeypatch)

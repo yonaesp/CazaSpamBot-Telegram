@@ -468,3 +468,21 @@ def test_reutiliza_los_botones_ya_probados():
     i = fuente.index("async def _avisar_imagen_dudosa(")
     cuerpo = fuente[i:fuente.index("\ndef _ocr_activo(", i)]
     assert "tnote:nada:" in cuerpo and "tnote:ban:" in cuerpo
+
+
+def test_no_se_descarga_lo_que_no_se_va_a_poder_leer():
+    """El tamaño y el tipo se miran ANTES de bajar el fichero.
+
+    `ocr.leer` descarta lo que pasa de `MAX_BYTES`, pero para entonces ya está
+    descargado: la Bot API deja hasta 20 MB por fichero y PTB procesa los updates
+    de uno en uno, así que bajar un adjunto que se va a tirar son segundos sin
+    moderar. Y un `document` puede ser un ZIP o un instalador, no una imagen.
+    """
+    from pathlib import Path
+    fuente = Path("src/handlers.py").read_text(encoding="utf-8")
+    i = fuente.index("async def _hits_de_la_imagen(")
+    cuerpo = fuente[i:fuente.index("\ndef _duda_de_la_imagen(", i)]
+    descarga = cuerpo.index("download_as_bytearray")
+    assert cuerpo.index("file_size") < descarga
+    assert cuerpo.index("mime_type") < descarga
+    assert "wait_for" in cuerpo[:descarga]

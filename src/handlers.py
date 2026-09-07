@@ -6,6 +6,7 @@ import asyncio
 from types import SimpleNamespace
 import html as _h
 import logging
+import re
 import time
 from collections import deque
 
@@ -361,10 +362,24 @@ async def _hits_de_la_imagen(context, db: DB, cfg: Config, msg, user,
     if not ocr.disponible() or not _ocr_activo(db, msg.chat_id):
         return []
     foto = msg.photo[-1] if msg.photo else msg.document
+    if foto is None:
+        return []
+    # Un `document` puede ser CUALQUIER cosa: un ZIP, un PDF, un instalador. Se
+    # mira el tipo declarado antes de bajar nada; Tesseract no va a leer un ZIP.
+    if not msg.photo and not (getattr(foto, "mime_type", None) or "").startswith("image/"):
+        return []
+    # Y el tamaño ANTES de descargar, no después. `ocr.leer` descarta lo que pasa
+    # de MAX_BYTES, pero para entonces ya se han bajado: la Bot API deja hasta
+    # 20 MB por fichero y PTB procesa los updates de UNO EN UNO, así que bajar un
+    # adjunto que se va a tirar son segundos sin moderar el grupo.
+    tam = getattr(foto, "file_size", None)
+    if tam is not None and tam > ocr.MAX_BYTES:
+        log.debug("OCR: imagen de %d bytes, por encima del tope; no se descarga", tam)
+        return []
     try:
-        fichero = await context.bot.get_file(foto.file_id)
-        datos = bytes(await fichero.download_as_bytearray())
-    except Exception as exc:  # noqa: BLE001
+        fichero = await asyncio.wait_for(context.bot.get_file(foto.file_id), 10.0)
+        datos = bytes(await asyncio.wait_for(fichero.download_as_bytearray(), 15.0))
+    except Exception as exc:  # noqa: BLE001 — incluye el TimeoutError del tope
         log.debug("OCR: no se pudo descargar la imagen: %s", exc)
         return []
     texto = await ocr.leer(datos)
@@ -435,10 +450,19 @@ def _duda_de_la_imagen(db: DB, cfg: Config, msg, user, texto: str, puntos: int) 
 # que sea un reenvío, que lleve una foto, que se escribiera a los pocos segundos
 # de entrar. Ninguna es prueba de spam por sí misma: su valor está en sumarse a
 # una señal de contenido, que es como han cazado todos los casos reales.
+# ⚠️ Los `jfm_*` (escribir a los pocos segundos de entrar) estuvieron aquí y se
+# sacaron el mismo día: `jfm_too_fast` ha expulsado a 2 personas como regla única
+# y **las 2 eran spam real** (PopcornTV con enlace, 1xbet), o sea 2 aciertos de 2.
+# Con ellos dentro, el perdón habría dejado pasar los dos. Antes de meter una regla
+# aquí hay que mirar qué ha cazado, no solo si «parece» estructural.
 _REGLAS_DE_FORMA = frozenset({
     "forward_first_msg", "first_msg_media",
-    "jfm_too_fast", "jfm_fast", "jfm_cron",
 })
+
+# Un enlace o una mención en el primer mensaje son CONTENIDO, no forma. Segunda red
+# por si ningún detector conoce ese dominio: `astrurl.io` no estaba en ninguna lista
+# y por eso aquel spam llegó a la decisión con una sola regla de forma disparada.
+_ENLACE_O_MENCION = re.compile(r"(?:https?://|www\.|\bt\.me/|@[A-Za-z0-9_]{4,})", re.I)
 
 # Cuánto texto propio hace falta para tomarlo por comunicación de verdad y no por
 # el «mira esto 👇» que acompaña a un cartel publicitario.
@@ -491,7 +515,8 @@ async def _perdon_por_contenido_limpio(
     Se exige que se cumpla TODO:
       - ninguna regla de contenido ni de perfil entre las disparadas;
       - el reenvío, si lo hay, no viene de canal/chat/bot;
-      - la persona escribió texto propio suficiente para juzgarla, y no disparó nada;
+      - la persona escribió texto propio suficiente para juzgarla, sin enlaces ni
+        menciones, y no disparó nada;
       - si además hay imagen, lo que el OCR saca de ella tampoco dispara nada. Esto
         último es lo que cierra el hueco de «caption inocente + cartel de spam»: se
         paga la lectura solo aquí, que es donde puede cambiar el veredicto.
@@ -500,7 +525,10 @@ async def _perdon_por_contenido_limpio(
         return ""
     if _forward_de_fuera(real):
         return ""
-    if not _texto_propio_sustantivo(msg_txt):
+    texto = _texto_propio_sustantivo(msg_txt)
+    if not texto:
+        return ""
+    if _ENLACE_O_MENCION.search(texto):
         return ""
     if msg.photo or msg.document:
         try:

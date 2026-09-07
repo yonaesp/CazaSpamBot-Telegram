@@ -37,7 +37,13 @@ Tres cambios, **ninguno tocando los scores**:
   reputación de la cuenta secundaria sin evidencia.
 
 El perdón **no alcanza al reenvío desde canal, chat o bot**: ese es el patrón
-fuerte y el único que ha acertado. 1524 tests.
+fuerte y el único que ha acertado, ni a un texto con enlaces o menciones.
+
+Auditando el propio cambio salieron dos cosas más, arregladas el mismo día: los
+`jfm_*` no debían estar en la lista de reglas de forma (`jfm_too_fast` ha expulsado
+a 2 personas como regla única y las 2 eran spam real), y el camino del OCR
+descargaba el fichero **antes** de mirar su tamaño y su tipo, con lo que un adjunto
+de 20 MB o un ZIP paraban la moderación mientras se bajaban. 1530 tests.
 
 ## 2026-09 · Leer el texto que va dentro de una imagen
 

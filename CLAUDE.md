@@ -182,6 +182,16 @@ que se desaconseja aquí):
    la reputación de la cuenta secundaria, que es justo lo que `_REPORT_MIN_SCORE`
    pretendía proteger, y dos señales de forma llegaban a 150 sin evidencia.
 
+⚠️ **«Parece estructural» no es lo mismo que «no ha cazado nada».** Al escribir el
+perdón se metieron también los `jfm_*` (escribir a los pocos segundos de entrar) por
+parecerse a los otros dos, y hubo que sacarlos el mismo día: `jfm_too_fast` ha
+expulsado a 2 personas como regla única y **las 2 eran spam real** (PopcornTV con
+enlace, 1xbet), o sea 2 aciertos de 2. Con ellos dentro, el perdón habría tapado los
+dos. Antes de meter una regla en `_REGLAS_DE_FORMA` hay que mirar en
+`moderation_log` qué ha cazado de verdad. De ahí salió la segunda red: **un texto con
+enlace o mención no compra el perdón**, porque `astrurl.io` no estaba en ninguna
+lista negra y aquel spam llegó a la decisión con una sola regla disparada.
+
 ⚠️ **El perdón NO alcanza al reenvío desde un canal, un chat o un bot**: ese es el
 patrón fuerte y el único que ha acertado. El caption lo escribe el spammer y le
 sale gratis, así que un texto limpio no puede comprarlo. Si alguien mete en
