@@ -49,6 +49,46 @@ _GIVE_BACK_RE = re.compile(
     re.IGNORECASE,
 )
 
+# --- Ancla 2: testimonio de REVERSIÓN, sin una sola cifra -------------------
+# «pensé que era una estafa, pero el dinero llegó». Caso real (11-sep-2026,
+# Windows 10): «Saw your post and honestly thought it was a scam, but the money
+# actually came through and I'm in shock». Ni cifras, ni @usuario, ni enlace: el
+# ancla numérica no casaba, `commercial_ad` daba 0 y al estar en inglés tampoco
+# saltaba `non_allowed_script`. El detector entero puntuaba **0** y lo tuvo que
+# borrar y banear un admin a mano.
+#
+# Es la otra mitad del mismo timo: uno publica el anzuelo y un segundo perfil
+# responde haciéndose pasar por cliente satisfecho. Por eso llega DÍAS después de
+# entrar (esta cuenta entró el 7 y escribió el 11) y por eso no lleva enlace: el
+# enlace lo pone el otro.
+#
+# La señal fuerte, igual que en el ancla numérica, es la DISCORDANCIA: admitir que
+# se sospechaba una estafa y a continuación decir que el dinero llegó. Es
+# estructural, no vocabulario, así que NO se externaliza a config/.
+_SKEPTIC = (
+    r"(?:thought\s+(?:it|this|that|they)\s+(?:was|were)\s+(?:a\s+)?(?:scam|fake|joke|lie)"
+    r"|was\s+(?:very\s+|so\s+)?(?:skeptical|sceptical|doubtful|unsure)"
+    r"|did(?:n't|\s+not)\s+(?:believe|think)\s+(?:it|this|that)"
+    r"|pens[eé]\s+que\s+(?:era|ser[ií]a)\s+(?:una\s+)?(?:estafa|timo|mentira)"
+    r"|no\s+me\s+lo\s+cre[ií]a|dudaba\s+(?:mucho|de)"
+    r"|cre[ií]\s+que\s+era\s+(?:una\s+)?(?:estafa|timo))"
+)
+_PAYOUT = (
+    r"(?:(?:money|payment|payout|funds?|cash|profits?)\s+(?:\w+\s+){0,3}?"
+    r"(?:came\s+through|arrived|landed|hit\s+my|was\s+real|is\s+real)"
+    r"|got\s+(?:paid|my\s+(?:money|payout|profit))"
+    r"|(?:it|this)\s+(?:actually|really)\s+(?:works?|worked|paid)"
+    r"|(?:received|withdrew|cashed\s+out)\s+(?:the\s+|my\s+)?(?:money|payment|profit)"
+    r"|(?:lleg[oó]|entr[oó])\s+el\s+dinero|me\s+(?:pagaron|lo\s+pagaron)"
+    r"|s[ií]\s+(?:funciona|pag[oó]|era\s+real))"
+)
+# El conector de reversión es obligatorio: sin él, «pensé que era una estafa» y
+# «me pagaron» pueden ser dos frases de conversaciones distintas del mismo párrafo.
+_SKEPTIC_FLIP_RE = re.compile(
+    rf"{_SKEPTIC}[^.\n]{{0,90}}?\b(?:but|yet|however|pero|aunque|sin\s+embargo)\b[^.\n]{{0,90}}?{_PAYOUT}",
+    re.IGNORECASE,
+)
+
 # --- Señales propias de la estafa (una es obligatoria además del ancla) ------
 # Las tres listas de vocabulario que siguen son EDITABLES por el admin desde
 # config/blacklist/ (genéricas + por idioma + custom), igual que las de
@@ -115,6 +155,26 @@ _DEFAULT_VOCAB = [
 ]
 
 
+# Fórmulas del testimonio en primera persona: el asombro de quien dice haber
+# cobrado y la referencia al mensaje ajeno al que responde. Por sí solas no
+# deciden nada (ver la guarda de dos señales): «no me lo puedo creer» lo dice
+# cualquiera. boundaries=True, como _DEFAULT_PRAISE.
+_DEFAULT_TESTIMONY = [
+    r"(?:i'?m|im|i\s+am)\s+(?:still\s+)?in\s+shock",
+    r"still\s+(?:can'?t|cannot)\s+believe",
+    r"can'?t\s+believe\s+(?:it|this|my\s+eyes)",
+    r"saw\s+(?:your|his|her|the)\s+(?:post|message|comment|testimony)",
+    r"(?:it|this)\s+(?:really|actually)\s+works?",
+    r"(?:no\s+me\s+lo\s+puedo\s+creer|a[uú]n\s+no\s+me\s+lo\s+creo)",
+    r"vi\s+(?:tu|su)\s+(?:publicaci[oó]n|mensaje|post|comentario)",
+    r"de\s+verdad\s+funciona",
+]
+
+
+def _testimony_re() -> re.Pattern:
+    return load_and_compile("investment_testimony.txt", _DEFAULT_TESTIMONY)
+
+
 def _praise_re() -> re.Pattern:
     return load_and_compile("investment_praise.txt", _DEFAULT_PRAISE)
 
@@ -177,12 +237,27 @@ def check(msg: Message, is_first_msg: bool = False) -> Hit:
     score = 0
     reasons: list[str] = []
 
-    # ANCLA: "di X y me devolvieron Y", con Y al menos 1.5x. Es la firma del timo.
+    # ANCLA 1: "di X y me devolvieron Y", con Y al menos 1.5x. Es la firma del timo.
     mult = _give_back_multiplier(text)
-    tiene_ancla = mult >= 1.5
-    if tiene_ancla:
+    tiene_ancla_num = mult >= 1.5
+    if tiene_ancla_num:
         score += 45
         reasons.append(t("reason.invscam_giveback", mult=f"{mult:.0f}"))
+
+    # ANCLA 2: "pensé que era una estafa, pero el dinero llegó". Mismo peso: es
+    # igual de específica, solo que sin cifras.
+    m_flip = _SKEPTIC_FLIP_RE.search(text)
+    tiene_flip = bool(m_flip)
+    if tiene_flip:
+        score += 45
+        reasons.append(t("reason.invscam_flip", q=_cita(m_flip)))
+    tiene_ancla = tiene_ancla_num or tiene_flip
+
+    m_testimony = _testimony_re().search(text)
+    tiene_testimony = bool(m_testimony)
+    if tiene_testimony:
+        score += 30
+        reasons.append(t("reason.invscam_testimony", q=_cita(m_testimony)))
 
     m_praise = _praise_re().search(text)
     m_cta = _cta_re().search(text)
@@ -200,7 +275,7 @@ def check(msg: Message, is_first_msg: bool = False) -> Hit:
         reasons.append(t("reason.invscam_vocab", q=_cita(m_vocab)))
 
     # Refuerzos que NUNCA deciden solos: solo suman si ya hay estructura de timo.
-    hay_estructura = tiene_ancla or tiene_praise or tiene_cta or tiene_vocab
+    hay_estructura = tiene_ancla or tiene_praise or tiene_cta or tiene_vocab or tiene_testimony
     if hay_estructura:
         if _TIME_RE.search(text):
             score += 10
@@ -214,7 +289,8 @@ def check(msg: Message, is_first_msg: bool = False) -> Hit:
     # falta DOS señales propias de la estafa; con el ancla, una. Así "invertí
     # 1000 y ahora vale 1500" (solo ancla) no llega, y "gracias John, me
     # ayudaste" (solo un gracias suelto) tampoco.
-    señales_estafa = sum((tiene_ancla, tiene_praise, tiene_cta, tiene_vocab))
+    señales_estafa = sum((tiene_ancla_num, tiene_flip, tiene_praise, tiene_cta,
+                          tiene_vocab, tiene_testimony))
     if señales_estafa < 2:
         return Hit.none()
 
@@ -227,6 +303,8 @@ def check(msg: Message, is_first_msg: bool = False) -> Hit:
         reason=t("reason.investment_scam", details=" + ".join(reasons)),
         payload={
             "multiplier": round(mult, 1),
+            "skeptic_flip": tiene_flip,
+            "testimony": tiene_testimony,
             "praise": tiene_praise,
             "cta": tiene_cta,
             "vocab": tiene_vocab,

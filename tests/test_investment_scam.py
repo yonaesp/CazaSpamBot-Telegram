@@ -100,3 +100,70 @@ def test_reason_traducido_en_ambos_idiomas():
         set_lang(lang)
         h = inv.check(_msg(txt), is_first_msg=True)
         assert h.reason and "reason." not in h.reason, f"reason sin traducir en {lang}: {h.reason}"
+
+
+# --- Ancla 2: el testimonio de reversión, sin una sola cifra -------------------
+#
+# Caso real (11-sep-2026, Windows 10). La cuenta entró el 7, se verificó en 71
+# segundos y escribió su primer y único mensaje CUATRO DÍAS después. Ni cifras, ni
+# @usuario, ni enlace: el ancla numérica no casaba, `commercial_ad` daba 0 y al
+# estar en inglés tampoco saltaba `non_allowed_script`. El detector puntuaba **0** y
+# lo tuvo que borrar y banear un admin a mano.
+#
+# Es la otra mitad del mismo timo: uno publica el anzuelo y un segundo perfil
+# responde haciéndose pasar por cliente satisfecho. De ahí que llegue días después
+# y sin enlace, porque el enlace lo pone el otro.
+
+MILA = ("Saw your post and honestly thought it was a scam, but the money actually "
+        "came through and I'm in shock")
+
+
+def test_el_testimonio_de_reversion_se_caza():
+    h = inv.check(_msg(MILA), is_first_msg=True)
+    assert h and h.score >= 60, h
+    assert h.payload["skeptic_flip"] is True
+    assert h.payload["multiplier"] == 0.0      # sin una sola cifra
+
+
+def test_la_reversion_tambien_en_espanol():
+    txt = ("Vi tu publicación y pensé que era una estafa, pero llegó el dinero igual "
+           "y aún no me lo creo")
+    assert inv.check(_msg(txt), is_first_msg=True).score >= 60
+
+
+def test_el_conector_de_reversion_es_obligatorio():
+    """Sin el «pero», las dos mitades pueden ser frases de conversaciones distintas."""
+    txt = ("Pensé que era una estafa. Por cierto, a mi hermano le llegó el dinero "
+           "de la devolución de Hacienda la semana pasada sin problema")
+    assert inv.check(_msg(txt), is_first_msg=True).score == 0
+
+
+def test_ni_la_reversion_ni_el_testimonio_deciden_solos():
+    """La guarda de dos señales sigue mandando: una sola nunca basta."""
+    solo_testimonio = "No me lo puedo creer, de verdad funciona el truco que me pasaste ayer"
+    assert inv.check(_msg(solo_testimonio), is_first_msg=True).score == 0
+    solo_escepticismo = "Pensé que era una estafa pero al final era verdad lo que decían del parche"
+    assert inv.check(_msg(solo_escepticismo), is_first_msg=True).score == 0
+
+
+def test_anti_fp_lenguaje_normal_de_un_grupo_de_windows():
+    """Medido sobre 365 mensajes reales de los grupos: cero disparos salvo las
+    dos estafas conocidas. Estos son los que más se le acercan."""
+    for txt in (
+        "Pensé que era un scam la web esa de licencias pero me llegó la clave y funciona bien",
+        "No me lo puedo creer, llevo dos días con el disco duro y por fin recuperé los archivos",
+        "Vi tu mensaje sobre el ollama en cloud, al final lo probaste o no?",
+        "Saludos familia buena tardes disculpen la molestia necesito un programa para "
+        "recuperar los archivos de un disco duro USB",
+        "Estaba en shock cuando vi el precio de la licencia retail en la tienda oficial",
+    ):
+        h = inv.check(_msg(txt), is_first_msg=True)
+        assert not h or h.score == 0, f"falso positivo: {txt!r} -> {h.score if h else 0}"
+
+
+def test_el_ancla_de_reversion_no_se_externaliza():
+    """Es lógica estructural del núcleo, como `_GIVE_BACK_RE`: no es vocabulario."""
+    import inspect
+    fuente = inspect.getsource(inv)
+    i = fuente.index("_SKEPTIC_FLIP_RE = re.compile(")
+    assert "load_and_compile" not in fuente[i:i + 400]

@@ -4,6 +4,29 @@ Cambios relevantes de CazaSpamBot, lo más reciente arriba. Se anotan hitos, no
 cada commit: para el detalle está el historial de git. Sin números de versión
 porque el bot es un servicio en producción continua, no un paquete que se libera.
 
+## 2026-09 · El testimonio de estafa que no lleva cifras
+
+`investment_scam` anclaba en «di X y me devolvieron Y»: necesitaba números. El timo
+viene en dos mitades y la segunda no los tiene. Caso real en Windows 10: «Saw your
+post and honestly thought it was a scam, but the money actually came through and
+I'm in shock». Ni cifras, ni @usuario, ni enlace, así que el ancla no casaba,
+`commercial_ad` daba 0 y al estar en inglés tampoco saltaba `non_allowed_script`:
+el detector puntuaba **0** y lo tuvo que borrar y banear un admin a mano.
+
+Es el cómplice: uno publica el anzuelo y un segundo perfil responde haciéndose
+pasar por cliente satisfecho. Por eso la cuenta entró el **7** y escribió su primer
+y único mensaje el **11** — el enlace lo pone el otro.
+
+Nueva ancla `_SKEPTIC_FLIP_RE`, del mismo peso que la numérica: admitir que se
+sospechaba una estafa **y a continuación** decir que el dinero llegó. El conector de
+reversión es obligatorio, porque sin él «pensé que era una estafa» y «me pagaron»
+pueden ser frases de conversaciones distintas. Sigue mandando la guarda de dos
+señales: ni la reversión ni el vocabulario de testimonio deciden solos.
+
+Medido antes de desplegar sobre **365 mensajes reales** de los cuatro grupos:
+disparan dos, y son las dos estafas conocidas. **Cero falsos positivos.** El
+mensaje quedó además guardado como muestra de aprendizaje. 1536 tests.
+
 ## 2026-09 · Las señales de forma dejan de castigar solas
 
 Un usuario legítimo acabó **baneado en los cuatro grupos y reportado a Telegram**

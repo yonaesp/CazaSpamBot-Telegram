@@ -237,6 +237,27 @@ Caza el testimonio «di X y me devolvieron Y (mucho mayor)» (caso real: «I gav
 - **Ninguna señal decide sola** (`señales_estafa < 2 → none()`). Con ancla basta una señal de apoyo; sin ancla hacen falta dos. Así «invertí 1000 y ahora vale 1500» (solo ancla, y `worth` está **fuera** de los verbos de retorno a propósito) no cae, ni «gracias John» (un elogio suelto) tampoco.
 - **Refuerzos que nunca deciden**: tiempo («after 12 hours»), primer mensaje. Solo suman si ya hay estructura.
 
+**El timo viene en DOS mitades, y la segunda no lleva cifras.** Uno publica el
+anzuelo y un segundo perfil responde haciéndose pasar por cliente satisfecho. Caso
+real (11-sep-2026, Windows 10): «Saw your post and honestly thought it was a scam,
+but the money actually came through and I'm in shock». Ni cifras, ni @usuario, ni
+enlace, así que el ancla numérica no casaba, `commercial_ad` daba 0 y al estar en
+inglés tampoco saltaba `non_allowed_script`: **el detector puntuaba 0** y lo tuvo
+que borrar y banear un admin a mano. Detalle que lo delata y conviene recordar: la
+cuenta entró el **7** y escribió su primer y único mensaje el **11** — llega días
+después precisamente porque el enlace lo pone el otro.
+
+Se añadió `_SKEPTIC_FLIP_RE` como **segunda ancla del mismo peso** (45): admitir que
+se sospechaba una estafa **y a continuación** decir que el dinero llegó. El conector
+de reversión («pero», «but») es obligatorio; sin él, «pensé que era una estafa» y
+«me pagaron» pueden ser dos frases de conversaciones distintas del mismo párrafo.
+Es estructural, no vocabulario, así que **no se externaliza** (hay test). Lo que sí
+es editable es `investment_testimony.txt`: las fórmulas de testimonio en primera
+persona («I'm in shock», «saw your post»), que **por sí solas no deciden nada**.
+
+Medido antes de desplegarlo sobre **365 mensajes reales** de los cuatro grupos:
+disparan **dos**, y son las dos estafas conocidas. Cero falsos positivos.
+
 ### Convenciones al escribir/editar patrones de detección
 
 - Cada línea de `config/blacklist/**.txt` es un **regex Python** (case-insensitive), acumulativo entre capas. Grupos **NO capturantes** `(?:...)`, nunca `(...)`: rompen el conteo de coincidencias en `compile_alternation`. Un patrón inválido se ignora con un log, no tumba el bot.

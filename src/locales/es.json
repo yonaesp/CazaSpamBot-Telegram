@@ -911,6 +911,8 @@
   "cfg.ct.err.escritura": "❌ No he podido guardar el archivo. Revisa los permisos del disco; no se ha cambiado nada.",
   "cfg.ct.err.generico": "❌ No se puede añadir esa palabra.",
   "reason.investment_scam": "Testimonio de estafa de inversión ({details})",
+  "reason.invscam_flip": "admite que sospechaba estafa y dice que cobró: «{q}»",
+  "reason.invscam_testimony": "fórmula de testimonio en primera persona: «{q}»",
   "reason.invscam_giveback": "estructura «di X y me devolvieron {mult}x»",
   "reason.invscam_praise": "elogio de testimonio: «{q}»",
   "reason.invscam_cta": "llamada a la acción: «{q}»",

@@ -82,6 +82,7 @@ es casi siempre más seguro que una palabra suelta.
 | `investment_praise.txt` | `investment_scam` | elogio a "quien te hace ganar" en el testimonio de estafa ("es de confianza", "changed my life") |
 | `investment_cta.txt` | `investment_scam` | llamada a contactar a esa persona ("contáctala", "DM her now", 👇👉📲). **Se carga sin `\b(?:...)\b`** (lleva emojis): pon tú los `\b` en los patrones de texto |
 | `investment_vocab.txt` | `investment_scam` | vocabulario de reclutamiento del timo ("inversión garantizada", "guaranteed profit", "passive income") |
+| `investment_testimony.txt` | `investment_scam` | fórmulas de testimonio en primera persona ("I'm in shock", "saw your post", "no me lo puedo creer"). **Nunca deciden solas**: hacen falta dos señales, así que sin un ancla no puntúan |
 | `story_source.txt` | `story_share` | Nombres de canal típicos de las historias de spam. Se contrasta contra el **título y el @username del canal de origen**, no contra el mensaje. **Se carga sin límites de palabra**: cada patrón pone sus propios `\b`, y van en PAREJAS («crypto signals»), nunca palabras sueltas. «insider» a secas casaba con «Windows Insider Program» |
 | `bio_spam_keywords.txt` | `bio_spam` | spam adulto/cripto/casino/préstamo en la bio del perfil |
 | `bio_illegal_services.txt` | `bio_spam` | servicios de hacking/piratería declarados en la bio |
