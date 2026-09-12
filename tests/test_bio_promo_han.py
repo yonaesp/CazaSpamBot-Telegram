@@ -36,12 +36,29 @@ def test_la_bio_publicitaria_anula_el_salvoconducto():
     assert baneado is True, "sigue librándose por tener cuenta antigua y fotos"
 
 
-def test_una_bio_normal_conserva_el_salvoconducto():
-    """Contrapeso: el salvoconducto existe para proteger a personas reales y tiene
-    que seguir haciéndolo."""
+def test_el_salvoconducto_ya_no_cubre_un_nombre_ENTERO_en_otro_alfabeto():
+    """Consecuencia del cambio de política del 13-sep-2026 (ban sin excepciones).
+
+    Antes, una bio normal conservaba el salvoconducto de «cuenta antigua con foto»
+    incluso con el nombre en Han. Ahora el criterio de un solo campo se evalúa
+    ANTES del salvoconducto, así que la bio ya no lo salva: el admin pidió ban
+    directo por el nombre y eso alcanza también al chino, no solo al árabe.
+
+    Lo que el salvoconducto SIGUE cubriendo está en el test de abajo: nombres de
+    una o dos letras, que no llegan al mínimo de 3 del criterio nuevo.
+    """
     baneado, _ = v._is_obvious_spam_profile(_cuenta("Ingeniero. Vivo en Madrid."),
                                             "pepe", "凎吙爪窝", None)
+    assert baneado is True
+
+
+def test_el_salvoconducto_sigue_vivo_para_nombres_cortos():
+    """`中文` son 2 letras: no llega al mínimo de 3, así que el camino de siempre
+    (salvoconducto + decisión del admin) se conserva intacto ahí."""
+    baneado, razones = v._is_obvious_spam_profile(_cuenta("Ingeniero. Vivo en Madrid."),
+                                                  "pepe", "中文", None)
     assert baneado is False
+    assert any(r[0] == v.REASON_BYPASS_OLD for r in razones)
 
 
 def test_no_se_pide_decision_de_algo_que_ya_se_banea():

@@ -287,7 +287,8 @@ async def _revisar_autor(context, cfg: Config, db: DB, target) -> list[str]:
             log.debug("scan autor señales: %s", exc)
 
     obvio, razones = verification._is_obvious_spam_profile(
-        sig, autor.username, autor.first_name, autor.last_name)
+        sig, autor.username, autor.first_name, autor.last_name,
+        allowed_scripts=verification.allowed_scripts_de(db, target.chat_id, cfg))
     if obvio:
         hallazgos.append(t("scan.autor_perfil",
                            motivos=", ".join(verification.render_reason_list(razones)[:3])))

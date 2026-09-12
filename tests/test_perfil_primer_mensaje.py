@@ -35,7 +35,10 @@ def test_el_nombre_de_ese_perfil_ya_bastaba():
     el criterio, era que en el primer mensaje no se aplicaba."""
     obvio, razones = _is_obvious_spam_profile(None, None, "李大哥", None)
     assert obvio
-    assert any(r[0] == "han_dominant" for r in razones)
+    # Desde el 13-sep-2026 el motivo es el criterio de UN campo, que se evalúa
+    # antes que `han_dominant`. La premisa del test no cambia: con ese nombre el
+    # join lo habría baneado; lo que fallaba era no aplicarlo al primer mensaje.
+    assert any(r[0] == "single_field_script" for r in razones)
 
 
 def test_y_el_canal_tambien_puntuaba():

@@ -107,6 +107,7 @@
   "reason.recent_account": "recent account ({days}d)",
   "reason.decorative": "{label} decorative (mixed alphabets, ignored)",
   "reason.non_latin_field": "{label} {ratio} non-latin ({dominant})",
+  "reason.single_field_script": "whole name in a different script: {label} {ratio} {dominant}",
   "reason.bypass_old_photo": "exception: old account with photo",
   "reason.han_dominant": "name dominated by Chinese ideographs (Han)",
   "reason.no_photo_new": "no photo + {days}d-old account",

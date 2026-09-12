@@ -22,12 +22,26 @@ def _cuenta(fotos, dias):
                            newest_photo=dt.datetime(2025, 1, 1))
 
 
-def test_el_caso_real_ahora_queda_a_decision_del_admin():
-    """Cuenta antigua con foto: ni ban automático ni pase libre."""
+def test_un_nombre_han_ENTERO_ya_no_llega_a_la_decision_del_admin():
+    """Cambio de política del 13-sep-2026: ban directo por el nombre, sin excepciones.
+
+    `han_requiere_decision` no ha cambiado y sigue devolviendo True, pero en la
+    práctica ya no se le pregunta para un nombre de 3+ letras: el ban directo
+    ocurre antes, en `_is_obvious_spam_profile`. El camino de «decide tú» queda
+    para los nombres Han cortos (1-2 letras), que no alcanzan el mínimo del
+    criterio nuevo — ver `test_la_decision_del_admin_sigue_viva_con_nombres_cortos`.
+    """
     sig = _cuenta(fotos=2, dias=800)
     assert v.han_requiere_decision(sig, None, "凎吙爪窝", None) is True
-    # y sigue sin banear solo, que es lo que protege al chino-hablante real
-    baneado, _ = v._is_obvious_spam_profile(sig, None, "凎吙爪窝", None)
+    baneado, razones = v._is_obvious_spam_profile(sig, None, "凎吙爪窝", None)
+    assert baneado is True
+    assert any(r[0] == v.REASON_SINGLE_FIELD_SCRIPT for r in razones)
+
+
+def test_la_decision_del_admin_sigue_viva_con_nombres_cortos():
+    sig = _cuenta(fotos=2, dias=800)
+    assert v.han_requiere_decision(sig, None, "中文", None) is True
+    baneado, _ = v._is_obvious_spam_profile(sig, None, "中文", None)
     assert baneado is False
 
 

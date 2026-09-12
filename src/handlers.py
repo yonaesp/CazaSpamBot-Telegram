@@ -81,13 +81,7 @@ def _chat_allowed_scripts(db: DB, chat_id: int, cfg) -> list[str]:
     Ante cualquier problema de lectura se cae al .env: quedarse sin lista sería
     peor que usar la global, porque una lista vacía marca CUALQUIER alfabeto.
     """
-    try:
-        s = db.get_chat_settings(chat_id)
-        crudo = (s["allowed_scripts"] if s is not None else None) or ""
-    except Exception:  # noqa: BLE001 — chat sin settings, columna vieja, BD ocupada
-        return list(cfg.allowed_scripts)
-    propios = [x.strip().lower() for x in crudo.split(",") if x.strip()]
-    return propios or list(cfg.allowed_scripts)
+    return verification.allowed_scripts_de(db, chat_id, cfg)
 
 
 def _chat_money_guard(db: DB, chat_id: int) -> str:
@@ -968,6 +962,7 @@ async def on_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             )
         obvious_spam, obv_reasons = verification._is_obvious_spam_profile(
             sig_pre, user.username, user.first_name, user.last_name,
+            allowed_scripts=_chat_allowed_scripts(db, cmu.chat.id, cfg),
         )
         if obvious_spam:
             log.info(
@@ -1682,6 +1677,7 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
             sig_perfil, client_perfil = await _senales()
             _obvio, _razones = verification._is_obvious_spam_profile(
                 sig_perfil, user.username, user.first_name, user.last_name,
+                allowed_scripts=_chat_allowed_scripts(db, chat_id, cfg),
             )
             if _obvio:
                 log.info("perfil de spam en el primer mensaje user=%s razones=%s",

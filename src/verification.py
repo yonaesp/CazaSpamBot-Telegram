@@ -182,17 +182,76 @@ def _bio_es_publicidad(bio) -> bool:
     return bool(bio) and bool(_INVITE_EN_BIO_RE.search(bio))
 
 
+def _letras_no_permitidas(texto: str, permitidos: list[str]) -> int:
+    """Cuántas LETRAS del texto están en un alfabeto que el chat no permite.
+
+    Se cuentan letras, no caracteres: los emojis, los signos y los espacios no
+    dicen nada del alfabeto en el que alguien escribe su nombre.
+    """
+    from .detectors.unicode_script import script_of
+    n = 0
+    for ch in texto or "":
+        if not ch.isalpha():
+            continue
+        sc = script_of(ch)
+        if sc and sc.lower() not in permitidos:
+            n += 1
+    return n
+
+
+def allowed_scripts_de(db: DB, chat_id: int, cfg) -> list[str]:
+    """Alfabetos permitidos en este chat, cayendo a ALLOWED_SCRIPTS del `.env`.
+
+    `chat_settings.allowed_scripts` guarda un CSV ('latin,cyrillic') y su NULL
+    significa «no se ha decidido aquí» → manda el `.env`. Esa herencia es lo que
+    permite que una instalación que ya permitía cirílico no empiece a marcar a sus
+    usuarios al actualizar.
+
+    Ante cualquier problema de lectura se cae al `.env`: quedarse sin lista sería
+    peor que usar la global, porque una lista vacía marca CUALQUIER alfabeto.
+
+    Vive aquí y no en `handlers` porque lo necesitan también `recien_llegados` y
+    `scan_cmd`, que no pueden importar handlers sin ciclo.
+    """
+    try:
+        s = db.get_chat_settings(chat_id)
+        crudo = (s["allowed_scripts"] if s is not None else None) or ""
+    except Exception:  # noqa: BLE001 — chat sin settings, columna vieja, BD ocupada
+        return list(cfg.allowed_scripts)
+    propios = [x.strip().lower() for x in crudo.split(",") if x.strip()]
+    return propios or list(cfg.allowed_scripts)
+
+
 def _is_obvious_spam_profile(
     sig: Optional[user_signals.UserSignals],
     username: Optional[str],
     first_name: Optional[str],
     last_name: Optional[str] = None,
+    allowed_scripts: Optional[list[str]] = None,
 ) -> tuple[bool, list[str]]:
     """Perfil EVIDENTEMENTE de spammer al hacer JOIN — ban directo sin verificación.
 
     Criterios (más conservadores tras incidente Cherokee 2026-05-29):
+      - 1 campo con >=70% de caracteres en un alfabeto NO PERMITIDO por el chat
+        (decisión del admin, 13-sep-2026; ver más abajo)
       - 2+ campos (first_name, last_name, username) con >30% chars no-latín
       - 1+ campo no-latín + cuenta sin foto + <30 días (si Telethon disponible)
+
+    ⚠️ El criterio de UN SOLO campo lo pidió el admin explícitamente y **no
+    admite excepciones**: va ANTES del salvoconducto de cuenta antigua con foto,
+    así que una cuenta de cinco años con foto y nombre en árabe o cirílico se
+    banea igual. Se le presentó el coste (cualquier persona real con nombre en
+    árabe, ruso, griego o hebreo queda fuera para siempre) y lo aceptó.
+
+    Medido sobre las 566 personas con nombre registrado antes de aplicarlo: el
+    criterio cambia el veredicto de **9**, todas con **0 mensajes**, y 5 ya
+    estaban baneadas por otra vía. El único veterano con nombre exótico del censo
+    (220 mensajes desde 2022) NO se ve afectado: su nombre tras NFKC queda en 22%
+    no latino, lejos del 70%.
+
+    Los alfabetos son los PERMITIDOS POR ESE CHAT (`chat_settings.allowed_scripts`),
+    no una lista fija: un grupo ruso o árabe que configure el suyo no se autodestruye
+    al actualizar. Sin parámetro se cae a `latin`, que es el defecto del `.env`.
 
     Lo que YA NO dispara ban directo (era FP):
       - 1 solo campo con ≥70% chars no-latín (mucha gente real con nombre
@@ -203,9 +262,11 @@ def _is_obvious_spam_profile(
     Para esos casos, on_chat_member ya aplica verification con botón.
     """
     import unicodedata
+    permitidos = [x for x in (allowed_scripts or ["latin"]) if x] or ["latin"]
     reasons: list[str] = []
     non_latin_count = 0
     high_ratio_single = False
+    campo_alto: Optional[tuple[str, str, float]] = None   # (campo, alfabeto, ratio)
     for value, label in [(first_name, "first_name"), (last_name, "last_name"), (username, "username")]:
         if not value:
             continue
@@ -215,13 +276,32 @@ def _is_obvious_spam_profile(
         if _is_decorative_mix(norm):
             reasons.append((REASON_DECORATIVE, {"label": label}))
             continue
-        ratio, dominant = non_allowed_ratio(norm, ["latin"])
+        ratio, dominant = non_allowed_ratio(norm, permitidos)
         if ratio > 0.3:
             non_latin_count += 1
             reasons.append((REASON_NON_LATIN_FIELD,
                             {"label": label, "ratio": f"{ratio:.0%}", "dominant": dominant}))
             if ratio >= 0.7:
                 high_ratio_single = True
+                # Un NOMBRE en otro alfabeto, no un adorno. `ツ` de apellido, `彡`
+                # o una corona son un carácter suelto que usa muchísima gente
+                # legítima, y con el criterio de un solo campo caerían todos: es
+                # el falso positivo del incidente de mayo por la puerta de atrás.
+                # Un nombre real en árabe, cirílico o hebreo tiene 3 letras o más
+                # (محمد=4, الحسن=5, Сервер=6, Фёдор=5, y los 9 del censo cumplen).
+                if campo_alto is None and _letras_no_permitidas(norm, permitidos) >= 3:
+                    campo_alto = (label, dominant or "?", ratio)
+    # UN SOLO campo con el nombre entero (>=70%) en un alfabeto que este chat no
+    # permite. Va ANTES del salvoconducto a propósito: el admin pidió ban directo
+    # «sin excepciones» el 13-sep-2026, sabiendo que eso deja fuera también a la
+    # persona real con cuenta asentada. Antes de esto el criterio era de 2 campos
+    # y el caso que lo motivó (nombre 100% árabe, sin apellido ni usuario) solo
+    # llegaba a verificación.
+    if campo_alto is not None:
+        _campo, _alfabeto, _ratio = campo_alto
+        return True, reasons + [(REASON_SINGLE_FIELD_SCRIPT, {
+            "label": _campo, "dominant": _alfabeto, "ratio": f"{_ratio:.0%}"})]
+
     # BYPASS de seguridad: si Telethon dice cuenta ≥365d + con foto,
     # NUNCA ban directo por nombre. Es un user bilingüe probable.
     #
@@ -314,6 +394,7 @@ REASON_BYPASS_OLD = "bypass_old_photo"
 REASON_HAN_DOMINANT = "han_dominant"
 REASON_NO_PHOTO_NEW = "no_photo_new"
 REASON_BIO_PROMO = "bio_promo"
+REASON_SINGLE_FIELD_SCRIPT = "single_field_script"
 
 
 def render_reason_list(reasons) -> list[str]:

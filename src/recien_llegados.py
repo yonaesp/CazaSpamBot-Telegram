@@ -318,8 +318,10 @@ async def _revisar_perfil(context, db: DB, cfg: Config, fila, espera: int) -> bo
     except Exception as exc:  # noqa: BLE001 — una traza jamás frena la revisión
         log.debug("recien_llegados: no se pudo comparar el nombre de %s: %s", user_id, exc)
 
+    _permitidos = verification.allowed_scripts_de(db, fila["chat_id"], cfg)
     obvio, _razones = verification._is_obvious_spam_profile(
         None, usuario.username, usuario.first_name, usuario.last_name,
+        allowed_scripts=_permitidos,
     )
     if not obvio and not _toca_leer_perfil(context, chat_id, user_id, espera):
         return False
@@ -345,6 +347,7 @@ async def _revisar_perfil(context, db: DB, cfg: Config, fila, espera: int) -> bo
 
     obvio, razones = verification._is_obvious_spam_profile(
         sig, usuario.username, usuario.first_name, usuario.last_name,
+        allowed_scripts=_permitidos,
     )
     if obvio:
         log.info(

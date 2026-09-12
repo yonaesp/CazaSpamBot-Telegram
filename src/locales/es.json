@@ -107,6 +107,7 @@
   "reason.recent_account": "cuenta reciente ({days}d)",
   "reason.decorative": "{label} decorativo (mezcla de alfabetos, ignorado)",
   "reason.non_latin_field": "{label} {ratio} no latino ({dominant})",
+  "reason.single_field_script": "nombre entero en otro alfabeto: {label} {ratio} {dominant}",
   "reason.bypass_old_photo": "excepción: cuenta antigua con foto",
   "reason.han_dominant": "nombre dominado por ideogramas chinos (Han)",
   "reason.no_photo_new": "sin foto + cuenta de {days}d",

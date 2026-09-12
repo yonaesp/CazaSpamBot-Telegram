@@ -4,6 +4,36 @@ Cambios relevantes de CazaSpamBot, lo más reciente arriba. Se anotan hitos, no
 cada commit: para el detalle está el historial de git. Sin números de versión
 porque el bot es un servicio en producción continua, no un paquete que se libera.
 
+## 2026-09 · Un nombre entero en otro alfabeto es ban directo
+
+Decisión explícita del admin. Antes hacían falta **dos** campos en un alfabeto no
+permitido, así que un nombre 100 % árabe sin apellido ni usuario solo llegaba a
+verificación. El criterio nuevo basta con **uno**, y se evalúa **antes** del
+salvoconducto de «cuenta antigua con foto»: una cuenta de cinco años con foto cae
+igual. Se le presentó el coste —cualquier persona real con nombre en árabe, ruso,
+griego o hebreo queda fuera para siempre— y lo aceptó.
+
+Medido sobre las 566 personas con nombre registrado antes de aplicarlo: el criterio
+cambia el veredicto de **9**, todas con **0 mensajes**, y **5 ya estaban baneadas**
+por otra vía. El único veterano con nombre exótico del censo (220 mensajes desde
+2022) no se ve afectado: tras NFKC queda en 22 % no latino.
+
+Tres salvaguardas que el criterio conserva:
+
+- **Mínimo 3 letras** en el alfabeto no permitido. Sin ese mínimo se revivía el
+  falso positivo de mayo por la puerta de atrás: `ツ` de apellido, `彡` o `♛` son
+  adornos que usa mucha gente legítima y son campos de una letra al 100 %. Salió
+  al ejecutar la suite, no al pensarlo.
+- **Los alfabetos son los del chat**, no una lista fija, así que un grupo ruso o
+  árabe que configure el suyo no se autodestruye al actualizar.
+- NFKC y el descarte de mezclas decorativas de 3+ alfabetos, intactos.
+
+⚠️ Alcanza también al chino, y eso deja `han_requiere_decision` sin uso práctico
+para nombres Han de 3+ letras: el ban ocurre antes de preguntar. Ese camino sigue
+vivo solo para nombres cortos. Es la consecuencia coherente de «sin excepciones».
+
+1540 tests.
+
 ## 2026-09 · El testimonio de estafa que no lleva cifras
 
 `investment_scam` anclaba en «di X y me devolvieron Y»: necesitaba números. El timo

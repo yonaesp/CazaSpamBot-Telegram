@@ -72,6 +72,37 @@ nativa; se itera `banChatMember` sobre los chats donde el bot es admin.
    - `bajo`: cualquier indicio, incluido no tener @usuario.
    Todo por chat vía `/config`.
 
+**Un nombre ENTERO en un alfabeto que el chat no permite es ban directo, sin
+excepciones** (decisión explícita del admin, 13-sep-2026). Antes hacían falta DOS
+campos y un nombre 100 % árabe sin apellido ni usuario solo llegaba a verificación,
+que es lo que pasó con «محمد» el 12-sep. El criterio se evalúa **antes** del
+salvoconducto de «cuenta antigua con foto», así que una cuenta de cinco años con
+foto cae igual: se le presentó el coste al admin (cualquier persona real con nombre
+en árabe, ruso, griego o hebreo queda fuera para siempre) y lo aceptó.
+
+Tres cosas que no se deben romper:
+- **Mínimo 3 letras** en el alfabeto no permitido. Sin ese mínimo el criterio
+  revive el falso positivo de mayo por la puerta de atrás: `ツ` de apellido, `彡`
+  o `♛` son adornos que usa muchísima gente legítima, y son campos de UNA letra
+  con ratio 100 %. Los nombres reales cumplen de sobra (محمد=4, الحسن=5,
+  Сервер=6). Hay test con los cinco adornos.
+- **Los alfabetos son los DEL CHAT** (`chat_settings.allowed_scripts`, resuelto
+  por `verification.allowed_scripts_de`), no una lista fija: un grupo ruso o árabe
+  que configure el suyo no se autodestruye al actualizar. Ese helper vive en
+  `verification` y no en `handlers` porque lo necesitan también `recien_llegados`
+  y `scan_cmd`, que no pueden importar handlers sin ciclo.
+- ⚠️ **Alcanza también al chino, y eso deja `han_requiere_decision` sin uso
+  práctico** para nombres Han de 3+ letras: el ban ocurre antes de preguntar. Ese
+  camino de «decide tú» sigue vivo solo para nombres cortos (`中文`, 2 letras).
+  No es un descuido, es la consecuencia coherente de «sin excepciones».
+
+**Medido antes de aplicarlo** sobre las 566 personas con nombre registrado: el
+criterio cambia el veredicto de **9**, todas con **0 mensajes**, y **5 ya estaban
+baneadas** por otra vía. El único veterano con nombre exótico del censo
+(`彡👽彡 - ꧁༒ 𝕄𝕧𝕀𝕚𝕀𝕒𝕏`, 220 mensajes desde 2022) **no se ve afectado**: tras NFKC
+queda en 22 % no latino, lejos del 70 %. Los 4 que quedaban dentro se banearon a
+mano al aplicar el cambio, con luz verde explícita.
+
 **Menos fricción para quien no la merece.** Dos criterios se relajaron con datos del propio grupo (30-ago-2026), a raíz de «mario»: nombre latino, **1 foto de hace 540 días**, sin @usuario, y le salió «verifica en 30 min o serás expulsado».
 - **`no_username` NO es señal fuerte**: medido, **29 %** de los miembros de Windows 11 y **14 %** de Domótica no tienen username. Ya existía `_STRONG_SUSP_REASONS` excluyéndola, pero solo se usaba para avisar al admin; ahora también decide el tier. Sin ninguna señal fuerte se pasa al tier NORMAL (3 h + recordatorio), no se salta la verificación.
 - **`_is_very_legit_profile` pide 1 foto, no 2**: sobre 20 usuarios asentados, **el 15 % tiene una sola**. Lo que esa condición prueba es la ANTIGÜEDAD, que sale de la foto más vieja: una de hace año y medio la demuestra igual que dos.
