@@ -9,11 +9,14 @@ recién llegada. Y no traía forma de ir al mensaje: había que buscarlo a mano.
 """
 from __future__ import annotations
 
+import asyncio
 import json
 from pathlib import Path
 from types import SimpleNamespace
 
-from src import handlers
+import pytest
+
+from src import handlers, notify_prefs
 from src.i18n import t, set_lang
 
 
@@ -48,6 +51,14 @@ def test_sin_message_id_no_se_construye_nada():
 
 # --- el texto del aviso ------------------------------------------------------
 
+@pytest.fixture(autouse=True)
+def _idioma_limpio():
+    """Sin esto, una aserción que falle dentro del bucle deja el idioma en `en`
+    y contamina los tests siguientes."""
+    yield
+    set_lang("es")
+
+
 def _render(avala: bool, url: str | None):
     return t("hdl.trust_notice_dm",
              cabecera=t("hdl.tn.head_trusted" if avala else "hdl.tn.head_no_evidence"),
@@ -62,7 +73,6 @@ def test_el_enlace_sale_en_el_aviso():
         set_lang(lang)
         txt = _render(True, "https://t.me/Windows11ESP/60588")
         assert 'href="https://t.me/Windows11ESP/60588"' in txt
-    set_lang("es")
 
 
 def test_sin_permalink_no_queda_ni_rastro_de_la_linea():
@@ -71,7 +81,6 @@ def test_sin_permalink_no_queda_ni_rastro_de_la_linea():
         set_lang(lang)
         txt = _render(True, None)
         assert "None" not in txt and "{" not in txt and "<a" not in txt
-    set_lang("es")
 
 
 def test_sin_confianza_el_aviso_NO_dice_que_el_historial_avala():
@@ -81,7 +90,6 @@ def test_sin_confianza_el_aviso_NO_dice_que_el_historial_avala():
         txt = _render(False, None).lower()
         for mentira in ("de confianza", "historial", "trusted", "history"):
             assert mentira not in txt, f"[{lang}] sigue diciendo «{mentira}»"
-    set_lang("es")
 
 
 def test_con_confianza_se_conserva_el_texto_de_siempre():
@@ -111,3 +119,95 @@ def test_las_claves_nuevas_estan_en_los_dos_idiomas():
     for lang in ("es", "en"):
         d = json.loads(Path(f"src/locales/{lang}.json").read_text(encoding="utf-8"))
         assert claves <= set(d), f"faltan en {lang}: {claves - set(d)}"
+
+
+# --- y ahora ejerciendo la función DE VERDAD ---------------------------------
+#
+# Los de arriba llaman a `t()` con las claves que `_send_trust_notice` DEBERÍA
+# pasar. Si alguien le quita el `if avala_historial else` del cuerpo, o le cambia
+# el nombre al kwarg, todos siguen en verde y el aviso miente igual: es la trampa
+# que este repo tiene documentada («Tests que pasan en verde sin comprobar nada»).
+# Estos invocan la función y leen el texto que se le manda a Telegram.
+
+def _enviar(avala: bool, chat_id=-1001190184646, username="Windows11ESP", monkeypatch=None):
+    capturado = {}
+
+    async def _send_message(**kw):
+        capturado.update(kw)
+        return SimpleNamespace(message_id=1)
+
+    monkeypatch.setattr(notify_prefs, "effective", lambda *a, **k: True)
+    monkeypatch.setattr(handlers, "_trust_score_cached", lambda *a, **k: 1)
+    context = SimpleNamespace(bot=SimpleNamespace(send_message=_send_message), bot_data={})
+    cfg = SimpleNamespace(admin_notify_chat_id=14573395)
+    msg = SimpleNamespace(
+        message_id=60588, chat_id=chat_id, text="Mi PC no aparece en red de mi propia PC",
+        caption=None, chat=SimpleNamespace(id=chat_id, username=username, title="W11"))
+    user = SimpleNamespace(id=2089088627, first_name="Eduardo", username=None)
+    asyncio.run(handlers._send_trust_notice(
+        context, None, cfg, msg, user, rules=["first_msg_media"],
+        reason="primer mensaje es foto", proposed_action="ban", trust=1,
+        avala_historial=avala))
+    return capturado
+
+
+def test_la_funcion_mete_el_enlace_de_verdad(monkeypatch):
+    env = _enviar(True, monkeypatch=monkeypatch)
+    assert 'href="https://t.me/Windows11ESP/60588"' in env["text"]
+    assert env["parse_mode"] == "HTML"
+    assert env["disable_web_page_preview"] is True
+    assert env["chat_id"] == 14573395
+    assert env["reply_markup"] is not None
+
+
+def test_la_funcion_no_dice_historial_cuando_no_lo_hay(monkeypatch):
+    """El caso de Eduardo, entero y por el camino real."""
+    env = _enviar(False, monkeypatch=monkeypatch)
+    bajo = env["text"].lower()
+    assert "historial" not in bajo and "de confianza" not in bajo
+    assert "dejado pasar" in bajo
+
+
+def test_la_funcion_conserva_el_texto_viejo_con_trust_alto(monkeypatch):
+    env = _enviar(True, monkeypatch=monkeypatch)
+    assert "historial" in env["text"].lower()
+
+
+def test_en_un_grupo_basico_no_manda_ningun_enlace(monkeypatch):
+    env = _enviar(True, chat_id=-4512345, username=None, monkeypatch=monkeypatch)
+    assert "<a" not in env["text"] and "None" not in env["text"] and "{" not in env["text"]
+
+
+def test_sin_destino_de_avisos_no_se_manda_nada(monkeypatch):
+    """La guarda de arriba, que hasta ahora no ejercía nadie."""
+    monkeypatch.setattr(notify_prefs, "effective", lambda *a, **k: True)
+    enviados = []
+
+    async def _send_message(**kw):
+        enviados.append(kw)
+
+    context = SimpleNamespace(bot=SimpleNamespace(send_message=_send_message), bot_data={})
+    msg = SimpleNamespace(message_id=1, chat_id=-100123, text="x", caption=None,
+                          chat=SimpleNamespace(id=-100123, username=None, title="t"))
+    asyncio.run(handlers._send_trust_notice(
+        context, None, SimpleNamespace(admin_notify_chat_id=None), msg,
+        SimpleNamespace(id=1, first_name="a", username=None),
+        rules=["r"], reason="x", proposed_action="ban", trust=1))
+    assert enviados == []
+
+
+def test_el_aviso_silenciado_no_se_manda(monkeypatch):
+    monkeypatch.setattr(notify_prefs, "effective", lambda *a, **k: False)
+    enviados = []
+
+    async def _send_message(**kw):
+        enviados.append(kw)
+
+    context = SimpleNamespace(bot=SimpleNamespace(send_message=_send_message), bot_data={})
+    msg = SimpleNamespace(message_id=1, chat_id=-100123, text="x", caption=None,
+                          chat=SimpleNamespace(id=-100123, username=None, title="t"))
+    asyncio.run(handlers._send_trust_notice(
+        context, None, SimpleNamespace(admin_notify_chat_id=1), msg,
+        SimpleNamespace(id=1, first_name="a", username=None),
+        rules=["r"], reason="x", proposed_action="ban", trust=1))
+    assert enviados == []
