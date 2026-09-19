@@ -186,6 +186,33 @@ def _modo_suave(db: DB, chat_id: int, cfg) -> bool:
     return bool(v)
 
 
+def _enlace_al_mensaje(msg) -> str | None:
+    """Permalink al mensaje, o None si ese chat no tiene ninguno.
+
+    Tres formas, y solo dos existen:
+      - grupo o canal PÚBLICO → `https://t.me/<username>/<id>`;
+      - supergrupo privado    → `https://t.me/c/<id sin el -100>/<id>`;
+      - grupo básico o DM     → no hay permalink, y no se inventa.
+
+    La forma plana vale también en grupos con foros: no lleva `message_thread_id`
+    (comprobado con un enlace real de Windows 11, que tiene temas).
+
+    Solo se usa en los avisos por privado al admin. En público sigue en pie la
+    regla de no poner enlaces clicables: allí van nombre e id y nada más.
+    """
+    mid = getattr(msg, "message_id", None)
+    chat = getattr(msg, "chat", None)
+    if not mid or chat is None:
+        return None
+    uname = getattr(chat, "username", None)
+    if uname:
+        return f"https://t.me/{uname}/{mid}"
+    cid = str(getattr(chat, "id", "") or "")
+    if cid.startswith("-100") and cid[4:].isdigit():
+        return f"https://t.me/c/{cid[4:]}/{mid}"
+    return None
+
+
 def _enlaces_tg_de(hits: list[Hit]) -> list[str]:
     """URLs t.me que ya han disparado un hit, para ir a mirar a dónde llevan.
 
@@ -1861,6 +1888,9 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
                 reason=decision.reason + " | " + _motivo_perdon,
                 proposed_action=decision.action,
                 trust=_trust_score_cached(context, db, chat_id, user.id),
+                # Aquí no se perdona por historial sino por falta de evidencia:
+                # quien dispara esto suele ser alguien recién llegado.
+                avala_historial=False,
             )
             return
 
@@ -1888,6 +1918,7 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
                 reason=decision.reason + " | veto: " + motivo,
                 proposed_action=decision.action,
                 trust=_trust_score_cached(context, db, chat_id, user.id),
+                avala_historial=False,   # lo tumbó el modelo, no el historial
             )
             return
 
@@ -2200,8 +2231,17 @@ async def _send_trust_notice(
     reason: str,
     proposed_action: str,
     trust: int,
+    avala_historial: bool = True,
 ) -> None:
-    """Aviso al admin cuando el trust alto ha ANULADO una acción severa.
+    """Aviso al admin cuando se ha decidido NO castigar algo que había saltado.
+
+    `avala_historial` elige la cabecera y el pie, y **no es cosmético**: de los
+    cuatro sitios que mandan este aviso, dos lo hacen con el trust por los suelos
+    (el perdón por señales de forma y el veto del modelo), y allí «algo raro de
+    alguien de confianza» y «su historial le avala» son sencillamente falsos. Caso
+    real (19-sep-2026): a un usuario con **confianza 1/10** preguntando por qué su
+    PC no se veía a sí misma en la red le salió ese encabezado. Quien manda el
+    aviso sabe por qué lo manda, así que lo dice él.
 
     Antes esto era un silencio total: el bot decidía no tocar a un veterano y no lo
     contaba. Pero una cuenta de confianza puede estar robada, o su dueño puede haber
@@ -2237,8 +2277,16 @@ async def _send_trust_notice(
         if ahora - visto > _AVISO_TRUST_CADA_S * 4:
             del cache[k]
     texto = msg.text or msg.caption or t("hdl.no_text")
+    # El enlace va al MENSAJE, no al perfil, y esto es un privado al admin: la
+    # regla de «sin enlaces clicables» es para lo que se publica en el grupo.
+    url = _enlace_al_mensaje(msg)
     info = t(
         "hdl.trust_notice_dm",
+        cabecera=t("hdl.tn.head_trusted" if avala_historial else "hdl.tn.head_no_evidence"),
+        pie=t("hdl.tn.foot_trusted" if avala_historial else "hdl.tn.foot_no_evidence"),
+        # Sin permalink (grupo básico) la línea entera desaparece: nunca un
+        # `<a href="None">` ni un `{link}` a medio rellenar.
+        enlace=t("hdl.tn.link", url=url) if url else "",
         uid=user.id,
         # Todo lo que viene de fuera se escapa: el TÍTULO del canal de origen entra
         # en `reason` y lo elige quien monta el canal de spam. Un canal llamado

@@ -223,6 +223,20 @@ dos. Antes de meter una regla en `_REGLAS_DE_FORMA` hay que mirar en
 enlace o mención no compra el perdón**, porque `astrurl.io` no estaba en ninguna
 lista negra y aquel spam llegó a la decisión con una sola regla disparada.
 
+⚠️ **El aviso del perdón NO puede decir «alguien de confianza».** Reutiliza
+`_send_trust_notice`, que nació para el trust alto, y de sus cuatro llamadores **dos
+avisan con el trust por los suelos** (este perdón y el veto del modelo): a «Eduardo»,
+**confianza 1/10**, preguntando por qué su PC no se veía a sí misma en la red, le
+salió «Algo raro de alguien de confianza… su historial le avala». Quien manda el
+aviso sabe por qué lo manda, así que elige cabecera y pie con `avala_historial`. Hay
+test que cuenta los llamadores: si aparece un quinto, hay que pensar su variante.
+
+Ese aviso lleva además **enlace al mensaje** (`_enlace_al_mensaje`): `t.me/<user>/<id>`
+en grupo público, `t.me/c/<id sin -100>/<id>` en supergrupo privado, y **nada** en un
+grupo básico, donde no existe permalink y no se inventa. La forma plana vale también
+con foros, sin `message_thread_id`. Es un privado al admin: la regla de «sin enlaces
+clicables» rige para lo que se publica en el grupo.
+
 ⚠️ **El perdón NO alcanza al reenvío desde un canal, un chat o un bot**: ese es el
 patrón fuerte y el único que ha acertado. El caption lo escribe el spammer y le
 sale gratis, así que un texto limpio no puede comprarlo. Si alguien mete en
