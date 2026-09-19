@@ -231,11 +231,20 @@ salió «Algo raro de alguien de confianza… su historial le avala». Quien man
 aviso sabe por qué lo manda, así que elige cabecera y pie con `avala_historial`. Hay
 test que cuenta los llamadores: si aparece un quinto, hay que pensar su variante.
 
-Ese aviso lleva además **enlace al mensaje** (`_enlace_al_mensaje`): `t.me/<user>/<id>`
-en grupo público, `t.me/c/<id sin -100>/<id>` en supergrupo privado, y **nada** en un
-grupo básico, donde no existe permalink y no se inventa. La forma plana vale también
+**Los cuatro avisos por privado llevan enlace al mensaje** (`enlaces.al_mensaje`,
+módulo propio porque `admin_report` no puede importar `handlers` sin ciclo):
+`t.me/<user>/<id>` en grupo público, `t.me/c/<id sin -100>/<id>` en supergrupo
+privado, y **nada** en un grupo básico, donde no existe permalink y no se inventa
+(ni `<a href="None">` ni `{enlace}` a medio rellenar). La forma plana vale también
 con foros, sin `message_thread_id`. Es un privado al admin: la regla de «sin enlaces
 clicables» rige para lo que se publica en el grupo.
+
+Una sola clave `hdl.enlace_al_msg` para los cuatro (`trust_notice_dm`,
+`ocr_review_dm`, `review_dm`, `report.admin_dm`): con una por aviso, la menos usada
+se queda atrás en silencio. El del reporte enlaza al mensaje **reportado**, no al del
+reportante, porque la copia que se manda llega sin el hilo alrededor. Hay test de que
+los cuatro huecos se rellenan desde el código: un `{enlace}` que nadie rellene
+revienta el aviso entero con un `KeyError` y el admin no se entera de nada.
 
 ⚠️ **El perdón NO alcanza al reenvío desde un canal, un chat o un bot**: ese es el
 patrón fuerte y el único que ha acertado. El caption lo escribe el spammer y le

@@ -25,7 +25,7 @@ from . import channel_reader
 from . import desofuscar
 from . import link_reader
 from . import llm_veto
-from . import admin_report, gentle_warning, greetings, learning, notify_prefs, quips, rule_explain, story_reader, trust as _trust, user_signals, verification
+from . import admin_report, enlaces, gentle_warning, greetings, learning, notify_prefs, quips, rule_explain, story_reader, trust as _trust, user_signals, verification
 from .config import Config
 from .db import DB
 from .detectors import Hit
@@ -186,31 +186,14 @@ def _modo_suave(db: DB, chat_id: int, cfg) -> bool:
     return bool(v)
 
 
-def _enlace_al_mensaje(msg) -> str | None:
-    """Permalink al mensaje, o None si ese chat no tiene ninguno.
+def _enlace_al_mensaje(msg, message_id: int | None = None) -> str | None:
+    """Permalink al mensaje. Ver `enlaces.al_mensaje` para las tres formas.
 
-    Tres formas, y solo dos existen:
-      - grupo o canal PÚBLICO → `https://t.me/<username>/<id>`;
-      - supergrupo privado    → `https://t.me/c/<id sin el -100>/<id>`;
-      - grupo básico o DM     → no hay permalink, y no se inventa.
-
-    La forma plana vale también en grupos con foros: no lleva `message_thread_id`
-    (comprobado con un enlace real de Windows 11, que tiene temas).
-
-    Solo se usa en los avisos por privado al admin. En público sigue en pie la
-    regla de no poner enlaces clicables: allí van nombre e id y nada más.
+    `message_id` aparte para cuando el aviso habla de OTRO mensaje (el reportado),
+    no del que lo provocó.
     """
-    mid = getattr(msg, "message_id", None)
-    chat = getattr(msg, "chat", None)
-    if not mid or chat is None:
-        return None
-    uname = getattr(chat, "username", None)
-    if uname:
-        return f"https://t.me/{uname}/{mid}"
-    cid = str(getattr(chat, "id", "") or "")
-    if cid.startswith("-100") and cid[4:].isdigit():
-        return f"https://t.me/c/{cid[4:]}/{mid}"
-    return None
+    return enlaces.al_mensaje(getattr(msg, "chat", None),
+                              message_id or getattr(msg, "message_id", None))
 
 
 def _enlaces_tg_de(hits: list[Hit]) -> list[str]:
@@ -329,8 +312,10 @@ async def _avisar_imagen_dudosa(context, db: DB, cfg: Config, msg, user,
         if ahora - visto > _AVISO_OCR_CADA_S * 4:
             del cache[k]
 
+    _url_ocr = _enlace_al_mensaje(msg)
     info = t(
         "hdl.ocr_review_dm",
+        enlace=t("hdl.enlace_al_msg", url=_url_ocr) if _url_ocr else "",
         uid=user.id,
         name=_h.escape((user.first_name or "user")[:40]),
         chat=_h.escape(str(msg.chat.title or msg.chat_id)),
@@ -2286,7 +2271,7 @@ async def _send_trust_notice(
         pie=t("hdl.tn.foot_trusted" if avala_historial else "hdl.tn.foot_no_evidence"),
         # Sin permalink (grupo básico) la línea entera desaparece: nunca un
         # `<a href="None">` ni un `{link}` a medio rellenar.
-        enlace=t("hdl.tn.link", url=url) if url else "",
+        enlace=t("hdl.enlace_al_msg", url=url) if url else "",
         uid=user.id,
         # Todo lo que viene de fuera se escapa: el TÍTULO del canal de origen entra
         # en `reason` y lo elige quien monta el canal de spam. Un canal llamado
@@ -2438,8 +2423,10 @@ async def _send_review_request(
     public_msg_id = public.message_id if public else 0
     text = msg.text or msg.caption or "(sin texto)"
     name = (user.first_name or "user")[:40]
+    _url_rev = _enlace_al_mensaje(msg)
     info = t(
         "hdl.review_dm",
+        enlace=t("hdl.enlace_al_msg", url=_url_rev) if _url_rev else "",
         uid=user_id,
         # Mismo motivo que en _send_trust_notice: `reason` y el nombre los controla
         # quien manda el mensaje. Sin escapar, un `<b>` suelto tumba el aviso entero.

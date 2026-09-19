@@ -63,7 +63,7 @@ def _render(avala: bool, url: str | None):
     return t("hdl.trust_notice_dm",
              cabecera=t("hdl.tn.head_trusted" if avala else "hdl.tn.head_no_evidence"),
              pie=t("hdl.tn.foot_trusted" if avala else "hdl.tn.foot_no_evidence"),
-             enlace=t("hdl.tn.link", url=url) if url else "",
+             enlace=t("hdl.enlace_al_msg", url=url) if url else "",
              uid=2089088627, name="Eduardo", trust="🔴 1/10", chat="W11",
              rules="first_msg_media", action="ban", reason="x", text="y")
 
@@ -115,7 +115,7 @@ def test_los_dos_perdones_sin_historial_lo_declaran():
 
 def test_las_claves_nuevas_estan_en_los_dos_idiomas():
     claves = {"hdl.tn.head_trusted", "hdl.tn.head_no_evidence",
-              "hdl.tn.foot_trusted", "hdl.tn.foot_no_evidence", "hdl.tn.link"}
+              "hdl.tn.foot_trusted", "hdl.tn.foot_no_evidence", "hdl.enlace_al_msg"}
     for lang in ("es", "en"):
         d = json.loads(Path(f"src/locales/{lang}.json").read_text(encoding="utf-8"))
         assert claves <= set(d), f"faltan en {lang}: {claves - set(d)}"
@@ -211,3 +211,45 @@ def test_el_aviso_silenciado_no_se_manda(monkeypatch):
         SimpleNamespace(id=1, first_name="a", username=None),
         rules=["r"], reason="x", proposed_action="ban", trust=1))
     assert enviados == []
+
+
+# --- los otros tres avisos por privado ---------------------------------------
+#
+# Mismo hueco, pedido después: quien los recibe tenía que buscar el mensaje a mano.
+# Comparten la clave `hdl.enlace_al_msg` en vez de tener cada uno la suya, que es
+# como acaba una desactualizada.
+
+def test_los_cuatro_avisos_por_privado_admiten_enlace():
+    for lang in ("es", "en"):
+        d = json.loads(Path(f"src/locales/{lang}.json").read_text(encoding="utf-8"))
+        for clave in ("hdl.trust_notice_dm", "hdl.ocr_review_dm",
+                      "hdl.review_dm", "report.admin_dm"):
+            assert "{enlace}" in d[clave], f"[{lang}] {clave} sin hueco de enlace"
+
+
+def test_los_cuatro_lo_rellenan_desde_el_codigo():
+    """Un `{enlace}` en la plantilla que nadie rellena revienta el aviso entero
+    con un KeyError, y el admin se queda sin enterarse de nada."""
+    fuentes = (Path("src/handlers.py").read_text(encoding="utf-8")
+               + Path("src/admin_report.py").read_text(encoding="utf-8"))
+    assert fuentes.count('enlace=t("hdl.enlace_al_msg"') == 4
+
+
+def test_el_reporte_de_admin_enlaza_al_mensaje_REPORTADO():
+    """No al del reportante: la copia que se manda llega sin el hilo alrededor,
+    y lo que hace falta mirar es el contexto donde se escribió."""
+    fuente = Path("src/admin_report.py").read_text(encoding="utf-8")
+    assert "enlaces.al_mensaje(msg.chat, reported_msg_id)" in fuente
+
+
+def test_enlaces_al_mensaje_acepta_un_id_distinto_del_de_su_msg():
+    from src import enlaces
+    chat = SimpleNamespace(id=-1001190184646, username=None)
+    assert enlaces.al_mensaje(chat, 999) == "https://t.me/c/1190184646/999"
+    assert enlaces.al_mensaje(chat, None) is None
+
+
+def test_el_helper_de_handlers_sigue_delegando():
+    """`handlers._enlace_al_mensaje` es la puerta que usan los avisos de ahí."""
+    assert handlers._enlace_al_mensaje(_msg(username="W11ESP")) == "https://t.me/W11ESP/60588"
+    assert handlers._enlace_al_mensaje(_msg(), message_id=7) == "https://t.me/c/1190184646/7"

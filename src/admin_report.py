@@ -28,7 +28,7 @@ from telegram import Message
 from telegram.error import TelegramError
 from telegram.ext import ContextTypes
 
-from . import borrado_diferido
+from . import borrado_diferido, enlaces
 from .db import DB
 from .i18n import t, variant_keys
 
@@ -152,8 +152,13 @@ async def handle_admin_mention(
                 else (reporter.first_name or f"id {reporter.id}")
             )
             via = t("report.via_reply") if reported else t("report.via_previous")
+            # Enlace al mensaje REPORTADO, no al del reportante: la copia que se
+            # manda arriba llega sin el hilo alrededor, y lo que hace falta mirar
+            # es el contexto en el que se escribió.
+            _url_rep = enlaces.al_mensaje(msg.chat, reported_msg_id)
             ctx_text = t(
                 "report.admin_dm",
+                enlace=t("hdl.enlace_al_msg", url=_url_rep) if _url_rep else "",
                 chat=html.escape(chat_title),
                 reporter=html.escape(reporter_disp), reporter_id=reporter.id,
                 msg_id=reported_msg_id, via=via,
