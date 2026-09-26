@@ -109,6 +109,21 @@ mano al aplicar el cambio, con luz verde explícita.
 
 **El perfil se mira en los TRES momentos**: al entrar, en el repaso de recién llegados y **en el primer mensaje**. Este último faltaba y se cobró casos: al hablar se juzgaba solo el texto, así que quien entraba con el perfil limpio y lo cambiaba justo antes de escribir pasaba. Caso medido (2026-08-09): «李大哥», nombre 100 % Han y canal `财天下飞机进群结演员结算频道`, entró limpio, se verificó en 4 segundos y escribió 15 h después; lo cazó `non_allowed_script`, o sea por el IDIOMA DEL TEXTO, y con un «hola buenas» habría pasado. En el primer mensaje se aplican los **mismos** criterios del join, sin umbrales propios. Dos guardas: solo si el bot presenció el join (`join_ts IS NOT NULL`, si no podría llevar años en el grupo) y **un solo `user_signals.fetch` por mensaje** (`_senales()`), porque había tres consumidores pidiéndolo por separado con 12 s de tope cada uno.
 
+**La antigüedad sin participación no da confianza.** `user_trust_score` solo suma
+los días en el grupo a partir de `MIN_MSGS_PARA_ANTIGUEDAD` (4: tres previos + el que
+se juzga). Caso real (26-sep-2026, Windows 11): «Miguel Angel» entró el 24-jun, no
+escribió nada en 3 meses y su primer mensaje fue un reenvío de un bot con publicidad
+porno y un botón a una web: `forward_first_msg` dio 95 (kick), pero con 0 mensajes
+tenía **trust 61, todo por días**, así que se preguntó al admin tres veces y el cuarto
+mensaje pasó sin preguntar. Medido sobre las 15 decisiones ablandadas por trust:
+**todas las de gente con ≤3 mensajes acabaron en ban**; las de quien participa,
+ninguna. Una cuenta durmiente es justo lo que espera su momento, no un veterano.
+
+Ese contenido llegó **opaco**: MTProto lo da como `MessageMediaUnsupported` (sin texto
+ni botón) y los detectores de contenido no vieron nada. Queda traza `mensaje opaco`
+con las claves de la Bot API y su `api_kwargs` (donde PTB guarda lo que aún no
+entiende): la próxima vez se sabrá si el botón llegaba y se podrá detectar.
+
 **`on_message`** — recolecta hits, `decide()`, luego trust score:
 - trust ≥70 → SKIP (excepto HARD_RULES: `cas_match`, `lols_match`, `federation_known_ban`, `reaction_farming`)
 - trust 40-69 + acción severa → review-with-buttons al admin DM (✅Legítimo/❌Spam, aprende)

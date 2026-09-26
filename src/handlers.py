@@ -1558,6 +1558,23 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     # los de enlaces y menciones siguen con el mensaje original, cuyas entidades no
     # se pueden descuadrar. Ver `desofuscar.py`.
     msg_txt, _trucos = desofuscar.para_detectores(msg)
+    # Traza de MENSAJES OPACOS: ni texto, ni pie, ni media que conozcamos. Caso real
+    # (26-sep-2026): un reenvío de un bot con publicidad porno y un botón a una web
+    # llegó vacío (MTProto lo da como `MessageMediaUnsupported`) y no quedó
+    # registrado qué vio la Bot API, así que no se pudo saber si el botón estaba
+    # ahí. PTB guarda en `api_kwargs` los campos que aún no entiende: es justo
+    # donde aparecería un tipo de contenido nuevo.
+    if not (msg.text or msg.caption or msg.photo or msg.video or msg.animation
+            or msg.document or msg.sticker or msg.voice or msg.audio or msg.video_note
+            or getattr(msg, "story", None) or msg.poll or msg.contact or msg.location):
+        try:
+            _claves = sorted(k for k, v in msg.to_dict().items() if v not in (None, [], {}, ""))
+        except Exception:  # noqa: BLE001 — una traza jamás tumba nada
+            _claves = ["?"]
+        log.info("mensaje opaco user=%s chat=%s msg=%s claves=%s api_kwargs=%s botones=%s",
+                 user.id, chat_id, msg.message_id, _claves,
+                 sorted((getattr(msg, "api_kwargs", None) or {}).keys()),
+                 bool(getattr(msg, "reply_markup", None)))
     if _trucos:
         log.info("texto disfrazado (%s) user=%s chat=%s → se evalúa el texto limpio",
                  "+".join(_trucos), user.id, chat_id)

@@ -301,6 +301,11 @@ CREATE TABLE IF NOT EXISTS bot_text_prefs (
 """
 
 
+# Mensajes (incluido el que se está juzgando) a partir de los cuales el tiempo en
+# el grupo suma confianza: 3 previos + el actual. Ver `user_trust_score`.
+MIN_MSGS_PARA_ANTIGUEDAD = 4
+
+
 class DB:
     def __init__(self, path: str) -> None:
         self.path = path
@@ -1585,8 +1590,19 @@ class DB:
         if row["whitelisted"]:
             return 100
         score = 0.0
-        score += min(int(row["msg_count"] or 0) * 1.0, 40)
-        if row["first_seen_ts"]:
+        msgs = int(row["msg_count"] or 0)
+        score += min(msgs * 1.0, 40)
+        # La ANTIGÜEDAD solo cuenta si ha participado. Estar dentro sin hablar no
+        # demuestra nada: es justo lo que hace una cuenta durmiente que espera su
+        # momento. Caso real (26-sep-2026, Windows 11): «Miguel Angel» entró el
+        # 24-jun, no escribió NADA en 3 meses y su primer mensaje fue un reenvío de
+        # un bot con publicidad porno y un botón a yournsfwplace.top. Con 0 mensajes
+        # tenía trust 61 (todo por días), así que el kick se convirtió en «¿qué
+        # hago?» tres veces seguidas y el cuarto mensaje pasó sin preguntar.
+        # Medido sobre las 15 decisiones que el trust ha ablandado: todas las de
+        # gente con ≤3 mensajes acabaron en ban; las de quien participa, ninguna.
+        # `msg_count` incluye el mensaje que se está juzgando, de ahí el +1.
+        if msgs >= MIN_MSGS_PARA_ANTIGUEDAD and row["first_seen_ts"]:
             days = (time.time() - row["first_seen_ts"]) / 86400
             score += min(days * 1.5, 30)
             if days >= 30:
