@@ -113,8 +113,14 @@ async def cmd_logout() -> int:
         print("✅ Sesión Telethon cerrada en Telegram.")
     p = Path(SESSION)
     if p.exists():
-        p.unlink()
-        print(f"✅ {SESSION} eliminado.")
+        # Se aparta en vez de borrarse: es el único estado de la cuenta secundaria,
+        # y rehacerlo exige un código por SMS. Un `logout` lanzado por error no puede
+        # costar eso (revisión del 21-sep-2026: «limpiar» borrando estado único dejó
+        # a otro servicio 12 días sin funcionar y sin aviso).
+        import time as _t
+        copia = p.with_name(f"{p.name}.bak-{_t.strftime('%Y%m%d-%H%M%S')}")
+        p.rename(copia)
+        print(f"✅ {SESSION} apartado en {copia.name} (bórralo a mano si sobra).")
     PENDING.unlink(missing_ok=True)
     return 0
 

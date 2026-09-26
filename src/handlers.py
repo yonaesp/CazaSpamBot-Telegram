@@ -552,6 +552,39 @@ async def _perdon_por_contenido_limpio(
     return t("reason.solo_forma", reglas=", ".join(h.rule for h in real))
 
 
+def _sin_confianza_posible(db: DB, chat_id: int, user_id: int, real: list[Hit],
+                           es_opaco: bool) -> str:
+    """Motivo por el que el trust NO puede ablandar esta decisión, o cadena vacía.
+
+    Decisión del admin (26-sep-2026): si alguien **nunca ha escrito** y su primer
+    mensaje es un reenvío de un bot o llega en un formato que no se puede leer, no
+    se le concede confianza. Caso que lo motivó: una cuenta dentro desde junio, sin
+    un solo mensaje en 3 meses, cuyo primer mensaje fue un reenvío de un bot con
+    publicidad porno y un botón a una web, que la cuenta secundaria recibe como
+    `MessageMediaUnsupported` (sin texto ni botón). El trust por antigüedad lo
+    convirtió en tres preguntas al admin.
+
+    Complementa a `MIN_MSGS_PARA_ANTIGUEDAD`, que ya deja ese trust bajo, pero va
+    aparte y explícito: la decisión no debe depender de cómo se calibre la fórmula,
+    ni de un `whitelisted` o de reglas futuras que suban el número.
+
+    `msg_count` incluye el mensaje que se está juzgando, así que «nunca ha escrito»
+    es ≤1. Sin fila no se puede afirmar nada y no se aplica.
+    """
+    try:
+        fila = db.get_seen(chat_id, user_id)
+    except Exception:  # noqa: BLE001
+        return ""
+    if fila is None or int(fila["msg_count"] or 0) > 1:
+        return ""
+    if any(h.rule == "forward_first_msg" and (h.payload or {}).get("origin_type") == "bot"
+           for h in real):
+        return "primer mensaje reenviado de un bot, sin historial"
+    if es_opaco:
+        return "primer mensaje en un formato ilegible, sin historial"
+    return ""
+
+
 def _can_restrict(member) -> bool:
     if member.status == ChatMemberStatus.OWNER:
         return True
@@ -1564,9 +1597,10 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     # registrado qué vio la Bot API, así que no se pudo saber si el botón estaba
     # ahí. PTB guarda en `api_kwargs` los campos que aún no entiende: es justo
     # donde aparecería un tipo de contenido nuevo.
-    if not (msg.text or msg.caption or msg.photo or msg.video or msg.animation
-            or msg.document or msg.sticker or msg.voice or msg.audio or msg.video_note
-            or getattr(msg, "story", None) or msg.poll or msg.contact or msg.location):
+    _es_opaco = not (msg.text or msg.caption or msg.photo or msg.video or msg.animation
+                     or msg.document or msg.sticker or msg.voice or msg.audio or msg.video_note
+                     or getattr(msg, "story", None) or msg.poll or msg.contact or msg.location)
+    if _es_opaco:
         try:
             _claves = sorted(k for k, v in msg.to_dict().items() if v not in (None, [], {}, ""))
         except Exception:  # noqa: BLE001 — una traza jamás tumba nada
@@ -1820,11 +1854,18 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
             )
             real.append(destino_hit)
 
+    # Sin historial + reenvío de un bot o formato ilegible: el trust no ablanda nada.
+    _motivo_sin_confianza = _sin_confianza_posible(db, chat_id, user.id, real, _es_opaco)
+    if _motivo_sin_confianza:
+        log.info("user=%s chat=%s sin confianza posible: %s (reglas=%s)",
+                 user.id, chat_id, _motivo_sin_confianza, [h.rule for h in real])
+
     # Trust graduation: si solo dispararon reglas "borderline" (mención/link)
     # Y el user tiene >10 msgs + >10 días en el grupo → aviso suave en vez de ban
     BORDERLINE = {"external_mention_or_link", "url_blocklist", "tg_deeplink"}
     only_borderline = all(h.rule in BORDERLINE for h in real)
-    if only_borderline and gentle_warning.is_trusted(db, chat_id, user.id):
+    if (only_borderline and not _motivo_sin_confianza
+            and gentle_warning.is_trusted(db, chat_id, user.id)):
         reason = " | ".join(h.reason for h in real)
         log.info("user=%s trusted en chat=%s → gentle_warning en lugar de acción", user.id, chat_id)
         await gentle_warning.send(context, db, msg, reason_hint=reason[:200])
@@ -1946,7 +1987,7 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     # Excepciones: reglas de severidad máxima nunca se degradan.
     HARD_RULES = HARD_RULES_BAN
     has_hard_rule = any(h.rule in HARD_RULES for h in real)
-    if not has_hard_rule and decision.action != "noop":
+    if not has_hard_rule and not _motivo_sin_confianza and decision.action != "noop":
         trust = _trust_score_cached(context, db, chat_id, user.id)
         # Trust medio (40-69) Y acción severa (ban/kick) → REVIEW por admin
         # en lugar de actuar directamente. El bot pregunta y aprende de la respuesta.

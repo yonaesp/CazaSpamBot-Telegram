@@ -119,6 +119,12 @@ mensaje pasó sin preguntar. Medido sobre las 15 decisiones ablandadas por trust
 **todas las de gente con ≤3 mensajes acabaron en ban**; las de quien participa,
 ninguna. Una cuenta durmiente es justo lo que espera su momento, no un veterano.
 
+**Y además, regla explícita** (decisión del admin, 26-sep): si alguien **nunca ha
+escrito** (`msg_count ≤ 1`, que incluye el actual) y su primer mensaje es un **reenvío
+de un bot** o llega **opaco**, el trust no ablanda nada, ni en la graduación suave ni
+en el bloque de trust (`_sin_confianza_posible`). Va aparte de la fórmula a propósito:
+la decisión no debe depender de cómo se calibre el trust.
+
 Ese contenido llegó **opaco**: MTProto lo da como `MessageMediaUnsupported` (sin texto
 ni botón) y los detectores de contenido no vieron nada. Queda traza `mensaje opaco`
 con las claves de la Bot API y su `api_kwargs` (donde PTB guarda lo que aún no

@@ -228,6 +228,10 @@ async def aplicar_warn(
     sancion_ok = True
 
     if n >= limit:
+        # El error REAL de Telegram, no una suposición: «¿me faltan permisos?» era
+        # una conjetura que despistaba cuando el motivo era otro (usuario ya fuera,
+        # admin intocable, límite de la API…). Revisión del 21-sep-2026, clase 3.
+        motivo_fallo = ""
         if action == "ban":
             motivo_ban = t("reason.warns_limit", n=n, limit=limit,
                            last_reason=reason or t("reason.no_reason"))
@@ -265,9 +269,11 @@ async def aplicar_warn(
                 )
             except TelegramError as exc:
                 sancion_ok = False
+                motivo_fallo = exc.message
                 log.warning("warn kick fallo: %s", exc)
             text = t("warn.limit_kick" if sancion_ok else "warn.limit_kick_fail",
-                     mention=mention, n=n, limit=limit)
+                     mention=mention, n=n, limit=limit,
+                     error=html.escape(motivo_fallo or "?"))
         elif action == "mute":
             from telegram import ChatPermissions
             try:
@@ -278,9 +284,11 @@ async def aplicar_warn(
                 )
             except TelegramError as exc:
                 sancion_ok = False
+                motivo_fallo = exc.message
                 log.warning("warn mute fallo: %s", exc)
             text = t("warn.limit_mute" if sancion_ok else "warn.limit_mute_fail",
-                     mention=mention, n=n, limit=limit)
+                     mention=mention, n=n, limit=limit,
+                     error=html.escape(motivo_fallo or "?"))
         else:
             text = t("warn.counter", mention=mention, n=n, limit=limit)
         # Solo se limpian los warns si la sanción se aplicó de verdad. Si no, el
