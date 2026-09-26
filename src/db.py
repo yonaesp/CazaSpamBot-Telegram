@@ -512,6 +512,13 @@ class DB:
             row = c.execute("SELECT username FROM bot_chats WHERE chat_id=?", (chat_id,)).fetchone()
         return row["username"] if row else None
 
+    def puede_moderar(self, chat_id: int) -> bool:
+        """¿El bot es admin con permiso de restringir en ese chat? Sin fila, no."""
+        with self._cur() as c:
+            row = c.execute("SELECT am_admin, can_restrict FROM bot_chats WHERE chat_id=?",
+                            (chat_id,)).fetchone()
+        return bool(row and row["am_admin"] and row["can_restrict"])
+
     def admin_chats(self) -> list[int]:
         with self._cur() as c:
             rows = c.execute("SELECT chat_id FROM bot_chats WHERE am_admin=1").fetchall()

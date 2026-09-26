@@ -585,6 +585,38 @@ def _sin_confianza_posible(db: DB, chat_id: int, user_id: int, real: list[Hit],
     return ""
 
 
+_AVISADO_SIN_PERMISOS: set[int] = set()
+
+
+def _se_modera(db: DB, cfg: Config, chat_id: int) -> bool:
+    """¿Este chat se modera? Hace falta estar en la lista Y poder actuar en él.
+
+    En modo autodescubrimiento (`MODERATED_CHAT_IDS` vacío) `cfg.is_moderated`
+    decía que sí a CUALQUIER chat, aunque el propio comentario prometía «donde sea
+    admin». Caso real (25/26-sep-2026): alguien metió el bot como miembro normal en
+    dos grupos de pesca ajenos. Allí decidía «ban», avisaba al admin de un
+    «Baneado (sincronizado en todos los grupos)» que no había podido ejecutar, el
+    spammer seguía dentro y volvía a escribir cada ~4 h, y cada vuelta era otro
+    aviso idéntico (6 de uno, 5 de otro). Peor aún: esos bans entraban en la
+    FEDERACIÓN, así que un grupo ajeno podía acabar baneando gente en los propios.
+
+    Con una lista explícita se respeta tal cual: quien la escribe sabe lo que pone.
+    """
+    if not cfg.is_moderated(chat_id):
+        return False
+    if cfg.moderated_chat_ids_set:
+        return True
+    try:
+        ok = db.puede_moderar(chat_id)
+    except Exception as exc:  # noqa: BLE001
+        log.debug("puede_moderar chat=%s ilegible: %s", chat_id, exc)
+        return False
+    if not ok and chat_id not in _AVISADO_SIN_PERMISOS:
+        _AVISADO_SIN_PERMISOS.add(chat_id)
+        log.info("chat=%s sin permisos de admin: se ignora (ni se modera ni se federa)", chat_id)
+    return ok
+
+
 def _can_restrict(member) -> bool:
     if member.status == ChatMemberStatus.OWNER:
         return True
@@ -830,7 +862,7 @@ async def on_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     cmu: ChatMemberUpdated = update.chat_member
     if not cmu:
         return
-    if not cfg.is_moderated(cmu.chat.id):
+    if not _se_modera(db, cfg, cmu.chat.id):
         return
     old_status = cmu.old_chat_member.status if cmu.old_chat_member else None
     new_status = cmu.new_chat_member.status
@@ -1357,7 +1389,7 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     chat_id = msg.chat_id
     if msg.chat.type in ("group", "supergroup"):
         await _ensure_chat_registered(context, db, msg.chat)
-    if not cfg.is_moderated(chat_id):
+    if not _se_modera(db, cfg, chat_id):
         return
     user = msg.from_user
     # Nuestro propio bot nunca se modera
@@ -2081,7 +2113,7 @@ async def on_message_reaction(update: Update, context: ContextTypes.DEFAULT_TYPE
     if user.is_bot or user.id == cfg.admin_user_id:
         return
     await _ensure_chat_registered(context, db, mru.chat)
-    if not cfg.is_moderated(mru.chat.id):
+    if not _se_modera(db, cfg, mru.chat.id):
         return
     # Guard whitelist: users marcados como inmunes no disparan reaction-farming
     if db.is_whitelisted(mru.chat.id, user.id):
@@ -2653,7 +2685,7 @@ async def _moderate_channel_message(context, db, cfg, msg) -> None:
         return  # admin anónimo del grupo posteando "como el grupo"
     if msg.chat.type in ("group", "supergroup"):
         await _ensure_chat_registered(context, db, msg.chat)
-    if not cfg.is_moderated(msg.chat_id):
+    if not _se_modera(db, cfg, msg.chat_id):
         return
     hits = [
         buttons_det.check(msg),

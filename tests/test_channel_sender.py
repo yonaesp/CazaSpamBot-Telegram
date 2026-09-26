@@ -30,8 +30,10 @@ def _ctx(shadow=False):
     cfg = SimpleNamespace(shadow=shadow, url_blocklist=set(),
                           admin_notify_chat_id=14573395,
                           allowed_scripts=["latin"], non_latin_ratio_threshold=0.30,
-                          is_moderated=lambda cid: True)
+                          is_moderated=lambda cid: True, moderated_chat_ids_set=set())
     db = MagicMock()
+    # Explícito, no el «truthy» de MagicMock: el bot es admin en este grupo.
+    db.puede_moderar.return_value = True
     bot = SimpleNamespace(
         ban_chat_sender_chat=AsyncMock(), delete_message=AsyncMock(),
         send_message=AsyncMock(), id=42,

@@ -22,6 +22,16 @@ Configúralos a partir de `.env.example`:
 Los chats que modera se configuran en `MODERATED_CHAT_IDS` (CSV de chat_ids) o,
 si se deja vacío, modera todos los grupos donde el bot sea admin (auto-discovery).
 
+⚠️ **«Donde sea admin» no lo comprobaba nadie.** `cfg.is_moderated` devolvía True para
+CUALQUIER chat en autodescubrimiento. Caso real (25/26-sep-2026): alguien metió el bot
+como miembro normal en dos grupos de pesca ajenos; allí decidía «ban», avisaba al admin
+de un «Baneado (sincronizado en todos los grupos)» que no podía ejecutar, el spammer
+seguía dentro y cada ~4 h llegaba otro aviso idéntico. Y esos bans **entraban en la
+federación**: un grupo ajeno podía banear gente en los propios. Las cuatro puertas
+(join, mensaje, reacción, canal) pasan ahora por `_se_modera`: lista explícita si la
+hay; si no, **admin con permiso de restringir** (`db.puede_moderar`). Hay test que
+impide volver a usar `cfg.is_moderated` a pelo en una puerta.
+
 **Federación**: ban en uno = ban en todos (`federation.py`). No hay primitiva
 nativa; se itera `banChatMember` sobre los chats donde el bot es admin.
 
