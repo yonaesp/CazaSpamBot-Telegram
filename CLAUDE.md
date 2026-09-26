@@ -140,6 +140,19 @@ ni botón) y los detectores de contenido no vieron nada. Queda traza `mensaje op
 con las claves de la Bot API y su `api_kwargs` (donde PTB guarda lo que aún no
 entiende): la próxima vez se sabrá si el botón llegaba y se podrá detectar.
 
+**Banear en un supergrupo NO borra los mensajes del baneado.** Caso real
+(26-sep-2026): cuatro reenvíos de spam, el admin pulsó «Spam» en uno y los otros tres
+siguieron en el grupo, más dos avisos de «un administrador lo revisará» respondiendo a
+un «mensaje eliminado». La función que debía limpiar (`aggressive_post_ban_cleanup`)
+**no la llamaba nadie** y solo miraba `moderation_log`, donde el cuarto ni aparecía;
+se retiró. Ahora `federate_ban`, por donde pasan TODOS los bans, llama al final a
+`_retirar_mensajes`: `mensajes_recientes` ∪ `moderation_log` de los últimos 7 días,
+solo en los chats donde el ban se aplicó, con `deleteMessages` (100 por llamada),
+solo Bot API y sin poder tumbar el ban. Se lleva también los avisos del bot ligados a
+esa persona: el «un admin lo revisará» se registra en `gentle_warnings` igual que el
+aviso suave, así que además la cascada de borrados (Telethon) lo quita cuando el
+mensaje se borra a mano sin pasar por los botones.
+
 **`on_message`** — recolecta hits, `decide()`, luego trust score:
 - trust ≥70 → SKIP (excepto HARD_RULES: `cas_match`, `lols_match`, `federation_known_ban`, `reaction_farming`)
 - trust 40-69 + acción severa → review-with-buttons al admin DM (✅Legítimo/❌Spam, aprende)

@@ -412,39 +412,3 @@ async def notify_bot_overlap(context: ContextTypes.DEFAULT_TYPE) -> int:
     return enviados
 
 
-async def aggressive_post_ban_cleanup(
-    context: ContextTypes.DEFAULT_TYPE,
-    chat_id: int,
-    user_id: int,
-    max_messages: int = 30,
-    since_seconds: int = 7 * 86400,
-) -> int:
-    """Tras un ban, intenta borrar los mensajes recientes del user en ese chat.
-
-    Solo borra mensajes loggeados en moderation_log que estén dentro de la ventana
-    de tiempo. NO usa Telethon (que tendría más cobertura) — más conservador.
-    Devuelve count de mensajes borrados.
-    """
-    db: DB = context.bot_data["db"]
-    cutoff = time.time() - since_seconds
-    with db._cur() as c:
-        rows = c.execute(
-            """
-            SELECT DISTINCT message_id FROM moderation_log
-            WHERE chat_id=? AND user_id=? AND message_id IS NOT NULL AND ts >= ?
-            ORDER BY ts DESC LIMIT ?
-            """,
-            (chat_id, user_id, cutoff, max_messages),
-        ).fetchall()
-    deleted = 0
-    for r in rows:
-        msg_id = r["message_id"]
-        try:
-            ok = await context.bot.delete_message(chat_id=chat_id, message_id=msg_id)
-            if ok:
-                deleted += 1
-        except Exception:
-            pass
-    if deleted:
-        log.info("aggressive_post_ban_cleanup: %d msgs borrados chat=%s user=%s", deleted, chat_id, user_id)
-    return deleted

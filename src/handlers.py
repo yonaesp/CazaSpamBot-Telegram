@@ -654,8 +654,13 @@ async def on_my_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         username=getattr(chat, "username", None),
     )
     log.info(
-        "my_chat_member chat=%s (%s) status=%s admin=%s restrict=%s delete=%s",
+        "my_chat_member chat=%s (%s) status=%s admin=%s restrict=%s delete=%s por=%s (%s)",
         chat.id, chat.title, new.status, am_admin, _can_restrict(new), _can_delete(new),
+        # QUIÉN lo hizo. No se guardaba, y el 25-sep-2026 alguien metió el bot en dos
+        # grupos de pesca ajenos sin que quedara forma de saber quién: Telegram solo
+        # lo dice en este update, y en ningún otro sitio al que el bot tenga acceso.
+        getattr(cmu.from_user, "id", "?"),
+        (getattr(cmu.from_user, "username", None) or getattr(cmu.from_user, "first_name", None) or "?"),
     )
 
     # Aviso si le QUITAN PERMISOS sin echarlo. Es el fallo silencioso: el bot se
@@ -2511,6 +2516,15 @@ async def _send_review_request(
     if not admin_dm:
         return
     public_msg_id = public.message_id if public else 0
+    # Se registra como los avisos suaves: «este aviso del bot va con ese mensaje».
+    # Así, si el mensaje se borra SIN pasar por los botones (a mano, o por la
+    # limpieza de un ban), la cascada de borrados se lleva también el aviso, en vez
+    # de dejar «un administrador lo revisará» respondiendo a un «mensaje eliminado».
+    if public is not None:
+        try:
+            db.add_gentle_warning(chat_id, msg_id, public.message_id, user_id)
+        except Exception as exc:  # noqa: BLE001
+            log.debug("no se pudo registrar el aviso de revisión: %s", exc)
     text = msg.text or msg.caption or "(sin texto)"
     name = (user.first_name or "user")[:40]
     _url_rev = _enlace_al_mensaje(msg)
@@ -2581,6 +2595,7 @@ async def on_pending_review_callback(update: Update, context: ContextTypes.DEFAU
                 await context.bot.delete_message(chat_id=chat_id, message_id=public_id)
             except TelegramError:
                 pass
+        db.delete_gentle_warning(chat_id, msg_id)
         # Editar el DM para marcar resuelto
         try:
             await q.edit_message_text(
@@ -2617,9 +2632,16 @@ async def on_pending_review_callback(update: Update, context: ContextTypes.DEFAU
         decision=decision, original_text=text,
         first_name=(seen["first_name"] if seen else None),
     )
+    # TODOS sus avisos de «un admin lo revisará», no solo el de este mensaje.
+    # Caso real (26-sep-2026): una cuenta mandó cuatro reenvíos de spam, se abrieron
+    # tres revisiones y al pulsar «Spam» en una se borró solo su aviso; los otros dos
+    # quedaron respondiendo a un «mensaje eliminado».
+    avisos = set(db.pop_avisos_de_usuario(chat_id, user_id))
     if public_id:
+        avisos.add(public_id)
+    for aviso in avisos:
         try:
-            await context.bot.delete_message(chat_id=chat_id, message_id=public_id)
+            await context.bot.delete_message(chat_id=chat_id, message_id=aviso)
         except TelegramError:
             pass
     try:

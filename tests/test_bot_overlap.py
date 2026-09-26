@@ -260,7 +260,8 @@ def test_se_piden_los_bots_explicitamente():
     from pathlib import Path
     fuente = Path("src/maintenance.py").read_text()
     i = fuente.index("async def notify_bot_overlap(")
-    cuerpo = fuente[i:fuente.index("\nasync def ", i + 10)]
+    cuerpo = fuente[i:(re.search(r"\n(?:async )?def \w", fuente[i + 10:]).start() + i + 10
+                          if re.search(r"\n(?:async )?def \w", fuente[i + 10:]) else len(fuente))]
     assert "return_bots" in cuerpo
 
 
@@ -270,7 +271,8 @@ def test_el_soporte_se_mira_por_firma_no_con_un_except():
     from pathlib import Path
     fuente = Path("src/maintenance.py").read_text()
     i = fuente.index("async def notify_bot_overlap(")
-    cuerpo = fuente[i:fuente.index("\nasync def ", i + 10)]
+    cuerpo = fuente[i:(re.search(r"\n(?:async )?def \w", fuente[i + 10:]).start() + i + 10
+                          if re.search(r"\n(?:async )?def \w", fuente[i + 10:]) else len(fuente))]
     assert "inspect.signature" in cuerpo
     assert "except TypeError:" not in cuerpo
 

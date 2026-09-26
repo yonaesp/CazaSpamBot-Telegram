@@ -755,6 +755,24 @@ class DB:
                 (chat_id, user_id, chat_id, user_id, self.MAX_RECIENTES_POR_USUARIO),
             )
 
+    def mensajes_para_limpiar(self, user_id: int, desde: float) -> dict[int, list[int]]:
+        """{chat_id: [msg_id, …]} de lo que esa persona ha escrito y el bot conoce.
+
+        Suma las dos fuentes: `mensajes_recientes` (todo lo que escribió, aunque no
+        disparara nada) y `moderation_log` (lo que sí disparó). Con solo la segunda
+        se quedaban en el grupo los mensajes que nadie llegó a juzgar.
+        """
+        fuera: dict[int, set[int]] = {}
+        with self._cur() as c:
+            for r in c.execute(
+                "SELECT chat_id, msg_id AS mid FROM mensajes_recientes WHERE user_id=? AND ts>=? "
+                "UNION SELECT chat_id, message_id AS mid FROM moderation_log "
+                "WHERE user_id=? AND ts>=? AND message_id IS NOT NULL AND message_id>0",
+                (user_id, desde, user_id, desde),
+            ):
+                fuera.setdefault(r["chat_id"], set()).add(int(r["mid"]))
+        return {cid: sorted(ids) for cid, ids in fuera.items()}
+
     def mensaje_reciente(self, chat_id: int, msg_id: int):
         """(user_id, texto) de un mensaje guardado, o None si ya no se tiene."""
         with self._cur() as c:
@@ -1496,6 +1514,18 @@ class DB:
             return c.execute(
                 "SELECT user_id, username, reactions_json, ts FROM friendly_greeters ORDER BY ts DESC"
             ).fetchall()
+
+    def pop_avisos_de_usuario(self, chat_id: int, user_id: int) -> list[int]:
+        """Saca y devuelve los ids de TODOS los avisos del bot ligados a esa persona
+        en ese chat (avisos suaves y «un admin lo revisará»)."""
+        with self._cur() as c:
+            filas = c.execute(
+                "SELECT bot_msg_id FROM gentle_warnings WHERE chat_id=? AND user_id=?",
+                (chat_id, user_id),
+            ).fetchall()
+            c.execute("DELETE FROM gentle_warnings WHERE chat_id=? AND user_id=?",
+                      (chat_id, user_id))
+        return [int(f["bot_msg_id"]) for f in filas]
 
     def delete_gentle_warning(self, chat_id: int, user_msg_id: int) -> None:
         with self._cur() as c:
