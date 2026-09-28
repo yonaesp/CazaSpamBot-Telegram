@@ -106,6 +106,17 @@ Tres cosas que no se deben romper:
   camino de «decide tú» sigue vivo solo para nombres cortos (`中文`, 2 letras).
   No es un descuido, es la consecuencia coherente de «sin excepciones».
 
+**Y lo mismo para la BIO y el título del CANAL PERSONAL** (decisión del admin,
+28-sep-2026): escritos en un alfabeto no permitido → ban directo, también antes del
+salvoconducto (`_texto_en_otro_alfabeto`, mismas guardas: NFKC, mezcla decorativa,
+≥70 % y ≥3 letras). Caso: «Mahmoud Rashed», nombre en latino y bio y canal
+(«برامج و العاب», programas y juegos) en árabe; se saltó hasta la verificación (3
+fotos, 650 días) y su único mensaje fue un comentario cebo en inglés para llevar
+gente al canal. El nombre es justo la parte que se cambia para pasar los filtros.
+**Tener canal a secas NO es ban**: es muy común en gente legítima. Una bio que mezcla
+idiomas («Люблю Windows») tampoco cae. No se pudo medir el impacto: ni bios ni
+canales de los miembros se guardan, y en tres semanas de logs solo entró este caso.
+
 **Medido antes de aplicarlo** sobre las 566 personas con nombre registrado: el
 criterio cambia el veredicto de **9**, todas con **0 mensajes**, y **5 ya estaban
 baneadas** por otra vía. El único veterano con nombre exótico del censo

@@ -1138,5 +1138,6 @@
   "hdl.ocr_sin_texto": "(no readable text in the image)",
   "hdl.ocr_duda_franja": "the image text adds up to {puntos} points: something's there, but not enough",
   "hdl.ocr_duda_sin_texto": "an image without a single letter as the first message of someone with no history (trust {trust}/100), which is exactly how you dodge the content detectors",
-  "hdl.ocr_duda_poco_texto": "first message with an image from someone with no history (trust {trust}/100)"
+  "hdl.ocr_duda_poco_texto": "first message with an image from someone with no history (trust {trust}/100)",
+  "reason.profile_text_script": "{label} written in a different script: {ratio} {dominant}"
 }

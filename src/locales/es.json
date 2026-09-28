@@ -1138,5 +1138,6 @@
   "hdl.ocr_sin_texto": "(la imagen no tiene texto legible)",
   "hdl.ocr_duda_franja": "el texto de la imagen suma {puntos} puntos: algo hay, pero no lo suficiente",
   "hdl.ocr_duda_sin_texto": "imagen sin una sola letra en el primer mensaje de alguien sin historial (confianza {trust}/100), que es justo la forma de esquivar los detectores de contenido",
-  "hdl.ocr_duda_poco_texto": "primer mensaje con imagen de alguien sin historial (confianza {trust}/100)"
+  "hdl.ocr_duda_poco_texto": "primer mensaje con imagen de alguien sin historial (confianza {trust}/100)",
+  "reason.profile_text_script": "{label} escrito en otro alfabeto: {ratio} {dominant}"
 }

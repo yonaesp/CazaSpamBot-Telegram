@@ -199,6 +199,25 @@ def _letras_no_permitidas(texto: str, permitidos: list[str]) -> int:
     return n
 
 
+def _texto_en_otro_alfabeto(texto: Optional[str], permitidos: list[str]):
+    """(alfabeto, ratio) si el texto está ESCRITO en un alfabeto no permitido.
+
+    Mismo criterio que para un campo del nombre: NFKC, se ignoran las mezclas
+    decorativas, ≥70 % de las letras fuera y al menos 3 (un `ツ` o un `♛` sueltos en
+    una bio en español no son escribir en otro alfabeto).
+    """
+    import unicodedata
+    if not texto:
+        return None
+    norm = unicodedata.normalize("NFKC", texto)
+    if _is_decorative_mix(norm):
+        return None
+    ratio, dominant = non_allowed_ratio(norm, permitidos)
+    if ratio >= 0.7 and _letras_no_permitidas(norm, permitidos) >= 3:
+        return dominant or "?", ratio
+    return None
+
+
 def allowed_scripts_de(db: DB, chat_id: int, cfg) -> list[str]:
     """Alfabetos permitidos en este chat, cayendo a ALLOWED_SCRIPTS del `.env`.
 
@@ -302,6 +321,25 @@ def _is_obvious_spam_profile(
         return True, reasons + [(REASON_SINGLE_FIELD_SCRIPT, {
             "label": _campo, "dominant": _alfabeto, "ratio": f"{_ratio:.0%}"})]
 
+    # La MISMA regla, aplicada a los otros dos escaparates del perfil: la bio y el
+    # título del canal personal (decisión del admin, 28-sep-2026). Caso que lo
+    # motivó (27/28-sep, Windows 10): «Mahmoud Rashed», nombre en latino, pero bio
+    # y canal («برامج و العاب», programas y juegos) en árabe; entró saltándose hasta
+    # la verificación (3 fotos, cuenta de 650 días) y su único mensaje fue un
+    # comentario cebo en inglés para llevar gente al canal. El detector del canal
+    # le daba 40 sobre 100. Con el nombre en latino y el resto en otro alfabeto, el
+    # nombre es justo la parte que se cambia para pasar los filtros.
+    # Mismas guardas que el nombre (NFKC, mezcla decorativa, ≥70 % y ≥3 letras) y
+    # también ANTES del salvoconducto: «sin excepciones».
+    if sig is not None:
+        for _texto, _campo in ((getattr(sig, "bio", None), "bio"),
+                               (getattr(sig, "personal_channel_title", None), "canal")):
+            _hit = _texto_en_otro_alfabeto(_texto, permitidos)
+            if _hit:
+                _alfabeto, _ratio = _hit
+                return True, reasons + [(REASON_PROFILE_TEXT_SCRIPT, {
+                    "label": _campo, "dominant": _alfabeto, "ratio": f"{_ratio:.0%}"})]
+
     # BYPASS de seguridad: si Telethon dice cuenta ≥365d + con foto,
     # NUNCA ban directo por nombre. Es un user bilingüe probable.
     #
@@ -395,6 +433,7 @@ REASON_HAN_DOMINANT = "han_dominant"
 REASON_NO_PHOTO_NEW = "no_photo_new"
 REASON_BIO_PROMO = "bio_promo"
 REASON_SINGLE_FIELD_SCRIPT = "single_field_script"
+REASON_PROFILE_TEXT_SCRIPT = "profile_text_script"
 
 
 def render_reason_list(reasons) -> list[str]:
