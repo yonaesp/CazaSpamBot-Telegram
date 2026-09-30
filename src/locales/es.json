@@ -1140,5 +1140,22 @@
   "hdl.ocr_duda_sin_texto": "imagen sin una sola letra en el primer mensaje de alguien sin historial (confianza {trust}/100), que es justo la forma de esquivar los detectores de contenido",
   "hdl.ocr_duda_poco_texto": "primer mensaje con imagen de alguien sin historial (confianza {trust}/100)",
   "reason.profile_text_script": "{label} escrito en otro alfabeto: {ratio} {dominant}",
-  "reason.ad_software_catalog": "catálogo de {n} programas o suscripciones de pago"
+  "reason.ad_software_catalog": "catálogo de {n} programas o suscripciones de pago",
+  "auto.motivo_ban_manual": "Lo ha baneado {admin} y yo no lo había visto venir.",
+  "auto.motivo_spam_cmd": "Lo has marcado como spam con /spam.",
+  "auto.prop_dm": "🧠 <b>¿Aprendo de esto?</b>\n{motivo}\n\n👤 <code>{uid}</code>\n💬 <i>{texto}</i>\n\n<b>Frases que podría vigilar</b> (ya probadas contra la conversación real de tus grupos):\n{terminos}\n\nSi era spam, pulsa una frase para que la vigile, o «Solo el mensaje» para que aprenda el ejemplo. Si no lo era, dímelo y no aprendo nada.",
+  "auto.prop_linea": "• «<code>{term}</code>»: 0 de {revisados} mensajes normales{extra}",
+  "auto.prop_en_otros": ", y ya salía en {n} spam anteriores",
+  "auto.prop_sin_terminos": "<i>Ninguna frase sale limpia: todas aparecen también en conversación normal. Mejor aprender solo el ejemplo.</i>",
+  "auto.btn_termino": "➕ «{term}»",
+  "auto.btn_solo_msg": "📚 Solo el mensaje",
+  "auto.btn_no": "✖️ No era spam",
+  "auto.caducada": "Esta propuesta ya no está disponible.",
+  "auto.ya_hecho": "Ya estaba aplicada.",
+  "auto.toast_no": "Entendido, no aprendo nada.",
+  "auto.toast_msg": "Aprendido: {n} ejemplo(s) de spam.",
+  "auto.toast_termino": "Vigilaré «{term}».",
+  "auto.toast_termino_err": "No se pudo añadir ({code}).",
+  "auto.suf_no": "\n\n✖️ <i>No era spam: no he aprendido nada.</i>",
+  "auto.suf_msg": "\n\n📚 <i>Aprendidos {n} ejemplo(s) de spam.</i>"
 }

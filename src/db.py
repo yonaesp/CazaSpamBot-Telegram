@@ -1252,6 +1252,74 @@ class DB:
             ).fetchall()
         return [r["text_norm"] for r in rows]
 
+    # --- autoaprendizaje (ver `autoaprendizaje.py`) -------------------------
+    # `added_by = 0` marca lo que el bot aprendió SOLO; lo que marca el admin lleva
+    # su id. Así lo automático se puede deshacer sin tocar lo que decidió él.
+
+    def muestras_auto_desde(self, label: str, desde: float) -> int:
+        with self._cur() as c:
+            return c.execute(
+                "SELECT COUNT(*) AS n FROM learning_samples "
+                "WHERE label=? AND added_by=0 AND ts>=?", (label, desde),
+            ).fetchone()["n"]
+
+    def muestra_auto_de_usuario_desde(self, user_id: int, label: str, desde: float) -> bool:
+        with self._cur() as c:
+            return c.execute(
+                "SELECT 1 FROM learning_samples WHERE source_user=? AND label=? "
+                "AND added_by=0 AND ts>=? LIMIT 1", (user_id, label, desde),
+            ).fetchone() is not None
+
+    def olvidar_muestras(self, user_id: int, label: str, solo_auto: bool) -> int:
+        """Borra las muestras de esa persona con esa etiqueta. Devuelve cuántas."""
+        q = "DELETE FROM learning_samples WHERE source_user=? AND label=?"
+        if solo_auto:
+            q += " AND added_by=0"
+        with self._cur() as c:
+            return c.execute(q, (user_id, label)).rowcount
+
+    def recortar_muestras_auto(self, label: str, maximo: int) -> int:
+        """Deja solo las `maximo` automáticas más recientes de esa etiqueta."""
+        with self._cur() as c:
+            return c.execute(
+                "DELETE FROM learning_samples WHERE label=? AND added_by=0 AND id NOT IN ("
+                "  SELECT id FROM learning_samples WHERE label=? AND added_by=0 "
+                "  ORDER BY ts DESC LIMIT ?)", (label, label, maximo),
+            ).rowcount
+
+    def textos_recientes_de(self, user_id: int, desde: float) -> list[tuple[int, int, str]]:
+        """(chat_id, msg_id, texto) de lo que esa persona escribió, lo más nuevo primero."""
+        with self._cur() as c:
+            return [(r["chat_id"], r["msg_id"], r["texto"]) for r in c.execute(
+                "SELECT chat_id, msg_id, texto FROM mensajes_recientes "
+                "WHERE user_id=? AND ts>=? AND texto IS NOT NULL ORDER BY ts DESC",
+                (user_id, desde))]
+
+    def textos_legitimos(self, limite: int = 5000) -> list[str]:
+        """Todo lo que se ha escrito en los grupos y NO es de un baneado vigente,
+        más los ejemplos legítimos. Es «cómo se habla aquí»."""
+        with self._cur() as c:
+            baneados = "SELECT user_id FROM banned_users WHERE revoked_at IS NULL"
+            filas = c.execute(
+                f"SELECT texto AS x FROM mensajes_recientes WHERE texto IS NOT NULL "
+                f"  AND user_id NOT IN ({baneados}) "
+                f"UNION SELECT last_msg_text FROM seen_users WHERE last_msg_text IS NOT NULL "
+                f"  AND user_id NOT IN ({baneados}) "
+                f"UNION SELECT first_msg_text FROM seen_users WHERE first_msg_text IS NOT NULL "
+                f"  AND user_id NOT IN ({baneados}) "
+                f"UNION SELECT text_norm FROM learning_samples WHERE label='ham' "
+                f"LIMIT ?", (limite,)).fetchall()
+        return [f["x"] for f in filas if f["x"]]
+
+    def el_bot_actuo_sobre(self, user_id: int, desde: float) -> bool:
+        """¿El propio bot castigó o llevó a revisión a esa persona en esa ventana?"""
+        with self._cur() as c:
+            return c.execute(
+                "SELECT 1 FROM moderation_log WHERE user_id=? AND ts>=? "
+                "AND action IN ('ban','kick','mute','pending_review') "
+                "AND rule NOT LIKE 'manual_%' LIMIT 1", (user_id, desde),
+            ).fetchone() is not None
+
     # ------------- chat_settings -------------
 
     def get_chat_settings(self, chat_id: int) -> sqlite3.Row | None:

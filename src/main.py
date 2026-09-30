@@ -364,6 +364,8 @@ def main() -> int:
     # Callback de review de spam (botones ✅ Legítimo / ❌ Spam en DM admin)
     from .handlers import on_pending_review_callback
     app.add_handler(CallbackQueryHandler(on_pending_review_callback, pattern=r"^prev:"))
+    from . import autoaprendizaje
+    app.add_handler(CallbackQueryHandler(autoaprendizaje.on_callback, pattern=r"^rprop:"))
     app.add_handler(CallbackQueryHandler(on_trust_notice_callback, pattern=r"^tnote:"))
     app.add_handler(CallbackQueryHandler(on_readmision_callback, pattern=r"^readm:"))
     # Callback de antiflood (botones ✅ No es bot / ❌ Es bot en DM admin)

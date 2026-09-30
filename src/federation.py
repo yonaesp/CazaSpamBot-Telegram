@@ -65,6 +65,9 @@ async def federate_ban(
     # Registrar el ban solo si al menos un chat lo aplicó (o si es shadow)
     any_applied = any(v in ("ok", "shadow") for v in results.values())
     if any_applied:
+        # Lo que se aprendió de esta persona como «legítimo» ya no vale.
+        from . import autoaprendizaje
+        autoaprendizaje.olvidar_ham_automatico(db, user_id)
         db.add_ban(
             user_id=user_id, reason=reason, rule=rule,
             banned_in_chat=triggered_in_chat, federated=True,
@@ -121,6 +124,9 @@ async def unfederate_ban(
     shadow: bool,
 ) -> dict[int, str]:
     db.revoke_ban(user_id, revoked_by)
+    # Desbanear es decir «me equivoqué»: lo que el bot aprendió solo de él, fuera.
+    from . import autoaprendizaje
+    autoaprendizaje.olvidar_spam_automatico(db, user_id)
     results: dict[int, str] = {}
     for chat_id in db.admin_chats():
         if shadow:

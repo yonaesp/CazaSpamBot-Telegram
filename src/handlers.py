@@ -25,7 +25,7 @@ from . import channel_reader
 from . import desofuscar
 from . import link_reader
 from . import llm_veto
-from . import admin_report, enlaces, gentle_warning, greetings, learning, notify_prefs, quips, rule_explain, story_reader, trust as _trust, user_signals, verification
+from . import admin_report, autoaprendizaje, enlaces, gentle_warning, greetings, learning, notify_prefs, quips, rule_explain, story_reader, trust as _trust, user_signals, verification
 from .config import Config
 from .db import DB
 from .detectors import Hit
@@ -1316,6 +1316,12 @@ async def _notify_manual_ban(
         "manual ban detected: actor=%s target=%s chat=%s",
         actor.id, target.id, chat.id,
     )
+    # Si el bot no lo había visto, que proponga qué aprender. Solo PROPONE: un ban
+    # manual no siempre es spam, y confirmar es cosa del admin (ver autoaprendizaje).
+    if not db.el_bot_actuo_sobre(target.id, time.time() - 2 * 3600):
+        await autoaprendizaje.proponer_reglas(
+            context, db, cfg, target.id, chat.id,
+            motivo=t("auto.motivo_ban_manual", admin=actor_label))
 
 
 async def _ensure_chat_registered(context: ContextTypes.DEFAULT_TYPE, db: DB, chat) -> None:
@@ -1868,6 +1874,11 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
     real = [h for h in hits if h]
     if not real:
+        # Nada que castigar: si quien escribe está asentado, su mensaje enseña al
+        # clasificador cómo se habla en este grupo. Ver `autoaprendizaje`.
+        autoaprendizaje.guardar_ham_si_procede(
+            db, chat_id, user.id, text, _trust_score_cached(context, db, chat_id, user.id),
+            reenviado=bool(getattr(msg, "forward_origin", None)))
         return
 
     # Filtrar reglas suprimidas (admin marcó "no era spam").
@@ -3259,6 +3270,8 @@ async def _apply_action(
                         )
                     else:
                         await context.bot.ban_chat_member(chat_id=chat_id, user_id=user_id)
+                    autoaprendizaje.aprender_spam_de_ban(
+                        db, chat_id, user_id, original_text, decision.rule, decision.score)
                 elif decision.action == "kick":
                     await context.bot.ban_chat_member(chat_id=chat_id, user_id=user_id)
                     await asyncio.sleep(0.5)

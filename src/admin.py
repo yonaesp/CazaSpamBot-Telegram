@@ -119,6 +119,14 @@ async def _add_sample_with_ux(
         source_user=target.from_user.id if target.from_user else None,
     )
     status = t("sample.status_added") if added else t("sample.status_dup")
+    # Marcar algo como spam es enseñar: además del ejemplo, el bot propone qué
+    # frases de ese mensaje podría vigilar. Ver `autoaprendizaje`.
+    if label == "spam":
+        from . import autoaprendizaje
+        await autoaprendizaje.proponer_reglas(
+            context, db, context.bot_data["cfg"],
+            target.from_user.id if target.from_user else 0, msg.chat_id,
+            motivo=t("auto.motivo_spam_cmd"), textos=[text])
     emoji = "🛑" if label == "spam" else "✅"
     label_txt = t("sample.label_spam") if label == "spam" else t("sample.label_ham")
 

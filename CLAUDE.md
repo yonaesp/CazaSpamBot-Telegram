@@ -413,6 +413,30 @@ Salvaguardas para que el bot no aprenda a castigar el vocabulario normal de su g
 - El visto una sola vez pesa un tercio: es ruido, no evidencia.
 - `classifier_excluded_tokens.txt`: los defaults en código son palabras funcionales del idioma (valen para cualquier comunidad). **El vocabulario temático lo pone cada admin**: solo él conoce su grupo.
 
+**Aprende solo, sin IA externa** (`autoaprendizaje.py`, decisión del admin 30-sep-2026:
+de «juez con IA», «aprender solo» y «que proponga reglas» eligió las dos que no sacan
+nada del servidor). **El clasificador llevaba dormido desde siempre**: solo mira 90
+días y en esa ventana había **1** ejemplo de spam y **0** legítimos (pide 10 y 10).
+- **Legítimos automáticos**: mensaje sin ningún hit de alguien con trust ≥70, ≥25
+  caracteres y ≥5 palabras, sin enlaces ni menciones ni reenvíos; uno por persona y
+  día, 40 al día, 400 en total. Si esa persona acaba baneada, se olvidan.
+- **Spam automático** solo de bans SEGUROS: alguna regla de CONTENIDO (ni de forma,
+  que es Kleo, ni de perfil) y además ≥150 o CAS/lols. `learned_similarity` no cuenta:
+  aprender de lo que ya se parece a lo aprendido es un bucle. Al desbanear se olvida.
+- `added_by = 0` marca lo automático: se deshace sin tocar lo que marcó el admin.
+- **Un ban manual solo PROPONE** («¿era spam?» por privado con botones): se banea
+  también por insultar, y aprender de eso enseñaría a castigar insultos.
+- **Propuestas de FRASES**: solo si la frase ya salió en OTRO spam confirmado, lleva
+  alguna palabra que nunca se ha dicho en la conversación legítima, y la vista previa
+  sale limpia. Medido: entre 37 spams reales **solo una** frase se repetía («al mes»,
+  corriente), y proponer frases de un único spam era proponer falsos positivos (a una
+  pregunta normal le sugería «no me aparece»; del Adobe, «office pro plus»). Serán
+  raras, a propósito. Se añaden a `commercial_illegal_services.txt` (35, no deciden
+  solas).
+- Ensayo en seco antes de activar, con 16 ejemplos de spam de los bans seguros de 90
+  días y 12 legítimos simulados: de 327 mensajes legítimos **ninguno sube** salvo dos
+  que resultaron ser spam (Mila y DARK VECTOR, cuyos bans nunca se federaron).
+
 `learned_similarity` **no** es HARD_RULE, así que el trust protege: con ≥70 se ignora, entre 40 y 69 va a revisión. El riesgo se concentra en usuarios nuevos.
 
 ## Panel `/config` y comandos

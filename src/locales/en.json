@@ -1140,5 +1140,22 @@
   "hdl.ocr_duda_sin_texto": "an image without a single letter as the first message of someone with no history (trust {trust}/100), which is exactly how you dodge the content detectors",
   "hdl.ocr_duda_poco_texto": "first message with an image from someone with no history (trust {trust}/100)",
   "reason.profile_text_script": "{label} written in a different script: {ratio} {dominant}",
-  "reason.ad_software_catalog": "catalogue of {n} paid programs or subscriptions"
+  "reason.ad_software_catalog": "catalogue of {n} paid programs or subscriptions",
+  "auto.motivo_ban_manual": "{admin} banned them and I had not seen it coming.",
+  "auto.motivo_spam_cmd": "You marked it as spam with /spam.",
+  "auto.prop_dm": "🧠 <b>Should I learn from this?</b>\n{motivo}\n\n👤 <code>{uid}</code>\n💬 <i>{texto}</i>\n\n<b>Phrases I could watch for</b> (already tested against your groups' real conversation):\n{terminos}\n\nIf it was spam, tap a phrase to watch for it, or «Just the message» to learn the example. If it was not, tell me and I learn nothing.",
+  "auto.prop_linea": "• «<code>{term}</code>»: 0 of {revisados} normal messages{extra}",
+  "auto.prop_en_otros": ", and it already appeared in {n} earlier spam",
+  "auto.prop_sin_terminos": "<i>No phrase comes out clean: all of them also appear in normal conversation. Better learn just the example.</i>",
+  "auto.btn_termino": "➕ «{term}»",
+  "auto.btn_solo_msg": "📚 Just the message",
+  "auto.btn_no": "✖️ Not spam",
+  "auto.caducada": "This proposal is no longer available.",
+  "auto.ya_hecho": "Already applied.",
+  "auto.toast_no": "Understood, I learn nothing.",
+  "auto.toast_msg": "Learned: {n} spam example(s).",
+  "auto.toast_termino": "I will watch for «{term}».",
+  "auto.toast_termino_err": "Could not add it ({code}).",
+  "auto.suf_no": "\n\n✖️ <i>Not spam: I learned nothing.</i>",
+  "auto.suf_msg": "\n\n📚 <i>Learned {n} spam example(s).</i>"
 }
