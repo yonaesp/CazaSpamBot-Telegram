@@ -227,6 +227,17 @@ Cuatro cosas que no se deben romper:
 
 **El vocabulario es la otra mitad, y sin él el OCR no sirve de nada**: el texto extraído puntuaba **0** con las listas de entonces. Al añadir el de venta de software pirata hay que recordar que el contexto son grupos de Windows, donde «activar», «instalación» y «licencia» son palabras del día a día: ninguna va suelta. Se probó `escríbeme por interno` y marcaba «escríbeme por interno y te paso el driver». Lo inequívoco es el CATÁLOGO (cinco programas de pago listados) y la estructura de oferta. Los patrones toleran ruido con `[\s\S]{0,N}` porque el OCR parte las palabras.
 
+**El mismo catálogo llega en inglés y en texto.** Caso real (30-sep-2026, Windows 10):
+cuenta «Adobe» (@Adobe_Global) con «ADOBE REDEEM CODE ( 1month - 12months ) —>
+( Warranty full )», Creative Cloud, CapCut Pro, Office Pro Plus, ChatGPT Pro… Puntuaba
+45 (solo las líneas con emoji): el vocabulario de software pirata estaba en español.
+Dos piezas: en `en/commercial_illegal_services.txt`, `redeem code`, `full warranty` y
+el rango de duración `1month - 12months` (ninguna decide sola: una = 50 < 60); y la
+señal de **catálogo** (`_marcas_distintas` ≥ `_CATALOGO_MIN` = 4 marcas de pago
+DISTINTAS, lista editable en `commercial_software_catalog.txt`, +40, que sola tampoco
+llega: un grupo de Windows nombra esas marcas a diario). Medido sobre **503 mensajes
+reales**: solo cambia el spam, de 0 a 155.
+
 ### Las señales de FORMA no castigan solas
 
 `forward_first_msg`, `first_msg_media` y los `jfm_*` no miran lo que DICE el

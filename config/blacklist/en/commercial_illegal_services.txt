@@ -52,3 +52,14 @@ passports?\s+(?:or|and|\+)\s*(?:id|dni|document)
 (?:rent|buy|sell|need)\s+(?:your\s+)?(?:bank\s+)?(?:account|card|passport|id)\b
 i\s+pay\s+you\b
 (?:only|just)\s+(?:one|1|two|2)\s+person\s+(?:i\s+)?need
+
+# --- Reventa de licencias y suscripciones (2026-09-30) ---
+# Caso real en Windows 10: cuenta «Adobe» (@Adobe_Global) publicando un catálogo
+# «ADOBE REDEEM CODE ( 1month - 12months ) —> ( Warranty full )», Office Pro Plus,
+# CapCut Pro, ChatGPT Pro… Solo puntuaba por las líneas con emoji (45 de 60).
+# Ninguna de estas va a decidir sola (una = 35 + primer mensaje 15 = 50 < 60):
+# «redeem code» o «full warranty» salen en una duda normal. Lo que delata el
+# anuncio es que aparezcan JUNTAS, y cada una distinta suma como servicio ilegal.
+redeem\s+codes?
+warranty\s+full|full\s+warranty
+\d{1,2}\s*months?\s*[-–—~]\s*\d{1,2}\s*months?

@@ -141,6 +141,35 @@ _DEFAULT_ILLEGAL_SERVICES = [
 ]
 
 
+# Marcas de software y suscripciones de PAGO. Un mensaje normal nombra una o dos
+# («¿Office o LibreOffice?»); un catálogo de reventa nombra media docena. Solo es
+# vocabulario, así que es editable (`commercial_software_catalog.txt`); lo que es
+# núcleo es el CONTEO de marcas distintas (`_CATALOGO_MIN`).
+_DEFAULT_SOFTWARE_CATALOG = [
+    r"adobe", r"photoshop", r"illustrator", r"premiere", r"after\s*effects",
+    r"creative\s*cloud", r"acrobat", r"autocad", r"autodesk", r"coreldraw",
+    r"office", r"microsoft\s*365", r"cap\s*cu[tp]", r"canva", r"chat\s*gpt",
+    r"midjourney", r"grammarly", r"netflix", r"spotify", r"youtube\s*premium",
+    r"windows\s*(?:10|11)?\s*(?:pro|key|keys|license)",
+]
+# Cuántas marcas DISTINTAS hacen falta para hablar de catálogo. Con 3 cae una
+# conversación corriente («uso Office, Photoshop y ChatGPT»).
+_CATALOGO_MIN = 4
+
+
+def _software_catalog_re() -> re.Pattern:
+    return load_and_compile("commercial_software_catalog.txt", _DEFAULT_SOFTWARE_CATALOG)
+
+
+def _marcas_distintas(text: str) -> int:
+    """Marcas de software de pago DISTINTAS nombradas en el texto."""
+    vistas = set()
+    for m in _software_catalog_re().finditer(text):
+        clave = re.sub(r"\s+", "", m.group(0).lower()).replace("capcup", "capcut")
+        vistas.add(clave)
+    return len(vistas)
+
+
 def _illegal_services_re() -> re.Pattern:
     return load_and_compile("commercial_illegal_services.txt", _DEFAULT_ILLEGAL_SERVICES)
 
@@ -208,6 +237,7 @@ def check(msg: Message, is_first_msg: bool = False) -> Hit:
     has_urgency = bool(_urgency_re().search(text))
     illegal = _illegal_services_re().findall(text)
     n_illegal = len(set(m.lower() for m in illegal))
+    n_marcas = _marcas_distintas(text)
 
     score = 0
     reasons: list[str] = []
@@ -226,6 +256,11 @@ def check(msg: Message, is_first_msg: bool = False) -> Hit:
     elif n_illegal == 1:
         score += 35
         reasons.append(t("reason.ad_illegal_single"))
+    # Catálogo de software de pago. Sola no llega (40 + primer mensaje 15 = 55):
+    # un grupo de Windows habla de estas marcas a diario.
+    if n_marcas >= _CATALOGO_MIN:
+        score += 40
+        reasons.append(t("reason.ad_software_catalog", n=n_marcas))
     if emoji_lines >= 3:
         score += 30
         reasons.append(t("reason.ad_emoji_lines", n=emoji_lines))
@@ -288,6 +323,7 @@ def check(msg: Message, is_first_msg: bool = False) -> Hit:
             "has_external_url": has_external_url,
             "has_domestic": has_domestic,
             "has_urgency": has_urgency,
+            "software_brands": n_marcas,
             "score": score,
         },
     )
