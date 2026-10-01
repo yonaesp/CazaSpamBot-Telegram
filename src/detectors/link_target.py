@@ -47,6 +47,10 @@ _DEFAULT_LINK_TARGET_KEYWORDS = [
     r"\bcontenido\s*\+?\s*18\b", r"\bpack\s+de\s+(?:chicas|nenas|pibas)\b",
     r"\bvideos?\s+porno\b", r"\bporno\s+(?:gratis|amateur|casero)\b",
     r"\bnudes?\s+(?:leaks?|packs?|gratis)\b", r"\bleaks?\s+nudes?\b",
+    # «Caseros» emparejado con su reclamo (1-oct-2026, «Caseros Wild»). Suelto no:
+    # «remedios caseros».
+    r"\bcaseros?\b[\s/|,·+-]{0,3}\b(?:exclusivos?|filtrados?|wild|xxx|hot|calientes?|amateur|leaks?)\b",
+    r"\b(?:exclusivos?|filtrados?|xxx|hot|calientes?)\b[\s/|,·+-]{0,3}\bcaseros?\b",
     # --- Reclamo de canal de spam genérico ---
     r"\bcuentas\s+(?:premium|hackeadas)\s+gratis\b",
     r"\btarjetas\s+(?:clonadas|robadas)\b",

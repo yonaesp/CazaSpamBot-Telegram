@@ -1157,5 +1157,7 @@
   "auto.toast_termino": "Vigilaré «{term}».",
   "auto.toast_termino_err": "No se pudo añadir ({code}).",
   "auto.suf_no": "\n\n✖️ <i>No era spam: no he aprendido nada.</i>",
-  "auto.suf_msg": "\n\n📚 <i>Aprendidos {n} ejemplo(s) de spam.</i>"
+  "auto.suf_msg": "\n\n📚 <i>Aprendidos {n} ejemplo(s) de spam.</i>",
+  "hdl.trust_porque": " (en el grupo desde {desde} · {n} mensajes{warns})",
+  "hdl.trust_porque_warns": " · {n} warns"
 }

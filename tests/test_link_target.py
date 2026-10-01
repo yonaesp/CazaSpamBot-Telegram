@@ -16,6 +16,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from src.detectors import link_target
 from src import link_reader
 from src.detectors import link_target as det
 
@@ -200,3 +201,27 @@ def test_el_aviso_suave_ya_no_es_un_silencio():
     fuente = _fuente()
     i = fuente.index("action=\"gentle_warn\"")
     assert "_send_trust_notice" in fuente[i:i + 1200]
+
+
+# --- «Caseros» con su reclamo (1-oct-2026, Domótica) --------------------------
+# Cuenta veterana (desde 2018, 70 mensajes, confianza 9/10) probablemente robada:
+# «https://t.me/+… Caseros Exclusivos, únete rápido!» hacia «Caseros Wild 🌎🌀»,
+# 5.507 miembros. Por la confianza solo hubo aviso suave; con el destino
+# reconocido, `link_target_spam` es regla dura y la confianza no lo ablanda.
+
+def test_caseros_con_su_reclamo_es_destino_de_spam():
+    from src.link_reader import Destino
+    for tit in ("Caseros Wild 🌎🌀", "Caseros Exclusivos", "Hot caseros 🔞"):
+        assert link_target.check(Destino(titulo=tit, descripcion="", url="https://t.me/+x")), tit
+
+
+def test_casero_suelto_sigue_limpio():
+    from src.link_reader import Destino
+    for tit in ("Remedios caseros", "Pan casero de la abuela", "Recetas caseras",
+                "Domótica casera", "Trucos caseros para el WiFi"):
+        assert not link_target.check(Destino(titulo=tit, descripcion="", url="https://t.me/+x")), tit
+
+
+def test_el_destino_de_spam_no_lo_ablanda_la_confianza():
+    from src import handlers
+    assert "link_target_spam" in handlers.HARD_RULES_BAN

@@ -253,3 +253,24 @@ def test_el_helper_de_handlers_sigue_delegando():
     """`handlers._enlace_al_mensaje` es la puerta que usan los avisos de ahí."""
     assert handlers._enlace_al_mensaje(_msg(username="W11ESP")) == "https://t.me/W11ESP/60588"
     assert handlers._enlace_al_mensaje(_msg(), message_id=7) == "https://t.me/c/1190184646/7"
+
+
+# --- el porqué de la confianza (1-oct-2026) -----------------------------------
+
+def test_la_confianza_explica_de_donde_sale(tmp_path):
+    """«🟢 9/10» a secas no explicaba nada: era una cuenta desde 2018 con 70
+    mensajes, casi seguro robada. El aviso enseña los datos, no solo el número."""
+    import time as _t
+    from src.db import DB
+    db = DB(str(tmp_path / "t.db"))
+    with db._cur() as c:
+        c.execute("INSERT INTO seen_users (chat_id, user_id, first_seen_ts, msg_count) "
+                  "VALUES (?, ?, ?, ?)", (-100, 7, _t.mktime((2018, 12, 13, 17, 30, 0, 0, 0, -1)), 70))
+    txt = handlers._porque_confianza(db, -100, 7)
+    assert "13/12/2018" in txt and "70" in txt
+    assert handlers._porque_confianza(db, -100, 999) == ""      # sin datos, nada
+
+
+def test_los_dos_avisos_con_confianza_la_explican():
+    fuente = Path("src/handlers.py").read_text(encoding="utf-8")
+    assert fuente.count("_trust.render_trust(trust) + _porque_confianza(") == 2

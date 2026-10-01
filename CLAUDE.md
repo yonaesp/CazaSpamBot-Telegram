@@ -312,6 +312,18 @@ reportante, porque la copia que se manda llega sin el hilo alrededor. Hay test d
 los cuatro huecos se rellenan desde el código: un `{enlace}` que nadie rellene
 revienta el aviso entero con un `KeyError` y el admin no se entera de nada.
 
+**La cuenta robada de un veterano la para el DESTINO, no la confianza.** Caso real
+(1-oct-2026, Domótica): «xevi», en el grupo desde 2018 con 70 mensajes (confianza
+9/10), publicó «t.me/+… Caseros Exclusivos, únete rápido!» hacia «Caseros Wild 🌎🌀»
+(5.507 miembros). Por la confianza solo hubo aviso suave, y es correcto que la
+confianza proteja a un veterano de una señal dudosa. Lo que faltaba era reconocer el
+destino: «caseros» solo contaba junto a «packs». Se añadió emparejado con su reclamo
+(wild, exclusivos, filtrados, xxx, hot…), nunca suelto («remedios caseros»), y como
+`link_target_spam` es regla dura, la confianza ya no lo ablanda. Queda traza
+`destino de enlace … → SPAM/limpio/sin ficha`: aquella vez no quedó ninguna. Y los
+avisos con confianza dicen de dónde sale (`_porque_confianza`: desde cuándo, cuántos
+mensajes, warns), a petición del admin: «9/10» a secas no explicaba nada.
+
 ⚠️ **El perdón NO alcanza al reenvío desde un canal, un chat o un bot**: ese es el
 patrón fuerte y el único que ha acertado. El caption lo escribe el spammer y le
 sale gratis, así que un texto limpio no puede comprarlo. Si alguien mete en

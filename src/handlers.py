@@ -617,6 +617,29 @@ def _se_modera(db: DB, cfg: Config, chat_id: int) -> bool:
     return ok
 
 
+def _porque_confianza(db: DB, chat_id: int, user_id: int) -> str:
+    """De dónde sale la confianza: desde cuándo está y cuánto ha participado.
+
+    Lo pidió el admin (1-oct-2026) ante un «🟢 9/10» que no explicaba nada: era una
+    cuenta en el grupo desde 2018 con 70 mensajes, casi seguro robada, y sin ver eso
+    no se entiende por qué el bot no actuó. Son los mismos datos que usa
+    `db.user_trust_score`, enseñados en vez de resumidos en un número.
+    Ante cualquier fallo, cadena vacía: el aviso sale igual.
+    """
+    try:
+        fila = db.get_seen(chat_id, user_id)
+        if fila is None:
+            return ""
+        warns = db.count_warns(user_id, chat_id)
+        return t("hdl.trust_porque",
+                 desde=fechas.dia(fila["first_seen_ts"]) if fila["first_seen_ts"] else "?",
+                 n=int(fila["msg_count"] or 0),
+                 warns=t("hdl.trust_porque_warns", n=warns) if warns else "")
+    except Exception as exc:  # noqa: BLE001
+        log.debug("porque_confianza user=%s: %s", user_id, exc)
+        return ""
+
+
 def _can_restrict(member) -> bool:
     if member.status == ChatMemberStatus.OWNER:
         return True
@@ -1895,6 +1918,12 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     if enlaces_tg:
         destino = await link_reader.leer(context, enlaces_tg, es_moderado=cfg.is_moderated)
         destino_hit = link_target_det.check(destino)
+        # Traza de lo que se vio del destino. El 1-oct-2026 no quedó ninguna, y para
+        # saber por qué no saltó hubo que volver a pedir la ficha a mano.
+        log.info("destino de enlace user=%s chat=%s titulo=%r url=%s → %s",
+                 user.id, chat_id, (getattr(destino, "titulo", None) or "")[:60],
+                 getattr(destino, "url", None) if destino else None,
+                 "SPAM" if destino_hit else ("sin ficha" if destino is None else "limpio"))
         if destino_hit:
             log.info(
                 "link_target_spam user=%s chat=%s destino=%r → el enlace deja de ser borderline",
@@ -2384,7 +2413,7 @@ async def _send_trust_notice(
         # «<b>Signals» dejaba el HTML sin cerrar, Telegram rechazaba el mensaje
         # entero y el aviso se perdía en silencio: el spammer decidía si te enterabas.
         name=_h.escape((user.first_name or "user")[:40]),
-        trust=_trust.render_trust(trust),
+        trust=_trust.render_trust(trust) + _porque_confianza(db, msg.chat_id, user.id),
         chat=_h.escape(str(msg.chat.title or msg.chat_id)),
         rules=_h.escape(", ".join(rules)),
         action=_h.escape(proposed_action),
@@ -2546,7 +2575,7 @@ async def _send_review_request(
         # Mismo motivo que en _send_trust_notice: `reason` y el nombre los controla
         # quien manda el mensaje. Sin escapar, un `<b>` suelto tumba el aviso entero.
         name=_h.escape(name),
-        trust=_trust.render_trust(trust),
+        trust=_trust.render_trust(trust) + _porque_confianza(db, chat_id, user_id),
         chat=_h.escape(str(msg.chat.title or chat_id)),
         rules=_h.escape(", ".join(rules)),
         action=_h.escape(proposed_action),

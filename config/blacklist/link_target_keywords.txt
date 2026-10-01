@@ -35,3 +35,10 @@
 # --- Cuentas y tarjetas robadas ---
 \bcuentas\s+(?:premium|hackeadas)\s+gratis\b
 \btarjetas\s+(?:clonadas|robadas)\b
+
+# «Caseros» como jerga de vídeo porno casero, emparejado con su reclamo. Caso real
+# (1-oct-2026, Domótica): cuenta veterana robada (desde 2018, 70 mensajes) enlazó
+# «Caseros Wild 🌎🌀» (5.507 miembros) con «Caseros Exclusivos, únete rápido!».
+# Suelto NO: «remedios caseros», «pan casero».
+\bcaseros?\b[\s/|,·+-]{0,3}\b(?:exclusivos?|filtrados?|wild|xxx|hot|calientes?|amateur|leaks?)\b
+\b(?:exclusivos?|filtrados?|xxx|hot|calientes?)\b[\s/|,·+-]{0,3}\bcaseros?\b
