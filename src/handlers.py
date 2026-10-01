@@ -2241,6 +2241,16 @@ def invalidate_trust_cache(context: ContextTypes.DEFAULT_TYPE, chat_id: int, use
         cache.pop((chat_id, user_id), None)
 
 
+_NO_ES_MIEMBRO = ("member not found", "user not found", "user_not_participant",
+                  "participant_id_invalid")
+
+
+def _no_es_miembro(exc: Exception) -> bool:
+    """¿Telegram ha dicho expresamente que esa persona no está en el chat?"""
+    texto = (getattr(exc, "message", None) or str(exc)).lower()
+    return any(m in texto for m in _NO_ES_MIEMBRO)
+
+
 async def _is_admin_of_chat(context: ContextTypes.DEFAULT_TYPE, chat_id: int, user_id: int) -> bool:
     """Comprueba si el user es admin/owner del chat. Resultado se cachea por (chat,user) durante 5 min.
 
@@ -2255,6 +2265,20 @@ async def _is_admin_of_chat(context: ContextTypes.DEFAULT_TYPE, chat_id: int, us
     try:
         member = await context.bot.get_chat_member(chat_id=chat_id, user_id=user_id)
         is_admin = member.status in (ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER)
+    except TelegramError as exc:
+        # «No es miembro» NO es una duda: es una respuesta, y la contraria a la que
+        # se asumía. Quien no está en el grupo no puede ser admin de él. Caso real
+        # (25/30-sep-2026): un spammer fichado en lols.bot que ya se había ido de
+        # Windows 10 lo encontraba el repaso cada 6 h, el ban se paraba aquí por
+        # «se asume admin», y así 27 veces en una semana sin quedar nunca baneado,
+        # libre para volver. Solo esta respuesta concreta se toma como «no admin»;
+        # cualquier otro fallo sigue cayendo del lado seguro de abajo.
+        if _no_es_miembro(exc):
+            cache[key] = (False, now + 300)
+            return False
+        log.warning("is_admin_of_chat: no se pudo comprobar chat=%s user=%s (%s); "
+                    "se asume admin y NO se actúa", chat_id, user_id, exc)
+        return True
     except Exception as exc:  # noqa: BLE001
         # FALLA DEL LADO SEGURO: si no se puede comprobar, se asume que SÍ es admin
         # y no se actúa. Antes devolvía False y un fallo transitorio de red bastaba

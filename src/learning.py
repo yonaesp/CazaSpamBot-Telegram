@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import functools
 import math
 import re
 import unicodedata
@@ -80,17 +81,39 @@ def _cosine(a: Counter, b: Counter) -> float:
     return dot / (na * nb)
 
 
+# Las muestras casi no cambian entre un mensaje y el siguiente, y antes se
+# recalculaban TODAS en cada mensaje. Medido el 1-oct-2026 con 200 + 200 muestras
+# (el tamaño al que las lleva el autoaprendizaje): 43 ms de media por mensaje, 60 ms
+# en el p95, en serie, porque PTB procesa los updates de uno en uno. Se cachea el
+# vector y la norma de cada muestra: el cálculo es el mismo, solo que no se repite.
+@functools.lru_cache(maxsize=4096)
+def _vector_muestra(texto: str) -> tuple[Counter, float]:
+    g = _char_ngrams(texto)
+    return g, sum(v * v for v in g.values()) ** 0.5
+
+
+def _cosine_con_norma(a: Counter, na: float, b: Counter, nb: float) -> float:
+    """El mismo coseno que `_cosine`, con las normas ya calculadas."""
+    if not a or not b or na == 0 or nb == 0:
+        return 0.0
+    pequeno, grande = (a, b) if len(a) <= len(b) else (b, a)
+    dot = sum(v * grande[k] for k, v in pequeno.items() if k in grande)
+    return dot / (na * nb) if dot else 0.0
+
+
 def best_match(query_text: str, samples: Iterable[str]) -> tuple[float, str | None]:
     """Devuelve (similarity_max, sample_match) contra una lista de samples."""
     if not query_text or len(query_text) < 10:
         return 0.0, None
     q_grams = _char_ngrams(query_text)
+    q_norm = sum(v * v for v in q_grams.values()) ** 0.5
     best_sim = 0.0
     best_sample = None
     for s in samples:
         if not s or len(s) < 10:
             continue
-        sim = _cosine(q_grams, _char_ngrams(s))
+        s_grams, s_norm = _vector_muestra(s)
+        sim = _cosine_con_norma(q_grams, q_norm, s_grams, s_norm)
         if sim > best_sim:
             best_sim = sim
             best_sample = s
@@ -182,6 +205,20 @@ def _tokenize(text: str) -> list[str]:
     return [t for t in _WORD_RE.findall(text) if t.lower() not in excluded]
 
 
+@functools.lru_cache(maxsize=4)
+def _modelo_bayes(spam: tuple[str, ...], ham: tuple[str, ...], _excluidos: frozenset[str]):
+    """Recuento de tokens por clase. Cacheado por el contenido de las muestras (y de
+    la lista de excluidos, que es editable): mientras no cambien, no se recuenta."""
+    spam_counts: Counter = Counter()
+    ham_counts: Counter = Counter()
+    for s in spam:
+        spam_counts.update(_tokenize(s))
+    for h in ham:
+        ham_counts.update(_tokenize(h))
+    return (spam_counts, ham_counts, sum(spam_counts.values()), sum(ham_counts.values()),
+            len(set(spam_counts) | set(ham_counts)))
+
+
 def naive_bayes_spam_prob(
     text: str, spam_samples: list[str], ham_samples: list[str],
 ) -> float | None:
@@ -194,23 +231,14 @@ def naive_bayes_spam_prob(
     ):
         return None
 
-    spam_counts: Counter = Counter()
-    ham_counts: Counter = Counter()
-    for s in spam_samples:
-        spam_counts.update(_tokenize(s))
-    for h in ham_samples:
-        ham_counts.update(_tokenize(h))
-    total_spam = sum(spam_counts.values())
-    total_ham = sum(ham_counts.values())
+    spam_counts, ham_counts, total_spam, total_ham, V = _modelo_bayes(
+        tuple(spam_samples), tuple(ham_samples), _excluded_tokens())
     if total_spam == 0 or total_ham == 0:
         return None
 
     n_spam = len(spam_samples)
     n_ham = len(ham_samples)
     prior_spam = n_spam / (n_spam + n_ham)
-
-    vocab = set(spam_counts) | set(ham_counts)
-    V = len(vocab)
 
     tokens = _tokenize(text)
     if not tokens:

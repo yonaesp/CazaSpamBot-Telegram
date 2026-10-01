@@ -32,6 +32,14 @@ federación**: un grupo ajeno podía banear gente en los propios. Las cuatro pue
 hay; si no, **admin con permiso de restringir** (`db.puede_moderar`). Hay test que
 impide volver a usar `cfg.is_moderated` a pelo en una puerta.
 
+⚠️ **«No es miembro» no es una duda.** `_is_admin_of_chat` cae del lado seguro
+(«se asume admin, no se actúa») cuando no puede comprobar, y eso incluía `Member not
+found`, que es una respuesta, y la contraria. Medido (24-sep a 1-oct-2026): **7
+spammers fichados en lols.bot** que ya se habían ido los encontraba el repaso cada
+6 h y la guarda los paraba siempre: **113 intentos**, ninguno baneado, libres para
+volver. Ahora esa respuesta concreta (`_no_es_miembro`) es «no admin»; cualquier otro
+fallo sigue cayendo del lado seguro.
+
 **Federación**: ban en uno = ban en todos (`federation.py`). No hay primitiva
 nativa; se itera `banChatMember` sobre los chats donde el bot es admin.
 
@@ -448,6 +456,11 @@ días y en esa ventana había **1** ejemplo de spam y **0** legítimos (pide 10 
 - Ensayo en seco antes de activar, con 16 ejemplos de spam de los bans seguros de 90
   días y 12 legítimos simulados: de 327 mensajes legítimos **ninguno sube** salvo dos
   que resultaron ser spam (Mila y DARK VECTOR, cuyos bans nunca se federaron).
+
+**Las muestras se cachean** (`_vector_muestra`, `_modelo_bayes`): antes se recalculaban
+TODAS en cada mensaje. Con 200 + 200 (el tamaño al que las lleva el autoaprendizaje)
+eran **38 ms por mensaje** en serie; ahora **3 ms**, con **0 resultados distintos** en
+352 mensajes reales (hay test de equivalencia del coseno).
 
 `learned_similarity` **no** es HARD_RULE, así que el trust protege: con ≥70 se ignora, entre 40 y 69 va a revisión. El riesgo se concentra en usuarios nuevos.
 

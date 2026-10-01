@@ -194,7 +194,7 @@ async def revisar_job(context) -> None:
     # «lleva días sin correr». Sale como mucho una línea por vuelta, y solo cuando
     # de verdad ha consultado a alguien.
     if nombres or mirados:
-        log.info("recien_llegados: %d nombres, %d en listas, %d en espera, %d en la ventana",
+        log.info("recien_llegados: %d nombres, %d consultados en listas, %d en espera, %d en la ventana",
                  nombres, mirados, saltados, len(candidatos))
 
 

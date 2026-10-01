@@ -1,6 +1,8 @@
 """Comandos admin del bot. Solo accesibles desde ADMIN_USER_ID."""
 from __future__ import annotations
 
+import asyncio
+
 from . import fechas
 import html
 import logging
@@ -571,7 +573,9 @@ async def _resolve_target_user(
     client = reporter.get_client() if reporter else None
     if client is not None:
         try:
-            entity = await client.get_entity(f"@{uname}")
+            # Con tope: dentro de un comando, una espera de Telethon (FloodWait de
+            # hasta 60 s) dejaría el bot entero sin moderar (audit del 7-sep-2026).
+            entity = await asyncio.wait_for(client.get_entity(f"@{uname}"), 8.0)
             if entity and getattr(entity, "id", None):
                 db.remember_username(uname, entity.id)
                 return int(entity.id), rest, None
@@ -773,7 +777,10 @@ async def cmd_ban(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if quip:
             text = quip
             if has_explicit_reason:
-                text += t("admin.quip_reason", reason=reason)
+                # El motivo lo escribe el admin a mano y va en HTML al grupo: un «<» o
+                # un «&» hacía que Telegram rechazara el mensaje entero y el quip no
+                # salía (audit del 7-sep-2026).
+                text += t("admin.quip_reason", reason=html.escape(reason))
             await _post_ban_quip_to_chats(
                 context, chats=[update.effective_chat.id],
                 text=text,
@@ -856,7 +863,10 @@ async def cmd_unban(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if quip:
             text = quip
             if has_explicit_reason:
-                text += t("admin.quip_reason", reason=reason_raw)
+                # El motivo lo escribe el admin a mano y va en HTML al grupo: un «<» o
+                # un «&» hacía que Telegram rechazara el mensaje entero y el quip no
+                # salía (audit del 7-sep-2026).
+                text += t("admin.quip_reason", reason=html.escape(reason_raw))
             await _post_ban_quip_to_chats(
                 context, chats=[update.effective_chat.id],
                 text=text,

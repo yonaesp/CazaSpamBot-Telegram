@@ -23,6 +23,8 @@ Tres cosas que conviene saber al leerlo:
 """
 from __future__ import annotations
 
+import asyncio
+
 from . import fechas
 import html as _h
 
@@ -36,6 +38,7 @@ from .i18n import t
 # Cuántos eventos se piden a Telegram. Suficiente para cubrir su ventana sin
 # pedir de más: el filtrado por usuario se hace después, en local.
 _LIMITE = 200
+_TOPE_S = 8.0   # segundos; el porqué, junto a la llamada
 
 
 def _estado(p) -> str:
@@ -71,9 +74,12 @@ async def _consultar(context, chat_id: int, user_id: int) -> list[str] | None:
         return None
 
     try:
-        canal = await client.get_input_entity(chat_id)
-        res = await client(GetAdminLogRequest(channel=canal, q="", max_id=0,
-                                              min_id=0, limit=_LIMITE))
+        # Con tope: esto corre dentro de un comando, y PTB procesa los updates de uno
+        # en uno. Telethon puede dormir hasta 60 s en un FloodWait sin avisar, y
+        # sería un minuto con el bot entero sin moderar (audit del 7-sep-2026).
+        canal = await asyncio.wait_for(client.get_input_entity(chat_id), _TOPE_S)
+        res = await asyncio.wait_for(client(GetAdminLogRequest(
+            channel=canal, q="", max_id=0, min_id=0, limit=_LIMITE)), _TOPE_S)
     except Exception as exc:  # noqa: BLE001
         from .story_reader import log as _log
         _log.info("quienfue: no se pudo leer el registro de %s: %s", chat_id, exc)
