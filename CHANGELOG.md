@@ -4,6 +4,13 @@ Cambios relevantes de CazaSpamBot, lo más reciente arriba. Se anotan hitos, no
 cada commit: para el detalle está el historial de git. Sin números de versión
 porque el bot es un servicio en producción continua, no un paquete que se libera.
 
+## 2026-10 · El bot se presenta a quien no es de la casa
+
+Gente ajena metía el bot en sus grupos, donde no puede moderar. Ahora su perfil y
+la respuesta a un privado o `/start` de un desconocido explican que es de código
+abierto, que en su grupo no funcionará y cómo montarse uno gratis. Apagable con
+`REPO_URL=` vacío.
+
 ## 2026-10 · Sorteo cripto falso en una captura, y el aviso que contradecía al ban
 
 Una captura de un tuit falso de Elon Musk («$2500 crypto giveaway… use my promo

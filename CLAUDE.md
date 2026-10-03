@@ -32,6 +32,13 @@ federación**: un grupo ajeno podía banear gente en los propios. Las cuatro pue
 hay; si no, **admin con permiso de restringir** (`db.puede_moderar`). Hay test que
 impide volver a usar `cfg.is_moderated` a pelo en una puerta.
 
+**Lo que ve un desconocido** (`publico.py`, 4-oct-2026): la descripción del perfil
+del bot (es/en, puesta al arrancar solo si cambia) y un privado o `/start` de quien
+no es admin de ningún grupo reciben que el bot es de código abierto, que en su
+grupo NO funcionará y el enlace a GitHub. **Una vez al día por persona**, para que
+nadie use el bot de frontón. `REPO_URL=` vacío en `.env` lo apaga entero. A los
+admins de los grupos no se les vende nada: siguen viendo el resumen de `/start`.
+
 ⚠️ **«No es miembro» no es una duda.** `_is_admin_of_chat` cae del lado seguro
 («se asume admin, no se actúa») cuando no puede comprobar, y eso incluía `Member not
 found`, que es una respuesta, y la contraria. Medido (24-sep a 1-oct-2026): **7

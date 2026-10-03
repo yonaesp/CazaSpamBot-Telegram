@@ -133,6 +133,10 @@ async def _post_init(app: Application) -> None:
         "activos" if reporter.reporting_ready() else "off",
     )
     await _register_bot_commands(app, cfg)
+    # Perfil del bot: que quien lo encuentre sepa que es de código abierto y que
+    # en su grupo no va a funcionar. Ver `publico`.
+    from . import publico
+    await publico.poner_descripcion(app.bot)
     if app.job_queue:
         app.job_queue.run_repeating(_heartbeat_job, interval=30, first=1)
         # Cada 15 min: cleanup verificaciones (3 tiers: kick suspicious 30min +
@@ -276,7 +280,7 @@ def main() -> int:
     app.bot_data["db"] = db
 
     # Comandos admin (en DMs y grupos, solo admin pasa).
-    app.add_handler(CommandHandler("start", admin.cmd_start))
+    app.add_handler(CommandHandler("start", admin.cmd_start_entrada))
     app.add_handler(CommandHandler("help", admin.cmd_help))
     # /comandos: comando público accesible para CUALQUIER usuario (no solo admin)
     app.add_handler(CommandHandler("comandos", admin.cmd_comandos))

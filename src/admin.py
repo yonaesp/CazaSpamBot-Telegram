@@ -31,6 +31,21 @@ def _read_admin(func):
     return permissions.chat_admin_or_bot_admin(func)
 
 
+async def cmd_start_entrada(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/start: resumen para admins; a un desconocido en privado, cómo montarse el bot.
+
+    Es lo primero que pulsa cualquiera que abre el bot, y antes recibía silencio.
+    """
+    u = update.effective_user
+    if not u:
+        return
+    if permissions.is_bot_admin(context, u.id) or await permissions.is_chat_admin_any(context, u.id):
+        await cmd_start(update, context)
+        return
+    from . import publico
+    await publico.responder_privado(update, context)
+
+
 @_read_admin
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     cfg: Config = context.bot_data["cfg"]
@@ -345,8 +360,15 @@ async def on_private_message(update: Update, context: ContextTypes.DEFAULT_TYPE)
     """Mensajes no-comando en DM: si soy el admin → hint suave; si no → ignorar."""
     cfg: Config = context.bot_data["cfg"]
     user = update.effective_user
-    if not user or user.id != cfg.admin_user_id:
-        return  # silent ignore para no-admins
+    if not user:
+        return
+    if user.id != cfg.admin_user_id:
+        # Un admin de los grupos no necesita que le vendan el bot; a un
+        # desconocido se le cuenta, una vez al día, que puede montarse el suyo.
+        if not await permissions.is_chat_admin_any(context, user.id):
+            from . import publico
+            await publico.responder_privado(update, context)
+        return
     # ¿Hay una edición de texto pendiente del panel /config? (botón ✏️/📜)
     from . import config_panel
     if await config_panel.handle_capture(update, context):
