@@ -4,6 +4,14 @@ Cambios relevantes de CazaSpamBot, lo más reciente arriba. Se anotan hitos, no
 cada commit: para el detalle está el historial de git. Sin números de versión
 porque el bot es un servicio en producción continua, no un paquete que se libera.
 
+## 2026-10 · Sorteo cripto falso en una captura, y el aviso que contradecía al ban
+
+Una captura de un tuit falso de Elon Musk («$2500 crypto giveaway… use my promo
+code») puntuaba 0 aunque el OCR la leía entera. Nueva ancla estructural en
+`investment_scam`: cripto + sorteo + canje en otra web o con código. Sobre 440
+textos reales no salta en ninguno. Y el aviso de «imagen dudosa» ya no sale antes
+de decidir: decía «no he hecho nada» de alguien baneado medio segundo después.
+
 ## 2026-09 · Un nombre entero en otro alfabeto es ban directo
 
 Decisión explícita del admin. Antes hacían falta **dos** campos en un alfabeto no

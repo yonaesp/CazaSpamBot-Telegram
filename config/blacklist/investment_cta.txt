@@ -25,3 +25,5 @@ only\s+\d+\s+(?:spots?|places?|seats?|slots?)\s+left
 limited\s+(?:spots?|places?|slots?)
 click\s+to\s+subscribe
 solo\s+quedan\s+\d+\s+(?:plazas|puestos|cupos)
+# Sorteo cripto falso: «usa mi código promocional»
+\b(?:usa|introduce|pon|aplica)\s+(?:mi\s+|el\s+)?c[oó]digo\s+(?:promocional|de\s+(?:bono|regalo|referido))\b

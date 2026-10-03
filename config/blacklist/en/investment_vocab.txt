@@ -15,3 +15,5 @@ double\s+your\s+(?:money|investment|capital)
 guaranteed\s+(?:profit|return|income)
 passive\s+income
 withdraw(?:al)?\s+(?:proof|instant)
+# Sorteo cripto falso (caso Joka, 3-oct-2026). Suelto no decide: hace falta otra señal.
+(?:crypto|bitcoin|btc|eth|usdt)\s+(?:giveaway|airdrop)s?

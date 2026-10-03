@@ -10,3 +10,5 @@
 \b(?:dm|pm|message|contact|write|reach\s+out\s+to|inbox)\s+(?:her|him|mrs|mr|ms|now|@)\b
 \b(?:join|start|invest)\s+(?:now|with|today)\b
 \blink\s+in\s+bio\b
+# Sorteo cripto falso (caso Joka, 3-oct-2026): «Use my promo code ElonX»
+\b(?:use|enter|apply)\s+(?:my\s+|the\s+|this\s+)?(?:promo|bonus|referral|gift)\s+code\b

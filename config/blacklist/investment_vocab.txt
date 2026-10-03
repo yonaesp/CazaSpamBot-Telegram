@@ -14,3 +14,4 @@ duplica\s+tu\s+(?:dinero|inversi[oó]n)
 (?:crypto|bitcoin|btc)\s+signals?
 private\s+(?:group|channel|club)\s+of\s+(?:a|an|the)
 legendary\s+(?:whale|trader|investor)
+sorteos?\s+de\s+(?:cripto(?:monedas?)?|bitcoin|btc|usdt)

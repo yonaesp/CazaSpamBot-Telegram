@@ -913,6 +913,7 @@
   "cfg.ct.err.generico": "❌ That word cannot be added.",
   "reason.investment_scam": "Investment scam testimonial ({details})",
   "reason.invscam_flip": "admits suspecting a scam then claims they got paid: «{q}»",
+  "reason.invscam_giveaway": "crypto giveaway redeemed elsewhere: «{q}»",
   "reason.invscam_testimony": "first-person testimonial phrasing: «{q}»",
   "reason.invscam_giveback": "«I gave X and got {mult}x back» structure",
   "reason.invscam_praise": "testimonial praise: “{q}”",

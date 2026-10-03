@@ -231,6 +231,7 @@ Cuatro cosas que no se deben romper:
 - **Se apaga por chat** desde `/config` (`chat_settings.ocr_enabled`, defecto **1**). Ante un ajuste ilegible se deja ENCENDIDO, al revés que los demás: aquí «restrictivo» sería dejar de mirar, y el OCR no castiga por sí mismo.
 - **Los idiomas salen de los del bot** (`wordlists.active_langs()`, o sea idioma activo + inglés, o `BLACKLIST_LANGS`), no de una lista aparte, y se filtran los que Tesseract no tenga instalados: pedirle uno que le falta hace fallar la llamada ENTERA. `OCR_LANGS` lo fija a mano si hace falta.
 - **Si no llega para actuar pero deja dudas, avisa por privado** (`ocr_review`, silenciable desde `/alertas`): cuando el texto queda en la franja gris (≥`mute_score` y por debajo de la acción) o cuando NO hay texto y quien la manda es un desconocido con trust bajo, que es justo la forma de esquivar los detectores de contenido. Solo avisa, nunca actúa, y reutiliza los botones nada/avisar/banear del aviso de confianza. Con freno de media hora por persona: alguien asentado mandando una foto no genera nada.
+- **Ese aviso se manda DESPUÉS de decidir, y solo si no se actúa** (`diferido` + `_soltar_aviso_imagen`, en los dos `return` sin hits y tras `decide()` con `noop`). Salía en cuanto acababa el OCR y medio segundo después las señales de forma baneaban: el admin recibió «No he hecho nada» de alguien ya baneado y creyó que se había colado (caso Joka, 3-oct-2026).
 - **El vocabulario es el MISMO que el de los mensajes escritos** (decisión del admin: el spam es el mismo venga en texto o en cartel, y dos listas en paralelo acaban con una desactualizada). Quien quiera términos que solo valgan para carteles los pone en `config/blacklist/ocr/`, que se SUMA y está vacía por defecto. El modo se activa con `wordlists.modo_ocr()` y entra en la clave de la caché de patrones: sin eso, el primer cartel dejaría cacheado un patrón que luego se aplicaría a los mensajes normales.
 
 **El vocabulario es la otra mitad, y sin él el OCR no sirve de nada**: el texto extraído puntuaba **0** con las listas de entonces. Al añadir el de venta de software pirata hay que recordar que el contexto son grupos de Windows, donde «activar», «instalación» y «licencia» son palabras del día a día: ninguna va suelta. Se probó `escríbeme por interno` y marcaba «escríbeme por interno y te paso el driver». Lo inequívoco es el CATÁLOGO (cinco programas de pago listados) y la estructura de oferta. Los patrones toleran ruido con `[\s\S]{0,N}` porque el OCR parte las palabras.
@@ -397,6 +398,18 @@ persona («I'm in shock», «saw your post»), que **por sí solas no deciden na
 
 Medido antes de desplegarlo sobre **365 mensajes reales** de los cuatro grupos:
 disparan **dos**, y son las dos estafas conocidas. Cero falsos positivos.
+
+**Tercera ancla: el sorteo cripto falso de un famoso** (`_GIVEAWAY_RE`, 45). Caso
+real (3-oct-2026, Windows 10): captura de un tuit falso de Elon Musk, «New $2500
+crypto giveaway | Is now LIVE on WexPred.com Use my promo code ElonX». El OCR lo
+leyó entero y puntuó **0**; lo cazaron por suerte `jfm_fast` + `first_msg_media`.
+La discordancia es regalar cripto y mandarte a canjearlo a otra web: exige
+cripto + sorteo/airdrop **y** el mecanismo de canje (código o «live on x.com») a
+≤160 caracteres. «Cuidado con los crypto giveaway» no cae. **El trozo del ancla no
+cuenta además como vocabulario**: si no, una sola frase sumaba dos señales y la
+guarda de dos señales dejaba de exigir nada. El caso real da 80 (kick); con la foto
+del primer mensaje pasa de 150. Medido sobre 440 textos reales: el ancla no salta
+en ninguno.
 
 ### Convenciones al escribir/editar patrones de detección
 

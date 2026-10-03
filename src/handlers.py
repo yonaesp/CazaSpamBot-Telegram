@@ -357,12 +357,16 @@ def _ocr_activo(db: DB, chat_id: int) -> bool:
 
 
 async def _hits_de_la_imagen(context, db: DB, cfg: Config, msg, user,
-                             avisar: bool = True) -> list[Hit]:
+                             avisar: bool = True,
+                             diferido: list | None = None) -> list[Hit]:
     """Pasa el texto que el OCR saca de la imagen por los detectores de contenido.
 
     Devuelve los hits tal cual, sin inventar ninguna regla propia: si el cartel
     dice lo que dice un anuncio, lo caza `commercial_ad` con sus umbrales de
     siempre. Así el OCR no puede banear por su cuenta ni desviarse del resto.
+
+    Con `diferido`, el aviso de imagen dudosa NO se manda: se deja ahí para que
+    quien llama lo suelte cuando sepa la decisión final. Ver `_soltar_aviso_imagen`.
     """
     from . import ocr
     if not ocr.disponible() or not _ocr_activo(db, msg.chat_id):
@@ -423,9 +427,27 @@ async def _hits_de_la_imagen(context, db: DB, cfg: Config, msg, user,
     puntos = sum(h.score for h in reales)
     if avisar and puntos < cfg.mute_score:
         motivo = _duda_de_la_imagen(db, cfg, msg, user, texto, puntos)
-        if motivo:
+        if motivo and diferido is not None:
+            diferido.append((texto, puntos, motivo))
+        elif motivo:
             await _avisar_imagen_dudosa(context, db, cfg, msg, user, texto, puntos, motivo)
     return hits
+
+
+async def _soltar_aviso_imagen(context, db: DB, cfg: Config, msg, user,
+                               diferido: list) -> None:
+    """Manda el aviso de imagen dudosa que quedó en espera, si lo hay.
+
+    Se llama SOLO por los caminos en que el bot no hace nada con el mensaje. Caso
+    real (3-oct-2026, Windows 10): «Joka» mandó una captura de un sorteo cripto
+    falso; el aviso salió en cuanto el OCR terminó («No he hecho nada: no llega
+    para actuar solo») y medio segundo después las señales de forma lo banearon.
+    El admin leyó «no he hecho nada» de alguien ya baneado y creyó que se había
+    colado. Un aviso que contradice lo que pasó es peor que no mandarlo.
+    """
+    while diferido:
+        texto, puntos, motivo = diferido.pop(0)
+        await _avisar_imagen_dudosa(context, db, cfg, msg, user, texto, puntos, motivo)
 
 
 def _duda_de_la_imagen(db: DB, cfg: Config, msg, user, texto: str, puntos: int) -> str:
@@ -1840,9 +1862,11 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     #
     # Solo en primeros mensajes con imagen y sin texto propio: es donde llega este
     # spam, y así el coste queda en unos 2 casos al día (~1 s de CPU).
+    _aviso_imagen: list = []
     if is_first and not (msg.text or msg.caption) and (msg.photo or msg.document):
         try:
-            hits += await _hits_de_la_imagen(context, db, cfg, msg, user)
+            hits += await _hits_de_la_imagen(context, db, cfg, msg, user,
+                                             diferido=_aviso_imagen)
         except Exception as exc:  # noqa: BLE001 — una mejora opcional nunca tumba nada
             log.warning("OCR: fallo leyendo la imagen: %s", exc, exc_info=True)
 
@@ -1902,12 +1926,14 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         autoaprendizaje.guardar_ham_si_procede(
             db, chat_id, user.id, text, _trust_score_cached(context, db, chat_id, user.id),
             reenviado=bool(getattr(msg, "forward_origin", None)))
+        await _soltar_aviso_imagen(context, db, cfg, msg, user, _aviso_imagen)
         return
 
     # Filtrar reglas suprimidas (admin marcó "no era spam").
     real = [h for h in real if not db.is_suppressed(user.id, h.rule)]
     if not real:
         log.info("Hits suprimidos para user %s", user.id)
+        await _soltar_aviso_imagen(context, db, cfg, msg, user, _aviso_imagen)
         return
 
     # 5) ¿A DÓNDE lleva el enlace? Un t.me a un chat externo es una señal ciega: no
@@ -1982,6 +2008,10 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         real, _ban_s, _kick_s, _mute_s,
         cfg.first_msg_attack_action, is_first_msg_attack=is_first_attack,
     )
+    # Si no se va a hacer nada, el aviso de imagen dudosa tiene sentido; si se
+    # actúa, o se avisa por otra vía (perdón, trust), sobra y además mentiría.
+    if decision.action == "noop":
+        await _soltar_aviso_imagen(context, db, cfg, msg, user, _aviso_imagen)
 
     # Señales de pura FORMA (reenvío, foto, prisa) sin una sola de contenido: si
     # además la persona escribió algo que no dispara nada, no hay motivo para

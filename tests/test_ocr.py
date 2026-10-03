@@ -109,7 +109,7 @@ def test_solo_en_primeros_mensajes_con_imagen_y_sin_texto():
     """El coste queda en ~2 casos al día. Si se aplicara a cada foto del grupo,
     serían cientos de descargas y de invocaciones diarias."""
     fuente = Path("src/handlers.py").read_text()
-    i = fuente.index("_hits_de_la_imagen(context, db, cfg, msg, user)")
+    i = fuente.index("hits += await _hits_de_la_imagen(")
     bloque = fuente[max(0, i - 600):i]
     assert "is_first" in bloque
     assert "not (msg.text or msg.caption)" in bloque
@@ -118,7 +118,7 @@ def test_solo_en_primeros_mensajes_con_imagen_y_sin_texto():
 
 def test_el_fallo_del_ocr_no_impide_moderar_el_mensaje():
     fuente = Path("src/handlers.py").read_text()
-    i = fuente.index("_hits_de_la_imagen(context, db, cfg, msg, user)")
+    i = fuente.index("hits += await _hits_de_la_imagen(")
     assert "except Exception" in fuente[i:i + 400]
 
 

@@ -89,6 +89,34 @@ _SKEPTIC_FLIP_RE = re.compile(
     re.IGNORECASE,
 )
 
+# ANCLA 3: el SORTEO CRIPTO FALSO de un famoso. Caso real (3-oct-2026, Windows
+# 10): «Joka» entró y a los 6 s mandó una captura de un tuit falso de Elon Musk,
+# «New $2500 crypto giveaway | Is now LIVE on WexPred.com Use my promo code
+# ElonX», sin una letra escrita. El OCR lo leyó entero y puntuó 0: no había
+# testimonio ni «di X y me devolvieron Y», que es lo único que este detector
+# sabía ver. Lo cazaron las señales de forma por suerte (jfm_fast + foto).
+#
+# La discordancia aquí es REGALAR CRIPTO y pedir que vayas a canjearlo a otra
+# parte: un sorteo de verdad no necesita que entres en una web con un código.
+# «crypto giveaway» suelto no basta (se habla de estas estafas para avisar):
+# hace falta el mecanismo de canje (código o «ya está en tal web») a poca
+# distancia. Estructural, así que NO se externaliza a config/.
+_CRIPTO = (r"(?:crypto|bitcoin|btc|eth(?:ereum)?|usdt|usdc|solana|dogecoin|doge"
+           r"|xrp|cripto(?:monedas?)?)")
+_REGALO = r"(?:giveaways?|airdrops?|sorteos?|regalos?)"
+_CANJE = (
+    r"(?:(?:promo|bonus|referral|gift|claim|redeem)\s+code"
+    r"|c[oó]digo\s+(?:promocional|de\s+(?:bono|regalo|referido|canje))"
+    r"|(?:is\s+)?(?:now\s+)?live\s+on\s+\S+\.[a-z]{2,}"
+    r"|(?:ya\s+)?(?:est[aá]\s+)?(?:activo|disponible)\s+en\s+\S+\.[a-z]{2,})"
+)
+_GIVEAWAY_RE = re.compile(
+    rf"\b{_CRIPTO}\s+{_REGALO}\b[\s\S]{{0,160}}?{_CANJE}"
+    rf"|\b{_REGALO}\s+(?:de\s+)?{_CRIPTO}\b[\s\S]{{0,160}}?{_CANJE}",
+    re.IGNORECASE,
+)
+
+
 # --- Señales propias de la estafa (una es obligatoria además del ancla) ------
 # Las tres listas de vocabulario que siguen son EDITABLES por el admin desde
 # config/blacklist/ (genéricas + por idioma + custom), igual que las de
@@ -130,6 +158,8 @@ _DEFAULT_CTA = [
     r"\bescr[ií]be(?:le|nos)?\b",
     r"\bcont[aá]cta(?:la|lo|le)?\b",
     r"\b[uú]nete\s+(?:ya|ahora|hoy)\b",
+    r"\b(?:use|enter|apply)\s+(?:my\s+|the\s+|this\s+)?(?:promo|bonus|referral|gift)\s+code\b",
+    r"\b(?:usa|introduce|pon|aplica)\s+(?:mi\s+|el\s+)?c[oó]digo\s+(?:promocional|de\s+(?:bono|regalo|referido))\b",
     r"👇",
     r"👉",
     r"📲",
@@ -152,6 +182,8 @@ _DEFAULT_VOCAB = [
     r"se[ñn]ales\s+de\s+trading",
     r"inversi[oó]n\s+garantizada",
     r"duplica\s+tu\s+(?:dinero|inversi[oó]n)",
+    r"(?:crypto|bitcoin|btc|eth|usdt)\s+(?:giveaway|airdrop)s?",
+    r"sorteos?\s+de\s+(?:cripto(?:monedas?)?|bitcoin|btc|usdt)",
 ]
 
 
@@ -251,7 +283,13 @@ def check(msg: Message, is_first_msg: bool = False) -> Hit:
     if tiene_flip:
         score += 45
         reasons.append(t("reason.invscam_flip", q=_cita(m_flip)))
-    tiene_ancla = tiene_ancla_num or tiene_flip
+    # ANCLA 3: sorteo cripto con canje en otra parte.
+    m_give = _GIVEAWAY_RE.search(text)
+    tiene_giveaway = bool(m_give)
+    if tiene_giveaway:
+        score += 45
+        reasons.append(t("reason.invscam_giveaway", q=_cita(m_give)))
+    tiene_ancla = tiene_ancla_num or tiene_flip or tiene_giveaway
 
     m_testimony = _testimony_re().search(text)
     tiene_testimony = bool(m_testimony)
@@ -261,7 +299,11 @@ def check(msg: Message, is_first_msg: bool = False) -> Hit:
 
     m_praise = _praise_re().search(text)
     m_cta = _cta_re().search(text)
-    m_vocab = _vocab_re().search(text)
+    # El trozo que ya es el ancla del sorteo no puede contar además como
+    # vocabulario: «crypto giveaway» sería una sola frase sumando dos señales y
+    # la guarda de dos señales dejaría de exigir nada.
+    texto_vocab = (text[:m_give.start()] + " " + text[m_give.end():]) if m_give else text
+    m_vocab = _vocab_re().search(texto_vocab)
     tiene_praise, tiene_cta, tiene_vocab = bool(m_praise), bool(m_cta), bool(m_vocab)
 
     if tiene_praise:
@@ -289,8 +331,8 @@ def check(msg: Message, is_first_msg: bool = False) -> Hit:
     # falta DOS señales propias de la estafa; con el ancla, una. Así "invertí
     # 1000 y ahora vale 1500" (solo ancla) no llega, y "gracias John, me
     # ayudaste" (solo un gracias suelto) tampoco.
-    señales_estafa = sum((tiene_ancla_num, tiene_flip, tiene_praise, tiene_cta,
-                          tiene_vocab, tiene_testimony))
+    señales_estafa = sum((tiene_ancla_num, tiene_flip, tiene_giveaway, tiene_praise,
+                          tiene_cta, tiene_vocab, tiene_testimony))
     if señales_estafa < 2:
         return Hit.none()
 
@@ -304,6 +346,7 @@ def check(msg: Message, is_first_msg: bool = False) -> Hit:
         payload={
             "multiplier": round(mult, 1),
             "skeptic_flip": tiene_flip,
+            "crypto_giveaway": tiene_giveaway,
             "testimony": tiene_testimony,
             "praise": tiene_praise,
             "cta": tiene_cta,
