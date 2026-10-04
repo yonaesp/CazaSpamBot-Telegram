@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🛡️ CazaSpamBot
+# 🛡️ CazaSpamBot: bot antispam para Telegram
 
 ### Bot antispam y de moderación para Telegram, self-hosted y de código abierto: bans sincronizados entre grupos, multiidioma, aprendizaje activo y casi cero falsos positivos
 
@@ -23,8 +23,10 @@
 
 CazaSpamBot vigila tus grupos de Telegram y elimina el spam **antes de que moleste**, con una obsesión: **nunca banear a un usuario legítimo**. Prefiere dejar pasar un spam dudoso que expulsar a una persona real.
 
+Frena el spam que llega hoy a los grupos de Telegram: **estafas de criptomonedas e inversión**, **sorteos falsos**, **ofertas de trabajo falsas**, **bots de spam porno y para adultos**, **enlaces de phishing y estafa**, venta de software pirata y cuentas que entran con un nombre limpio y lo cambian justo antes de escribir. Es **gratuito y de código abierto** (GPL-3.0): sin suscripción, sin servicios de terceros, y los datos de tus grupos se quedan en tu servidor.
+
 - 🔗 **Bans sincronizados** — si alguien cae en uno de tus grupos, queda baneado en **todos los demás grupos donde TU copia del bot es admin** (lo que otros bots llaman *federación*). Solo cuentan los grupos que tú gestionas con tu bot: si alguien lo mete en un grupo ajeno como miembro normal, allí no hace nada. Y cada instalación es independiente: los bans de otras personas que usen este código no llegan a tus grupos, ni los tuyos a los suyos.
-- 🧠 **22 detectores** combinados con un sistema de confianza graduado.
+- 🧠 **25 detectores** combinados con un sistema de confianza graduado.
 - 🤫 **Moderación silenciosa** — los bans automáticos no ensucian el chat.
 - 📚 **Aprendizaje activo** — aprende de tus `/spam` y `/legal` (Naive Bayes + similitud coseno).
 - 🛰️ **Reportes oficiales** a Telegram (Native Antispam) vía MTProto.
@@ -415,6 +417,28 @@ tests/                   # 1018 tests
 - Secretos e identificadores solo en `.env` (gitignored). `.env.example` con valores vacíos.
 - Sesión Telethon (`*.session`) nunca se sube. Usa una **cuenta secundaria**, no la personal.
 - La cuenta secundaria reporta con criterios estrictos (whitelist de reglas + rate limit) para no perder reputación en Telegram.
+
+---
+
+## ❓ Preguntas frecuentes
+
+**¿Cómo evito los bots de spam en mi grupo de Telegram?**
+Monta tu propia copia de CazaSpamBot (ver [Puesta en marcha](#-puesta-en-marcha)), añádela como admin a tus grupos y desactiva el Privacy Mode. Revisa a cada persona que entra y cada primer mensaje, y banea al spammer en todos tus grupos a la vez.
+
+**¿Puedo añadir @CazaSpamBot a mi grupo sin más?**
+No. Esa instancia es privada y solo modera los grupos de su dueño. El código es gratuito, así que montas tu propio bot con tu propio token, y es enteramente tuyo.
+
+**¿Es gratis? ¿Qué necesito para montarlo?**
+Sí, gratuito y de código abierto. Cualquier máquina con Docker que esté siempre encendida: un VPS barato, un mini PC o un servidor en casa. Gasta unos 100 MB de RAM.
+
+**¿Baneará a miembros legítimos?**
+Es lo que más se esfuerza en evitar. Quien tiene historial en el grupo está protegido por los niveles de confianza, los casos dudosos te llegan con botones en vez de acabar en ban, y puedes arrancar en `MODE=shadow` para ver lo que *haría* antes de dejarle actuar.
+
+**¿Funciona en grupos de otros idiomas?**
+La detección no depende del idioma del grupo, y tú eliges qué alfabetos son normales en cada uno. La interfaz viene en español e inglés, y añadir un idioma es un archivo JSON.
+
+**¿Dónde pido ayuda?**
+Abre una [incidencia en GitHub](https://github.com/yonaesp/CazaSpamBot-Telegram/issues). El soporte es gratuito.
 
 ---
 

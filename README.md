@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🛡️ CazaSpamBot
+# 🛡️ CazaSpamBot: Telegram anti-spam bot
 
 ### Self-hosted, open source anti-spam and moderation bot for Telegram: synchronized cross-group bans, multilingual, active learning, and near-zero false positives
 
@@ -22,6 +22,8 @@
 ## ✨ What it does
 
 CazaSpamBot watches your Telegram groups and removes spam **before it becomes a nuisance**, with one obsession: **never ban a legitimate user**. It would rather let a borderline spam slip through than kick a real person.
+
+It stops the spam that actually hits Telegram groups today: **crypto and investment scams**, **fake giveaways**, **fake job offers**, **adult and porn spam bots**, **phishing and scam links**, sellers of pirated software, and accounts that join with a clean name and change it right before posting. It's **free and open source** (GPL-3.0): no subscription, no third-party service, and your group data stays on your own server.
 
 - 🔗 **Synchronized bans** — when someone is caught in one of your groups, they're banned in **every other group where YOUR copy of the bot is an admin** (what other bots call *federation*). Only groups you manage with your bot count: if someone adds it to their own group as a regular member, it does nothing there. And every install is independent: bans from other people running this code never reach your groups, and yours never reach theirs.
 - 🧠 **25 detectors** combined with a graduated trust system.
@@ -430,6 +432,28 @@ tests/                   # 1652 tests
 - Secrets and identifiers live only in `.env` (gitignored). `.env.example` ships empty values.
 - The Telethon session (`*.session`) is never committed. Use a **secondary account**, not your personal one.
 - The secondary account reports under strict criteria (rule allowlist + rate limit) to protect its Telegram reputation.
+
+---
+
+## ❓ FAQ
+
+**How do I stop spam bots in my Telegram group?**
+Run your own copy of CazaSpamBot (see [Getting started](#-getting-started)), add it to your groups as an admin and disable Privacy Mode. It checks every newcomer and every first message, and bans spammers in all your groups at once.
+
+**Can I just add @CazaSpamBot to my group?**
+No. That instance is private and only moderates its owner's groups. The code is free, so you run your own bot with your own token, and it's fully yours.
+
+**Is it free? What do I need to run it?**
+Yes, free and open source. Any machine with Docker that stays on: a cheap VPS, a mini PC or a home server. It uses around 100 MB of RAM.
+
+**Will it ban legitimate members?**
+That's the thing it tries hardest to avoid. Members with history in the group are protected by the trust levels, doubtful cases go to you with buttons instead of being banned, and you can start in `MODE=shadow` to see what it *would* do before letting it act.
+
+**Does it work in languages other than English or Spanish?**
+Detection doesn't depend on the group's language, and you choose which alphabets are normal in each group. The interface ships in Spanish and English, and adding a language is one JSON file.
+
+**Where can I get help?**
+Open an [issue on GitHub](https://github.com/yonaesp/CazaSpamBot-Telegram/issues). Support is free.
 
 ---
 
