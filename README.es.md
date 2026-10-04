@@ -8,7 +8,7 @@
 [![python-telegram-bot](https://img.shields.io/badge/PTB-22.8-26A5E4?logo=telegram&logoColor=white)](https://python-telegram-bot.org/)
 [![Telethon](https://img.shields.io/badge/Telethon-1.44-blueviolet)](https://docs.telethon.dev/)
 [![Idiomas](https://img.shields.io/badge/idiomas-es%20%7C%20en%20%7C%20a%C3%B1ade%20el%20tuyo-orange)](src/locales/README.md)
-[![Tests](https://img.shields.io/badge/tests-1018%20passing-success)](#-tests)
+[![Tests](https://img.shields.io/badge/tests-1652%20passing-success)](#-tests)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 
 🌍 [**English**](README.md) · **Español**
@@ -23,7 +23,7 @@
 
 CazaSpamBot vigila tus grupos de Telegram y elimina el spam **antes de que moleste**, con una obsesión: **nunca banear a un usuario legítimo**. Prefiere dejar pasar un spam dudoso que expulsar a una persona real.
 
-- 🔗 **Bans sincronizados** — un ban en un grupo = ban en **todos** tus grupos (lo que otros bots llaman *federación*). Sin primitiva nativa: itera sobre los chats donde es admin.
+- 🔗 **Bans sincronizados** — si alguien cae en uno de tus grupos, queda baneado en **todos los demás grupos donde TU copia del bot es admin** (lo que otros bots llaman *federación*). Solo cuentan los grupos que tú gestionas con tu bot: si alguien lo mete en un grupo ajeno como miembro normal, allí no hace nada. Y cada instalación es independiente: los bans de otras personas que usen este código no llegan a tus grupos, ni los tuyos a los suyos.
 - 🧠 **22 detectores** combinados con un sistema de confianza graduado.
 - 🤫 **Moderación silenciosa** — los bans automáticos no ensucian el chat.
 - 📚 **Aprendizaje activo** — aprende de tus `/spam` y `/legal` (Naive Bayes + similitud coseno).
@@ -270,7 +270,35 @@ El `.env.example` está comentado paso a paso y cada variable trae un **ejemplo 
 
 **No tienes que crear ninguna carpeta a mano.** La carpeta `data/` (base de datos, sesión, heartbeat) se crea sola al levantar el contenedor, y `config/` (bienvenidas y listas negras) ya viene incluida con valores por defecto. Solo escribes en `data/`, que es el único volumen con permiso de escritura.
 
-*(Opcional, solo si activas Telethon)* la sesión se genera **dentro del contenedor**, una única vez:
+### Configurar Telegram paso a paso
+
+**1. Crea el bot en @BotFather**
+
+1. Abre [@BotFather](https://t.me/BotFather), envía `/newbot` y elige nombre y usuario (tiene que acabar en `bot`). Te dará el **token**: va en `TELEGRAM_BOT_TOKEN`.
+2. `/setprivacy` → tu bot → **Disable**. Sin esto el bot solo ve los comandos y no puede detectar spam en los mensajes normales.
+3. `/mybots` → tu bot → **Bot Settings** → **Allow Groups?** → déjalo en **on** mientras lo añades a tus grupos (paso 2).
+
+**2. Añádelo a tus grupos como administrador**
+
+En cada grupo: *Administradores* → *Añadir administrador* → tu bot, con al menos estos permisos:
+
+- **Eliminar mensajes**
+- **Banear usuarios** (en algunas versiones de Telegram se llama *Restringir miembros*)
+
+El bot solo modera donde es admin con permiso de banear. Si `MODERATED_CHAT_IDS` está vacío, descubre solo esos grupos; si pones ahí una lista, se limita a ella.
+
+**3. Cierra la puerta a grupos ajenos**
+
+Cuando ya esté en todos tus grupos, vuelve a `/mybots` → tu bot → **Bot Settings** → **Allow Groups?** → **Turn groups off**. Así nadie más puede meter tu bot en sus grupos. Los grupos donde ya está no se ven afectados; si algún día quieres añadirlo a otro, lo activas un momento y lo vuelves a desactivar.
+
+**4. (Opcional, muy recomendable) Cuenta secundaria con Telethon (MTProto)**
+
+Un bot de Telegram no puede leer la bio ni las fotos de perfil de un usuario, ni el canal personal, ni las historias, ni mandar reportes oficiales de spam. Para eso se usa una **cuenta de usuario normal**, que el bot maneja por MTProto con [Telethon](https://docs.telethon.dev/). Sin ella el bot funciona igual, pero sin esos detectores.
+
+1. Crea una **cuenta secundaria** de Telegram con otro número. **No uses tu cuenta personal**: si Telegram la limitara por actividad automática, no perderías la tuya.
+2. Entra en [my.telegram.org](https://my.telegram.org) con ese número → **API development tools** → crea una app (nombre y descripción libres). Copia el **api_id** y el **api_hash** a `TG_API_ID` y `TG_API_HASH`, y el número a `TG_PHONE` (formato `+34600111222`).
+3. Añade esa cuenta a tus grupos como **administrador**: sin eso no puede leer el registro de administración ni reportar.
+4. Con el bot levantado, genera la sesión **una sola vez**, dentro del contenedor:
 
 ```bash
 # 1) Telegram envía un código a la app de la cuenta secundaria:
@@ -279,7 +307,7 @@ docker compose exec antispam-bot python -m scripts.telethon_login request
 docker compose exec antispam-bot python -m scripts.telethon_login confirm 12345
 ```
 
-**Requisitos del bot en Telegram**: admin de los grupos con permisos de *borrar mensajes* y *expulsar usuarios*, y **Privacy Mode desactivado** (BotFather → `/setprivacy` → Disable) para que vea todos los mensajes.
+La sesión queda en `data/telethon.session`: trátala como una contraseña, da acceso a esa cuenta. Los reportes oficiales a Telegram van aparte y vienen **apagados** (`REPORT_BEFORE_BAN=false`): actívalos cuando confíes en los detectores, porque reportar a gente legítima puede hacer que Telegram limite la cuenta secundaria.
 
 **¿Dónde recibes los avisos?** Dos opciones (`ADMIN_NOTIFY_CHAT_ID` en el `.env`): por **DM privado** contigo mismo (déjalo vacío) o en un **grupo de moderación** (pon su `chat_id`). Si eliges el DM, **abre tu bot y pulsa START una vez** — Telegram no deja que un bot te escriba primero, así que sin ese START no te llegarán los avisos.
 
