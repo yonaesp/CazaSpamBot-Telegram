@@ -2,7 +2,7 @@
 python-telegram-bot[ext]==22.8
 
 # Async HTTP (CAS lookup + notificaciones)
-aiohttp==3.10.10
+aiohttp==3.14.3
 
 # Telethon (cliente MTProto). NO es solo para scripts: lo usan en runtime
 # reporter.py, user_signals.py, telethon_bridge.py y story_reader.py, o sea
