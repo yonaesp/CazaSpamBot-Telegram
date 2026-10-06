@@ -520,6 +520,31 @@ def _forward_de_fuera(real: list[Hit]) -> bool:
     )
 
 
+def _solo_prisa_sin_contenido(msg, real: list[Hit]) -> bool:
+    """¿Lo único que hay es haber escrito pronto, y el mensaje no trae NADA más?
+
+    Nada más es: ni enlace ni mención (en el texto o en sus entidades), ni
+    reenvío, ni adjunto, ni botones. Los dos aciertos de `jfm_too_fast` como regla
+    única llevaban contenido (el de PopcornTV, un enlace a astrurl.io): eso sigue
+    cayendo aunque el perfil sea antiguo.
+    """
+    if not real or any(not h.rule.startswith("jfm_") for h in real):
+        return False
+    txt = (getattr(msg, "text", None) or getattr(msg, "caption", None) or "")
+    if _ENLACE_O_MENCION.search(txt):
+        return False
+    # tuple() a los dos lados: un `tuple + list` ya tumbó un detector aquí.
+    for e in tuple(getattr(msg, "entities", None) or ()) + tuple(getattr(msg, "caption_entities", None) or ()):
+        if getattr(e, "type", None) in ("url", "text_link", "mention", "text_mention"):
+            return False
+    if getattr(msg, "forward_origin", None) or getattr(msg, "reply_markup", None):
+        return False
+    adjunto = any(getattr(msg, a, None) for a in (
+        "photo", "video", "animation", "sticker", "voice", "audio",
+        "document", "video_note", "contact", "story"))
+    return not adjunto
+
+
 async def _perdon_por_contenido_limpio(
     context, db: DB, cfg: Config, msg, msg_txt, user, real: list[Hit],
 ) -> str:
@@ -2012,6 +2037,31 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     # actúa, o se avisa por otra vía (perdón, trust), sobra y además mentiría.
     if decision.action == "noop":
         await _soltar_aviso_imagen(context, db, cfg, msg, user, _aviso_imagen)
+
+    # ESCRIBIR PRONTO no castiga a quien el bot ya da por legítimo. Caso real
+    # (6-oct-2026, Windows 11): «Saizor», cuenta de 2.885 días con 20 fotos (al
+    # entrar se le saltó la verificación por eso mismo), escribió «BUENAS» a los
+    # 3 s y se le expulsó por `jfm_too_fast`; volvió, escribió «HOLA» a los 3 s y
+    # otra expulsión. Hay gente que entra con el mensaje ya pensado. Solo se
+    # perdona si NO hay nada más que la prisa: con un enlace, una mención, un
+    # reenvío o un adjunto se castiga igual que siempre.
+    if (decision.action in ("ban", "kick", "mute", "delete")
+            and _solo_prisa_sin_contenido(msg, real)):
+        _sig_p, _ = await _senales()
+        _legit_p, _por_p = verification._is_very_legit_profile(
+            _sig_p, user.username, user.first_name, getattr(user, "last_name", None))
+        if _legit_p:
+            log.info("acción %s ANULADA sobre user=%s: solo escribió pronto y el perfil es "
+                     "legítimo (%s) (reglas=%s)", decision.action, user.id,
+                     ", ".join(_por_p), [h.rule for h in real])
+            db.log_action(
+                chat_id=chat_id, user_id=user.id, username=user.username,
+                message_id=msg.message_id, rule="+".join(h.rule for h in real),
+                action="noop_prisa_legitimo", score=decision.score,
+                mode=("shadow" if cfg.shadow else "active"),
+                payload={"would_be": decision.action, "perfil": _por_p},
+            )
+            return
 
     # Señales de pura FORMA (reenvío, foto, prisa) sin una sola de contenido: si
     # además la persona escribió algo que no dispara nada, no hay motivo para

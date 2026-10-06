@@ -4,6 +4,13 @@ Cambios relevantes de CazaSpamBot, lo más reciente arriba. Se anotan hitos, no
 cada commit: para el detalle está el historial de git. Sin números de versión
 porque el bot es un servicio en producción continua, no un paquete que se libera.
 
+## 2026-10 · Escribir rápido ya no expulsa a una cuenta legítima
+
+Una cuenta de casi 8 años con 20 fotos fue expulsada dos veces por saludar a los
+3 segundos de entrar. Ahora la prisa sola no castiga si el perfil es legítimo y
+el mensaje no trae nada más (enlace, mención, reenvío, adjunto). El spam rápido con
+contenido sigue cayendo igual.
+
 ## 2026-10 · El bot se presenta a quien no es de la casa
 
 Gente ajena metía el bot en sus grupos, donde no puede moderar. Ahora su perfil y

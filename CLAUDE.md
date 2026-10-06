@@ -340,6 +340,18 @@ destino: «caseros» solo contaba junto a «packs». Se añadió emparejado con 
 avisos con confianza dicen de dónde sale (`_porque_confianza`: desde cuándo, cuántos
 mensajes, warns), a petición del admin: «9/10» a secas no explicaba nada.
 
+**Escribir pronto no castiga a quien el bot ya da por legítimo**
+(`_solo_prisa_sin_contenido` + `_is_very_legit_profile`, tras `decide()`). Caso real
+(6-oct-2026, Windows 11): «Saizor», cuenta de 2.885 días con 20 fotos, a quien al
+entrar se le saltó la verificación por eso mismo, escribió «BUENAS» a los 3 s y lo
+expulsó `jfm_too_fast`; volvió, «HOLA» a los 3 s, otra expulsión. Con esto el
+historial de esa regla como única queda en 2 aciertos y 1 falso positivo, y los
+aciertos llevaban contenido. Solo se perdona si **no hay nada más que la prisa**
+(ni enlace, ni mención, ni reenvío, ni adjunto, ni botones, ni otra regla) **y** el
+perfil es legítimo: PopcornTV, con su enlace, sigue cayendo. Queda auditado como
+`noop_prisa_legitimo`. No se tocó el umbral ni se metieron los `jfm_*` en
+`_REGLAS_DE_FORMA`: el perdón de forma exige texto largo, y un saludo no lo es.
+
 ⚠️ **El perdón NO alcanza al reenvío desde un canal, un chat o un bot**: ese es el
 patrón fuerte y el único que ha acertado. El caption lo escribe el spammer y le
 sale gratis, así que un texto limpio no puede comprarlo. Si alguien mete en
