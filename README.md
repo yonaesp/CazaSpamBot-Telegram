@@ -251,20 +251,52 @@ Each folder has its own `README.md` explaining the format.
 
 ## 🚀 Getting started
 
-Set up your credentials one of two ways:
+### What you need
 
-**Option A — Interactive wizard** (recommended for first-timers). It walks you through every value and tells you where to get it. Needs nothing installed but Python 3, and it won't nag if already configured:
+- A Linux machine that stays on: a cheap VPS, a mini PC or a home server. The bot uses around 100 MB of RAM.
+- Your bot's **token** and your Telegram **user_id**. If you don't have them yet, go through [Setting up Telegram step by step](#setting-up-telegram-step-by-step) first: it takes two minutes.
+
+### Install (copy and paste)
 
 ```bash
-python3 scripts/setup.py          # creates .env by answering a few questions
-# (to redo it on purpose:  python3 scripts/setup.py --force)
+# 1) Docker and git, if you don't have them (Debian, Ubuntu and derivatives)
+sudo apt update && sudo apt install -y git
+curl -fsSL https://get.docker.com | sudo sh
+
+# 2) Get the bot
+git clone https://github.com/yonaesp/CazaSpamBot-Telegram.git
+cd CazaSpamBot-Telegram
+
+# 3) Configure it: it asks for the token and your user_id and creates the .env file
+python3 scripts/setup.py
+
+# 4) Start it
+sudo docker compose up -d --build
 ```
 
-**Option B — By hand**:
+Check that it's alive:
+
+```bash
+sudo docker compose logs -f
+# … Bot @YourBot (id=…) listo. Modo=shadow …      (Ctrl+C to leave the log)
+```
+
+It starts in **test mode** (`MODE=shadow`): it watches everything and logs what it *would* do, without banning anyone. Once you've checked the log for a few days and trust it, turn it on:
+
+```bash
+sed -i 's/^MODE=.*/MODE=active/' .env
+sudo docker compose up -d        # "restart" does NOT reload .env; "up -d" does
+```
+
+> If your user is in the `docker` group, you can drop the `sudo` from every command.
+
+### Without the wizard
+
+If you'd rather edit the file by hand:
 
 ```bash
 cp .env.example .env
-nano .env    # replace TELEGRAM_BOT_TOKEN and ADMIN_USER_ID; the rest has defaults
+nano .env    # fill in TELEGRAM_BOT_TOKEN and ADMIN_USER_ID; everything else has defaults
 ```
 
 Only those two values are mandatory. The ones below are **made up**, just to show the format:
@@ -276,16 +308,49 @@ TELEGRAM_BOT_TOKEN=8123456789:AAF-ThisTokenIsFakeReplaceItWithYours00
 ADMIN_USER_ID=123456789
 ```
 
-Then bring it up and verify:
+`.env.example` explains every variable with a sample of its format. Never commit your `.env` (it's already in `.gitignore`).
+
+### With Podman instead of Docker
+
+Same steps, replacing `docker compose` with `podman compose`:
 
 ```bash
-docker compose up -d --build
-docker compose logs -f            # "Bot @... listo. Modo=shadow"
+sudo apt install -y podman podman-compose     # Fedora: sudo dnf install -y podman podman-compose
+podman compose up -d --build
+podman compose logs -f
 ```
 
-The `.env.example` is commented step by step, and every variable ships a **fake example** of the format. Never commit your `.env` (it's already in `.gitignore`).
+Two differences from Docker:
 
-**No folders to create by hand.** `data/` (database, session, heartbeat) is created on first run, and `config/` (welcomes and blocklists) already ships with sensible defaults. `data/` is the only writable volume.
+- **Starting again after a server reboot**: rootless Podman doesn't do it on its own. Enable it once with `systemctl --user enable --now podman-restart.service` and `loginctl enable-linger $USER`.
+- **Fedora, RHEL and derivatives (SELinux)**: if the container can't read `config/` or write to `data/`, add `Z` to each volume in `docker-compose.yml`, e.g. `./data:/app/data:Z` and `./config:/app/config:ro,Z`.
+
+### What `docker-compose.yml` does
+
+You don't need to touch it. In case you want to know what it mounts:
+
+| Line | What it's for |
+|---|---|
+| `build: .` | The image is built on your machine from the `Dockerfile`: nothing is pulled from a registry |
+| `env_file: .env` | Your configuration. Without `.env`, compose won't start |
+| `./data:/app/data` | Database, Telethon session and daily backups. It's the only place it writes to: **back up this folder and your `.env`** |
+| `./config:/app/config:ro` | Blocklists and welcomes, read-only |
+| `./src` and `./scripts` (`:ro`) | The code, mounted so an update applies without rebuilding |
+| `restart: unless-stopped` | Starts again on its own after a crash or a server reboot |
+| `healthcheck` | Docker marks it `unhealthy` if it stops showing signs of life for 5 minutes |
+| `logging` | The log rotates over 3 files of 10 MB, so it never fills the disk |
+
+`data/` is created on first run and `config/` ships with sensible defaults: no folders to create by hand.
+
+### Day to day
+
+| I want to… | Command |
+|---|---|
+| See what it's doing | `sudo docker compose logs -f` |
+| Update to the latest version | `git pull && sudo docker compose up -d --build` |
+| Restart it | `sudo docker compose restart` |
+| Stop it | `sudo docker compose down` (everything in `data/` is kept) |
+| Apply a change to `.env` | `sudo docker compose up -d` |
 
 ### Setting up Telegram step by step
 
@@ -328,18 +393,16 @@ The session lives in `data/telethon.session`: treat it like a password, it grant
 
 **Where do alerts go?** Two options (`ADMIN_NOTIFY_CHAT_ID` in `.env`): your **private DM** (leave it empty) or a **moderation group** (set its `chat_id`). If you pick the DM, **open your bot and press START once** — Telegram won't let a bot message you first.
 
-**Tip**: start in `MODE=shadow` (only logs what it *would* do, without acting), watch the log for a few days, then switch to `MODE=active`.
-
 ---
 
 ## 🔄 Updating an existing install
 
 ```bash
 git pull
-docker compose restart
+sudo docker compose up -d --build
 ```
 
-That's it. `docker-compose.yml` mounts `./src`, `./config` and `./data` as volumes, so new code, language packs and blocklists are picked up **without rebuilding the image**. `docker compose pull` does nothing here: the image is built locally (`build:`), never downloaded. You only need `docker compose up -d --build` when `requirements.txt` or the `Dockerfile` change.
+That's it. Always use `up -d --build`: it only rebuilds the image when `requirements.txt` or the `Dockerfile` changed (otherwise it reuses the cache and takes seconds), and it also applies any `.env` change. A plain `restart` picks up new code, because `./src` and `./config` are mounted as volumes, but it would miss an update that bumps a dependency, such as a security fix. `docker compose pull` does nothing here: the image is built locally (`build:`), never downloaded.
 
 **Nothing you configured is lost.** Your `.env`, the database (`data/`: chosen language, each group's settings, bans, learned samples) and your own welcomes all live outside version control, and any new database columns are created on startup.
 

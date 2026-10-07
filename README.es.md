@@ -231,26 +231,55 @@ Todo por grupo, desde el propio Telegram (solo el admin del bot). `/verificacion
 
 ## 🚀 Puesta en marcha
 
-Configura las credenciales de una de estas dos formas (elige la que prefieras):
+### Lo que necesitas
 
-**Opción A — Asistente interactivo** (recomendado si es tu primera vez). Te
-pregunta paso a paso y te dice de dónde sacar cada dato. No necesita nada
-instalado (solo Python 3). Si ya está configurado, no molesta:
+- Un ordenador con Linux siempre encendido: un VPS barato, un mini PC o un servidor en casa. El bot gasta unos 100 MB de RAM.
+- El **token** de tu bot y tu **user_id** de Telegram. Si aún no los tienes, sigue antes [Configurar Telegram paso a paso](#configurar-telegram-paso-a-paso): son dos minutos.
+
+### Instalación (copiar y pegar)
 
 ```bash
-python3 scripts/setup.py          # crea el .env respondiendo unas preguntas
-# (para rehacerlo a propósito:  python3 scripts/setup.py --force)
+# 1) Docker y git, si no los tienes (Debian, Ubuntu y derivadas)
+sudo apt update && sudo apt install -y git
+curl -fsSL https://get.docker.com | sudo sh
+
+# 2) Descarga el bot
+git clone https://github.com/yonaesp/CazaSpamBot-Telegram.git
+cd CazaSpamBot-Telegram
+
+# 3) Configúralo: te pide el token y tu user_id y crea el archivo .env
+python3 scripts/setup.py
+
+# 4) Arráncalo
+sudo docker compose up -d --build
 ```
 
-**Opción B — A mano** (si te manejas con archivos de texto):
+Comprueba que está vivo:
+
+```bash
+sudo docker compose logs -f
+# … Bot @TuBot (id=…) listo. Modo=shadow …      (Ctrl+C para salir del log)
+```
+
+Arranca en **modo prueba** (`MODE=shadow`): lo mira todo y apunta lo que haría, sin banear a nadie. Cuando lleves unos días revisando el log y te fíes, actívalo:
+
+```bash
+sed -i 's/^MODE=.*/MODE=active/' .env
+sudo docker compose up -d        # «restart» NO relee el .env; «up -d» sí
+```
+
+> Si tu usuario está en el grupo `docker`, puedes quitar el `sudo` de todos los comandos.
+
+### Sin el asistente
+
+Si prefieres editar el archivo a mano:
 
 ```bash
 cp .env.example .env
-nano .env    # reemplaza TELEGRAM_BOT_TOKEN y ADMIN_USER_ID; el resto tiene defaults
+nano .env    # rellena TELEGRAM_BOT_TOKEN y ADMIN_USER_ID; el resto tiene valores por defecto
 ```
 
-En ambos casos, lo obligatorio son solo esos dos valores. Los de aquí son
-**inventados**, solo para ver el formato:
+Solo esos dos valores son obligatorios. Los de aquí son **inventados**, para que veas el formato:
 
 ```ini
 # Token que te da @BotFather al crear el bot (/newbot):
@@ -259,18 +288,49 @@ TELEGRAM_BOT_TOKEN=8123456789:AAF-EsteTokenEsFalsoReemplazaloPorElTuyo00
 ADMIN_USER_ID=123456789
 ```
 
-Después, levanta y verifica:
+El `.env.example` explica cada variable con un ejemplo del formato. Nunca subas tu `.env` a git (ya está en `.gitignore`).
+
+### Con Podman en vez de Docker
+
+Los mismos pasos, cambiando `docker compose` por `podman compose`:
 
 ```bash
-docker compose up -d --build
-docker compose logs -f            # "Bot @... listo. Modo=shadow"
+sudo apt install -y podman podman-compose     # Fedora: sudo dnf install -y podman podman-compose
+podman compose up -d --build
+podman compose logs -f
 ```
 
-El `.env.example` está comentado paso a paso y cada variable trae un **ejemplo inventado** del formato: dónde crear el bot (@BotFather), cómo saber tu user_id (@userinfobot, @getidsbot), cómo obtener las credenciales de Telethon, etc.
+Dos diferencias con Docker:
 
-> ⚠️ Los valores de ejemplo son **falsos**: reemplázalos siempre por los tuyos. Nunca subas tu `.env` a git (ya está en `.gitignore`).
+- **Arranque automático tras reiniciar el servidor**: Podman sin root no lo hace solo. Actívalo una vez con `systemctl --user enable --now podman-restart.service` y `loginctl enable-linger $USER`.
+- **Fedora, RHEL y derivadas (SELinux)**: si el contenedor no puede leer `config/` o escribir en `data/`, añade `Z` a cada volumen del `docker-compose.yml`, por ejemplo `./data:/app/data:Z` y `./config:/app/config:ro,Z`.
 
-**No tienes que crear ninguna carpeta a mano.** La carpeta `data/` (base de datos, sesión, heartbeat) se crea sola al levantar el contenedor, y `config/` (bienvenidas y listas negras) ya viene incluida con valores por defecto. Solo escribes en `data/`, que es el único volumen con permiso de escritura.
+### Qué hace el `docker-compose.yml`
+
+No hace falta tocarlo. Por si quieres saber qué monta:
+
+| Línea | Para qué sirve |
+|---|---|
+| `build: .` | La imagen se construye en tu máquina desde el `Dockerfile`: no se descarga nada de ningún registro |
+| `env_file: .env` | Tu configuración. Sin `.env`, compose no arranca |
+| `./data:/app/data` | Base de datos, sesión de Telethon y copias diarias. Es lo único donde escribe: **haz copia de esta carpeta y del `.env`** |
+| `./config:/app/config:ro` | Listas negras y bienvenidas, en solo lectura |
+| `./src` y `./scripts` (`:ro`) | El código, montado para que una actualización se aplique sin reconstruir |
+| `restart: unless-stopped` | Vuelve a arrancar solo tras un fallo o un reinicio del servidor |
+| `healthcheck` | Docker lo marca como `unhealthy` si deja de dar señales de vida 5 minutos |
+| `logging` | El log rota en 3 ficheros de 10 MB, para no llenar el disco |
+
+`data/` se crea sola al arrancar, y `config/` ya viene con valores por defecto: no tienes que crear ninguna carpeta.
+
+### El día a día
+
+| Quiero… | Comando |
+|---|---|
+| Ver qué está haciendo | `sudo docker compose logs -f` |
+| Actualizar a la última versión | `git pull && sudo docker compose up -d --build` |
+| Reiniciarlo | `sudo docker compose restart` |
+| Pararlo | `sudo docker compose down` (lo de `data/` se conserva) |
+| Aplicar un cambio del `.env` | `sudo docker compose up -d` |
 
 ### Configurar Telegram paso a paso
 
@@ -313,18 +373,16 @@ La sesión queda en `data/telethon.session`: trátala como una contraseña, da a
 
 **¿Dónde recibes los avisos?** Dos opciones (`ADMIN_NOTIFY_CHAT_ID` en el `.env`): por **DM privado** contigo mismo (déjalo vacío) o en un **grupo de moderación** (pon su `chat_id`). Si eliges el DM, **abre tu bot y pulsa START una vez** — Telegram no deja que un bot te escriba primero, así que sin ese START no te llegarán los avisos.
 
-**Consejo**: arranca en `MODE=shadow` (solo registra lo que haría, sin actuar), revisa unos días el log, y cuando confíes pásalo a `MODE=active`.
-
 ---
 
 ## 🔄 Actualizar una instalación existente
 
 ```bash
 git pull
-docker compose restart
+sudo docker compose up -d --build
 ```
 
-Ya está. El `docker-compose.yml` monta `./src`, `./config` y `./data` por volumen, así que el código nuevo, los paquetes de idioma y las listas negras se recogen **sin reconstruir la imagen**. `docker compose pull` aquí no sirve de nada: la imagen se construye en local (`build:`), no se descarga. Solo necesitas `docker compose up -d --build` cuando cambien `requirements.txt` o el `Dockerfile`.
+Ya está. Usa siempre `up -d --build`: solo reconstruye la imagen si cambiaron `requirements.txt` o el `Dockerfile` (si no, tira de caché y tarda segundos), y además aplica cualquier cambio del `.env`. Un `restart` a secas recoge el código nuevo, porque `./src` y `./config` van montados por volumen, pero se dejaría a medias una actualización que suba una dependencia, como un parche de seguridad. `docker compose pull` aquí no sirve de nada: la imagen se construye en local (`build:`), no se descarga.
 
 **No pierdes nada de lo que tengas configurado.** Tu `.env`, la base de datos (`data/`: idioma elegido, ajustes de cada grupo, baneos, muestras aprendidas) y tus bienvenidas propias viven fuera del control de versiones, y las columnas nuevas de la base de datos se crean solas al arrancar.
 

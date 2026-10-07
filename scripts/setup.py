@@ -53,6 +53,10 @@ def ask(
         try:
             raw = input(f"   {GREEN}➜{RESET} {label}{suffix}: ").strip()
         except EOFError:
+            # Sin nadie al otro lado, un valor obligatorio no llegará nunca:
+            # seguir preguntando era un bucle infinito. Se aborta (lo recoge main).
+            if required and not default:
+                raise
             raw = ""
         if not raw and default is not None:
             raw = default
@@ -230,4 +234,10 @@ if __name__ == "__main__":
         raise SystemExit(main())
     except KeyboardInterrupt:
         print("\nCancelado.")
+    except EOFError:
+        # Sin terminal (p. ej. `docker run` sin -it o un pipe): antes salía un
+        # traceback. El asistente necesita a alguien que conteste.
+        print("\nEl asistente es interactivo: ejecútalo en una terminal, o copia "
+              ".env.example a .env y edítalo a mano.")
+        raise SystemExit(1)
         raise SystemExit(130)
