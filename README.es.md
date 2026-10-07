@@ -359,7 +359,7 @@ Un bot de Telegram no puede leer la bio ni las fotos de perfil de un usuario, ni
 
 1. Crea una **cuenta secundaria** de Telegram con otro número. **No uses tu cuenta personal**: si Telegram la limitara por actividad automática, no perderías la tuya.
 2. Entra en [my.telegram.org](https://my.telegram.org) con ese número → **API development tools** → crea una app (nombre y descripción libres). Copia el **api_id** y el **api_hash** a `TG_API_ID` y `TG_API_HASH`, y el número a `TG_PHONE` (formato `+34600111222`).
-3. Añade esa cuenta a tus grupos como **administrador**: sin eso no puede leer el registro de administración ni reportar.
+3. Añade esa cuenta a tus grupos como **administrador**: sin eso no puede leer el registro de administración ni reportar. En la instalación de referencia tiene *Eliminar mensajes* y *Banear usuarios*, y con eso funciona todo.
 4. Con el bot levantado, genera la sesión **una sola vez**, dentro del contenedor:
 
 ```bash

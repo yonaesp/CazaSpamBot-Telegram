@@ -1,7 +1,7 @@
 # CazaSpamBot — Bot Antispam Telegram
 
 Bot de moderación antispam **en producción 24/7**, multi-grupo, federado y **bilingüe** (es/en).
-~14.400 LOC, Docker, **934 tests**, 21 detectores.
+~23.000 LOC en `src/`, Docker, **1670 tests**, 25 detectores (un módulo cada uno en `src/detectors/`).
 
 > **Estado: PRODUCCIÓN.** No es un esqueleto. Cualquier cambio afecta grupos reales con miles de usuarios. **Investiga > Confirma > Actúa.**
 
@@ -62,7 +62,7 @@ nativa; se itera `banChatMember` sobre los chats donde el bot es admin.
 
 **Todo el texto que ve el usuario vive en `src/locales/<código>.json`.** Nada de textos en el código.
 
-- `es.json` / `en.json`, **889 claves** cada uno. Idioma GLOBAL de la instancia.
+- `es.json` / `en.json`, **1.169 claves** cada uno. Idioma GLOBAL de la instancia.
 - **Autodescubrimiento**: soltar un `fr.json` basta para que `/idioma fr` funcione. Cero cambios de código.
 - **Fallback por clave** al español: un idioma al 40 % ya es usable.
 - **A prueba de fallos**: un JSON roto se ignora con un log y el bot sigue. Por eso son JSON y no módulos `.py` (un `.py` se ejecuta al importarse: una comilla mal puesta tumbaba el arranque).
@@ -187,7 +187,7 @@ mensaje se borra a mano sin pasar por los botones.
 
 ## Detectores (`src/detectors/` + `verification.py`)
 
-21 detectores: `obvious_spam_profile`, `bio_spam`, `photos_batch`, `commercial_ad`, `investment_scam`, `contact_spam`, `forward_first_msg`, `first_msg_media`, `inline_buttons`, `external_mention`, `external_reply`, `url_blocklist`, `tg_deeplink`, `non_allowed_script` (unicode_script), `reaction_farming`, `jfm_delta`, `premium_new_link`, `emoji_only`, `dormant_bot_mention`, `cas`, `lols_bot`, `learned_similarity`, `personal_channel_spam`.
+25 detectores en `src/detectors/`: `bio_spam`, `cas`, `commercial_ad`, `contact_spam`, `cross_post`, `dormant_bot_mention`, `emoji_only`, `external_mention`, `external_reply`, `first_msg_media`, `forward_first_msg`, `inline_buttons`, `investment_scam`, `jfm_delta`, `link_target`, `lols_bot`, `offplatform_contact`, `personal_channel`, `photos_batch`, `premium_new_link`, `reaction_farming`, `story_share`, `tg_deeplink`, `unicode_script` (`non_allowed_script`), `url_blocklist`. Fuera de esa carpeta deciden también `obvious_spam_profile` (`verification.py`) y `learned_similarity` (`learning.py`).
 También banea spam publicado en nombre de un canal (`sender_chat` → `banChatSenderChat`).
 
 `rule_explain.py` traduce el id técnico de regla a la explicación que lee el admin. **Es el texto más visible del bot** y tiene prioridad sobre el `reason` del detector.
@@ -701,7 +701,7 @@ automático. Hay que averiguar por qué.
 ## Flujo de trabajo típico
 
 ```bash
-.venv/bin/python -m pytest tests/ -q          # 798 tests
+.venv/bin/python -m pytest tests/ -q          # suite completa
 .venv/bin/ruff check src/ tests/
 sudo -n docker compose restart                # o up -d si cambia .env o requirements
 sudo -n docker logs cazaspam-bot --tail 5     # verificar "Bot ... listo"
@@ -744,4 +744,4 @@ Si el `gh` de la máquina está autenticado con **otra** cuenta o con un token q
 alcanza a este repo, no hace falta reconfigurar `gh`: basta exportar `GH_TOKEN` con
 el token bueno solo para esa ejecución. `gh` lo prefiere sobre su sesión guardada.
 
-*Actualizado: 2026-07-23 — bilingüe es/en, 21 detectores (+investment_scam), 831 tests, panel completo, ajuste money_guard, registro de tráfico local.*
+*Actualizado: 2026-10-08 — 25 detectores, 1670 tests, 1.169 claves por idioma.*

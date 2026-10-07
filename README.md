@@ -379,7 +379,7 @@ A Telegram bot can't read a user's bio, profile photos, personal channel or stor
 
 1. Create a **secondary** Telegram account with another phone number. **Don't use your personal account**: if Telegram ever limits it for automated activity, yours stays safe.
 2. Log in to [my.telegram.org](https://my.telegram.org) with that number → **API development tools** → create an app (any name and description). Copy **api_id** and **api_hash** into `TG_API_ID` and `TG_API_HASH`, and the number into `TG_PHONE` (format `+34600111222`).
-3. Add that account to your groups as an **administrator**: without it, it can't read the admin log or report.
+3. Add that account to your groups as an **administrator**: without it, it can't read the admin log or report. In the reference install it has *Delete messages* and *Ban users*, and everything works with that.
 4. With the bot running, generate the session **once**, inside the container:
 
 ```bash
