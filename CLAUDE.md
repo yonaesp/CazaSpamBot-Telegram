@@ -254,6 +254,20 @@ DISTINTAS, lista editable en `commercial_software_catalog.txt`, +40, que sola ta
 llega: un grupo de Windows nombra esas marcas a diario). Medido sobre **503 mensajes
 reales**: solo cambia el spam, de 0 a 155.
 
+**El guion del «dinero extra» que se cierra por privado.** Caso real (8-oct-2026,
+Windows 10): «Natalia», «Si alguna vez has querido ganar dinero extra pero no sabes
+por dónde empezar, puedo compartir contigo algo que estoy haciendo… estoy
+obteniendo buenos resultados… solo envíame un mensaje». Sin cifras ni enlace sumaba
+50 (< 60) y solo lo paró `learned_similarity` con un mute. Tres piezas nuevas en
+`commercial_ad`: oferta de dinero + petición de **privado** (`commercial_dm_cta.txt`)
+= +35, el mismo peso que oferta + enlace, porque aquí el privado ES el enlace;
+**frases gancho** (`commercial_teaser.txt`, 1 = +20, 2+ distintas = +45); y el
+guion entero (dinero + privado + 2 ganchos) = +25. El caso da **155**: ban y
+reporte. ⚠️ **Ni los ganchos ni el privado cuentan sin oferta de dinero o
+trabajo**: «si no sabes por dónde empezar, escríbeme y te paso la guía» es ayuda
+normal en un grupo de Windows (hay test). Medido sobre 524 textos reales: solo
+cambia este (0 → 155).
+
 ### Las señales de FORMA no castigan solas
 
 `forward_first_msg`, `first_msg_media` y los `jfm_*` no miran lo que DICE el

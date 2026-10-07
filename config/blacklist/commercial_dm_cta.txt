@@ -1,0 +1,10 @@
+# Petición de llevar la conversación al PRIVADO, en español (commercial_ad).
+# Solo cuenta junto a una oferta de dinero o trabajo (commercial_work): sola es
+# conversación normal («escríbeme si no te funciona»). Las de inglés, en en/.
+# Un patrón por línea (regex, case-insensitive). # = comentario. Usa (?:...).
+env[ií]a(?:me|nos)\s+(?:un\s+)?(?:mensaje|dm|md|privado)
+m[aá]nda(?:me|nos)\s+(?:un\s+)?(?:mensaje|dm|md|privado)
+escr[ií]be(?:me|nos)
+escribime
+h[aá]blame
+(?:por|al)\s+(?:privado|interno|md|dm)

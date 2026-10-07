@@ -4,6 +4,12 @@ Cambios relevantes de CazaSpamBot, lo más reciente arriba. Se anotan hitos, no
 cada commit: para el detalle está el historial de git. Sin números de versión
 porque el bot es un servicio en producción continua, no un paquete que se libera.
 
+## 2026-10 · El «gana dinero extra, escríbeme por privado» cae directo
+
+Un mensaje de captación sin cifras ni enlace solo se llevaba un mute. Ahora la
+oferta de dinero que se cierra por privado, con sus frases gancho, llega a ban y
+reporte. Sobre 524 mensajes reales no cambia ningún otro.
+
 ## 2026-10 · Escribir rápido ya no expulsa a una cuenta legítima
 
 Una cuenta de casi 8 años con 20 fotos fue expulsada dos veces por saludar a los

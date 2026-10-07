@@ -51,3 +51,5 @@ investment\s+(?:opportunit(?:y|ies)|plan|scheme)
 # «come for work» no casaba con nada («now hiring», «job vacancy», etc.).
 come\s+(?:for|to)\s+work\b
 (?:people|persons?)\s+from\s+(?:europe|uk|usa|us|spain)\b
+# «earn extra money» sin cifras (guion de captación, caso Natalia 8-oct-2026)
+(?:make|earn)\s+(?:some\s+)?extra\s+(?:money|cash|income)

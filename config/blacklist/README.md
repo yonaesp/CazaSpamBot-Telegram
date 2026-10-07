@@ -75,6 +75,8 @@ es casi siempre más seguro que una palabra suelta.
 | `commercial_illegal_services.txt` | `commercial_ad` | servicios ilegales en anuncios (hacking, acceso a cuentas, recuperar dinero...) |
 | `commercial_cta.txt` | `commercial_ad` | llamadas a la acción publicitarias (postúlate, contáctanos, apply now...) |
 | `commercial_work.txt` | `commercial_ad` | vocabulario de oferta de empleo / dinero fácil (vacantes, sueldo, now hiring...) |
+| `commercial_dm_cta.txt` | `commercial_ad` | petición de pasar al privado (envíame un mensaje, DM me...); solo cuenta junto a una oferta de dinero |
+| `commercial_teaser.txt` | `commercial_ad` | frases gancho de captación (puedo compartir contigo, estoy obteniendo buenos resultados...); solo cuentan junto a una oferta de dinero |
 | `commercial_money.txt` | `commercial_ad` **y** `bio_spam` | importes con moneda (500€, $500, R$ 2.000, 20000 ARS...). **Aquí añades tu moneda** |
 | `commercial_money_periodic.txt` | `commercial_ad` | periodicidad pegada al importe (al mes, /day, mensuales...). No lleva monedas: se combina con la lista de arriba |
 | `commercial_urgency.txt` | `commercial_ad` | urgencia gritada de scam (URGENTE, HOY MISMO, act now...) |

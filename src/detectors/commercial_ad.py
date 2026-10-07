@@ -210,6 +210,63 @@ def _periodic_money_re() -> re.Pattern:
     return rx
 
 
+# --- El guion del «dinero extra» que se cierra por privado ---------------------
+# Caso real (8-oct-2026, Windows 10): «Natalia» entró, se verificó en 4 s y a las
+# 46 h escribió «Si alguna vez has querido ganar dinero extra pero no sabes por
+# dónde empezar, puedo compartir contigo algo que estoy haciendo. Es fácil de
+# seguir y estoy obteniendo buenos resultados. También puedo explicárselo a
+# cualquiera que quiera saber más; solo envíame un mensaje.» Ni cifras ni enlace:
+# «ganar dinero» (15) + «envíame un mensaje» (20) + primer mensaje (15) = 50, por
+# debajo de 60. Solo lo paró el clasificador aprendido, con un mute.
+#
+# El enlace de este spam es el PRIVADO: igual que «oferta + enlace», «oferta de
+# dinero + escríbeme por privado» es la conversión. Y las frases gancho («puedo
+# compartir contigo», «estoy obteniendo buenos resultados») son el relleno que
+# hace que parezca una persona normal. Ninguna de las dos listas cuenta sin la
+# oferta de dinero: «si no sabes por dónde empezar, escríbeme y te paso la guía»
+# es ayuda corriente en un grupo de Windows.
+_DEFAULT_DM_CTA = [
+    r"env[ií]a(?:me|nos)\s+(?:un\s+)?(?:mensaje|dm|md|privado)",
+    r"m[aá]nda(?:me|nos)\s+(?:un\s+)?(?:mensaje|dm|md|privado)",
+    r"escr[ií]be(?:me|nos)",
+    r"escribime",
+    r"h[aá]blame",
+    r"(?:por|al)\s+(?:privado|interno|md|dm)",
+    r"(?:dm|pm|inbox|message|text)\s+me",
+    r"send\s+me\s+(?:a\s+)?(?:message|dm|pm|text)",
+    r"(?:hit|slide\s+into)\s+my\s+(?:dms?|inbox)",
+]
+_DEFAULT_TEASER = [
+    r"puedo\s+compartir(?:lo)?\s+contigo",
+    r"(?:algo|lo)\s+que\s+(?:yo\s+)?estoy\s+haciendo",
+    r"estoy\s+(?:obteniendo|teniendo|consiguiendo|sacando)\s+(?:muy\s+)?buenos\s+resultados",
+    r"(?:a\s+)?(?:cualquiera|quien(?:es)?)\s+(?:que\s+)?quiera(?:n)?\s+saber\s+m[aá]s",
+    r"no\s+sabes?\s+por\s+d[oó]nde\s+empezar",
+    r"es\s+f[aá]cil\s+de\s+seguir",
+    r"si\s+alguna\s+vez\s+has\s+querido",
+    r"i\s+can\s+share\s+(?:it\s+|this\s+)?with\s+you",
+    r"something\s+i(?:'m|\s+am)\s+doing",
+    r"(?:i'?m|i\s+am)\s+(?:getting|seeing)\s+(?:really\s+)?(?:good|great|amazing)\s+results",
+    r"anyone\s+who\s+wants\s+to\s+(?:know|learn)\s+more",
+    r"(?:don'?t|do\s+not)\s+know\s+where\s+to\s+start",
+    r"easy\s+to\s+follow",
+    r"if\s+you(?:'ve|\s+have)\s+ever\s+wanted\s+to",
+]
+
+
+def _dm_cta_re() -> re.Pattern:
+    return load_and_compile("commercial_dm_cta.txt", _DEFAULT_DM_CTA)
+
+
+def _teaser_re() -> re.Pattern:
+    return load_and_compile("commercial_teaser.txt", _DEFAULT_TEASER)
+
+
+def _ganchos_distintos(text: str) -> int:
+    """Frases gancho DISTINTAS: una sola puede ser casualidad, varias son guion."""
+    return len({re.sub(r"\s+", " ", m.group(0).lower()) for m in _teaser_re().finditer(text)})
+
+
 def _domestic_re() -> re.Pattern:
     return load_and_compile("commercial_domestic.txt", _DEFAULT_DOMESTIC)
 
@@ -231,6 +288,8 @@ def check(msg: Message, is_first_msg: bool = False) -> Hit:
     has_money = bool(money_re().search(text))
     has_cta = bool(_cta_re().search(text))
     has_work = bool(_work_re().search(text))
+    has_dm = has_work and bool(_dm_cta_re().search(text))
+    n_ganchos = _ganchos_distintos(text) if has_work else 0
     has_tg_link = "t.me/" in text.lower() or "telegram.me/" in text.lower()
     has_external_url = bool(_EXTERNAL_URL_RE.search(text))
     has_domestic = bool(_domestic_re().search(text))
@@ -294,6 +353,20 @@ def check(msg: Message, is_first_msg: bool = False) -> Hit:
     if has_work and (has_tg_link or has_external_url):
         score += 35
         reasons.append(t("reason.ad_job_spam"))
+    # Mismo combo, con el privado haciendo de enlace.
+    if has_dm:
+        score += 35
+        reasons.append(t("reason.ad_money_dm"))
+    if n_ganchos >= 2:
+        score += 45
+        reasons.append(t("reason.ad_teaser_multi", n=n_ganchos))
+    elif n_ganchos == 1:
+        score += 20
+        reasons.append(t("reason.ad_teaser"))
+    # El guion entero (dinero + ganchos + privado) ya no es una coincidencia.
+    if has_dm and n_ganchos >= 2:
+        score += 25
+        reasons.append(t("reason.ad_money_script"))
     if has_domestic:
         score += 20
         reasons.append(t("reason.ad_domestic"))
@@ -319,6 +392,8 @@ def check(msg: Message, is_first_msg: bool = False) -> Hit:
             "has_periodic_money": has_periodic_money,
             "has_cta": has_cta,
             "has_work": has_work,
+            "has_money_dm": has_dm,
+            "teasers": n_ganchos,
             "has_tg_link": has_tg_link,
             "has_external_url": has_external_url,
             "has_domestic": has_domestic,

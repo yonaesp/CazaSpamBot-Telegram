@@ -1,0 +1,5 @@
+# Petición de llevar la conversación al PRIVADO, en inglés (commercial_ad).
+# Se SUMAN a ../commercial_dm_cta.txt. Solo cuentan junto a una oferta de dinero.
+(?:dm|pm|inbox|message|text)\s+me
+send\s+me\s+(?:a\s+)?(?:message|dm|pm|text)
+(?:hit|slide\s+into)\s+my\s+(?:dms?|inbox)

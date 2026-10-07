@@ -1,0 +1,8 @@
+# Frases gancho del guion de captación, en inglés. Se SUMAN a ../commercial_teaser.txt.
+i\s+can\s+share\s+(?:it\s+|this\s+)?with\s+you
+something\s+i(?:'m|\s+am)\s+doing
+(?:i'?m|i\s+am)\s+(?:getting|seeing)\s+(?:really\s+)?(?:good|great|amazing)\s+results
+anyone\s+who\s+wants\s+to\s+(?:know|learn)\s+more
+(?:don'?t|do\s+not)\s+know\s+where\s+to\s+start
+easy\s+to\s+follow
+if\s+you(?:'ve|\s+have)\s+ever\s+wanted\s+to

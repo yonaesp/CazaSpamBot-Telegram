@@ -37,7 +37,12 @@ LIMPIA = "Gana 500 euros al dia trabajando desde casa, escribeme ahora"
     "Gаna 500 eurоs al dia trabajandо desde casa, escribeme ahora",     # 3 cirílicas
 ])
 def test_una_letra_cambiada_ya_no_esconde_el_mensaje(texto):
-    assert com.check(_msg(texto), is_first_msg=True).score == 0, "premisa: sin limpiar no casa"
+    # Premisa: el disfraz esconde parte del mensaje. Era «== 0», pero desde el
+    # 8-oct-2026 el combo dinero + «escríbeme» (caso Natalia) caza la variante de
+    # una sola cirílica aunque «eurоs» no se lea: lo que se comprueba es que
+    # limpiar recupera lo que faltaba.
+    assert com.check(_msg(texto), is_first_msg=True).score < \
+        com.check(_msg(LIMPIA), is_first_msg=True).score, "premisa: el disfraz esconde algo"
     limpio, trucos = desofuscar.limpiar(texto)
     assert trucos == ["homoglifos"]
     assert com.check(_msg(limpio), is_first_msg=True).score == \

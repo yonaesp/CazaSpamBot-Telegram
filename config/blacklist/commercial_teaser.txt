@@ -1,0 +1,11 @@
+# Frases gancho del guion de captación «dinero extra» (commercial_ad), en español.
+# Caso real: «Natalia», 8-oct-2026. Solo cuentan si hay oferta de dinero o trabajo
+# en el mismo mensaje; una sola suma poco, varias DISTINTAS son el guion.
+# Un patrón por línea (regex, case-insensitive). # = comentario. Usa (?:...).
+puedo\s+compartir(?:lo)?\s+contigo
+(?:algo|lo)\s+que\s+(?:yo\s+)?estoy\s+haciendo
+estoy\s+(?:obteniendo|teniendo|consiguiendo|sacando)\s+(?:muy\s+)?buenos\s+resultados
+(?:a\s+)?(?:cualquiera|quien(?:es)?)\s+(?:que\s+)?quiera(?:n)?\s+saber\s+m[aá]s
+no\s+sabes?\s+por\s+d[oó]nde\s+empezar
+es\s+f[aá]cil\s+de\s+seguir
+si\s+alguna\s+vez\s+has\s+querido
