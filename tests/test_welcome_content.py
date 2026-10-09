@@ -58,9 +58,31 @@ def test_verification_footer_tiempos():
     s = {"verification_suspicious_kick_minutes": 30, "verification_kick_normal": 1,
          "verification_reminder_hours": 3, "verification_kick_after_reminder_hours": 6}
     assert "30 min" in _verification_footer(s, True, [(v.REASON_NO_PHOTO, {})])  # sospechoso
-    assert "9h" in _verification_footer(s, False, [])                     # normal kick: 3+6
+    assert "9 h" in _verification_footer(s, False, [])                     # normal kick: 3+6
     s2 = dict(s)
     s2["verification_kick_normal"] = 0
     assert "no podrás escribir" in _verification_footer(s2, False, [])    # normal mute
     # NO duplica la instrucción del botón (esa va en el welcome)
     assert "Pulsa el botón" not in _verification_footer(s, True, [])
+
+
+def test_el_pie_publico_no_cuenta_por_que_es_sospechoso():
+    """9-oct-2026: «Cuenta sospechosa (sin username, sin foto)» salía en el GRUPO.
+    Le enseñaba al spammer qué mira el bot y señalaba a gente legítima."""
+    from src import verification as v
+    from src.verification import _verification_footer
+    s = {"verification_suspicious_kick_minutes": 30}
+    pie = _verification_footer(s, True, [(v.REASON_NO_PHOTO, {}), (v.REASON_NO_USERNAME, {})])
+    assert "30 min" in pie
+    for delator in ("sospechos", "username", "foto", "suspicious", "photo"):
+        assert delator not in pie.lower(), delator
+
+
+def test_el_boton_cabe_en_un_movil():
+    """En móvil «✅ SOY HUMANO (PULSA PARA ENTRAR)» (33 caracteres en mayúsculas)
+    salía cortado. El texto y los pies lo citan, así que tienen que coincidir."""
+    from src.i18n import SUPPORTED, t
+    for lang in SUPPORTED:
+        btn = t("verif.btn_human", _lang=lang)
+        assert len(btn) <= 22, (lang, btn)
+        assert btn != btn.upper(), "en mayúsculas ocupa bastante más"

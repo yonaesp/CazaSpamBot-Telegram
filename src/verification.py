@@ -63,9 +63,12 @@ def _verification_footer(settings, suspicious: bool, susp_reasons: list) -> str:
     configurados. No repite lo del botón (eso ya va en el welcome, custom o default),
     solo informa de qué pasa si no verifica, siempre con la config real."""
     if suspicious:
+        # Los motivos NO se publican (9-oct-2026). Decía «Cuenta sospechosa (sin
+        # username, sin foto)» delante de todo el grupo: enseñaba al spammer qué
+        # mira el bot y señalaba a gente legítima (el 29 % de Windows 11 no tiene
+        # username). El plazo corto ya se aplica igual; los motivos van al admin.
         kick_minutes = settings["verification_suspicious_kick_minutes"] or 30
-        reasons_str = render_reasons(susp_reasons)
-        return t("verif.footer_susp", reasons=html.escape(reasons_str), mins=kick_minutes)
+        return t("verif.footer_susp", mins=kick_minutes)
     if settings["verification_kick_normal"]:
         total_h = (settings["verification_reminder_hours"] or 3) + (settings["verification_kick_after_reminder_hours"] or 6)
         return t("verif.footer_kick", hours=total_h)

@@ -4,6 +4,12 @@ Cambios relevantes de CazaSpamBot, lo más reciente arriba. Se anotan hitos, no
 cada commit: para el detalle está el historial de git. Sin números de versión
 porque el bot es un servicio en producción continua, no un paquete que se libera.
 
+## 2026-10 · La verificación se lee bien en el móvil
+
+El botón «SOY HUMANO (PULSA PARA ENTRAR)» se cortaba en el móvil. Ahora es corto
+(«✅ Soy humano · Entrar»), la acción va en negrita y el pie ya no anuncia en público
+por qué una cuenta parece sospechosa.
+
 ## 2026-10 · El «gana dinero extra, escríbeme por privado» cae directo
 
 Un mensaje de captación sin cifras ni enlace solo se llevaba un mute. Ahora la

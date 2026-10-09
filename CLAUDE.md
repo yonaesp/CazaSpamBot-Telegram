@@ -1,7 +1,7 @@
 # CazaSpamBot — Bot Antispam Telegram
 
 Bot de moderación antispam **en producción 24/7**, multi-grupo, federado y **bilingüe** (es/en).
-~23.000 LOC en `src/`, Docker, **1670 tests**, 25 detectores (un módulo cada uno en `src/detectors/`).
+~23.000 LOC en `src/`, Docker, **1672 tests**, 25 detectores (un módulo cada uno en `src/detectors/`).
 
 > **Estado: PRODUCCIÓN.** No es un esqueleto. Cualquier cambio afecta grupos reales con miles de usuarios. **Investiga > Confirma > Actúa.**
 
@@ -546,6 +546,16 @@ Dos trampas de ese ajuste:
 - **0 es un valor VÁLIDO**, así que no se puede resolver con un `or` (se comería el «nunca» y devolvería el default).
 - Se borra en **dos sitios**: el `jq.run_once` al verificar y el **barrido por BD** del `cleanup_job` (que existe porque los jobs en memoria se pierden al reiniciar). Los dos respetan el 0; sin la guarda del barrido, el mensaje «permanente» sobrevivía hasta el siguiente reinicio y luego desaparecía.
 
+**El mensaje de verificación se diseña para MÓVIL** (9-oct-2026). El botón era
+«✅ SOY HUMANO (PULSA PARA ENTRAR)»: 33 caracteres en mayúsculas, y en el móvil se
+cortaba («…PARA ENTRAR» sin el paréntesis). Ahora «✅ Soy humano · Entrar» (hay test:
+≤22 caracteres y no todo en mayúsculas) y el texto y los pies lo citan por su nombre,
+«Soy humano», así que **si cambia el botón hay que cambiar también los pies**. Y el pie
+del sospechoso **ya no publica los motivos**: decía «Cuenta sospechosa (sin username,
+sin foto)» delante de todo el grupo, que enseña al spammer qué mira el bot y señala
+a gente legítima. La bienvenida propia de Windows 10 y 11 (en `chat_settings`, no en
+el repo) se rehízo a juego; la de Domótica es otra y no se tocó.
+
 Cada línea del catálogo es el saludo COMPLETO (`📥 Bienvenido/a {name}. <gracia temática>`); la cabecera de verificación no saluda, para no duplicar el «Bienvenido/a». El pie fijo y los botones se añaden aparte.
 
 ## Jobs programados (`main.py`)
@@ -744,4 +754,4 @@ Si el `gh` de la máquina está autenticado con **otra** cuenta o con un token q
 alcanza a este repo, no hace falta reconfigurar `gh`: basta exportar `GH_TOKEN` con
 el token bueno solo para esa ejecución. `gh` lo prefiere sobre su sesión guardada.
 
-*Actualizado: 2026-10-08 — 25 detectores, 1670 tests, 1.169 claves por idioma.*
+*Actualizado: 2026-10-08 — 25 detectores, 1672 tests, 1.169 claves por idioma.*
