@@ -17,6 +17,11 @@ Configúralos a partir de `.env.example`:
 | Cuenta Telethon (MTProto, opcional) | `TG_API_ID` / `TG_API_HASH` + `data/telethon.session` |
 | Notificaciones a admin | DM directo del propio bot |
 
+⚠️ **`.env` y `data/telethon.session` van en 600** (9-oct-2026, rotación de credenciales):
+estaban en 644, legibles por cualquier usuario del N100 y de la réplica del N6005, y la
+sesión da la cuenta secundaria entera. Nada de `.env.bak*` con secretos al lado. El
+historial del repo público se revisó entero por hash: solo hay los ejemplos inventados.
+
 ## Grupos federados
 
 Los chats que modera se configuran en `MODERATED_CHAT_IDS` (CSV de chat_ids) o,
