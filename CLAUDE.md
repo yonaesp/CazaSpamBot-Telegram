@@ -1,7 +1,7 @@
 # CazaSpamBot — Bot Antispam Telegram
 
 Bot de moderación antispam **en producción 24/7**, multi-grupo, federado y **bilingüe** (es/en).
-~23.000 LOC en `src/`, Docker, **1672 tests**, 25 detectores (un módulo cada uno en `src/detectors/`).
+~23.000 LOC en `src/`, Docker, **1676 tests**, 25 detectores (un módulo cada uno en `src/detectors/`).
 
 > **Estado: PRODUCCIÓN.** No es un esqueleto. Cualquier cambio afecta grupos reales con miles de usuarios. **Investiga > Confirma > Actúa.**
 
@@ -61,7 +61,13 @@ nativa; se itera `banChatMember` sobre los chats donde el bot es admin.
 - Telethon 1.44 (MTProto) — **solo** para lo que Bot API no puede: reportes oficiales (`channels.reportSpam`), leer bio/fotos de perfil, admin_log, iter_messages histórico
 - SQLite WAL (`data/antispam.db`)
 - `confusable-homoglyphs` (UTS#39) para detección de nombres decorativos
-- Docker (`docker compose`), contenedor `cazaspam-bot`
+- Docker (`docker compose`), contenedor `cazaspam-bot`, **sin root: uid 10112** (10-oct-2026,
+  registro `/home/docs/uids-contenedores.md`). Escribe SOLO en `data/` y en
+  `config/blacklist/custom/` (montada aparte con escritura; con todo `config/` en `:ro`,
+  guardar palabras desde Telegram fallaba siempre). Si se añade otra ruta donde el bot
+  escriba, hay que montarla y darle el dueño 10112, o fallará en silencio. Instalación
+  nueva: `sudo install -d -o 10112 -g 10112 data config/blacklist/custom` (y `main()`
+  avisa claro si `data/` no es escribible). `docker exec` también corre como 10112.
 
 ## Idiomas (i18n)
 
@@ -759,4 +765,4 @@ Si el `gh` de la máquina está autenticado con **otra** cuenta o con un token q
 alcanza a este repo, no hace falta reconfigurar `gh`: basta exportar `GH_TOKEN` con
 el token bueno solo para esa ejecución. `gh` lo prefiere sobre su sesión guardada.
 
-*Actualizado: 2026-10-08 — 25 detectores, 1672 tests, 1.169 claves por idioma.*
+*Actualizado: 2026-10-08 — 25 detectores, 1676 tests, 1.169 claves por idioma.*

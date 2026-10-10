@@ -4,6 +4,13 @@ Cambios relevantes de CazaSpamBot, lo más reciente arriba. Se anotan hitos, no
 cada commit: para el detalle está el historial de git. Sin números de versión
 porque el bot es un servicio en producción continua, no un paquete que se libera.
 
+## 2026-10 · El contenedor corre sin root
+
+`cazaspam-bot` corre con el uid 10112, que no es de nadie en el host: escapar del
+contenedor ya no da root. Solo puede escribir en `data/` y en la lista de palabras
+personalizada, que de paso vuelve a funcionar (estaba en una carpeta de solo lectura).
+Las instalaciones nuevas necesitan un paso más, ya en la guía y en el asistente.
+
 ## 2026-10 · La verificación se lee bien en el móvil
 
 El botón «SOY HUMANO (PULSA PARA ENTRAR)» se cortaba en el móvil. Ahora es corto

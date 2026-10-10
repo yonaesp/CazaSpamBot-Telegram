@@ -8,7 +8,7 @@
 [![python-telegram-bot](https://img.shields.io/badge/PTB-22.8-26A5E4?logo=telegram&logoColor=white)](https://python-telegram-bot.org/)
 [![Telethon](https://img.shields.io/badge/Telethon-1.44-blueviolet)](https://docs.telethon.dev/)
 [![Languages](https://img.shields.io/badge/languages-es%20%7C%20en%20%7C%20add%20yours-orange)](src/locales/README.md)
-[![Tests](https://img.shields.io/badge/tests-1672%20passing-success)](#-tests)
+[![Tests](https://img.shields.io/badge/tests-1676%20passing-success)](#-tests)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 
 🌍 **English** · [**Español**](README.es.md)
@@ -270,7 +270,10 @@ cd CazaSpamBot-Telegram
 # 3) Configure it: it asks for the token and your user_id and creates the .env file
 python3 scripts/setup.py
 
-# 4) Start it
+# 4) Prepare the folders it writes to: the bot runs without root, as uid 10112
+sudo install -d -o 10112 -g 10112 data config/blacklist/custom
+
+# 5) Start it
 sudo docker compose up -d --build
 ```
 
@@ -322,6 +325,7 @@ podman compose logs -f
 
 Two differences from Docker:
 
+- **Folders, with `podman unshare`**: rootless Podman maps the container's uid 10112 to a different host uid, so step 4 becomes `podman unshare chown -R 10112:10112 data config/blacklist/custom` (create the folders first with `mkdir -p`).
 - **Starting again after a server reboot**: rootless Podman doesn't do it on its own. Enable it once with `systemctl --user enable --now podman-restart.service` and `loginctl enable-linger $USER`.
 - **Fedora, RHEL and derivatives (SELinux)**: if the container can't read `config/` or write to `data/`, add `Z` to each volume in `docker-compose.yml`, e.g. `./data:/app/data:Z` and `./config:/app/config:ro,Z`.
 
@@ -332,9 +336,11 @@ You don't need to touch it. In case you want to know what it mounts:
 | Line | What it's for |
 |---|---|
 | `build: .` | The image is built on your machine from the `Dockerfile`: nothing is pulled from a registry |
+| `user: "10112:10112"` | Runs without root, as a uid nobody owns on your machine: escaping the container wouldn't make anyone a real user. Different uid: `APP_UID`/`APP_GID` in `.env` |
 | `env_file: .env` | Your configuration. Without `.env`, compose won't start |
 | `./data:/app/data` | Database, Telethon session and daily backups. It's the only place it writes to: **back up this folder and your `.env`** |
 | `./config:/app/config:ro` | Blocklists and welcomes, read-only |
+| `./config/blacklist/custom` | The only part of `config/` it writes to: the words you add from Telegram |
 | `./src` and `./scripts` (`:ro`) | The code, mounted so an update applies without rebuilding |
 | `restart: unless-stopped` | Starts again on its own after a crash or a server reboot |
 | `healthcheck` | Docker marks it `unhealthy` if it stops showing signs of life for 5 minutes |
@@ -452,7 +458,7 @@ Group members can report with **`@admin`** (reply to a message); the bot notifie
 ## 🧪 Tests
 
 ```bash
-.venv/bin/python -m pytest tests/ -q     # 1672 tests
+.venv/bin/python -m pytest tests/ -q     # 1676 tests
 ```
 
 Every detector has **positive and negative** test cases (emphasis on anti-false-positives). Philosophy: *a false positive is worse than a false negative.*
@@ -485,7 +491,7 @@ config/
 ├── welcomes/            # editable greetings (generic + per group)
 └── blacklist/           # editable anti-spam words/regex
 docs/                    # ARCHITECTURE, ROADMAP, ...
-tests/                   # 1672 tests
+tests/                   # 1676 tests
 ```
 
 ---

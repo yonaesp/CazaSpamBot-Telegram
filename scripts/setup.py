@@ -215,12 +215,14 @@ def main() -> int:
     print(f"     con permisos de {BOLD}borrar mensajes{RESET} y {BOLD}expulsar/banear usuarios{RESET}.")
     print("  2. En @BotFather desactiva el modo privacidad para que vea todos los")
     print(f"     mensajes:  /setprivacy  →  tu bot  →  {BOLD}Disable{RESET}.")
-    print("  3. Levanta el bot:")
+    print("  3. Dale al bot sus carpetas (corre sin root, con el uid 10112):")
+    print(f"       {CYAN}sudo install -d -o 10112 -g 10112 data config/blacklist/custom{RESET}")
+    print("  4. Levanta el bot:")
     print(f"       {CYAN}docker compose up -d --build{RESET}")
-    print("  4. Comprueba que arrancó:")
+    print("  5. Comprueba que arrancó:")
     print(f"       {CYAN}docker compose logs -f{RESET}   {DIM}(verás \"Bot @... listo\"){RESET}")
     if not notify:
-        print(f"  5. {BOLD}Abre tu bot en Telegram y pulsa START/INICIAR una vez{RESET} — si no,")
+        print(f"  6. {BOLD}Abre tu bot en Telegram y pulsa START/INICIAR una vez{RESET} — si no,")
         print("     Telegram no le deja mandarte los avisos por DM (no puede escribirte primero).")
     if mode == "shadow":
         print(f"\n  {DIM}Estás en modo shadow: cuando confíes, cambia MODE=active en .env y{RESET}")

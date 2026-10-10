@@ -5,6 +5,10 @@ services:
       dockerfile: Dockerfile
     container_name: cazaspam-bot
     restart: unless-stopped
+    # Sin root y con un uid que no es de nadie en el host: si alguien escapara del
+    # contenedor, no sería ningún usuario real. Ese uid tiene que poder escribir en
+    # ./data y en ./config/blacklist/custom (ver README, «Instalación»).
+    user: "${APP_UID:-10112}:${APP_GID:-10112}"
     env_file: .env
     environment:
       - TZ=Europe/Madrid
@@ -14,6 +18,9 @@ services:
       - ./src:/app/src:ro
       - ./scripts:/app/scripts:ro
       - ./config:/app/config:ro
+      # Lo único de config/ que el bot escribe: las palabras que se añaden desde
+      # Telegram. Con todo config/ en solo lectura, guardarlas fallaba.
+      - ./config/blacklist/custom:/app/config/blacklist/custom
     healthcheck:
       test: ["CMD", "python", "-c", "import os,time; p='/app/data/heartbeat'; exit(0 if os.path.exists(p) and time.time()-os.path.getmtime(p)<300 else 1)"]
       interval: 2m

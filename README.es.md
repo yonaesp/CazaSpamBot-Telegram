@@ -8,7 +8,7 @@
 [![python-telegram-bot](https://img.shields.io/badge/PTB-22.8-26A5E4?logo=telegram&logoColor=white)](https://python-telegram-bot.org/)
 [![Telethon](https://img.shields.io/badge/Telethon-1.44-blueviolet)](https://docs.telethon.dev/)
 [![Idiomas](https://img.shields.io/badge/idiomas-es%20%7C%20en%20%7C%20a%C3%B1ade%20el%20tuyo-orange)](src/locales/README.md)
-[![Tests](https://img.shields.io/badge/tests-1672%20passing-success)](#-tests)
+[![Tests](https://img.shields.io/badge/tests-1676%20passing-success)](#-tests)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 
 🌍 [**English**](README.md) · **Español**
@@ -250,7 +250,10 @@ cd CazaSpamBot-Telegram
 # 3) Configúralo: te pide el token y tu user_id y crea el archivo .env
 python3 scripts/setup.py
 
-# 4) Arráncalo
+# 4) Prepara las carpetas donde escribe: el bot corre sin root, con el uid 10112
+sudo install -d -o 10112 -g 10112 data config/blacklist/custom
+
+# 5) Arráncalo
 sudo docker compose up -d --build
 ```
 
@@ -302,6 +305,7 @@ podman compose logs -f
 
 Dos diferencias con Docker:
 
+- **Las carpetas, con `podman unshare`**: Podman sin root traduce el uid 10112 del contenedor a otro del host, así que el paso 4 se hace con `podman unshare chown -R 10112:10112 data config/blacklist/custom` (crea antes las carpetas con `mkdir -p`).
 - **Arranque automático tras reiniciar el servidor**: Podman sin root no lo hace solo. Actívalo una vez con `systemctl --user enable --now podman-restart.service` y `loginctl enable-linger $USER`.
 - **Fedora, RHEL y derivadas (SELinux)**: si el contenedor no puede leer `config/` o escribir en `data/`, añade `Z` a cada volumen del `docker-compose.yml`, por ejemplo `./data:/app/data:Z` y `./config:/app/config:ro,Z`.
 
@@ -312,9 +316,11 @@ No hace falta tocarlo. Por si quieres saber qué monta:
 | Línea | Para qué sirve |
 |---|---|
 | `build: .` | La imagen se construye en tu máquina desde el `Dockerfile`: no se descarga nada de ningún registro |
+| `user: "10112:10112"` | Corre sin root y con un uid que no es de nadie en tu máquina: si alguien escapara del contenedor, no sería ningún usuario real. Otro uid: `APP_UID`/`APP_GID` en el `.env` |
 | `env_file: .env` | Tu configuración. Sin `.env`, compose no arranca |
 | `./data:/app/data` | Base de datos, sesión de Telethon y copias diarias. Es lo único donde escribe: **haz copia de esta carpeta y del `.env`** |
 | `./config:/app/config:ro` | Listas negras y bienvenidas, en solo lectura |
+| `./config/blacklist/custom` | La única parte de `config/` donde escribe: las palabras que añades desde Telegram |
 | `./src` y `./scripts` (`:ro`) | El código, montado para que una actualización se aplique sin reconstruir |
 | `restart: unless-stopped` | Vuelve a arrancar solo tras un fallo o un reinicio del servidor |
 | `healthcheck` | Docker lo marca como `unhealthy` si deja de dar señales de vida 5 minutos |

@@ -240,6 +240,17 @@ def main() -> int:
     log = logging.getLogger("antispam")
     log.info("CazaSpamBot arrancando en modo=%s", cfg.mode)
 
+    # El contenedor corre sin root (uid 10112 por defecto). Si ./data no es suyo,
+    # SQLite falla con un «unable to open database file» que no dice qué pasa.
+    # Le pasará a cualquiera que instale sin el paso del chown: mejor decirlo claro.
+    _datos = os.path.dirname(os.path.abspath(cfg.db_path)) or "."
+    if os.path.isdir(_datos) and not os.access(_datos, os.W_OK):
+        log.error(
+            "No puedo escribir en %s (uid=%s). Dale la carpeta al usuario del contenedor: "
+            "sudo chown -R %s:%s data config/blacklist/custom",
+            _datos, os.getuid(), os.getuid(), os.getgid())
+        return 1
+
     db = DB(cfg.db_path)
     # El modo elegido con /shadow MANDA sobre el .env. Antes solo se cambiaba en
     # memoria: pasabas a activo, reiniciabas (que es el flujo normal para recargar
