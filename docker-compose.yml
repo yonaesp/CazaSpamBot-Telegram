@@ -22,7 +22,9 @@ services:
       # Telegram. Con todo config/ en solo lectura, guardarlas fallaba.
       - ./config/blacklist/custom:/app/config/blacklist/custom
     healthcheck:
-      test: ["CMD", "python", "-c", "import os,time; p='/app/data/heartbeat'; exit(0 if os.path.exists(p) and time.time()-os.path.getmtime(p)<300 else 1)"]
+      # CMD-SHELL (17-oct-2026): la API de Podman parte por los espacios el código de un «CMD python -c …» y el
+      # healthcheck fallaba siempre (unhealthy con el bot funcionando). En una sola cadena para sh -c, no.
+      test: ["CMD-SHELL", "python -c \"import os,time; p='/app/data/heartbeat'; exit(0 if os.path.exists(p) and time.time()-os.path.getmtime(p)<300 else 1)\""]
       interval: 2m
       timeout: 10s
       retries: 3
