@@ -27,6 +27,9 @@ Miracle crypto, "work from home, $300 a day", porn bots, fake celebrity giveaway
 |:---|:---|:---|
 | Reads the whole profile, the text inside images, and stories. | From your decisions and on its own, with no external AI and nothing leaving your server. | Bans without flooding the group, and asks you about doubtful cases in private. |
 
+> [!TIP]
+> **On the reference install** (4 groups, May to October 2026) it removed over 1,300 suspicious or spam accounts on its own, **nearly 9 in 10 before they wrote a single word**. Spam keeps coming, but it's stopped at the door, and the group barely notices. What admins had to ban by hand dropped from **41 in May to 4 or 5 a month**: every spam that slips through teaches it to catch the next one.
+
 ---
 
 <a id="different"></a>
@@ -46,8 +49,7 @@ CazaSpamBot can also use **a regular Telegram account that you authorize**, just
 | What a **story** shared in the group says | ❌ arrives empty | ✅ |
 | **Reporting** spam to Telegram officially | ❌ | ✅ |
 
-> [!TIP]
-> **Measured on the reference install** (4 groups, May to October 2026): **1 in 5 removed spammers (165 out of 833) were caught by what only the account can see**: their bio, profile channel or photos. Their message had nothing to give them away.
+On the reference install, **165 spammers were given away by their profile alone** (bio, channel or photos): no other rule fired on them.
 
 The account **doesn't give itself away**: reading a story or a channel doesn't count as a view and never joins anything. It's optional: without it, the bot works the same with everything else.
 

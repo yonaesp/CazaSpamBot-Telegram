@@ -7,8 +7,9 @@ porque el bot es un servicio en producción continua, no un paquete que se liber
 ## 2026-10 · README nuevo e instalación de copiar y pegar
 
 Los dos README, reescritos para leerse de un tirón: qué ve el bot gracias a la
-cuenta secundaria (medido: 1 de cada 5 spammers expulsados, 165 de 833, cayó por
-lo que solo se ve con ella), lo que lo distingue, y la instalación en seis pasos
+cuenta secundaria, lo que mide la instalación de referencia (casi 9 de cada 10
+cuentas caen antes de escribir; los bans a mano, de 41 en mayo a 4 o 5 al mes),
+lo que lo distingue, y la instalación en seis pasos
 de copiar y pegar. Lo detallado queda en desplegables. El asistente pregunta
 ahora la cuenta secundaria (opcional), deja el `.env` en 600 y dice cómo iniciar
 su sesión. El healthcheck del compose pasa a `CMD-SHELL`, que con Podman fallaba.

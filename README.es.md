@@ -27,6 +27,9 @@ Cripto milagrosa, «trabaja desde casa 300 € al día», bots de porno, sorteos
 |:---|:---|:---|
 | Lee el perfil entero, el texto de las imágenes y las historias. | De tus decisiones y por su cuenta, sin IA externa y sin sacar nada de tu servidor. | Banea sin llenar el grupo de mensajes y te pregunta lo dudoso por privado. |
 
+> [!TIP]
+> **En la instalación de referencia** (4 grupos, de mayo a octubre de 2026) ha sacado él solo a más de 1.300 cuentas sospechosas o de spam, **casi 9 de cada 10 antes de que escribieran una sola palabra**. El spam sigue llegando, pero cae en la puerta, y en el grupo apenas se nota. Lo que los admins tuvieron que banear a mano bajó de **41 en mayo a 4 o 5 al mes**: cada spam que se escapa le enseña a cazar el siguiente.
+
 ---
 
 <a id="distinto"></a>
@@ -46,8 +49,7 @@ CazaSpamBot puede usar además **una cuenta normal de Telegram que tú autorizas
 | Lo que dice una **historia** compartida en el grupo | ❌ le llega vacía | ✅ |
 | **Reportar** el spam a Telegram de forma oficial | ❌ | ✅ |
 
-> [!TIP]
-> **Medido en la instalación de referencia** (4 grupos, de mayo a octubre de 2026): **1 de cada 5 spammers expulsados (165 de 833) cayó por lo que solo se ve con la cuenta**, o sea la bio, el canal del perfil o sus fotos. En el mensaje no había nada que delatarlos.
+En la instalación de referencia, a **165 spammers los delató solo su perfil** (la bio, el canal o las fotos): con ellos no saltó ninguna otra regla.
 
 La cuenta **no se delata**: leer una historia o un canal no cuenta como visualización y no se une a nada. Es opcional: sin ella, el bot funciona igual con todo lo demás.
 
