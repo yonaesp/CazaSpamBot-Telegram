@@ -2,516 +2,425 @@
 
 # 🛡️ CazaSpamBot: bot antispam para Telegram
 
-### Bot antispam y de moderación para Telegram, self-hosted y de código abierto: bans sincronizados entre grupos, multiidioma, aprendizaje activo y casi cero falsos positivos
+### El bot antispam de Telegram que mira al spammer, no solo su mensaje. Gratis, de código abierto y en tu propio servidor.
 
 [![Python](https://img.shields.io/badge/Python-3.11-blue?logo=python&logoColor=white)](https://www.python.org/)
 [![python-telegram-bot](https://img.shields.io/badge/PTB-22.8-26A5E4?logo=telegram&logoColor=white)](https://python-telegram-bot.org/)
 [![Telethon](https://img.shields.io/badge/Telethon-1.44-blueviolet)](https://docs.telethon.dev/)
 [![Idiomas](https://img.shields.io/badge/idiomas-es%20%7C%20en%20%7C%20a%C3%B1ade%20el%20tuyo-orange)](src/locales/README.md)
-[![Tests](https://img.shields.io/badge/tests-1676%20passing-success)](#-tests)
+[![Tests](https://img.shields.io/badge/tests-1681%20passing-success)](#tests)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 
 🌍 [**English**](README.md) · **Español**
 
-*Modera todos los grupos que quieras, 24/7. Diseñado para que el usuario medio nunca note que existe… hasta que cae un spammer.*
+**[Qué lo hace distinto](#distinto)** · **[Instalar en 5 minutos](#instalacion)** · **[Preguntas frecuentes](#faq)**
 
 </div>
 
 ---
 
-## ✨ Qué hace
+Cripto milagrosa, «trabaja desde casa 300 € al día», bots de porno, sorteos falsos de famosos, Office pirata… El spam de Telegram ya no se deja pillar por una lista de palabras: va **dentro de una imagen**, en una **historia**, en la **bio** o en el **canal del perfil**, o entra con un nombre limpio y **se lo cambia justo antes de escribir**.
 
-CazaSpamBot vigila tus grupos de Telegram y elimina el spam **antes de que moleste**, con una obsesión: **nunca banear a un usuario legítimo**. Prefiere dejar pasar un spam dudoso que expulsar a una persona real.
+**CazaSpamBot lo busca ahí donde se esconde.** Lo hace en silencio y con una obsesión: **no tocar nunca a un miembro legítimo**.
 
-Frena el spam que llega hoy a los grupos de Telegram: **estafas de criptomonedas e inversión**, **sorteos falsos**, **ofertas de trabajo falsas**, **bots de spam porno y para adultos**, **enlaces de phishing y estafa**, venta de software pirata y cuentas que entran con un nombre limpio y lo cambian justo antes de escribir. Es **gratuito y de código abierto** (GPL-3.0): sin suscripción, sin servicios de terceros, y los datos de tus grupos se quedan en tu servidor.
-
-- 🔗 **Bans sincronizados** — si alguien cae en uno de tus grupos, queda baneado en **todos los demás grupos donde TU copia del bot es admin** (lo que otros bots llaman *federación*). Solo cuentan los grupos que tú gestionas con tu bot: si alguien lo mete en un grupo ajeno como miembro normal, allí no hace nada. Y cada instalación es independiente: los bans de otras personas que usen este código no llegan a tus grupos, ni los tuyos a los suyos.
-- 🧠 **25 detectores** combinados con un sistema de confianza graduado.
-- 🤫 **Moderación silenciosa** — los bans automáticos no ensucian el chat.
-- 📚 **Aprendizaje activo** — aprende de tus `/spam` y `/legal` (Naive Bayes + similitud coseno).
-- 🛰️ **Reportes oficiales** a Telegram (Native Antispam) vía MTProto.
-- 🌍 **Multiidioma**: viene en español e inglés, y añadir otro idioma es un archivo JSON, sin tocar código.
-- ⚙️ **Personalizable sin tocar código** — bienvenidas, listas negras y alfabetos permitidos se configuran en archivos de texto y `.env`.
-
-Funciona con **cualquier número de grupos** (auto-descubre aquellos donde es admin, o limítalo con `MODERATED_CHAT_IDS`). La detección es independiente del idioma del grupo: tú decides qué alfabetos son normales en tu comunidad.
+| 👁️ Ve más | 🧠 Aprende | 🤫 No molesta |
+|:---|:---|:---|
+| Lee el perfil entero, el texto de las imágenes y las historias. | De tus decisiones y por su cuenta, sin IA externa y sin sacar nada de tu servidor. | Banea sin llenar el grupo de mensajes y te pregunta lo dudoso por privado. |
 
 ---
 
-## 🛡️ Cómo protege
+<a id="distinto"></a>
 
-### Al entrar alguien nuevo
+## 👁️ Por qué caza más spam que un bot normal
 
-```
-¿Ya lo baneó antes el bot en otro de TUS grupos?  ──► re-ban
-¿Perfil claramente spam?    ──► ban directo, silencioso
-   · nombre en alfabetos no habituales (≥2 campos)
-   · bio con invite porno/promo + emojis + keywords
-   · fotos subidas todas de golpe (identidad robada)
-¿En listas globales (CAS / lols.bot)?  ──► ban (umbral configurable)
-¿Es un bot añadido al grupo?           ──► kick + aviso al admin
-¿Perfil muy legítimo? (foto + >1 año + nombre normal)  ──► entra directo
-El resto  ──► modo limpio por defecto (ver más abajo)
-```
+Un bot de Telegram solo ve **el mensaje**. La mayoría de bots antispam, incluidos los más usados, se quedan ahí porque es lo único que da la Bot API.
 
-> **Bans sincronizados ≠ listas globales.** La sincronización (la "federación" de Rose y otros bots) es interna: tus propios bans replicados entre tus grupos. **CAS** ([cas.chat](https://cas.chat), de Combot) y **lols.bot** son bases de datos colaborativas mundiales de spammers ya cazados en miles de grupos. Con CAS decides lo estricto con `CAS_AUTOBAN_MIN`: `2` (por defecto) banea solo si está confirmado en 2+ grupos y te manda a revisión los casos con 1; `1` banea con cualquier señal (más agresivo, más falsos positivos). Los usuarios de confianza alta nunca se banean por lista sin pasar antes por tu revisión.
+CazaSpamBot puede usar además **una cuenta normal de Telegram que tú autorizas**, igual que cuando abres sesión en otro dispositivo (por **MTProto**, el protocolo de las apps oficiales). Con ella ve también **a quien escribe el mensaje**:
 
-### En cada mensaje
+| Lo que mira | Un bot normal | CazaSpamBot con cuenta secundaria |
+|:---|:---:|:---:|
+| El texto del mensaje | ✅ | ✅ |
+| La **bio** del perfil | ❌ | ✅ |
+| El **canal personal** del perfil y lo que publica en él | ❌ | ✅ |
+| **Cuándo se subió** cada foto de perfil (cuentas montadas en un rato) | ❌ | ✅ |
+| Lo que dice una **historia** compartida en el grupo | ❌ le llega vacía | ✅ |
+| **Reportar** el spam a Telegram de forma oficial | ❌ | ✅ |
 
-| Detector | Caza |
+> [!TIP]
+> **Medido en la instalación de referencia** (4 grupos, de mayo a octubre de 2026): **1 de cada 5 spammers expulsados (165 de 833) cayó por lo que solo se ve con la cuenta**, o sea la bio, el canal del perfil o sus fotos. En el mensaje no había nada que delatarlos.
+
+La cuenta **no se delata**: leer una historia o un canal no cuenta como visualización y no se une a nada. Es opcional: sin ella, el bot funciona igual con todo lo demás.
+
+---
+
+## ✨ Lo que lo hace distinto
+
+🖼️ **Lee el texto de las imágenes (OCR).** Un cartel con «Windows, Office, Photoshop, AutoCAD… escríbeme por privado» no lleva ni una letra escrita, así que para un bot normal es un mensaje vacío. CazaSpamBot lo lee con Tesseract y lo juzga como si fuera texto. Lo mismo con la captura de un falso sorteo de cripto de Elon Musk. Sin GPU: 0,6 segundos por imagen.
+
+🎭 **Desmonta el disfraz.** El truco de moda es entrar con un nombre normal y ponerse el de verdad justo antes de escribir. El bot vigila el nombre de cada recién llegado **durante 7 días** y vuelve a mirarle el perfil entero en su primer mensaje.
+
+💸 **Entiende la estafa, no solo las palabras.** Reconoce cómo se construye: el testimonio «le di 500 y me devolvió 5.000», el falso cliente que contesta al anzuelo sin cifras ni enlaces («Saw your post and honestly thought it was a scam, but the money actually came through», caso real), el «dinero extra, escríbeme por privado» y el sorteo cripto que te manda a otra web a canjear un código.
+
+🧠 **Aprende solo, sin IA externa.** Aprende de tus `/spam` y `/legal` y, sin que hagas nada, de los bans seguros y de cómo hablan tus veteranos. Todo se queda en tu servidor.
+
+📖 **Lee las historias compartidas.** Telegram se las entrega a los bots sin texto ni enlace, y por ahí se colaba la publicidad. El bot pide el contenido real y lo analiza.
+
+🧹 **Limpia lo que dejó el spammer.** Banear en Telegram no borra sus mensajes. CazaSpamBot borra los recientes en todos los grupos donde lo banea, junto con sus propios avisos.
+
+🔗 **Ban en uno, ban en todos tus grupos.** Además consulta las listas mundiales de spammers [CAS](https://cas.chat) y lols.bot, y si quieres reporta el spam claro a Telegram.
+
+🤝 **Respeta a la gente normal.** Cada miembro tiene una confianza del 1 al 10 según su historial en el grupo. Lo dudoso te llega **por privado con botones** (✅ Legítimo / ❌ Spam), y se puede arrancar en **modo prueba**, sin banear a nadie, para ver qué haría.
+
+🌍 **Para cualquier comunidad.** Viene en español e inglés y otro idioma es un archivo JSON. Tú eliges qué alfabetos son normales en tu grupo.
+
+<details>
+<summary><b>🔍 Ver los 25 detectores</b></summary>
+
+<br>
+
+🔑 = necesita la cuenta secundaria.
+
+| Detector | Qué caza |
 |---|---|
-| `non_allowed_script` | Texto en alfabetos no permitidos (configurable con `ALLOWED_SCRIPTS`) |
-| `external_mention` | Menciones/enlaces a otros grupos |
-| `url_blocklist` · `tg_deeplink` | Acortadores y deep-links de phishing |
-| `commercial_ad` | Anuncios (sueldos, "trabaja desde casa", cripto, servicios ilegales) |
-| `investment_scam` | Testimonios «le di X y me devolvió Y» que elogian a quien «te hace ganar», incluso sin @mención |
-| `contact_spam` | Tarjeta de contacto compartida cuyo nombre es el anuncio (otro alfabeto o con enlaces) |
-| `external_reply` | Promoción de un canal externo mediante cita a otro chat (el "quote" que lleva fuera) |
-| `bio_spam` | Bio del perfil con promo porno/comercial/hacking |
-| `personal_channel_spam` | Canal enlazado en el perfil usado como escaparate de spam |
-| `forward_first_msg` | Forward de canal en el primer mensaje |
-| `first_msg_media` · `inline_buttons` | Foto/botones sospechosos al empezar |
-| `story_share` | **Historia (story) de otro canal** compartida nada más entrar, o por alguien que apenas escribe y viene de un canal con nombre de spam. **No necesita Telethon** |
-| `photos_batch_upload` | 3+ fotos de perfil subidas en segundos |
-| `obvious_spam_profile` | Perfil con múltiples señales de bot |
-| `reaction_farming` | Cuentas que solo dan likes sin escribir |
-| `dormant_bot_mention` | Cuenta dormida >1 año que reaparece citando un bot (hackeada) |
-| `emoji_only` | Primer mensaje que es solo una ristra de emojis sin texto |
-| `jfm_delta` | Primer mensaje sospechosamente rápido tras entrar (<90s = bot) |
-| `premium_new_link` | Cuenta Premium recién creada que entra posteando enlaces |
-| `cas` · `lols_bot` | Spammers fichados en las listas globales CAS y lols.bot |
-| `learned_similarity` | Lo que aprendió de tus `/spam` |
-| `antiflood` | Inundación de mensajes por usuario |
+| `unicode_script` | Texto en un alfabeto que tu grupo no usa (`/config` ▸ Alfabetos permitidos) |
+| `external_mention` | Menciones y enlaces a otros grupos o canales |
+| `url_blocklist` | Acortadores de enlaces típicos del spam |
+| `tg_deeplink` | Enlaces `tg://` de phishing |
+| `link_target` | El enlace lleva a un chat que se anuncia como spam |
+| `commercial_ad` | Anuncios: sueldos, «trabaja desde casa», software pirata, «escríbeme por privado» |
+| `investment_scam` | «Le di X y me devolvió Y», el falso cliente satisfecho y los sorteos cripto falsos |
+| `offplatform_contact` | «Este es mi número de otra app, escríbeme ahí» |
+| `contact_spam` | Una tarjeta de contacto cuyo nombre es el anuncio |
+| `external_reply` | Promocionar un canal ajeno citando un mensaje suyo |
+| `cross_post` | El mismo mensaje a la vez en varios de tus grupos |
+| `forward_first_msg` | Primer mensaje reenviado desde un canal o un bot |
+| `first_msg_media` | Primer mensaje que es solo una foto, un vídeo o un sticker |
+| `inline_buttons` | Una persona (no un bot) que manda botones |
+| `emoji_only` | Primer mensaje que es una ristra de emojis |
+| `jfm_delta` | Escribir a los pocos segundos de entrar |
+| `premium_new_link` | Cuenta Premium recién creada que entra con un enlace |
+| `dormant_bot_mention` | Cuenta dormida más de un año que reaparece citando un bot (robada) |
+| `reaction_farming` | Cuentas que solo reparten reacciones sin escribir nunca |
+| `story_share` | Compartir la historia de otro canal nada más entrar (sin cuenta secundaria) |
+| `bio_spam` 🔑 | Bio con promoción porno, comercial o de hacking |
+| `personal_channel` 🔑 | El canal del perfil usado como escaparate de spam |
+| `photos_batch` 🔑 | Varias fotos de perfil subidas en minutos: cuenta montada |
+| `cas` · `lols_bot` | Spammers fichados en las listas mundiales |
 
-> **El canal enlazado en un perfil es un campo aparte de la bio** (Telegram lo añadió en 2024), y era un punto ciego: una cuenta con la bio vacía, sin foto y sin @username puede estar apuntando a un canal entero de spam. `personal_channel_spam` lee ese título vía Telethon. **Tener un canal personal es completamente legítimo** y por sí solo no dispara nada: lo que cuenta es la discordancia, un nombre escrito en el alfabeto que usa tu grupo junto a un canal titulado en otro, más vocabulario de spam en el título (editable en `config/blacklist/personal_channel_keywords.txt`) o un perfil sin nada más público que mirar. Ninguna señal suelta llega al umbral: hacen falta al menos dos.
-
-También banea el **spam publicado "en nombre de un canal"** (`sender_chat` → `banChatSenderChat`) en grupos de comentarios, cuando dispara una regla fuerte. Con **`/scan`** (responde a un mensaje reenviado) puedes comprobar de antemano si el bot detectaría cualquier mensaje y qué estructura tiene.
-
-### Niveles de confianza (anti-falsos-positivos)
-
-Cada usuario tiene un **nivel de confianza del 1 al 10** (sube con mensajes y antigüedad en el grupo, baja con warns; whitelist = 10 directo):
-
-- **Nivel 7-10** (veteranos) → prácticamente intocables. El bot no actúa, pero **ya no se calla**:
-  si a un veterano le salta una regla, te llega un aviso **por privado** (nunca al grupo) con botones
-  **Nada / Avisar / Banear** y decides tú. Una cuenta de confianza puede estar robada, o su dueño
-  puede haber compartido algo sin mirarlo. Se silencia desde `/alertas`.
-- **Nivel 4-6** + algo sospechoso → el bot **pregunta al admin por privado** con botones ✅ Legítimo / ❌ Spam, y **aprende** de la respuesta.
-- **Nivel 1-3** (nuevos) → moderación normal.
-
-Cada alerta incluye también un **nivel de spam 1-10** del mensaje, para que se entienda de un vistazo.
-
-Refuerzos: **NFKC + [confusable_homoglyphs](https://github.com/vhf/confusable_homoglyphs) (UTS#39)** para no confundir nombres decorativos (Cherokee, matemáticos, mezclas) con spam. Bypass para cuentas antiguas con foto.
+Y además: perfil evidente de spam (nombre entero en otro alfabeto, letras disfrazadas con homoglifos), lo aprendido de tus `/spam`, el texto de las imágenes y las historias, y el antiflood por persona.
+</details>
 
 ---
 
-### 📖 Historias (stories): el formato que los bots no pueden leer
+<a id="instalacion"></a>
 
-Telegram entrega a los bots una historia compartida con **solo dos campos**: `chat` e `id`.
-Ni texto, ni imagen, ni entidades, **ni siquiera marca de reenvío**, así que `forward_first_msg`
-tampoco salta. Para el bot es un mensaje vacío, y por ahí se colaba publicidad con su enlace
-de invitación bien visible para cualquier humano del grupo.
+## 🚀 Instalación en 5 minutos
 
-El bot lo cubre en **dos capas**, y la primera funciona sin cuenta secundaria:
+Necesitas un Linux siempre encendido (un VPS barato, un mini PC o un servidor en casa). El bot gasta menos de 100 MB de RAM.
 
-| Capa | Necesita Telethon | Qué hace |
-|---|---|---|
-| **Estructura** (`story_share`) | No | Compartir la historia de OTRO canal nada más entrar, o viniendo de un canal con nombre de spam siendo alguien que apenas escribe |
-| **Contenido** (`story_reader.py`) | Sí | Pide el texto real por MTProto y lo pasa por los detectores de siempre, con los mismos umbrales |
+### Paso 0 · Prepara Telegram (2 minutos)
 
-Dos cosas que conviene saber:
+1. Abre [@BotFather](https://t.me/BotFather), envía `/newbot` y ponle nombre. Te da el **token**: guárdalo.
+2. En @BotFather, `/setprivacy` → tu bot → **Disable**, para que vea todos los mensajes y no solo los comandos.
+3. Escribe a [@userinfobot](https://t.me/userinfobot): te dice tu **user_id** (un número).
+4. *(Recomendado)* Para la cuenta secundaria: con **otro** número de Telegram, entra en [my.telegram.org](https://my.telegram.org) → **API development tools**, crea una app y apunta el **api_id** y el **api_hash**.
 
-- **No delata a tu cuenta.** Leer una historia con `stories.getStoriesByID` **no cuenta como
-  visualización** (eso es `incrementStoryViews`), así que no apareces en la lista de espectadores
-  que ve quien la publicó.
-- **Caducan en 24 h** (entre 6 y 48 según la cuenta). Para moderar en vivo sobra, porque el spam
-  llega con la historia recién puesta. Para analizar a posteriori un mensaje viejo ya no hay nada
-  que leer, y `/scan` te lo dice en vez de fingir un veredicto.
-
-Ninguna señal decide sola: la estructura por sí misma no llega al umbral de acción, y el nombre
-del canal solo pesa si además el usuario apenas participa. La lista de nombres
-(`config/blacklist/story_source.txt`) es de **parejas** («crypto signals», «pump and dump»), nunca
-palabras sueltas: «insider» a secas casaba con «Windows Insider Program».
-
-## 🎨 Personalización sin tocar código
-
-| Qué | Dónde | Cómo |
-|---|---|---|
-| Saludos de bienvenida | `config/welcomes/` | Una frase por línea, `{name}` para el nombre. `generic.txt` para todos los grupos, `<chat_id>.txt` para frases temáticas de un grupo concreto. Desactivables con `FRIENDLY_WELCOMES_ENABLED=false`. |
-| Palabras/frases de la lista negra | `config/blacklist/` | Un patrón por línea (palabra o regex). Anuncios ilegales, keywords de bio, etc. Si borras un archivo, el bot usa los valores por defecto. |
-| Idiomas de las listas negras | `.env` → `BLACKLIST_LANGS` | CSV de códigos de idioma. Por defecto el bot carga las listas genéricas más `config/blacklist/<lang>/` del **idioma activo y del inglés** (la lengua franca del spam en Telegram). Ponla (p. ej. `es,en,pt`) para sustituir esa elección en una comunidad multilingüe. |
-| Idioma del bot | `.env` → `BOT_LANG` | `es`, `en` o cualquier idioma que añadas. Vacío = se detecta del sistema. |
-| Alfabetos permitidos | Panel `/config` ▸ **Alfabetos permitidos**, o `.env` → `ALLOWED_SCRIPTS` | Qué alfabetos son normales en tu comunidad. **Si tu grupo no escribe en alfabeto latino, esto es lo primero que debes ajustar** (ver aviso abajo). El panel te enseña qué alfabetos aparecen de verdad en tu grupo. |
-| Rigor con la lista CAS | `.env` → `CAS_AUTOBAN_MIN` | `2` = banear solo confirmados en 2+ grupos (recomendado); `1` = banear con cualquier señal. Por debajo del umbral, te lo manda a revisar. |
-| Acortadores bloqueados | `.env` → `URL_BLOCKLIST` | CSV de dominios. |
-| Umbrales y acciones | `.env` | Scores de ban/kick/mute, acción ante primer mensaje sospechoso, etc. |
-| Bienvenida fija por grupo | comando `/setwelcome` | Sin tocar archivos, desde el propio Telegram. |
-| Verificación humana por grupo | comando `/verificacion` | Desde Telegram, por grupo. Ver abajo. |
-
-Cada carpeta tiene su `README.md` con el formato explicado.
-
-### Panel de ajustes con botones (comando `/config`)
-
-La forma **visual y recomendada** de configurar cada grupo, sin recordar subcomandos. Escribe `/config` (alias `/ajustes`, `/panel`) en el grupo, o **en el DM del bot** para elegir el grupo con botones. Aparece un panel que se actualiza al instante al pulsar:
-
-- 🔗 **Sincronizar todos los grupos** on/off (ver abajo)
-- 🛡️ **Verificación** on/off · 👁️ **Revisar sospechosos en privado** on/off · 🔔 **Recordatorios** on/off
-- 🚪 **Al no verificar**: Expulsar / Silenciar · ⏱️ **Tiempos** (submenú con presets)
-- 👋 **Bienvenida** on/off · ✏️ **Editar bienvenida** · 📜 **Editar reglas** (al editar eliges **Todos los grupos** o **uno concreto**, y el bot te muestra un ejemplo para escribir el texto directamente)
-- 🧹 **Limpiar mensajes de servicio** on/off · 🔔 **Avisos informativos**
-- 🔤 **Alfabetos permitidos** (submenú, ver abajo)
-- 🛡️ **Rigor trabajo/dinero** (submenú, ver abajo) · 🚫 **Palabras bloqueadas** (ver abajo)
-
-> ### ⚠️ Si tu comunidad no escribe en alfabeto latino, lee esto primero
->
-> Por defecto el bot solo considera normal el **alfabeto latino**, y marca como sospechoso el primer mensaje escrito en otro. Es lo correcto para un grupo en español o inglés, pero significa que **en un grupo árabe, ruso, griego o hindi el bot marcaría a tus propios miembros**.
->
-> Se arregla en dos toques: `/config` ▸ 🔤 **Alfabetos permitidos** y activa el tuyo. Esa pantalla te enseña **qué alfabetos se están escribiendo de verdad en tu grupo** y te avisa de cuáles causarían falsos positivos, así no tienes que adivinar. También puedes dejarlo fijo para todas tus instalaciones con `ALLOWED_SCRIPTS` en el `.env`.
-
-**Ajustar cuánto aprieta con mensajes de trabajo y dinero**: el botón 🛡️ **Rigor trabajo/dinero** controla los dos detectores que marcan anuncios de empleo y testimonios de inversión (la estafa del «le di X y me devolvió Y»), sobre todo en el primer mensaje. Tres modos: **Normal** (por defecto, caza los casos claros y los dudosos), **Suave** (solo los muy evidentes; los mensajes borderline de trabajo/dinero pasan) y **Desactivado** (esos dos detectores no actúan, el resto sigue). Útil si en tu comunidad se habla mucho de dinero de forma legítima y quieres menos bans dudosos.
-
-**Bloquear palabras sin entrar al servidor**: el botón 🚫 **Palabras bloqueadas** añade y quita términos de las listas negras desde el propio Telegram. Lo que escribes se trata como **texto literal**, nunca como regex, así que un `.*` de más no puede convertirse en un comodín que banee vecinos. Antes de guardar, el bot te dice **con cuántos mensajes reales y recientes de tu grupo habría coincidido ese término**, con ejemplos: la diferencia entre añadir «oferta» a ciegas y ver que arrasaría con 14 conversaciones normales. Tus términos se guardan aparte, en `config/blacklist/custom/`, así que **no se pierden al actualizar el bot**.
-
-Es un atajo con la misma persistencia que los comandos sueltos de abajo; usa el que prefieras. Solo el admin del bot puede tocarlo.
-
-**Bienvenida independiente de la verificación**: la bienvenida (👋) es un interruptor aparte. Puedes tener **bienvenida sin verificación** (saluda al entrar, sin botón *SOY HUMANO* ni mute, se autoborra), verificación sin más, o ambas. Por defecto la bienvenida está **OFF** (grupo silencioso).
-
-### Sincronizar ajustes entre grupos (comando `/sync`, opción 🔗 en `/config`)
-
-**Activada por defecto.** Cuando la sincronización está **ON**, cualquier cambio de ajuste se aplica **a la vez a todos los grupos** donde el bot es admin (quedan idénticos), el texto de bienvenida es común (usa `{chat}` para el nombre del grupo y `{name}` para el usuario), y el panel `/config` **no pide elegir grupo** (configuras "para todos"). Ponla **OFF** (`/sync off` o el botón 🔗) para configurar cada grupo por separado, con selector de grupo. `/sync` sin argumentos muestra el estado.
-
-### Idioma del bot (comando `/idioma`)
-
-Todos los textos que ve el usuario viven en `src/locales/<código>.json`, un JSON plano por idioma. **Español e inglés vienen de serie**, y añadir un tercero no lleva ni una línea de código: dejas un `fr.json` al lado, reinicias y el bot ya lo ofrece. Lo que no traduzcas cae al español clave por clave, así que un idioma al 40 % ya sirve, y un archivo mal formado se ignora con un aviso en el log en vez de tumbar el arranque.
-
-Se cambia con `/idioma en` (alias `/language`, solo el admin del bot, y persiste entre reinicios). En una instalación nueva el idioma se detecta del entorno (`BOT_LANG`, o las habituales `LC_ALL` / `LC_MESSAGES` / `LANG` / `LANGUAGE`), y si no reconoce ninguno usa español.
-
-> 📖 **Para traducir:** [`src/locales/README.md`](src/locales/README.md) tiene la guía completa: las reglas que importan (no tocar las claves ni los `{placeholders}`, cerrar siempre las etiquetas HTML) y cómo comprobar tu trabajo con `pytest tests/test_locales.py`, que valida JSON, placeholders y HTML balanceado en todos los idiomas.
-
-### Mantener limpios los grupos (comando `/limpieza`)
-
-Oculta los comandos del bot en los grupos (no aparecen al teclear «/») y auto-borra los mensajes de comando escritos en el chat, para que nada ensucie el grupo ni los usuarios los pulsen por curiosidad. Ambas cosas **activadas por defecto**.
-
-### Verificación humana (comando `/verificacion`)
-
-**Por defecto viene en modo LIMPIO**: verificación y bienvenida **OFF** (el grupo no se
-molesta con mensajes de bienvenida ni botón *SOY HUMANO*), y **revisión de sospechosos
-por privado ON**: cuando entra un perfil claramente dudoso, te llega un aviso **privado**
-(a tu DM o al chat/canal de `ADMIN_NOTIFY_CHAT_ID`) con botones **✅ Permitir** / **🔨 Banear**
-y el usuario entra permitido por defecto. La moderación de mensajes (spam, contactos,
-listas, etc.) sigue activa igualmente. Todo esto se cambia por grupo con `/config` o
-`/verificacion`.
-
-Todo por grupo, desde el propio Telegram (solo el admin del bot). `/verificacion` sin nada muestra el estado y las opciones:
-
-| Subcomando | Qué hace |
-|---|---|
-| `/verificacion on\|off` | Activa/desactiva la verificación (botón *SOY HUMANO* + mute al entrar) **y** el mensaje de bienvenida a la vez. **OFF por defecto** = los nuevos entran directos. |
-| `/verificacion revisar on\|off` | **Modo revisión** (**ON por defecto**). En vez de verificar en el grupo, cuando entra un perfil dudoso te llega un aviso **privado** (a tu DM o al canal configurado) con botones **✅ Permitir** / **🔨 Banear**. El usuario entra **permitido por defecto**; si no haces nada, se queda. Solo avisa de perfiles con señal real (nombre en otro alfabeto, sin foto, cuenta reciente…), no por cada usuario sin @username. El propio aviso trae un botón **⚙️ Ajustes del grupo** que despliega, sin salir de la notificación, toggles rápidos que se actualizan al pulsar: **🛡️ Verificación humana**, **🔔 Avisos de sospechosos**, **⏰ Recordatorios de verificación** (on/off) y **⏱️ Tiempos** (submenú con presets, si los recordatorios están activos). Todo respeta el modo de sincronización. |
-| `/verificacion avisos on\|off` | Enviar (o no) un recordatorio a los normales antes de expulsarlos. |
-| `/verificacion accion kick\|mute` | Qué pasa con un normal que no verifica: **kick** (expulsar) o **mute** (queda muteado para siempre, sin kick; puede verificar cuando quiera). |
-| `/verificacion tiempos <susp_min> <recordatorio_h> <kick_h>` | Tiempos: sospechosos se expulsan a los `susp_min` minutos; a los normales se les avisa a las `recordatorio_h` horas y se les expulsa `kick_h` horas después. Ej: `/verificacion tiempos 30 3 6`. |
-
-> Los usuarios con **perfil sospechoso** siempre se expulsan al pasar su tiempo (es la capa de seguridad); las opciones `avisos`/`accion` aplican a los usuarios **normales**. La moderación de mensajes (spam, listas negras, etc.) es independiente y sigue activa aunque desactives la verificación.
-
----
-
-## 🧰 Stack
-
-| Componente | Tecnología |
-|---|---|
-| Bot API (async polling) | `python-telegram-bot[ext]` 22.8 |
-| MTProto (bio, fotos, canal personal, reportes oficiales) | `Telethon` 1.44 |
-| Base de datos | SQLite (WAL) |
-| Clasificador | Naive Bayes + coseno (stdlib, sin sklearn) |
-| Homóglifos | `confusable-homoglyphs` (UTS#39) |
-| Despliegue | Docker Compose |
-
-> **Telethon es opcional** (pero recomendable): requiere una cuenta de usuario secundaria. Sin configurarlo, o con `TELETHON_ENABLED=false`, el bot funciona solo con Bot API: las funciones que dependen de él (leer bios, fotos de perfil, **el canal enlazado en un perfil**, reportes oficiales) simplemente no se activan y todo lo demás sigue igual.
-
----
-
-## 🚀 Puesta en marcha
-
-### Lo que necesitas
-
-- Un ordenador con Linux siempre encendido: un VPS barato, un mini PC o un servidor en casa. El bot gasta unos 100 MB de RAM.
-- El **token** de tu bot y tu **user_id** de Telegram. Si aún no los tienes, sigue antes [Configurar Telegram paso a paso](#configurar-telegram-paso-a-paso): son dos minutos.
-
-### Instalación (copiar y pegar)
+### Paso 1 · Instala Docker y descarga el bot
 
 ```bash
-# 1) Docker y git, si no los tienes (Debian, Ubuntu y derivadas)
-sudo apt update && sudo apt install -y git
+sudo apt update && sudo apt install -y git curl python3
 curl -fsSL https://get.docker.com | sudo sh
-
-# 2) Descarga el bot
 git clone https://github.com/yonaesp/CazaSpamBot-Telegram.git
 cd CazaSpamBot-Telegram
+```
 
-# 3) Configúralo: te pide el token y tu user_id y crea el archivo .env
+### Paso 2 · Configúralo
+
+Te hace unas preguntas: pega el token, tu user_id y, si quieres, los datos de la cuenta secundaria. Lo demás, Enter.
+
+```bash
 python3 scripts/setup.py
+```
 
-# 4) Prepara las carpetas donde escribe: el bot corre sin root, con el uid 10112
+### Paso 3 · Arráncalo
+
+```bash
 sudo install -d -o 10112 -g 10112 data config/blacklist/custom
-
-# 5) Arráncalo
 sudo docker compose up -d --build
-```
-
-Comprueba que está vivo:
-
-```bash
 sudo docker compose logs -f
-# … Bot @TuBot (id=…) listo. Modo=shadow …      (Ctrl+C para salir del log)
 ```
 
-Arranca en **modo prueba** (`MODE=shadow`): lo mira todo y apunta lo que haría, sin banear a nadie. Cuando lleves unos días revisando el log y te fíes, actívalo:
+Cuando veas `Bot @TuBot … listo`, ya está vivo (Ctrl+C sale del log; el bot sigue).
+
+### Paso 4 · Ponlo en tus grupos
+
+1. En cada grupo: *Administradores* → *Añadir administrador* → tu bot, con **Eliminar mensajes** y **Banear usuarios**.
+2. Abre tu bot en Telegram y pulsa **Iniciar**. Sin eso, Telegram no le deja mandarte los avisos.
+3. Cuando esté en todos tus grupos, cierra la puerta para que nadie lo meta en los suyos: @BotFather → `/mybots` → tu bot → **Bot Settings** → **Allow Groups?** → **Turn groups off**.
+
+### Paso 5 · Conecta la cuenta secundaria *(si la configuraste)*
+
+Añádela también como administradora de tus grupos, con los mismos permisos. Luego:
 
 ```bash
-sed -i 's/^MODE=.*/MODE=active/' .env
-sudo docker compose up -d        # «restart» NO relee el .env; «up -d» sí
+sudo docker compose exec antispam-bot python -m scripts.telethon_login request
 ```
 
-> Si tu usuario está en el grupo `docker`, puedes quitar el `sudo` de todos los comandos.
-
-### Sin el asistente
-
-Si prefieres editar el archivo a mano:
+Telegram le manda un código a esa cuenta. Cámbialo por el `12345` (si tiene verificación en dos pasos, pon la contraseña detrás):
 
 ```bash
-cp .env.example .env
-nano .env    # rellena TELEGRAM_BOT_TOKEN y ADMIN_USER_ID; el resto tiene valores por defecto
+sudo docker compose exec antispam-bot python -m scripts.telethon_login confirm 12345
+sudo docker compose restart
 ```
 
-Solo esos dos valores son obligatorios. Los de aquí son **inventados**, para que veas el formato:
+En el log verás `Telethon=conectado`.
 
-```ini
-# Token que te da @BotFather al crear el bot (/newbot):
-TELEGRAM_BOT_TOKEN=8123456789:AAF-EsteTokenEsFalsoReemplazaloPorElTuyo00
-# Tu user_id numérico de Telegram (te lo dice @userinfobot):
-ADMIN_USER_ID=123456789
-```
+### Paso 6 · De prueba a real
 
-El `.env.example` explica cada variable con un ejemplo del formato. Nunca subas tu `.env` a git (ya está en `.gitignore`).
-
-### Con Podman en vez de Docker
-
-Los mismos pasos, cambiando `docker compose` por `podman compose`:
+Arranca en **modo prueba**: lo mira todo y apunta lo que haría, sin banear a nadie. Cuando lleves unos días mirando el log y te fíes:
 
 ```bash
-sudo apt install -y podman podman-compose     # Fedora: sudo dnf install -y podman podman-compose
-podman compose up -d --build
-podman compose logs -f
+sed -i 's/^MODE=.*/MODE=active/' .env && sudo docker compose up -d
 ```
 
-Dos diferencias con Docker:
+> [!NOTE]
+> Los reportes oficiales a Telegram vienen **apagados**. Actívalos con `REPORT_BEFORE_BAN=true` en el `.env` cuando confíes en los detectores: reportar a gente legítima puede hacer que Telegram limite la cuenta secundaria.
 
-- **Las carpetas, con `podman unshare`**: Podman sin root traduce el uid 10112 del contenedor a otro del host, así que el paso 4 se hace con `podman unshare chown -R 10112:10112 data config/blacklist/custom` (crea antes las carpetas con `mkdir -p`).
-- **Arranque automático tras reiniciar el servidor**: Podman sin root no lo hace solo. Actívalo una vez con `systemctl --user enable --now podman-restart.service` y `loginctl enable-linger $USER`.
-- **Fedora, RHEL y derivadas (SELinux)**: si el contenedor no puede leer `config/` o escribir en `data/`, añade `Z` a cada volumen del `docker-compose.yml`, por ejemplo `./data:/app/data:Z` y `./config:/app/config:ro,Z`.
+<details>
+<summary><b>El día a día: actualizar, ver el log, parar</b></summary>
 
-### Qué hace el `docker-compose.yml`
-
-No hace falta tocarlo. Por si quieres saber qué monta:
-
-| Línea | Para qué sirve |
-|---|---|
-| `build: .` | La imagen se construye en tu máquina desde el `Dockerfile`: no se descarga nada de ningún registro |
-| `user: "10112:10112"` | Corre sin root y con un uid que no es de nadie en tu máquina: si alguien escapara del contenedor, no sería ningún usuario real. Otro uid: `APP_UID`/`APP_GID` en el `.env` |
-| `env_file: .env` | Tu configuración. Sin `.env`, compose no arranca |
-| `./data:/app/data` | Base de datos, sesión de Telethon y copias diarias. Es lo único donde escribe: **haz copia de esta carpeta y del `.env`** |
-| `./config:/app/config:ro` | Listas negras y bienvenidas, en solo lectura |
-| `./config/blacklist/custom` | La única parte de `config/` donde escribe: las palabras que añades desde Telegram |
-| `./src` y `./scripts` (`:ro`) | El código, montado para que una actualización se aplique sin reconstruir |
-| `restart: unless-stopped` | Vuelve a arrancar solo tras un fallo o un reinicio del servidor |
-| `healthcheck` | Docker lo marca como `unhealthy` si deja de dar señales de vida 5 minutos |
-| `logging` | El log rota en 3 ficheros de 10 MB, para no llenar el disco |
-
-`data/` se crea sola al arrancar, y `config/` ya viene con valores por defecto: no tienes que crear ninguna carpeta.
-
-### El día a día
+<br>
 
 | Quiero… | Comando |
 |---|---|
 | Ver qué está haciendo | `sudo docker compose logs -f` |
 | Actualizar a la última versión | `git pull && sudo docker compose up -d --build` |
+| Aplicar un cambio del `.env` | `sudo docker compose up -d` (`restart` no relee el `.env`) |
 | Reiniciarlo | `sudo docker compose restart` |
 | Pararlo | `sudo docker compose down` (lo de `data/` se conserva) |
-| Aplicar un cambio del `.env` | `sudo docker compose up -d` |
 
-### Configurar Telegram paso a paso
+**Al actualizar no pierdes nada**: tu `.env`, la base de datos (`data/`) y las palabras que añadiste desde Telegram (`config/blacklist/custom/`) viven fuera de git, y lo nuevo de la base de datos se crea solo al arrancar. Si editaste a mano una lista versionada de `config/blacklist/` y git da conflicto: `git stash && git pull && git stash pop`.
 
-**1. Crea el bot en @BotFather**
+**Haz copia** de la carpeta `data/` y del `.env`: es todo lo que necesitas para recuperarlo en otra máquina. El bot ya deja una copia diaria de la base de datos en `data/backups/` (7 días).
 
-1. Abre [@BotFather](https://t.me/BotFather), envía `/newbot` y elige nombre y usuario (tiene que acabar en `bot`). Te dará el **token**: va en `TELEGRAM_BOT_TOKEN`.
-2. `/setprivacy` → tu bot → **Disable**. Sin esto el bot solo ve los comandos y no puede detectar spam en los mensajes normales.
-3. `/mybots` → tu bot → **Bot Settings** → **Allow Groups?** → déjalo en **on** mientras lo añades a tus grupos (paso 2).
+Si tu usuario está en el grupo `docker`, puedes quitar el `sudo` de todos los comandos.
 
-**2. Añádelo a tus grupos como administrador**
+</details>
 
-En cada grupo: *Administradores* → *Añadir administrador* → tu bot, con al menos estos permisos:
+<details>
+<summary><b>Con Podman en vez de Docker</b></summary>
 
-- **Eliminar mensajes**
-- **Banear usuarios** (en algunas versiones de Telegram se llama *Restringir miembros*)
+<br>
 
-El bot solo modera donde es admin con permiso de banear. Si `MODERATED_CHAT_IDS` está vacío, descubre solo esos grupos; si pones ahí una lista, se limita a ella.
-
-**3. Cierra la puerta a grupos ajenos**
-
-Cuando ya esté en todos tus grupos, vuelve a `/mybots` → tu bot → **Bot Settings** → **Allow Groups?** → **Turn groups off**. Así nadie más puede meter tu bot en sus grupos. Los grupos donde ya está no se ven afectados; si algún día quieres añadirlo a otro, lo activas un momento y lo vuelves a desactivar.
-
-**4. (Opcional, muy recomendable) Cuenta secundaria con Telethon (MTProto)**
-
-Un bot de Telegram no puede leer la bio ni las fotos de perfil de un usuario, ni el canal personal, ni las historias, ni mandar reportes oficiales de spam. Para eso se usa una **cuenta de usuario normal**, que el bot maneja por MTProto con [Telethon](https://docs.telethon.dev/). Sin ella el bot funciona igual, pero sin esos detectores.
-
-1. Crea una **cuenta secundaria** de Telegram con otro número. **No uses tu cuenta personal**: si Telegram la limitara por actividad automática, no perderías la tuya.
-2. Entra en [my.telegram.org](https://my.telegram.org) con ese número → **API development tools** → crea una app (nombre y descripción libres). Copia el **api_id** y el **api_hash** a `TG_API_ID` y `TG_API_HASH`, y el número a `TG_PHONE` (formato `+34600111222`).
-3. Añade esa cuenta a tus grupos como **administrador**: sin eso no puede leer el registro de administración ni reportar. En la instalación de referencia tiene *Eliminar mensajes* y *Banear usuarios*, y con eso funciona todo.
-4. Con el bot levantado, genera la sesión **una sola vez**, dentro del contenedor:
+Los mismos pasos, cambiando `docker compose` por `podman compose`:
 
 ```bash
-# 1) Telegram envía un código a la app de la cuenta secundaria:
-docker compose exec antispam-bot python -m scripts.telethon_login request
-# 2) Confírmalo con el código recibido (añade tu contraseña 2FA al final si la tienes):
-docker compose exec antispam-bot python -m scripts.telethon_login confirm 12345
+sudo apt install -y podman podman-compose     # Fedora: sudo dnf install -y podman podman-compose
+mkdir -p data config/blacklist/custom
+podman unshare chown -R 10112:10112 data config/blacklist/custom
+podman compose up -d --build
 ```
 
-La sesión queda en `data/telethon.session`: trátala como una contraseña, da acceso a esa cuenta. Los reportes oficiales a Telegram van aparte y vienen **apagados** (`REPORT_BEFORE_BAN=false`): actívalos cuando confíes en los detectores, porque reportar a gente legítima puede hacer que Telegram limite la cuenta secundaria.
+- **Las carpetas van con `podman unshare`**: Podman sin root traduce el uid 10112 del contenedor a otro de tu máquina, así que el `sudo install` del paso 3 no sirve aquí.
+- **Para que arranque solo tras reiniciar el servidor**, una vez: `systemctl --user enable --now podman-restart.service` y `loginctl enable-linger $USER`.
+- **Fedora, RHEL y derivadas (SELinux)**: si no puede leer `config/` o escribir en `data/`, añade `Z` a cada volumen del `docker-compose.yml`, por ejemplo `./data:/app/data:Z` y `./config:/app/config:ro,Z`.
 
-**¿Dónde recibes los avisos?** Dos opciones (`ADMIN_NOTIFY_CHAT_ID` en el `.env`): por **DM privado** contigo mismo (déjalo vacío) o en un **grupo de moderación** (pon su `chat_id`). Si eliges el DM, **abre tu bot y pulsa START una vez** — Telegram no deja que un bot te escriba primero, así que sin ese START no te llegarán los avisos.
+</details>
+
+<details>
+<summary><b>Configurar a mano, sin el asistente</b></summary>
+
+<br>
+
+```bash
+cp .env.example .env && chmod 600 .env
+nano .env
+```
+
+Solo hay dos valores obligatorios. Los de aquí son **inventados**, para que veas el formato:
+
+```ini
+TELEGRAM_BOT_TOKEN=8123456789:AAF-EsteTokenEsFalsoReemplazaloPorElTuyo00
+ADMIN_USER_ID=123456789
+```
+
+Para la cuenta secundaria, `TG_API_ID`, `TG_API_HASH` y `TG_PHONE` (con prefijo, `+34600111222`). El `.env.example` explica cada variable con un ejemplo. Nunca subas tu `.env` a git (ya está en `.gitignore`).
+
+</details>
+
+<details>
+<summary><b>Qué monta el <code>docker-compose.yml</code></b></summary>
+
+<br>
+
+No hace falta tocarlo. Por si quieres saber qué hace:
+
+| Línea | Para qué sirve |
+|---|---|
+| `build: .` | La imagen se construye en tu máquina desde el `Dockerfile`: no se descarga nada de ningún registro |
+| `user: "10112:10112"` | Corre sin root y con un uid que no es de nadie en tu máquina. Otro uid: `APP_UID`/`APP_GID` en el `.env` |
+| `env_file: .env` | Tu configuración |
+| `./data:/app/data` | Base de datos, sesión de la cuenta secundaria y copias diarias |
+| `./config:/app/config:ro` | Listas negras y bienvenidas, en solo lectura |
+| `./config/blacklist/custom` | La única parte de `config/` donde escribe: las palabras que añades desde Telegram |
+| `./src` y `./scripts` (`:ro`) | El código, montado para que una actualización se aplique sin reconstruir |
+| `restart: unless-stopped` | Vuelve a arrancar solo tras un fallo o un reinicio del servidor |
+| `healthcheck` | Lo marca como `unhealthy` si deja de dar señales de vida 5 minutos |
+| `logging` | El log rota en 3 ficheros de 10 MB, para no llenar el disco |
+
+</details>
 
 ---
 
-## 🔄 Actualizar una instalación existente
+## ⚙️ Se maneja desde Telegram
 
-```bash
-git pull
-sudo docker compose up -d --build
-```
+Escribe **`/config`** en el grupo o en el privado del bot y sale un panel con botones. Sin comandos que recordar:
 
-Ya está. Usa siempre `up -d --build`: solo reconstruye la imagen si cambiaron `requirements.txt` o el `Dockerfile` (si no, tira de caché y tarda segundos), y además aplica cualquier cambio del `.env`. Un `restart` a secas recoge el código nuevo, porque `./src` y `./config` van montados por volumen, pero se dejaría a medias una actualización que suba una dependencia, como un parche de seguridad. `docker compose pull` aquí no sirve de nada: la imagen se construye en local (`build:`), no se descarga.
+- 🛡️ **Verificación** con botón «Soy humano», 👋 **bienvenida** y 📜 **reglas**, cada una por separado
+- 👁️ **Avisos de sospechosos** por privado, con tres niveles de rigor
+- 🔤 **Alfabetos permitidos**: te enseña cuáles se escriben de verdad en tu grupo
+- 🛡️ **Rigor con trabajo y dinero**: normal, suave o apagado
+- 🚫 **Palabras bloqueadas**: antes de guardar te dice con cuántos mensajes reales de tu grupo habría coincidido
+- ⚠️ **Warns**: límite, castigo y quién puede ponerlos
+- 🔗 **Sincronizar**: un cambio vale para todos tus grupos (activado por defecto)
 
-**No pierdes nada de lo que tengas configurado.** Tu `.env`, la base de datos (`data/`: idioma elegido, ajustes de cada grupo, baneos, muestras aprendidas) y tus bienvenidas propias viven fuera del control de versiones, y las columnas nuevas de la base de datos se crean solas al arrancar.
+Por defecto el grupo queda **limpio y callado**: sin bienvenidas ni verificación, y la moderación funcionando igual.
 
-Dos cosas que conviene saber antes de hacer el `git pull`:
+> [!WARNING]
+> **Si tu comunidad no escribe en alfabeto latino, ajusta esto lo primero.** Por defecto el bot solo considera normal el alfabeto latino, así que en un grupo árabe, ruso, griego o hindi marcaría a tus propios miembros. Se arregla en dos toques: `/config` ▸ 🔤 **Alfabetos permitidos** y activa el tuyo.
 
-- Si editaste a mano `src/locales/es.py` o `en.py`, esos cambios se han perdido: esos archivos ya no existen. Los idiomas son ahora `es.json` / `en.json`.
-- Si editaste a mano una lista negra versionada como `config/blacklist/classifier_excluded_tokens.txt`, git puede darte un conflicto. Se resuelve con `git stash` → `git pull` → `git stash pop`. Los términos que añadiste desde el panel `/config` están a salvo: viven en `config/blacklist/custom/`, fuera del repo.
+<details>
+<summary><b>🎛️ Ajustes del <code>.env</code> y archivos editables</b></summary>
 
----
+<br>
 
-## 💬 Comandos principales
+| Qué | Dónde |
+|---|---|
+| Grupos a moderar | `MODERATED_CHAT_IDS` (vacío = todos donde sea admin con permiso de banear) |
+| Dónde te llegan los avisos | `ADMIN_NOTIFY_CHAT_ID` (vacío = tu privado; o el `chat_id` de un grupo de moderación) |
+| Rigor con la lista CAS | `CAS_AUTOBAN_MIN`: `2` banea si está confirmado en 2+ grupos y te consulta el resto (recomendado); `1`, con cualquier señal |
+| Idiomas de las listas de palabras | `BLACKLIST_LANGS` (por defecto, el del bot + inglés, la lengua franca del spam) |
+| Idiomas que lee el OCR | `OCR_LANGS` (por defecto, los del bot) |
+| Acortadores bloqueados | `URL_BLOCKLIST` |
+| Umbrales de ban, expulsión y silencio | Las variables `*_SCORE` del `.env.example` |
+| Listas de palabras y frases | `config/blacklist/` (un patrón por línea; [guía](config/blacklist/README.md)) |
+| Bienvenidas con gracia por grupo | `config/welcomes/` ([guía](config/welcomes/README.md)) |
 
-Solo el **admin del bot** (`ADMIN_USER_ID`) puede ejecutar acciones; los **admins de los grupos** pueden consultar información; al resto de usuarios el bot los ignora en silencio.
+Lo que se toca desde `/config` se guarda en la base de datos y sobrevive a las actualizaciones.
+
+</details>
+
+<details>
+<summary><b>💬 Todos los comandos</b></summary>
+
+<br>
+
+Solo el **admin del bot** (`ADMIN_USER_ID`) puede cambiar cosas. Los **admins de cada grupo** pueden consultar y poner warns. Al resto, el bot los ignora.
 
 | Comando | Qué hace |
 |---|---|
-| `/help` · `/comandos` | Guía completa de cómo funciona el bot |
-| `/ban @user razón` · `/unban @user` | Ban/unban en todos tus grupos a la vez (acepta reply, @username o id) |
-| `/warn` `/warns` `/rmwarn` `/warnlimit` | Sistema de avisos progresivos |
-| `/spam` · `/legal` | Enseña al clasificador (reply a un mensaje) |
-| `/whitelist @user` | Marca a un usuario como inmune |
-| `/stats` `/recent` `/top` `/topweekly` | Métricas y rankings |
-| `/config` (alias `/ajustes` `/panel`) | Panel de ajustes con botones (verificación, bienvenida, reglas, tiempos...) |
-| `/sync on\|off` (alias `/sincronizar`) | Sincronizar ajustes iguales en todos los grupos (ON por defecto) |
-| `/idioma <código>` (alias `/language`) | Idioma del bot (`es`, `en` o cualquier archivo de idioma que añadas). Persiste. |
-| `/verificacion` | Verificación humana por grupo (ver arriba) |
-| `/limpieza` | Ocultar los comandos del bot en grupos (no salen al teclear «/») y auto-borrar los comandos escritos en el chat (ambos ON por defecto) |
-| `/setwelcome` `/setrules` `/welcome` `/rules` `/cleanservice` | Configurar bienvenida, reglas y limpieza de mensajes de servicio |
-| `/scan` (alias `/analizar`) | Analiza un mensaje (responde a él): ¿lo detectaría? y qué estructura tiene |
-| `/alertas` | Activa o silencia los avisos informativos (borrados, bans de otros admins...) |
-| `/notspam <id>` | Revierte un falso positivo (deshace el ban y aprende) |
-| `/forget <id>` | Borra una muestra del clasificador |
-| `/shadow on/off` | Modo prueba (solo loggea) / activo |
+| `/config` (`/ajustes`, `/panel`) | Panel de ajustes con botones |
+| `/ban @user motivo` · `/unban @user` | Ban o unban en todos tus grupos a la vez (acepta respuesta, @usuario o id) |
+| `/warn` `/warns` `/rmwarn` `/resetwarns` `/warnlimit` `/warnaction` | Avisos progresivos |
+| `/spam` · `/legal` | Enseña al bot (respondiendo a un mensaje) |
+| `/scan` (`/analizar`) | ¿Detectaría este mensaje? (respondiendo a él) |
+| `/notspam <id>` · `/forget <id>` | Deshace un falso positivo · borra una muestra aprendida |
+| `/whitelist @user` | Marca a alguien como intocable |
+| `/stats` `/recent` `/top` `/topweekly` | Estadísticas y rankings |
+| `/verificacion` | Verificación humana por grupo |
+| `/setwelcome` `/setrules` `/welcome` `/rules` | Bienvenida y reglas |
+| `/cleanservice` · `/limpieza` | Borrar mensajes de servicio · ocultar y borrar los comandos en el grupo |
+| `/alertas` | Qué avisos te llegan por privado |
+| `/sync on\|off` | Ajustes iguales en todos los grupos |
+| `/idioma <código>` (`/language`) | Idioma del bot |
+| `/shadow on\|off` | Modo prueba |
+| `/help` · `/comandos` | La guía completa dentro de Telegram |
 
-> **Ojo con `/ban` y el motivo.** Si respondes a un mensaje, el bot **borra también ese mensaje**.
-> Y el **motivo actúa como consentimiento**: sin motivo el ban es silencioso, como los automáticos;
-> si escribes uno, el bot lo publica en el grupo y **ese aviso se queda de forma permanente**, porque
-> un motivo escrito a mano es un registro de moderación, no un chiste que caduca. Para que se
-> autoborre, pon los segundos en `BAN_NOTICE_DELETE_AFTER_S` (por defecto `0` = permanente).
+Con **`/ban` y un motivo**, el bot publica el motivo en el grupo y ese aviso se queda; sin motivo, el ban es silencioso. Los miembros pueden avisarte respondiendo a un mensaje con **`@admin`**.
 
-**Alias en inglés:** los comandos con nombre en español responden también a `/verification`, `/language`, `/alerts`, `/cleanup` y `/commands`. El menú «/» de Telegram muestra el nombre que corresponda al idioma activo, y los nombres en español siguen funcionando siempre, así que no se rompe nada si cambias de idioma sobre la marcha.
-
-Los miembros del grupo pueden reportar con **`@admin`** (reply a un mensaje); el bot avisa al admin y, si actúa, agradece al reporter.
+</details>
 
 ---
 
-## 🧪 Tests
-
-```bash
-.venv/bin/python -m pytest tests/ -q     # 1018 tests
-```
-
-Cada detector tiene tests de casos positivos **y negativos** (énfasis en anti-falsos-positivos). Filosofía: *un falso positivo es peor que un falso negativo.*
-
-Los paquetes de idioma tienen su propia red de seguridad (`tests/test_locales.py`): JSON válido, placeholders idénticos a los del español, HTML balanceado y paridad total entre los dos idiomas oficiales. Una traducción incompleta no hace fallar los tests, solo informa del porcentaje.
-
----
-
-## 📁 Estructura
-
-```
-src/
-├── main.py              # entry point, handlers, jobs
-├── handlers.py          # on_message, on_chat_member, _apply_action
-├── verification.py      # bienvenida + botón SOY HUMANO + 3 tiers
-├── federation.py        # ban federado cross-group
-├── detectors/           # un módulo por detector
-├── locales/             # paquetes de idioma (es.json, en.json, + el tuyo)
-├── i18n.py              # función t() con fallback por clave
-├── config_panel.py      # panel de ajustes /config
-├── settings_sync.py     # sincronización de ajustes entre grupos
-├── group_clean.py       # ocultar/auto-borrar comandos en grupos
-├── wordlists.py         # carga de listas negras editables
-├── trust.py             # niveles 1-10 de confianza y spam
-├── ban_announce.py      # consolidación de quips en ráfaga
-├── learning.py          # Naive Bayes + coseno
-├── reporter.py          # reportes oficiales (Telethon)
-└── db.py                # SQLite + migraciones
-config/
-├── welcomes/            # saludos editables (genérico + por grupo)
-└── blacklist/           # palabras/regex antispam editables
-docs/                    # ARCHITECTURE, ROADMAP, ...
-tests/                   # 1018 tests
-```
-
----
-
-## 🔒 Seguridad
-
-- Secretos e identificadores solo en `.env` (gitignored). `.env.example` con valores vacíos.
-- Sesión Telethon (`*.session`) nunca se sube. Usa una **cuenta secundaria**, no la personal.
-- La cuenta secundaria reporta con criterios estrictos (whitelist de reglas + rate limit) para no perder reputación en Telegram.
-
----
+<a id="faq"></a>
 
 ## ❓ Preguntas frecuentes
 
-**¿Cómo evito los bots de spam en mi grupo de Telegram?**
-Monta tu propia copia de CazaSpamBot (ver [Puesta en marcha](#-puesta-en-marcha)), añádela como admin a tus grupos y desactiva el Privacy Mode. Revisa a cada persona que entra y cada primer mensaje, y banea al spammer en todos tus grupos a la vez.
-
 **¿Puedo añadir @CazaSpamBot a mi grupo sin más?**
-No. Esa instancia es privada y solo modera los grupos de su dueño. El código es gratuito, así que montas tu propio bot con tu propio token, y es enteramente tuyo.
+No: esa copia es privada y solo modera los grupos de su dueño. El código es gratis, así que montas tu propio bot con tu propio token y es enteramente tuyo. Son [5 minutos](#instalacion).
 
-**¿Es gratis? ¿Qué necesito para montarlo?**
-Sí, gratuito y de código abierto. Cualquier máquina con Docker que esté siempre encendida: un VPS barato, un mini PC o un servidor en casa. Gasta unos 100 MB de RAM.
+**¿Qué es eso de la cuenta secundaria? ¿Es seguro?**
+Es una cuenta normal de Telegram, con otro número, que el bot usa como lo harías tú desde otro dispositivo. **No uses tu cuenta personal**: si Telegram limitara la secundaria por actividad automática, la tuya no se vería afectada. La sesión queda en `data/telethon.session` y hay que tratarla como una contraseña. Es opcional.
 
 **¿Baneará a miembros legítimos?**
-Es lo que más se esfuerza en evitar. Quien tiene historial en el grupo está protegido por los niveles de confianza, los casos dudosos te llegan con botones en vez de acabar en ban, y puedes arrancar en `MODE=shadow` para ver lo que *haría* antes de dejarle actuar.
+Es lo que más se esfuerza en evitar. Quien tiene historial en el grupo está protegido por su confianza, lo dudoso te llega con botones en vez de acabar en ban, y puedes arrancar en modo prueba para ver qué haría antes de dejarle actuar.
 
-**¿Funciona en grupos de otros idiomas?**
-La detección no depende del idioma del grupo, y tú eliges qué alfabetos son normales en cada uno. La interfaz viene en español e inglés, y añadir un idioma es un archivo JSON.
+**¿En qué se diferencia de un bot de captcha?**
+Un captcha solo frena a los bots tontos al entrar. Aquí la verificación es opcional y viene apagada, porque el spam de hoy la supera y luego escribe con calma. Lo importante es mirar quién es y qué publica, también días después.
+
+**¿Mis datos salen del servidor?**
+No. El aprendizaje y el OCR son locales. Fuera de Telegram, lo único que sale son las consultas a las listas CAS y lols.bot (con el id del usuario) y, si los activas, los reportes a Telegram.
+
+**¿Es gratis? ¿Funciona en otros idiomas?**
+Sí, gratis y de código abierto (GPL-3.0). La detección no depende del idioma del grupo, la interfaz viene en español e inglés, y añadir un idioma es un archivo JSON ([guía para traductores](src/locales/README.md)).
 
 **¿Dónde pido ayuda?**
 Abre una [incidencia en GitHub](https://github.com/yonaesp/CazaSpamBot-Telegram/issues). El soporte es gratuito.
 
 ---
 
+## 🔒 Seguridad
+
+- Corre **sin root**, con un uid que no es de nadie en tu máquina, y con el código y la configuración en **solo lectura**.
+- Los secretos viven solo en `.env` (permisos `600`, fuera de git). La sesión de la cuenta secundaria nunca se sube.
+- La cuenta secundaria reporta con criterios estrictos (reglas concretas, puntuación alta y límite por hora) para cuidar su reputación en Telegram.
+
+<a id="tests"></a>
+
+## 🧪 Tests
+
+```bash
+.venv/bin/python -m pytest tests/ -q     # 1681 tests
+```
+
+Cada detector tiene tests de lo que debe cazar **y de lo que no**, con casos reales. Un falso positivo es peor que un falso negativo.
+
+<details>
+<summary><b>📁 Estructura del código y documentación</b></summary>
+
+<br>
+
+```
+src/
+├── main.py              # arranque, handlers y tareas programadas
+├── handlers.py          # cada mensaje y cada entrada al grupo
+├── detectors/           # un módulo por detector
+├── verification.py      # verificación «Soy humano» y perfiles evidentes
+├── federation.py        # ban en todos tus grupos y limpieza de mensajes
+├── learning.py          # Naive Bayes + coseno
+├── autoaprendizaje.py   # lo que aprende solo
+├── ocr.py               # texto dentro de imágenes
+├── story_reader.py      # contenido de las historias (MTProto)
+├── channel_reader.py    # canal personal del perfil (MTProto)
+├── reporter.py          # reportes oficiales a Telegram (MTProto)
+├── config_panel.py      # panel /config
+├── locales/             # idiomas (es.json, en.json y el tuyo)
+└── db.py                # SQLite + migraciones
+config/
+├── welcomes/            # bienvenidas editables
+└── blacklist/           # listas de palabras editables
+```
+
+Más a fondo: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), [`docs/LEARNING.md`](docs/LEARNING.md), [`config/blacklist/README.md`](config/blacklist/README.md) y [`CHANGELOG.md`](CHANGELOG.md).
+
+</details>
+
 ## 📄 Licencia
 
-[GPL-3.0](LICENSE) — úsalo, modifícalo y compártelo libremente; los forks y derivados deben seguir siendo código abierto.
+[GPL-3.0](LICENSE): úsalo, modifícalo y compártelo libremente; los forks y derivados deben seguir siendo código abierto.
 
 ---
 
 <div align="center">
-<sub>Hecho con cariño y mucho café para mantener comunidades limpias. · <a href="README.md">🇬🇧 English version</a></sub>
+<sub>Hecho con cariño y mucho café para mantener limpias las comunidades. · <a href="README.md">🇬🇧 English version</a></sub>
 </div>

@@ -95,6 +95,28 @@ def _valid_chatids(v: str) -> tuple[bool, str]:
     return False, "Deben ser chat_id numéricos separados por comas (empiezan por -100)."
 
 
+def _valid_api_id(v: str) -> tuple[bool, str]:
+    if v.isdigit():
+        return True, ""
+    return False, "El api_id es un número (lo da my.telegram.org)."
+
+
+def _valid_api_hash(v: str) -> tuple[bool, str]:
+    if re.fullmatch(r"[0-9a-fA-F]{32}", v):
+        return True, ""
+    return False, "El api_hash son 32 caracteres hexadecimales (0-9 y a-f)."
+
+
+def _valid_phone(v: str) -> tuple[bool, str]:
+    if re.fullmatch(r"\+\d{6,15}", v):
+        return True, ""
+    return False, "Con prefijo internacional y sin espacios, p. ej. +34600111222."
+
+
+def _si(respuesta: str) -> bool:
+    return respuesta.strip().lower() in ("s", "si", "sí", "y", "yes")
+
+
 def set_var(text: str, key: str, value: str) -> str:
     """Sustituye `KEY=...` (línea completa) por `KEY=value` conservando el resto.
 
@@ -132,7 +154,7 @@ def main() -> int:
             print(f"   {DIM}Para cambiar algo, edita el archivo .env directamente,{RESET}")
             print(f"   {DIM}o fuerza el asistente de nuevo:  python3 scripts/setup.py --force{RESET}\n")
             return 0
-        print(f"\n{YELLOW}Ya existe un .env.{RESET} Actualizaré token, user_id, grupos y modo;")
+        print(f"\n{YELLOW}Ya existe un .env.{RESET} Actualizaré token, user_id, grupos y modo (y la cuenta secundaria si quieres);")
         print(f"   {DIM}el RESTO de tu configuración (Telethon, umbrales, etc.) se conserva.{RESET}")
         if input("   ¿Continuar? (s/N): ").strip().lower() not in ("s", "si", "sí", "y", "yes"):
             print("   Cancelado. No se ha tocado tu .env.")
@@ -202,12 +224,50 @@ def main() -> int:
         validate=lambda v: (v in ("shadow", "active"), "Escribe 'shadow' o 'active'."),
     )
 
+    # La cuenta secundaria es opcional, pero sin ella el bot no ve la bio, el
+    # canal del perfil, las fotos ni las historias: preguntarla aquí ahorra
+    # tener que abrir el .env a mano después.
+    ya_telethon = bool(_read_var(text, "TG_API_ID") and _read_var(text, "TG_API_HASH"))
+    print()
+    print(f"{BOLD}{CYAN}▸ Cuenta secundaria (MTProto, opcional y muy recomendable){RESET}")
+    _print_help(
+        "Una cuenta normal de Telegram que tú autorizas, como abrir sesión en otro\n"
+        "dispositivo. Con ella el bot lee lo que un bot no ve: bio, canal del perfil,\n"
+        "fotos e historias. Usa OTRA cuenta, nunca la personal.\n"
+        "Necesitas su api_id y api_hash de https://my.telegram.org → API development tools."
+    )
+    pregunta = ("   ¿Cambiarla? (s/N): " if ya_telethon
+                else "   ¿Configurarla ahora? (s/N): ")
+    if ya_telethon:
+        print(f"   {DIM}Ya tienes una puesta en el .env.{RESET}")
+    try:
+        quiere_telethon = _si(input(pregunta))
+    except EOFError:
+        quiere_telethon = False
+    telethon_nuevo = False
+    if quiere_telethon:
+        api_id = ask("api_id (TG_API_ID)", help_text="Ejemplo inventado: 1234567",
+                     validate=_valid_api_id, required=True)
+        api_hash = ask("api_hash (TG_API_HASH)",
+                       help_text="Ejemplo inventado: 0123456789abcdef0123456789abcdef",
+                       validate=_valid_api_hash, required=True, secret=True)
+        phone = ask("Teléfono de la cuenta secundaria (TG_PHONE)",
+                    help_text="Con prefijo internacional. Ejemplo inventado: +34600111222",
+                    validate=_valid_phone, required=True)
+        text = set_var(text, "TG_API_ID", api_id)
+        text = set_var(text, "TG_API_HASH", api_hash)
+        text = set_var(text, "TG_PHONE", phone)
+        text = set_var(text, "TELETHON_ENABLED", "true")
+        telethon_nuevo = True
+
     text = set_var(text, "TELEGRAM_BOT_TOKEN", token)
     text = set_var(text, "ADMIN_USER_ID", admin)
     text = set_var(text, "MODERATED_CHAT_IDS", chats)
     text = set_var(text, "ADMIN_NOTIFY_CHAT_ID", notify)
     text = set_var(text, "MODE", mode)
     ENV.write_text(text)
+    # Lleva el token del bot y, si la hay, la clave de la cuenta secundaria.
+    ENV.chmod(0o600)
 
     print(f"\n{GREEN}{BOLD}✅ .env guardado en {ENV}{RESET}")
     print(f"\n{BOLD}Siguientes pasos:{RESET}")
@@ -218,12 +278,20 @@ def main() -> int:
     print("  3. Dale al bot sus carpetas (corre sin root, con el uid 10112):")
     print(f"       {CYAN}sudo install -d -o 10112 -g 10112 data config/blacklist/custom{RESET}")
     print("  4. Levanta el bot:")
-    print(f"       {CYAN}docker compose up -d --build{RESET}")
+    print(f"       {CYAN}sudo docker compose up -d --build{RESET}")
     print("  5. Comprueba que arrancó:")
-    print(f"       {CYAN}docker compose logs -f{RESET}   {DIM}(verás \"Bot @... listo\"){RESET}")
+    print(f"       {CYAN}sudo docker compose logs -f{RESET}   {DIM}(verás \"Bot @... listo\"){RESET}")
+    paso = 6
     if not notify:
-        print(f"  6. {BOLD}Abre tu bot en Telegram y pulsa START/INICIAR una vez{RESET} — si no,")
+        print(f"  {paso}. {BOLD}Abre tu bot en Telegram y pulsa START/INICIAR una vez{RESET}: si no,")
         print("     Telegram no le deja mandarte los avisos por DM (no puede escribirte primero).")
+        paso += 1
+    if telethon_nuevo:
+        print(f"  {paso}. Inicia sesión con la cuenta secundaria (Telegram le manda un código):")
+        print(f"       {CYAN}sudo docker compose exec antispam-bot python -m scripts.telethon_login request{RESET}")
+        print(f"       {CYAN}sudo docker compose exec antispam-bot python -m scripts.telethon_login confirm 12345{RESET}")
+        print(f"     {DIM}(tu código en vez de 12345; si tiene verificación en dos pasos, la contraseña detrás){RESET}")
+        print(f"       {CYAN}sudo docker compose restart{RESET}   {DIM}(para que la use){RESET}")
     if mode == "shadow":
         print(f"\n  {DIM}Estás en modo shadow: cuando confíes, cambia MODE=active en .env y{RESET}")
         print(f"  {DIM}reinicia con  docker compose up -d.{RESET}")
@@ -236,10 +304,10 @@ if __name__ == "__main__":
         raise SystemExit(main())
     except KeyboardInterrupt:
         print("\nCancelado.")
+        raise SystemExit(130)
     except EOFError:
         # Sin terminal (p. ej. `docker run` sin -it o un pipe): antes salía un
         # traceback. El asistente necesita a alguien que conteste.
         print("\nEl asistente es interactivo: ejecútalo en una terminal, o copia "
               ".env.example a .env y edítalo a mano.")
         raise SystemExit(1)
-        raise SystemExit(130)

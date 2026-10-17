@@ -1,7 +1,7 @@
 # CazaSpamBot — Bot Antispam Telegram
 
 Bot de moderación antispam **en producción 24/7**, multi-grupo, federado y **bilingüe** (es/en).
-~23.000 LOC en `src/`, Docker, **1676 tests**, 25 detectores (un módulo cada uno en `src/detectors/`).
+~23.000 LOC en `src/`, Docker, **1681 tests**, 25 detectores (un módulo cada uno en `src/detectors/`).
 
 > **Estado: PRODUCCIÓN.** No es un esqueleto. Cualquier cambio afecta grupos reales con miles de usuarios. **Investiga > Confirma > Actúa.**
 
@@ -765,4 +765,4 @@ Si el `gh` de la máquina está autenticado con **otra** cuenta o con un token q
 alcanza a este repo, no hace falta reconfigurar `gh`: basta exportar `GH_TOKEN` con
 el token bueno solo para esa ejecución. `gh` lo prefiere sobre su sesión guardada.
 
-*Actualizado: 2026-10-08 — 25 detectores, 1676 tests, 1.169 claves por idioma.*
+*Actualizado: 2026-10-08 — 25 detectores, 1681 tests, 1.169 claves por idioma.*

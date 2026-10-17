@@ -41,6 +41,7 @@ def _numeros(patron: str, *ficheros: str) -> list[tuple[str, int]]:
 def test_los_docs_dicen_los_detectores_que_hay():
     reales = _detectores_reales()
     citados = _numeros(r"(\d+)\s+detectores?\b", "docs/ARCHITECTURE.md", "docs/ROADMAP.md")
+    citados += _numeros(r"(\d+)\s+detectores?\b", "README.es.md")
     citados += _numeros(r"(\d+)\s+detectors?\b", "README.md")
     assert citados, "ningún doc dice cuántos detectores hay"
     malos = [(f, n) for f, n in citados if n != reales]
@@ -55,9 +56,9 @@ def test_los_docs_dicen_los_tests_que_hay(request):
     reales = getattr(request.session, "testscollected", 0)
     if reales < _MINIMO_SUITE:
         pytest.skip("se está ejecutando un subconjunto, no la suite entera")
-    citados = _numeros(r"(\d[\d.]*)\s+tests\b", "README.md", "docs/ARCHITECTURE.md",
-                       "docs/ROADMAP.md")
-    citados += _numeros(r"tests-(\d+)%20passing", "README.md")
+    citados = _numeros(r"(\d[\d.]*)\s+tests\b", "README.md", "README.es.md",
+                       "docs/ARCHITECTURE.md", "docs/ROADMAP.md")
+    citados += _numeros(r"tests-(\d+)%20passing", "README.md", "README.es.md")
     assert citados, "ningún doc dice cuántos tests hay"
     malos = [(f, n) for f, n in citados if n != reales]
     assert not malos, (

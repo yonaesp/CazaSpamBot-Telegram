@@ -4,6 +4,15 @@ Cambios relevantes de CazaSpamBot, lo más reciente arriba. Se anotan hitos, no
 cada commit: para el detalle está el historial de git. Sin números de versión
 porque el bot es un servicio en producción continua, no un paquete que se libera.
 
+## 2026-10 · README nuevo e instalación de copiar y pegar
+
+Los dos README, reescritos para leerse de un tirón: qué ve el bot gracias a la
+cuenta secundaria (medido: 1 de cada 5 spammers expulsados, 165 de 833, cayó por
+lo que solo se ve con ella), lo que lo distingue, y la instalación en seis pasos
+de copiar y pegar. Lo detallado queda en desplegables. El asistente pregunta
+ahora la cuenta secundaria (opcional), deja el `.env` en 600 y dice cómo iniciar
+su sesión. El healthcheck del compose pasa a `CMD-SHELL`, que con Podman fallaba.
+
 ## 2026-10 · El contenedor corre sin root
 
 `cazaspam-bot` corre con el uid 10112, que no es de nadie en el host: escapar del
