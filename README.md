@@ -2,7 +2,7 @@
 
 # 🛡️ CazaSpamBot: Telegram anti-spam bot
 
-### The Telegram anti-spam bot that looks at the spammer, not just their message. Free, open source and running on your own server.
+### Checks who is posting, not just what they post.
 
 [![Python](https://img.shields.io/badge/Python-3.11-blue?logo=python&logoColor=white)](https://www.python.org/)
 [![python-telegram-bot](https://img.shields.io/badge/PTB-22.8-26A5E4?logo=telegram&logoColor=white)](https://python-telegram-bot.org/)
@@ -19,16 +19,19 @@
 
 ---
 
-Miracle crypto, "work from home, $300 a day", porn bots, fake celebrity giveaways, pirated Office… Telegram spam no longer gets caught by a word list: it hides **inside an image**, in a **story**, in the **bio** or in the **profile's channel**, or it joins with a clean name and **changes it right before posting**.
+**CazaSpamBot** is an anti-spam bot for people who run Telegram groups: free, open source, and you run it on your own server. A regular bot only sees the message. CazaSpamBot can also look at the sender's profile, the text inside images and the content of shared stories, so it catches spam that looks clean when all you read is the message.
 
-**CazaSpamBot looks for it wherever it hides.** It works silently, with one obsession: **never touch a legitimate member**.
+- **Sees what a regular bot can't.** With an optional secondary Telegram account that you authorize, it reads the bio, personal channel, profile photos and stories of whoever is posting.
+- **Reads the text in images.** It extracts the text from posters and screenshots with OCR, on your server and without a GPU, and judges it as if it had been typed.
+- **Learns from your group.** From your decisions and, on its own, from safe bans and everyday conversation. All local, no external AI.
+- **Careful and quiet.** Doubtful cases reach you in private, with buttons, instead of ending in a ban, and it doesn't flood the group with notices. You can start in test mode, banning no one.
+- **Easy to get running.** You install it by copying and pasting a handful of commands, and manage it from Telegram with the `/config` panel.
 
-| 👁️ Sees more | 🧠 Learns | 🤫 Stays out of the way |
-|:---|:---|:---|
-| Reads the whole profile, the text inside images, and stories. | From your decisions and on its own, with no external AI and nothing leaving your server. | Bans without flooding the group, and asks you about doubtful cases in private. |
-
-> [!TIP]
-> **On the reference install** (4 groups, May to October 2026) it removed over 1,300 suspicious or spam accounts on its own, **nearly 9 in 10 before they wrote a single word**. Spam keeps coming, but it's stopped at the door, and the group barely notices. What admins had to ban by hand dropped from **41 in May to 4 or 5 a month**: every spam that slips through teaches it to catch the next one.
+> [!NOTE]
+> **In production.** Reference install: 4 groups, May to October 2026.
+> - It removed **over 1,300 suspicious or spam accounts** on its own, **nearly 9 in 10 before they wrote a single word**.
+> - Bans the admins had to make by hand dropped from **41 in May to 4 or 5 a month**: every spam that slips through teaches it to catch the next one.
+> - Spam keeps coming, but it's stopped at the door and the group barely notices.
 
 ---
 

@@ -2,7 +2,7 @@
 
 # 🛡️ CazaSpamBot: bot antispam para Telegram
 
-### El bot antispam de Telegram que mira al spammer, no solo su mensaje. Gratis, de código abierto y en tu propio servidor.
+### Analiza a quien escribe, no solo lo que escribe.
 
 [![Python](https://img.shields.io/badge/Python-3.11-blue?logo=python&logoColor=white)](https://www.python.org/)
 [![python-telegram-bot](https://img.shields.io/badge/PTB-22.8-26A5E4?logo=telegram&logoColor=white)](https://python-telegram-bot.org/)
@@ -19,16 +19,19 @@
 
 ---
 
-Cripto milagrosa, «trabaja desde casa 300 € al día», bots de porno, sorteos falsos de famosos, Office pirata… El spam de Telegram ya no se deja pillar por una lista de palabras: va **dentro de una imagen**, en una **historia**, en la **bio** o en el **canal del perfil**, o entra con un nombre limpio y **se lo cambia justo antes de escribir**.
+**CazaSpamBot** es un bot antispam para quienes administran grupos de Telegram: gratuito, de código abierto y para instalar en tu propio servidor. Un bot normal solo ve el mensaje. CazaSpamBot puede analizar además el perfil de quien lo envía, el texto que va dentro de las imágenes y el contenido de las historias, y así caza el spam que, leyendo solo el mensaje, parece limpio.
 
-**CazaSpamBot lo busca ahí donde se esconde.** Lo hace en silencio y con una obsesión: **no tocar nunca a un miembro legítimo**.
+- **Ve lo que un bot normal no ve.** Con una cuenta secundaria de Telegram que tú autorizas (opcional), lee la bio, el canal personal, las fotos de perfil y las historias de quien escribe.
+- **Lee el texto de las imágenes.** Extrae con OCR el texto de carteles y capturas, en tu servidor y sin GPU, y lo juzga como si estuviera escrito.
+- **Aprende de tu grupo.** De tus decisiones y, por su cuenta, de los bans seguros y de las conversaciones normales. Todo en local, sin IA externa.
+- **Prudente y discreto.** Lo dudoso te lo consulta por privado, con botones, en lugar de banear, y no llena el grupo de avisos. Puedes empezar en modo prueba, sin banear a nadie.
+- **Fácil de poner en marcha.** Se instala copiando y pegando unos pocos comandos y se maneja desde Telegram, con el panel `/config`.
 
-| 👁️ Ve más | 🧠 Aprende | 🤫 No molesta |
-|:---|:---|:---|
-| Lee el perfil entero, el texto de las imágenes y las historias. | De tus decisiones y por su cuenta, sin IA externa y sin sacar nada de tu servidor. | Banea sin llenar el grupo de mensajes y te pregunta lo dudoso por privado. |
-
-> [!TIP]
-> **En la instalación de referencia** (4 grupos, de mayo a octubre de 2026) ha sacado él solo a más de 1.300 cuentas sospechosas o de spam, **casi 9 de cada 10 antes de que escribieran una sola palabra**. El spam sigue llegando, pero cae en la puerta, y en el grupo apenas se nota. Lo que los admins tuvieron que banear a mano bajó de **41 en mayo a 4 o 5 al mes**: cada spam que se escapa le enseña a cazar el siguiente.
+> [!NOTE]
+> **En producción.** Instalación de referencia: 4 grupos, de mayo a octubre de 2026.
+> - Ha sacado él solo a **más de 1.300 cuentas** sospechosas o de spam, **casi 9 de cada 10 antes de que escribieran una sola palabra**.
+> - Los bans que los admins tuvieron que hacer a mano bajaron de **41 en mayo a 4 o 5 al mes**: cada spam que se escapa le enseña a cazar el siguiente.
+> - El spam sigue llegando, pero cae en la puerta y en el grupo apenas se nota.
 
 ---
 
