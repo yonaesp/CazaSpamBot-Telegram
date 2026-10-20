@@ -3,3 +3,4 @@
 (?:dm|pm|inbox|message|text)\s+me
 send\s+me\s+(?:a\s+)?(?:message|dm|pm|text)
 (?:hit|slide\s+into)\s+my\s+(?:dms?|inbox)
+(?:i'?ll|happy\s+to|glad\s+to|i\s+can)\s+send\s+you\s+(?:the\s+|more\s+|all\s+the\s+)?info(?:rmation)?

@@ -20,3 +20,8 @@ si\s+est[aá]s\s+buscando\s+(?:trabajo|empleo)
 # Voseo: «ganá dinero», «trabajá desde casa».
 gan[aá]\s+(?:dinero|plata|hasta\s+\d)
 trabaj(?:a|á|ando)\s+desde\s+(?:casa|tu\s+(?:celular|m[oó]vil|casa))
+# El guion del «trabajo extra» que se cierra por privado (caso María, 20-oct-2026,
+# Windows 10): «Tengo un trabajo extra al que solo le dedico unas pocas horas…».
+# «trabajo extra» suelto NO: «me supone un trabajo extra configurarlo» es normal.
+tengo\s+un\s+(?:trabajo|empleo|ingreso|negocio)\s+extra
+(?:un|mi)\s+(?:trabajo|empleo)\s+extra\s+(?:al|con\s+el|en\s+el)\s+que

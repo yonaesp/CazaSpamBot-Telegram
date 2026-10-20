@@ -4,6 +4,15 @@ Cambios relevantes de CazaSpamBot, lo más reciente arriba. Se anotan hitos, no
 cada commit: para el detalle está el historial de git. Sin números de versión
 porque el bot es un servicio en producción continua, no un paquete que se libera.
 
+## 2026-10 · Porno con enlace y el guion del «trabajo extra»
+
+Dos spams del 20-oct que el bot no llegó a banear. Nueva regla dura `adult_link`
+(en `link_target`): anuncio porno con enlace a una web, con dos señales explícitas o
+una y un dominio que se anuncia por el nombre; la confianza ya no lo deja pasar, que
+era lo que salvaba a una cuenta veterana robada. Y `commercial_ad` reconoce el guion
+del «tengo un trabajo extra… no son ventas… les envío la información» (0 → 135).
+Medido sobre los mensajes reales de los cuatro grupos: ningún legítimo cambia.
+
 ## 2026-10 · README nuevo e instalación de copiar y pegar
 
 Los dos README, reescritos para leerse de un tirón: qué ve el bot gracias a la

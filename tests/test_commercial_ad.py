@@ -230,3 +230,27 @@ def test_busca_trabajo_preguntando_sin_enlace_no_dispara():
         is_first_msg=True,
     )
     assert hit is None or hit.score < 60
+
+
+# --- El guion del «trabajo extra» (caso María, 20-oct-2026, Windows 10) -------
+# Cuenta que entró el 7-sep, se verificó y no dijo nada en 42 días. Su primer
+# mensaje puntuaba 0 aquí y solo la frenó `learned_similarity` con un mute.
+MARIA = ("Hola a todos 👋 Tengo un trabajo extra al que solo le dedico unas pocas horas "
+         "al día, de vez en cuando. ¡Y afortunadamente no es por teléfono, ya que tengo dos "
+         "niños menores de 4 años! 😅 Me encanta porque no se trata de ventas ni implica "
+         "molestar a familiares o amigos. De verdad, no hay nada igual, y si les interesa, "
+         "¡con mucho gusto les envío la información! 🥳💖😀")
+
+
+def test_guion_trabajo_extra_es_ban():
+    hit = det.check(_msg(MARIA), is_first_msg=True)
+    assert hit.rule == "commercial_ad" and hit.score >= 100
+    assert hit.payload["teasers"] >= 2 and hit.payload["has_money_dm"]
+
+
+def test_trabajo_extra_en_conversacion_normal_no_dispara():
+    for texto in ("Configurar el Zigbee me ha supuesto un trabajo extra, pero si te interesa "
+                  "te paso la info del script que usé, no hay nada igual",
+                  "En mi trabajo le dedico pocas horas a esto, si os interesa os paso la "
+                  "información del curso de Home Assistant que hice"):
+        assert not det.check(_msg(texto), is_first_msg=True), texto

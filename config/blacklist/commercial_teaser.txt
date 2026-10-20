@@ -9,3 +9,9 @@ estoy\s+(?:obteniendo|teniendo|consiguiendo|sacando)\s+(?:muy\s+)?buenos\s+resul
 no\s+sabes?\s+por\s+d[oó]nde\s+empezar
 es\s+f[aá]cil\s+de\s+seguir
 si\s+alguna\s+vez\s+has\s+querido
+# Guion del «trabajo extra» (caso María, 20-oct-2026): las objeciones que
+# responde antes de que nadie pregunte. Solo cuentan junto a una oferta de trabajo.
+dedic(?:o|as|amos)\s+(?:s[oó]lo\s+)?(?:unas\s+)?pocas\s+horas
+no\s+(?:se\s+trata\s+de|es\s+de|son|hay\s+que\s+hacer)\s+ventas
+molestar\s+a\s+(?:tus?\s+|mis?\s+|sus\s+)?(?:familiares|familia|amig[oa]s|conocidos)
+no\s+hay\s+nada\s+igual

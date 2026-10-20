@@ -1,0 +1,13 @@
+# Explicit porn-ad wording in English (rule `adult_link`). Added to ../adult_explicit.txt.
+# Caso real (20-oct-2026, Windows 11): «LOOKING FOR SOMETHING TO JERK OFF TO?🔞».
+jerk(?:ing)?\s+off
+cum(?:ming|shots?)?(?!\s+laude)
+horny
+puss(?:y|ies)
+tits
+boobs
+blow\s?jobs?
+masturbat\w*
+nudes
+(?:leaked|hot|amateur|homemade)\s+(?:vids|videos?|content|pics|photos|tapes?|girls)
+onlyfans\s+(?:leaks?|free|gratis)

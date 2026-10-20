@@ -1,0 +1,17 @@
+# Trozos que delatan una web porno en su propio NOMBRE (regla `adult_link`):
+# `nsfwlook.online`. Se buscan dentro del dominio, sin límites de palabra. Solos no
+# deciden: hace falta además una palabra de adult_explicit.txt en el mensaje.
+porn
+nsfw
+xxx
+hentai
+nude
+xvideo
+xnxx
+erome
+fapello
+onlyfans
+xhamster
+chaturbate
+stripchat
+bongacams

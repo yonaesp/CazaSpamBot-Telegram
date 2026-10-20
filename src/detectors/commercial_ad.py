@@ -105,6 +105,8 @@ _DEFAULT_WORK = [
     r"se\s+(?:busca|necesita[n]?)\s+(?:personal|empleados?|gente|colaboradores)",
     r"trabajo\s+que\s+m[aá]s\s+te\s+interese",
     r"si\s+est[aá]s\s+buscando\s+(?:trabajo|empleo)",
+    r"tengo\s+un\s+(?:trabajo|empleo|ingreso|negocio)\s+extra",
+    r"(?:un|mi)\s+(?:trabajo|empleo)\s+extra\s+(?:al|con\s+el|en\s+el)\s+que",
 ]
 # URL externa (http/https) que NO sea t.me — enlaces a webs de "empleo"/scam.
 _EXTERNAL_URL_RE = re.compile(r'https?://(?!t\.me/|telegram\.me/)\S+', re.IGNORECASE)
@@ -235,6 +237,7 @@ _DEFAULT_DM_CTA = [
     r"(?:dm|pm|inbox|message|text)\s+me",
     r"send\s+me\s+(?:a\s+)?(?:message|dm|pm|text)",
     r"(?:hit|slide\s+into)\s+my\s+(?:dms?|inbox)",
+    r"(?:les?|te|os)\s+(?:env[ií]o|paso|mando|comparto|doy)\s+(?:(?:toda|m[aá]s)\s+)?(?:la\s+)?info(?:rmaci[oó]n)?",
 ]
 _DEFAULT_TEASER = [
     r"puedo\s+compartir(?:lo)?\s+contigo",
@@ -251,6 +254,10 @@ _DEFAULT_TEASER = [
     r"(?:don'?t|do\s+not)\s+know\s+where\s+to\s+start",
     r"easy\s+to\s+follow",
     r"if\s+you(?:'ve|\s+have)\s+ever\s+wanted\s+to",
+    r"dedic(?:o|as|amos)\s+(?:s[oó]lo\s+)?(?:unas\s+)?pocas\s+horas",
+    r"no\s+(?:se\s+trata\s+de|es\s+de|son|hay\s+que\s+hacer)\s+ventas",
+    r"molestar\s+a\s+(?:tus?\s+|mis?\s+|sus\s+)?(?:familiares|familia|amig[oa]s|conocidos)",
+    r"no\s+hay\s+nada\s+igual",
 ]
 
 

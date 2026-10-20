@@ -109,7 +109,7 @@ def olvidar_ham_automatico(db, user_id: int) -> None:
 # lo aprendido es un bucle que se refuerza solo.
 _REGLAS_DE_CONTENIDO = frozenset({
     "commercial_ad", "investment_scam", "url_blocklist", "contact_spam",
-    "offplatform_contact", "link_target_spam", "tg_deeplink",
+    "offplatform_contact", "link_target_spam", "adult_link", "tg_deeplink",
     "inline_buttons_from_user", "external_mention_or_link",
 })
 _LISTAS_EXTERNAS = frozenset({"cas_match", "lols_match"})

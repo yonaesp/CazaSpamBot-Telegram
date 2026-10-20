@@ -8,3 +8,6 @@ escr[ií]be(?:me|nos)
 escribime
 h[aá]blame
 (?:por|al)\s+(?:privado|interno|md|dm)
+# «Si les interesa, con mucho gusto les envío la información» (caso María,
+# 20-oct-2026): el privado sin decir «privado». Solo cuenta con oferta de trabajo.
+(?:les?|te|os)\s+(?:env[ií]o|paso|mando|comparto|doy)\s+(?:(?:toda|m[aá]s)\s+)?(?:la\s+)?info(?:rmaci[oó]n)?

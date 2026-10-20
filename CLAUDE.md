@@ -1,7 +1,7 @@
 # CazaSpamBot — Bot Antispam Telegram
 
 Bot de moderación antispam **en producción 24/7**, multi-grupo, federado y **bilingüe** (es/en).
-~23.000 LOC en `src/`, Docker, **1681 tests**, 25 detectores (un módulo cada uno en `src/detectors/`).
+~23.000 LOC en `src/`, Docker, **1691 tests**, 25 detectores (un módulo cada uno en `src/detectors/`).
 
 > **Estado: PRODUCCIÓN.** No es un esqueleto. Cualquier cambio afecta grupos reales con miles de usuarios. **Investiga > Confirma > Actúa.**
 
@@ -73,7 +73,7 @@ nativa; se itera `banChatMember` sobre los chats donde el bot es admin.
 
 **Todo el texto que ve el usuario vive en `src/locales/<código>.json`.** Nada de textos en el código.
 
-- `es.json` / `en.json`, **1.169 claves** cada uno. Idioma GLOBAL de la instancia.
+- `es.json` / `en.json`, **1.174 claves** cada uno. Idioma GLOBAL de la instancia.
 - **Autodescubrimiento**: soltar un `fr.json` basta para que `/idioma fr` funcione. Cero cambios de código.
 - **Fallback por clave** al español: un idioma al 40 % ya es usable.
 - **A prueba de fallos**: un JSON roto se ignora con un log y el bot sigue. Por eso son JSON y no módulos `.py` (un `.py` se ejecuta al importarse: una comilla mal puesta tumbaba el arranque).
@@ -279,6 +279,18 @@ trabajo**: «si no sabes por dónde empezar, escríbeme y te paso la guía» es 
 normal en un grupo de Windows (hay test). Medido sobre 524 textos reales: solo
 cambia este (0 → 155).
 
+**La variante del «trabajo extra»** (20-oct-2026, Windows 10, «María», cuenta
+callada 42 días): «Tengo un trabajo extra al que solo le dedico unas pocas horas…
+no se trata de ventas ni implica molestar a familiares… si les interesa, les envío
+la información». Daba **0** y solo hubo mute por `learned_similarity`. Ahora es
+oferta de trabajo **solo con «tengo un trabajo extra» / «trabajo extra al que…»**
+(«me supone un trabajo extra» no cuenta), «les envío la información» hace de
+privado y las objeciones («pocas horas», «no son ventas», «sin molestar a
+familiares», «no hay nada igual») son ganchos: **135**. Medido sobre 669 textos
+reales: solo cambia este. ⚠️ «Tengo un trabajo extra en una tienda, si os interesa
+os paso la información» en un primer mensaje da **65** (mute de recién llegado,
+nada para quien tiene confianza ≥40): es autopromoción y se aceptó así.
+
 ### Las señales de FORMA no castigan solas
 
 `forward_first_msg`, `first_msg_media` y los `jfm_*` no miran lo que DICE el
@@ -364,6 +376,19 @@ destino: «caseros» solo contaba junto a «packs». Se añadió emparejado con 
 `destino de enlace … → SPAM/limpio/sin ficha`: aquella vez no quedó ninguna. Y los
 avisos con confianza dicen de dónde sale (`_porque_confianza`: desde cuándo, cuántos
 mensajes, warns), a petición del admin: «9/10» a secas no explicaba nada.
+
+**Y lo mismo con una WEB porno: `adult_link`** (`link_target.check_anuncio`, regla
+dura y reportable). Caso real (20-oct-2026, Windows 11): «Elxufas», en el grupo
+desde 2025 con confianza 64, publicó tres veces «JERK OFF… leaked content… 🔞
+http://nsfwlook.online»; solo saltó `learned_similarity` y la confianza lo anuló.
+Una web no se lee como un t.me (salir a mirarla delataría al servidor), pero se
+presenta sola: exige **enlace + dos señales explícitas distintas**, o una y un
+dominio que se anuncia por el nombre (`adult_domains.txt`). ⚠️ **Fuera de
+`adult_explicit.txt` todo lo que se dice al hablar de control parental**: «porno»,
+«xxx», «contenido para adultos», «+18», «sexo explícito», «contenido filtrado» (el
+test lo cazó: «cómo bloqueo el contenido xxx… pornhub.com» daba ban). La URL se
+quita del texto antes de contar, para que el dominio no cuente dos veces. Medido
+sobre 453 mensajes legítimos: ni una coincidencia de vocabulario.
 
 **Escribir pronto no castiga a quien el bot ya da por legítimo**
 (`_solo_prisa_sin_contenido` + `_is_very_legit_profile`, tras `decide()`). Caso real
@@ -765,4 +790,4 @@ Si el `gh` de la máquina está autenticado con **otra** cuenta o con un token q
 alcanza a este repo, no hace falta reconfigurar `gh`: basta exportar `GH_TOKEN` con
 el token bueno solo para esa ejecución. `gh` lo prefiere sobre su sesión guardada.
 
-*Actualizado: 2026-10-08 — 25 detectores, 1681 tests, 1.169 claves por idioma.*
+*Actualizado: 2026-10-20 — 25 detectores, 1691 tests, 1.174 claves por idioma.*

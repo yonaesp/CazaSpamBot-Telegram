@@ -162,7 +162,9 @@ async def _avisar_si_le_recortan(context, db: DB, cfg: Config, chat, old, new, a
 # `link_target_spam` entra aquí porque no es una heurística sobre el mensaje: es lo
 # que el chat enlazado dice de sí mismo. Justo el caso que el trust dejaba escapar
 # (cuenta veterana, probablemente robada, publicando un canal de packs): con el
-# atajo por trust alto el enlace se quedaba en el grupo.
+# atajo por trust alto el enlace se quedaba en el grupo. `adult_link`, por lo
+# mismo con una web: el anuncio porno de una cuenta de 2025 con trust 64 (Elxufas,
+# 20-oct-2026) se quedó tres veces en el grupo.
 # Cada cuánto se repite el aviso de «algo raro de alguien de confianza» para la
 # misma persona, regla y chat. Ver `_send_trust_notice`.
 _AVISO_TRUST_CADA_S = 30 * 60
@@ -170,7 +172,7 @@ _CLAVE_AVISO_TRUST = "_aviso_trust_visto"
 
 HARD_RULES_BAN = frozenset({
     "cas_match", "lols_match", "federation_known_ban", "reaction_farming",
-    "link_target_spam",
+    "link_target_spam", "adult_link",
 })
 
 
@@ -1746,6 +1748,11 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     # mención y en español correcto, así que ningún otro detector lo veía: hubo que
     # borrarlo a mano tras hora y cuarto en el grupo.
     hits.append(_sin_tumbar(lambda: offplat_det.check(msg_txt, is_first_msg=is_first), "offplat"))
+    # 3d-sept) Anuncio porno con enlace a una web. Regla dura: es lo que publica una
+    # cuenta veterana robada, y la confianza no puede dejarlo en el grupo. Ver
+    # `link_target.check_anuncio` (caso Elxufas, 20-oct-2026).
+    hits.append(_sin_tumbar(lambda: link_target_det.check_anuncio(
+        msg, msg_txt.text or msg_txt.caption or ""), "adult_link"))
     # 3d-bis) Forward desde canal/bot en primer mensaje o primeros 3 min → ban directo
     seen_row_fwd = db.get_seen(chat_id, user.id)
     secs_since_first = None
@@ -2398,6 +2405,7 @@ _REPORTABLE_RULES = frozenset({
     "inline_buttons_from_user",   # users normales no pueden enviar reply_markup
     "photos_batch_upload",        # fotos de perfil subidas en ráfaga = identidad robada
     "commercial_ad",              # anuncio comercial estructurado (multi-señal)
+    "adult_link",                 # anuncio porno con enlace (2+ señales explícitas)
 })
 
 # Score mínimo combinado para que un ban genere reporte oficial. Evita

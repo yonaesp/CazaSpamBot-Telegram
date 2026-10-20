@@ -31,6 +31,7 @@ KNOWN_RULES: frozenset[str] = frozenset({
     "url_blocklist",
     "tg_deeplink",
     "link_target_spam",
+    "adult_link",
     "non_allowed_script",
     "contact_spam",
     "offplatform_contact",

@@ -6,3 +6,7 @@ anyone\s+who\s+wants\s+to\s+(?:know|learn)\s+more
 (?:don'?t|do\s+not)\s+know\s+where\s+to\s+start
 easy\s+to\s+follow
 if\s+you(?:'ve|\s+have)\s+ever\s+wanted\s+to
+# «Extra job» script (María case, 20-oct-2026). Only with a work offer.
+(?:only\s+)?(?:spend|takes?)\s+(?:only\s+)?a\s+few\s+hours\s+a\s+day
+(?:it'?s\s+)?not\s+(?:about\s+)?(?:sales|selling)
+(?:bother|bug|pester)(?:ing)?\s+(?:your\s+|my\s+)?(?:family|friends)

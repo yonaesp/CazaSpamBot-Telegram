@@ -1,0 +1,17 @@
+# Vocabulario EXPLÍCITO de anuncio porno (regla `adult_link`, en link_target.py).
+# Solo cuenta con un enlace en el mensaje y hacen falta DOS términos distintos, o uno
+# y una web que se anuncia por el nombre (adult_domains.txt). Se SUMAN los de en/.
+# Nunca palabras de tema («porno», «xxx», «sexo» a secas) ni lo que se dice al hablar
+# de control parental («contenido para adultos», «+18», «sexo explícito»): «cómo
+# bloqueo el porno en el router» es una pregunta normal en un grupo de domótica.
+hacerse\s+(?:una\s+)?pajas?
+pajear\w*
+foll(?:ar|ando|ada)
+tetas
+masturb\w+
+cachond[ao]s?
+desnudas
+(?:chicas|mujeres|v[ií]deos?|fotos?)\s+(?:calientes|desnudas|hot)
+contenido\s+caliente
+sexo\s+(?:gratis|en\s+vivo|casual)
+putas

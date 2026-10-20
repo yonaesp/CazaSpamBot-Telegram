@@ -53,3 +53,5 @@ come\s+(?:for|to)\s+work\b
 (?:people|persons?)\s+from\s+(?:europe|uk|usa|us|spain)\b
 # «earn extra money» sin cifras (guion de captación, caso Natalia 8-oct-2026)
 (?:make|earn)\s+(?:some\s+)?extra\s+(?:money|cash|income)
+# Same «extra job» script in English (María case, 20-oct-2026).
+i\s+have\s+(?:a|an)\s+(?:side\s+(?:job|gig|hustle)|extra\s+(?:job|income))
