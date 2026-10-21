@@ -2,7 +2,12 @@
 python-telegram-bot[ext]==22.8
 
 # Async HTTP (CAS lookup + notificaciones)
-aiohttp==3.14.3
+aiohttp==3.14.4
+
+# Certificados raíz. No lo pide el bot: llega por httpx (python-telegram-bot).
+# Mínimo y no exacto a propósito: un almacén de certificados fijado se queda
+# viejo, y así ninguna compilación vuelve a uno con avisos (GHSA-6q48-6c7w-9gw2).
+certifi>=2026.10.19
 
 # Telethon (cliente MTProto). NO es solo para scripts: lo usan en runtime
 # reporter.py, user_signals.py, telethon_bridge.py y story_reader.py, o sea

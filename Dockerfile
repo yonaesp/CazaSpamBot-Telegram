@@ -1,4 +1,6 @@
-FROM python:3.11-slim
+# Nombre completo a propósito: en Podman un nombre corto que no esté en
+# shortnames.conf falla con «no stage or image found».
+FROM docker.io/library/python:3.11-slim
 
 ENV TZ=Europe/Madrid
 ENV DEBIAN_FRONTEND=noninteractive

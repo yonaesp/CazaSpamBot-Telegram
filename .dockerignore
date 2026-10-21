@@ -1,0 +1,15 @@
+# El Dockerfile solo copia requirements.txt, src/ y scripts/, pero sin esto el
+# contexto de compilación arrastraba todo lo demás (119 MB, 21-oct-2026): la
+# sesión de Telethon, la base de datos y el .env. Nada de eso debe salir de aquí,
+# ni siquiera hacia el motor de contenedores, y un futuro «COPY . .» lo metería
+# en la imagen.
+data/
+traffic/
+.env
+.env.*
+!.env.example
+.venv/
+.git/
+**/__pycache__/
+**/*.pyc
+*.bak*
