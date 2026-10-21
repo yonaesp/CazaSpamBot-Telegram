@@ -70,6 +70,7 @@ _RULES: tuple[str, ...] = (
     "tg_deeplink",
     "link_target_spam",
     "adult_link",
+    "via_bot_referral",
     "premium_new_link",
     "lols_match",
     "learned_similarity",

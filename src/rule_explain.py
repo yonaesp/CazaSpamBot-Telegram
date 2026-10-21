@@ -41,6 +41,7 @@ KNOWN_RULES: frozenset[str] = frozenset({
     "forward_first_msg",
     "first_msg_media",
     "via_bot_spam",
+    "via_bot_referral",
     "learned_similarity",
     # --- Comportamiento ---
     "jfm_fast",

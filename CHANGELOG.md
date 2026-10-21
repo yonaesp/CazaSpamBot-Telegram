@@ -4,6 +4,14 @@ Cambios relevantes de CazaSpamBot, lo más reciente arriba. Se anotan hitos, no
 cada commit: para el detalle está el historial de git. Sin números de versión
 porque el bot es un servicio en producción continua, no un paquete que se libera.
 
+## 2026-10 · Referidos publicados con un bot inline
+
+Quien publica con un bot inline un anuncio con su propio enlace de referido (el
+caso: cajas de premios de una mini-app con `startapp=r_<su id>`) cae baneado,
+también siendo miembro antiguo. Los demás mensajes con botones vía bot (encuestas,
+juegos) se siguen borrando sin ban, y el aviso al admin trae ahora la copia del
+mensaje y sus botones, que antes no enseñaba.
+
 ## 2026-10 · Porno con enlace y el guion del «trabajo extra»
 
 Dos spams del 20-oct que el bot no llegó a banear. Nueva regla dura `adult_link`

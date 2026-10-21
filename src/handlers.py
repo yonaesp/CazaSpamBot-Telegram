@@ -172,7 +172,7 @@ _CLAVE_AVISO_TRUST = "_aviso_trust_visto"
 
 HARD_RULES_BAN = frozenset({
     "cas_match", "lols_match", "federation_known_ban", "reaction_farming",
-    "link_target_spam", "adult_link",
+    "link_target_spam", "adult_link", "via_bot_referral",
 })
 
 
@@ -2910,15 +2910,62 @@ async def _moderate_channel_message(context, db, cfg, msg) -> None:
             pass
 
 
+# Un anuncio con el enlace de referido de quien lo publica es ban directo, sin
+# pasar por la confianza: el caso que lo originó era un miembro de 2025.
+SCORE_REFERIDO_VIA_BOT = 100
+
+
+def _botones_para_aviso(msg, tope: int = 5) -> str:
+    """Los botones del mensaje, uno por línea, para el aviso privado al admin."""
+    lineas = []
+    for row in getattr(getattr(msg, "reply_markup", None), "inline_keyboard", None) or []:
+        for btn in row:
+            linea = f"• «{_h.escape(getattr(btn, 'text', '') or '?')}»"
+            url = getattr(btn, "url", None)
+            if url:
+                linea += f" → <code>{_h.escape(url)}</code>"
+            lineas.append(linea + "\n")
+    return "".join(lineas[:tope])
+
+
 async def _moderate_via_bot_message(context, db, cfg, msg, user) -> bool:
-    """Mensaje posteado por un user VÍA inline bot. Si tiene botones spam,
-    borra el mensaje y avisa al admin (NO autobanea al user: puede ser
-    establecido y haber sido engañado). Devuelve True si actuó."""
+    """Mensaje posteado por un user VÍA inline bot. Con su enlace de referido en un
+    botón → ban (ver `inline_buttons.enlaces_de_referido`). Con otros botones, solo
+    borra y avisa al admin: puede ser una encuesta o un juego. Devuelve True si actuó."""
     bhit = buttons_det.check(msg)
     if not bhit:
         return False
+    # El dueño del bot y la lista blanca siguen el camino normal, que los deja pasar.
+    # Los admins del chat los protege la guarda de `_apply_action`.
+    if user.id == cfg.admin_user_id or db.is_whitelisted(msg.chat_id, user.id):
+        return False
     via = getattr(msg, "via_bot", None)
     via_uname = getattr(via, "username", None) if via else None
+    referidos = buttons_det.enlaces_de_referido(msg, user.id)
+    if referidos:
+        log.info("via_bot referido user=%s (@%s) chat=%s bot=@%s → ban",
+                 user.id, user.username, msg.chat_id, via_uname)
+        # `_apply_action` copia el mensaje al privado ANTES de borrarlo: así el admin
+        # ve qué se publicó (el aviso de solo borrar no lo enseñaba).
+        await _apply_action(
+            context, db, cfg, chat_id=msg.chat_id, chat_title=msg.chat.title,
+            user_id=user.id, username=user.username, message_id=msg.message_id,
+            decision=Decision(
+                action="ban", score=SCORE_REFERIDO_VIA_BOT, rule="via_bot_referral",
+                reason=t("reason.via_bot_referral", bot=via_uname or "?"),
+                payload={"via_bot": via_uname, "urls": referidos[:3]},
+            ),
+            original_text=(msg.text or msg.caption), first_name=user.first_name,
+        )
+        return True
+    # Copia al privado antes de borrar: sin ella el admin recibía «mensaje borrado»
+    # sin poder ver qué era.
+    if cfg.admin_notify_chat_id:
+        try:
+            await context.bot.copy_message(chat_id=cfg.admin_notify_chat_id,
+                                           from_chat_id=msg.chat_id, message_id=msg.message_id)
+        except TelegramError as exc:
+            log.debug("via_bot copia al admin fallo: %s", exc)
     # Borrar el mensaje
     try:
         await context.bot.delete_message(chat_id=msg.chat_id, message_id=msg.message_id)
@@ -2943,6 +2990,7 @@ async def _moderate_via_bot_message(context, db, cfg, msg, user) -> bool:
                     name=display,
                     via_bot=via_uname or "?",
                     n_buttons=bhit.payload.get("n_buttons", "?"),
+                    botones=_botones_para_aviso(msg),
                 ),
                 parse_mode="HTML", disable_web_page_preview=True,
             )

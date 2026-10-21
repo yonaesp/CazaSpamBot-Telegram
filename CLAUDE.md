@@ -1,7 +1,7 @@
 # CazaSpamBot — Bot Antispam Telegram
 
 Bot de moderación antispam **en producción 24/7**, multi-grupo, federado y **bilingüe** (es/en).
-~23.000 LOC en `src/`, Docker, **1691 tests**, 25 detectores (un módulo cada uno en `src/detectors/`).
+~23.000 LOC en `src/`, Docker, **1710 tests**, 25 detectores (un módulo cada uno en `src/detectors/`).
 
 > **Estado: PRODUCCIÓN.** No es un esqueleto. Cualquier cambio afecta grupos reales con miles de usuarios. **Investiga > Confirma > Actúa.**
 
@@ -73,7 +73,7 @@ nativa; se itera `banChatMember` sobre los chats donde el bot es admin.
 
 **Todo el texto que ve el usuario vive en `src/locales/<código>.json`.** Nada de textos en el código.
 
-- `es.json` / `en.json`, **1.174 claves** cada uno. Idioma GLOBAL de la instancia.
+- `es.json` / `en.json`, **1.179 claves** cada uno. Idioma GLOBAL de la instancia.
 - **Autodescubrimiento**: soltar un `fr.json` basta para que `/idioma fr` funcione. Cero cambios de código.
 - **Fallback por clave** al español: un idioma al 40 % ya es usable.
 - **A prueba de fallos**: un JSON roto se ignora con un log y el bot sigue. Por eso son JSON y no módulos `.py` (un `.py` se ejecuta al importarse: una comilla mal puesta tumbaba el arranque).
@@ -389,6 +389,20 @@ dominio que se anuncia por el nombre (`adult_domains.txt`). ⚠️ **Fuera de
 test lo cazó: «cómo bloqueo el contenido xxx… pornhub.com» daba ban). La URL se
 quita del texto antes de contar, para que el dominio no cuente dos veces. Medido
 sobre 453 mensajes legítimos: ni una coincidencia de vocabulario.
+
+**Y el referido publicado con un bot inline: `via_bot_referral`**
+(`inline_buttons.enlaces_de_referido`, regla dura). Caso real (21-oct-2026, Windows
+11): «Lil Pani», miembro desde 2025 con 27 preguntas sobre Windows, publicó con
+@case_rush_bot un anuncio de cajas de premios con un botón a
+`t.me/case_rush_bot/app?startapp=r_<su id>`: cobra por cada uno que entre. El
+camino `via_bot` solo borraba y avisaba «no le he baneado», **sin enseñar qué era**.
+Ahora, un botón a un bot o mini-app cuyo `start`/`startapp` lleva **el id de quien
+publica** o empieza por `ref`/`r_`/`invite`/`aff` = ban por `_apply_action` (que
+copia el mensaje al privado antes de borrarlo). ⚠️ **El resto de botones vía bot
+NO banea**: encuestas (@vote) y juegos llevan callbacks, y un cheque de cripto
+(`t.me/send?start=CQ…`) lleva parámetro pero no es un referido (hay test). Esos
+siguen en «borrar y avisar», ahora con copia y la lista de botones. Solo había un
+caso en `moderation_log`: no hay más con qué medir.
 
 **Escribir pronto no castiga a quien el bot ya da por legítimo**
 (`_solo_prisa_sin_contenido` + `_is_very_legit_profile`, tras `decide()`). Caso real
@@ -790,4 +804,4 @@ Si el `gh` de la máquina está autenticado con **otra** cuenta o con un token q
 alcanza a este repo, no hace falta reconfigurar `gh`: basta exportar `GH_TOKEN` con
 el token bueno solo para esa ejecución. `gh` lo prefiere sobre su sesión guardada.
 
-*Actualizado: 2026-10-20 — 25 detectores, 1691 tests, 1.174 claves por idioma.*
+*Actualizado: 2026-10-21 — 25 detectores, 1710 tests, 1.179 claves por idioma.*
