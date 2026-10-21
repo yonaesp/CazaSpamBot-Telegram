@@ -61,7 +61,9 @@ nativa; se itera `banChatMember` sobre los chats donde el bot es admin.
 - Telethon 1.44 (MTProto) — **solo** para lo que Bot API no puede: reportes oficiales (`channels.reportSpam`), leer bio/fotos de perfil, admin_log, iter_messages histórico
 - SQLite WAL (`data/antispam.db`)
 - `confusable-homoglyphs` (UTS#39) para detección de nombres decorativos
-- Docker (`docker compose`), contenedor `cazaspam-bot`, **sin root: uid 10112** (10-oct-2026,
+- **Podman con root** desde el 17-oct-2026 (Docker retirado del servidor). `sudo docker …`
+  es un envoltorio (`/usr/local/bin/docker`): `docker compose` = el cliente compose sobre
+  la API de Podman, y lo demás, `podman`. Sin `buildx`. Contenedor `cazaspam-bot`, **sin root: uid 10112** (10-oct-2026,
   registro `/home/docs/uids-contenedores.md`). Escribe SOLO en `data/` y en
   `config/blacklist/custom/` (montada aparte con escritura; con todo `config/` en `:ro`,
   guardar palabras desde Telegram fallaba siempre). Si se añade otra ruta donde el bot
