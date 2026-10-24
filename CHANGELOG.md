@@ -4,6 +4,13 @@ Cambios relevantes de CazaSpamBot, lo más reciente arriba. Se anotan hitos, no
 cada commit: para el detalle está el historial de git. Sin números de versión
 porque el bot es un servicio en producción continua, no un paquete que se libera.
 
+## 2026-10 · El clasificador aprendido ya no castiga los mensajes largos
+
+En el Bayes, una palabra que no aparecía en ninguna muestra contaba como señal
+de spam en cuanto hubo más ejemplos legítimos que de spam. Una pregunta técnica
+larga de un recién llegado acabó silenciada y borrada. Ahora lo desconocido no
+cuenta: de 421 mensajes legítimos guardados, 47 puntuaban así y ahora ninguno.
+
 ## 2026-10 · Referidos publicados con un bot inline
 
 Quien publica con un bot inline un anuncio con su propio enlace de referido (el

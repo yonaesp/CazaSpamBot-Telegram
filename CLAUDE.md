@@ -1,7 +1,7 @@
 # CazaSpamBot — Bot Antispam Telegram
 
 Bot de moderación antispam **en producción 24/7**, multi-grupo, federado y **bilingüe** (es/en).
-~23.000 LOC en `src/`, Docker, **1710 tests**, 25 detectores (un módulo cada uno en `src/detectors/`).
+~23.000 LOC en `src/`, Docker, **1712 tests**, 25 detectores (un módulo cada uno en `src/detectors/`).
 
 > **Estado: PRODUCCIÓN.** No es un esqueleto. Cualquier cambio afecta grupos reales con miles de usuarios. **Investiga > Confirma > Actúa.**
 
@@ -555,6 +555,18 @@ días y en esa ventana había **1** ejemplo de spam y **0** legítimos (pide 10 
   días y 12 legítimos simulados: de 327 mensajes legítimos **ninguno sube** salvo dos
   que resultaron ser spam (Mila y DARK VECTOR, cuyos bans nunca se federaron).
 
+⚠️ **Una palabra NUNCA vista no es evidencia** (`naive_bayes_spam_prob` la salta).
+Con Laplace pesa hacia la clase con MENOS texto. Al activar el autoaprendizaje esa
+era el ham y el sesgo absolvía; el ham crece más rápido (40 al día) y el 24-oct ya
+eran 91 legítimos frente a 30 spams, así que cada palabra nueva sumaba +0,37 a
+spam y **un mensaje largo caía por ser largo**. Caso real (24-oct-2026, Windows
+11): «Andre», recién llegado, preguntó en 500 caracteres por qué la instalación de
+Windows no veía sus discos (partdisk, particionar, HDD…): p=0,997, mute y mensaje
+borrado. Medido sobre los textos guardados: **47 de 421 legítimos** (el 11 %, casi
+todo preguntas técnicas largas) puntuaban así y ahora **0**; de 169 spams, 18
+pierden esa señal y 9 de ellos siguen cayendo por otros detectores. Hay test de
+que la longitud no puede acusar.
+
 **Las muestras se cachean** (`_vector_muestra`, `_modelo_bayes`): antes se recalculaban
 TODAS en cada mensaje. Con 200 + 200 (el tamaño al que las lleva el autoaprendizaje)
 eran **38 ms por mensaje** en serie; ahora **3 ms**, con **0 resultados distintos** en
@@ -806,4 +818,4 @@ Si el `gh` de la máquina está autenticado con **otra** cuenta o con un token q
 alcanza a este repo, no hace falta reconfigurar `gh`: basta exportar `GH_TOKEN` con
 el token bueno solo para esa ejecución. `gh` lo prefiere sobre su sesión guardada.
 
-*Actualizado: 2026-10-21 — 25 detectores, 1710 tests, 1.179 claves por idioma.*
+*Actualizado: 2026-10-24 — 25 detectores, 1712 tests, 1.179 claves por idioma.*

@@ -255,3 +255,38 @@ def test_defaults_sin_vocabulario_tematico_ajeno():
     assert learning._DEFAULT_THEMATIC_TOKENS == []
     assert "que" in learning._STOPWORDS_ES
     assert "the" in learning._STOPWORDS_EN
+
+
+ANDRE = (
+    "Hola buenas noches, soy nuevo en el grupo, disculpen la molestia, quisiera algún "
+    "consejo respecto a mi pc, estoy tratando de formatear pero de los 3 disco duros qué "
+    "tengo (1 HDD y 2 SSD) ninguno me deja particionar ni formatear, me sale un mensaje que "
+    "dice en instalación de Windows 11: error al realizar la operación de disco, ya busque "
+    "por YouTube y me dicen que abra el comando(shif+F10) ya lo hice, puse partdisk y luego "
+    "list disk, pero cuando hago eso no me sale ninguno de los 3 disco que tengo"
+)
+
+
+def test_palabras_nunca_vistas_no_acusan():
+    """Caso real (24-oct-2026, Windows 11): con más texto legítimo que spam en las
+    muestras (91 frente a 30), Laplace hacía que cada palabra NUNCA vista pesara
+    hacia spam (+0,37). Un recién llegado preguntó en 500 caracteres por qué la
+    instalación de Windows no veía sus discos: 36 palabras nuevas, p=0,997, mute y
+    mensaje borrado. Lo desconocido no es evidencia de nada: el resultado debe
+    quedarse en el prior, no subir con la longitud."""
+    ham_abundante = HAM_SAMPLES * 3  # el ham supera al spam, como en producción
+    p_corto = learning.naive_bayes_spam_prob("zorglub", SPAM_SAMPLES, ham_abundante)
+    p_largo = learning.naive_bayes_spam_prob(
+        " ".join(f"palabranueva{i}" for i in range(60)), SPAM_SAMPLES, ham_abundante)
+    prior = len(SPAM_SAMPLES) / (len(SPAM_SAMPLES) + len(ham_abundante))
+    assert abs(p_corto - prior) < 1e-9
+    assert abs(p_largo - prior) < 1e-9, "la longitud no puede acusar"
+    score, _ = learning.check_against_samples(ANDRE, SPAM_SAMPLES, ham_abundante)
+    assert score <= 0, f"la pregunta de Andre puntuó {score}"
+
+
+def test_lo_desconocido_no_tapa_el_spam_conocido():
+    """Ignorar lo nunca visto no deja ciego al Bayes: el vocabulario que sí salió
+    en spam sigue sumando aunque vaya rodeado de palabras nuevas."""
+    texto = "zorglub " + " ".join(SPAM_SAMPLES[:6]) + " flimflam"
+    assert learning.naive_bayes_spam_prob(texto, SPAM_SAMPLES, HAM_SAMPLES * 3) > 0.85

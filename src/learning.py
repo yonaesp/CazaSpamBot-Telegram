@@ -253,6 +253,15 @@ def naive_bayes_spam_prob(
         # Laplace smoothing
         n_tok_spam = spam_counts.get(tok, 0)
         n_tok_ham = ham_counts.get(tok, 0)
+        if not (n_tok_spam or n_tok_ham):
+            # Nunca visto en ninguna muestra: no es evidencia de nada. Con Laplace
+            # pesaría hacia la clase con MENOS texto, que aquí es el spam (30
+            # muestras frente a 91), así que cada palabra nueva sumaba +0,37 y un
+            # mensaje largo acababa en spam por ser largo. Caso real (24-oct-2026,
+            # Windows 11): un recién llegado preguntó en 500 caracteres por qué la
+            # instalación de Windows no veía sus discos (partdisk, particionar,
+            # HDD…), 36 palabras nuevas, p=0,997 y mute con el mensaje borrado.
+            continue
         p_t_given_spam = (n_tok_spam + 1) / (total_spam + V)
         p_t_given_ham = (n_tok_ham + 1) / (total_ham + V)
         weight = math.log(p_t_given_spam) - math.log(p_t_given_ham)
