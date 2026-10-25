@@ -1,12 +1,12 @@
 """«¿Quizás te referías a @x?»: una mención a un desconocido que se parece a un miembro.
 
-Caso real (24-oct-2026, Domótica): «Juan M.», 124 mensajes en el grupo, escribió
+Caso real (25-oct-2026, Domótica): «Juan M.», 124 mensajes en el grupo, escribió
 «Era porque @Moliko tenía varios Spot…» queriendo decir @Molkio. El bot lo trató
 como una mención a un externo: aviso suave en el grupo y «Algo raro de alguien de
 confianza» por privado al admin, que tuvo que mirarlo para nada. Ahora esa mención
 no cuenta como externa (`external_mention.posible_errata`) y el bot responde al
-mensaje con la sugerencia. Si el autor lo corrige editando, la sugerencia se borra
-en el momento; si no, a los 10 min.
+mensaje citando justo el «@Moliko», con la sugerencia. Si el autor lo corrige
+editando, la sugerencia se borra en el momento; si no, a los 10 min.
 
 Tres cosas que no se deben romper:
 - Los @usuario van en `<code>`: así no se avisa a nadie (ni al miembro sugerido
@@ -24,11 +24,13 @@ import html
 import logging
 import time
 
-from telegram.error import TelegramError
+from telegram import MessageEntity, ReplyParameters
+from telegram.error import BadRequest, TelegramError
 from telegram.ext import ContextTypes
 
 from .db import DB
 from .detectors import external_mention as ext_det
+from .detectors import trozo_entidad
 from .i18n import t
 
 log = logging.getLogger(__name__)
@@ -57,11 +59,15 @@ async def sugerir(context: ContextTypes.DEFAULT_TYPE, db: DB, cfg, msg,
     texto = "\n".join(t("errata.linea", mal=html.escape(mal), bien=html.escape(bien))
                       for mal, bien in erratas[:3]) + t("errata.pie")
     try:
-        sent = await context.bot.send_message(
-            chat_id=msg.chat_id, text=texto, parse_mode="HTML",
-            reply_to_message_id=msg.message_id,
-            disable_notification=True, allow_sending_without_reply=False,
-        )
+        try:
+            sent = await _responder(context.bot, msg, texto, cita=_cita(msg, erratas[0][0]))
+        except BadRequest as exc:
+            # La cita tiene que casar letra a letra con el mensaje; si Telegram
+            # no la acepta, la respuesta normal también señala el mensaje.
+            if "quote" not in str(exc).lower():
+                raise
+            log.info("errata: Telegram no aceptó la cita (%s); respondo sin ella", exc)
+            sent = await _responder(context.bot, msg, texto, cita=None)
     except TelegramError as exc:
         log.warning("errata: no se pudo sugerir en chat=%s msg=%s: %s",
                     msg.chat_id, msg.message_id, exc)
@@ -77,6 +83,26 @@ async def sugerir(context: ContextTypes.DEFAULT_TYPE, db: DB, cfg, msg,
                     data={"chat_id": msg.chat_id, "user_msg_id": msg.message_id,
                           "bot_msg_id": sent.message_id},
                     name=f"del_errata_{msg.chat_id}_{sent.message_id}")
+
+
+def _cita(msg, mal: str) -> tuple[str, int] | None:
+    """(«@lo_mal_escrito», posición) para citar justo el fallo, o None."""
+    texto = msg.text or msg.caption or ""
+    for e in ext_det._extract_entities(msg):
+        if e.type == MessageEntity.MENTION:
+            trozo = trozo_entidad(texto, e.offset, e.length)
+            if trozo.lstrip("@").lower() == mal.lower():
+                return trozo, e.offset   # offset ya en UTF-16, como lo pide Telegram
+    return None
+
+
+async def _responder(bot, msg, texto: str, cita: tuple[str, int] | None):
+    return await bot.send_message(
+        chat_id=msg.chat_id, text=texto, parse_mode="HTML", disable_notification=True,
+        reply_parameters=ReplyParameters(
+            message_id=msg.message_id, allow_sending_without_reply=False,
+            quote=cita[0] if cita else None, quote_position=cita[1] if cita else None),
+    )
 
 
 async def al_editar(context: ContextTypes.DEFAULT_TYPE, db: DB, msg) -> None:

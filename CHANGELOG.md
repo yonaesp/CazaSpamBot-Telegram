@@ -8,7 +8,8 @@ porque el bot es un servicio en producción continua, no un paquete que se liber
 
 Un @ mal escrito ya no se trata como una mención a alguien de fuera. Si el
 @usuario no lo conoce el bot y está a una tecla del de un miembro del grupo
-(`@Moliko` por `@Molkio`, el caso real), no puntúa y el bot responde «No encuentro
+(`@Moliko` por `@Molkio`, el caso real), no puntúa y el bot responde citando
+ese @ «No encuentro
 a @Moliko en el grupo. ¿Quizás te referías a @Molkio?», sin avisar a ninguno de
 los dos. Si el autor lo corrige editando, la pregunta se borra; si no, a los 10
 minutos. No se aplica en los primeros mensajes, donde parecerse al @ de un

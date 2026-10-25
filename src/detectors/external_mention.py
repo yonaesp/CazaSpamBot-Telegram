@@ -75,7 +75,7 @@ def posible_errata(handle: str, candidatos) -> str | None:
     """El @usuario de un miembro al que `handle` se parece lo bastante, o None.
 
     Una tecla de más, de menos, cambiada o dos cruzadas (dos si el nombre pasa de
-    nueve letras). Caso real (24-oct-2026, Domótica): «Era porque @Moliko tenía
+    nueve letras). Caso real (25-oct-2026, Domótica): «Era porque @Moliko tenía
     varios Spot», con el miembro @Molkio, 382 mensajes. Si dos miembros quedan
     igual de cerca no se adivina: una sugerencia equivocada señala a otra persona.
     Medido sobre 786 textos guardados: de 111 menciones a desconocidos (casi todas

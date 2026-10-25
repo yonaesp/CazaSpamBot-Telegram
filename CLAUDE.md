@@ -1,7 +1,7 @@
 # CazaSpamBot — Bot Antispam Telegram
 
 Bot de moderación antispam **en producción 24/7**, multi-grupo, federado y **bilingüe** (es/en).
-~23.000 LOC en `src/`, Docker, **1737 tests**, 25 detectores (un módulo cada uno en `src/detectors/`).
+~23.000 LOC en `src/`, Docker, **1739 tests**, 25 detectores (un módulo cada uno en `src/detectors/`).
 
 > **Estado: PRODUCCIÓN.** No es un esqueleto. Cualquier cambio afecta grupos reales con miles de usuarios. **Investiga > Confirma > Actúa.**
 
@@ -407,14 +407,15 @@ siguen en «borrar y avisar», ahora con copia y la lista de botones. Solo habí
 caso en `moderation_log`: no hay más con qué medir.
 
 **Un @ mal escrito no es una mención externa: `errata_mencion`.** Caso real
-(24-oct-2026, Domótica): «Juan M.», confianza 9/10, escribió «Era porque @Moliko
+(25-oct-2026, Domótica): «Juan M.», confianza 9/10, escribió «Era porque @Moliko
 tenía varios Spot…» por @Molkio (382 mensajes): aviso suave en el grupo y «Algo
 raro de alguien de confianza» al admin, para nada. Ahora un @ que el bot **no
 conoce** (si resuelve a alguien, es otra persona) y que está a una tecla del de un
 miembro (`external_mention.posible_errata`: una edición o dos letras vecinas
 cruzadas; dos si pasa de nueve letras; empate entre dos miembros = no se adivina)
-no puntúa, y en las salidas sin acción el bot responde «No encuentro a @x en el
-grupo. ¿Quizás te referías a @y?». Se borra al corregirlo editando
+no puntúa, y en las salidas sin acción el bot responde **citando justo el @ mal
+escrito** (`ReplyParameters.quote`, posición en UTF-16; si Telegram rechaza la cita,
+responde sin ella) «No encuentro a @x en el grupo. ¿Quizás te referías a @y?». Se borra al corregirlo editando
 (`on_edited_message`, aunque el re-escaneo esté apagado) o a los 10 min; va en
 `gentle_warnings` (columna `errata`) para heredar la cascada al borrar y la
 limpieza al banear, y `barrido_job` cubre los reinicios. ⚠️ **Nunca en los
@@ -836,4 +837,4 @@ Si el `gh` de la máquina está autenticado con **otra** cuenta o con un token q
 alcanza a este repo, no hace falta reconfigurar `gh`: basta exportar `GH_TOKEN` con
 el token bueno solo para esa ejecución. `gh` lo prefiere sobre su sesión guardada.
 
-*Actualizado: 2026-10-25 — 25 detectores, 1737 tests, 1.181 claves por idioma.*
+*Actualizado: 2026-10-25 — 25 detectores, 1739 tests, 1.181 claves por idioma.*

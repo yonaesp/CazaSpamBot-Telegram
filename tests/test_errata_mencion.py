@@ -1,6 +1,6 @@
 """«¿Quizás te referías a @x?» (`errata_mencion` + `external_mention.posible_errata`).
 
-Caso real (24-oct-2026, Domótica): «Juan M.» (124 mensajes, confianza 9/10)
+Caso real (25-oct-2026, Domótica): «Juan M.» (124 mensajes, confianza 9/10)
 escribió «Era porque @Moliko tenía varios Spot…» queriendo decir @Molkio, miembro
 con 382 mensajes. Salió como mención a un externo: aviso suave en el grupo y
 «Algo raro de alguien de confianza» por privado. Ahora no puntúa y el bot sugiere
@@ -157,11 +157,32 @@ async def test_sugiere_sin_avisar_a_nadie(tmp_db):
     ctx = _ctx(tmp_db)
     await errata_mencion.sugerir(ctx, tmp_db, _CFG, _msg(), [("Moliko", "Molkio")])
     kw = ctx.bot.send_message.await_args.kwargs
-    assert kw["reply_to_message_id"] == 451443
+    rp = kw["reply_parameters"]
+    # Cita justo lo mal escrito, en su sitio (posición en UTF-16, como pide Telegram)
+    assert (rp.message_id, rp.quote, rp.quote_position) == (451443, "@Moliko", TEXTO.index("@"))
+    assert rp.allow_sending_without_reply is False
     # En <code>: ni Molkio ni el dueño de @Moliko reciben una mención del bot
     assert "<code>@Molkio</code>" in kw["text"] and "<code>@Moliko</code>" in kw["text"]
     assert kw["text"].replace("<code>@Molkio</code>", "").replace("<code>@Moliko</code>", "").count("@") == 0
     assert "No encuentro" in kw["text"]
+    assert tmp_db.errata_pendiente(CHAT, 451443) == (9001, [["Moliko", "Molkio"]])
+
+
+def test_la_cita_cuenta_en_utf16():
+    """Con un emoji delante, la posición de Python y la de Telegram difieren."""
+    m = _msg("🔊🔊 Era porque @Moliko tenía")
+    m.entities[0] = MessageEntity(type=MessageEntity.MENTION, offset=16, length=7)
+    assert errata_mencion._cita(m, "moliko") == ("@Moliko", 16)
+
+
+@pytest.mark.asyncio
+async def test_si_telegram_rechaza_la_cita_responde_sin_ella(tmp_db):
+    from telegram.error import BadRequest
+    ctx = _ctx(tmp_db)
+    ctx.bot.send_message.side_effect = [BadRequest("Quote_text_invalid"), NS(message_id=9001)]
+    await errata_mencion.sugerir(ctx, tmp_db, _CFG, _msg(), [("Moliko", "Molkio")])
+    citas = [c.kwargs["reply_parameters"].quote for c in ctx.bot.send_message.await_args_list]
+    assert citas == ["@Moliko", None]
     assert tmp_db.errata_pendiente(CHAT, 451443) == (9001, [["Moliko", "Molkio"]])
 
 
