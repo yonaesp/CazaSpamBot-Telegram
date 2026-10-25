@@ -122,6 +122,13 @@ async def cleanup_nightly_job(context: ContextTypes.DEFAULT_TYPE) -> None:
         ).rowcount
         stats["gentle_warnings"] = n
 
+        # avisos_admin > 48 h: es lo que Telegram deja editar un mensaje, así que
+        # después ya no puede llegar la corrección que los daría por resueltos.
+        n = c.execute(
+            "DELETE FROM avisos_admin WHERE ts < ?", (now - 2 * 86400,),
+        ).rowcount
+        stats["avisos_admin"] = n
+
         # pending_verifications verificadas hace >7 días
         n = c.execute(
             "DELETE FROM pending_verifications WHERE verified_at IS NOT NULL AND verified_at < ?",

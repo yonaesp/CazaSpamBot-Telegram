@@ -977,6 +977,7 @@
   "hdl.btn.tn_nothing": "👌 Nada",
   "hdl.btn.tn_warn": "⚠️ Avisar",
   "hdl.btn.tn_ban": "🔨 Banear",
+  "hdl.tn_corregido": "✅ <b>Corregido por su autor</b>\n\n{name} (id: {uid}) editó su mensaje en {chat} y ya no salta nada. No hace falta que hagas nada.{enlace}\n\n<b>Antes decía:</b>\n<code>{antes}</code>",
   "hdl.tn_ack_nothing": "Vale, lo dejo estar.",
   "hdl.tn_ack_warn": "Aviso puesto ({n}).",
   "hdl.tn_ack_ban": "Baneado en todos tus grupos.",

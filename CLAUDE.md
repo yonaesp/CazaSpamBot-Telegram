@@ -1,7 +1,7 @@
 # CazaSpamBot — Bot Antispam Telegram
 
 Bot de moderación antispam **en producción 24/7**, multi-grupo, federado y **bilingüe** (es/en).
-~23.000 LOC en `src/`, Docker, **1739 tests**, 25 detectores (un módulo cada uno en `src/detectors/`).
+~23.000 LOC en `src/`, Docker, **1745 tests**, 25 detectores (un módulo cada uno en `src/detectors/`).
 
 > **Estado: PRODUCCIÓN.** No es un esqueleto. Cualquier cambio afecta grupos reales con miles de usuarios. **Investiga > Confirma > Actúa.**
 
@@ -75,7 +75,7 @@ nativa; se itera `banChatMember` sobre los chats donde el bot es admin.
 
 **Todo el texto que ve el usuario vive en `src/locales/<código>.json`.** Nada de textos en el código.
 
-- `es.json` / `en.json`, **1.181 claves** cada uno. Idioma GLOBAL de la instancia.
+- `es.json` / `en.json`, **1.182 claves** cada uno. Idioma GLOBAL de la instancia.
 - **Autodescubrimiento**: soltar un `fr.json` basta para que `/idioma fr` funcione. Cero cambios de código.
 - **Fallback por clave** al español: un idioma al 40 % ya es usable.
 - **A prueba de fallos**: un JSON roto se ignora con un log y el bot sigue. Por eso son JSON y no módulos `.py` (un `.py` se ejecuta al importarse: una comilla mal puesta tumbaba el arranque).
@@ -424,6 +424,17 @@ ahí sigue puntuando. ⚠️ **Los @ van en `<code>`**: sin eso el bot mencionar
 miembro y al dueño de lo mal escrito, que puede ser cualquiera de fuera. Medido
 sobre 786 textos: de 111 menciones a desconocidos (casi todas bots de spam con
 nombres al azar) solo esta se parece a un miembro.
+
+**Y si el aviso ya salió y el autor lo corrige editando** (petición del admin,
+25-oct-2026): el camino del aviso suave (solo reglas borderline y alguien de
+confianza) guarda en `avisos_admin` el id del privado, el del aviso del grupo y el
+texto. Si una edición deja el mensaje sin ningún hit, `_aviso_resuelto_al_editar`
+**edita** el privado a «✅ Corregido por su autor», sin botones y con «Antes decía:»
+(editar no notifica, y la prueba queda por si era una cuenta robada borrando el
+rastro), y borra el aviso del grupo. Una edición que sigue igual no repite ninguno de
+los dos. ⚠️ **Solo ese camino se registra** (hay test): lo que el bot habría baneado
+no se da por bueno porque se edite. Si el admin ya pulsó un botón, la fila se borra
+y su decisión no se reescribe.
 
 **Escribir pronto no castiga a quien el bot ya da por legítimo**
 (`_solo_prisa_sin_contenido` + `_is_very_legit_profile`, tras `decide()`). Caso real
@@ -837,4 +848,4 @@ Si el `gh` de la máquina está autenticado con **otra** cuenta o con un token q
 alcanza a este repo, no hace falta reconfigurar `gh`: basta exportar `GH_TOKEN` con
 el token bueno solo para esa ejecución. `gh` lo prefiere sobre su sesión guardada.
 
-*Actualizado: 2026-10-25 — 25 detectores, 1739 tests, 1.181 claves por idioma.*
+*Actualizado: 2026-10-25 — 25 detectores, 1745 tests, 1.182 claves por idioma.*

@@ -4,6 +4,14 @@ Cambios relevantes de CazaSpamBot, lo más reciente arriba. Se anotan hitos, no
 cada commit: para el detalle está el historial de git. Sin números de versión
 porque el bot es un servicio en producción continua, no un paquete que se libera.
 
+## 2026-10 · El aviso se da por resuelto si el autor lo corrige
+
+Cuando alguien de confianza menciona un chat ajeno o pone un enlace, el bot solo
+le avisa con suavidad y te lo cuenta por privado. Si después lo corrige editando,
+ese privado se actualiza solo a «✅ Corregido por su autor», sin notificación y
+conservando lo que decía antes, y el aviso del grupo se borra. Lo que el bot
+habría baneado no se da por bueno aunque se edite.
+
 ## 2026-10 · «¿Quizás te referías a @…?»
 
 Un @ mal escrito ya no se trata como una mención a alguien de fuera. Si el

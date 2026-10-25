@@ -219,20 +219,22 @@ def test_el_aviso_silenciado_no_se_manda(monkeypatch):
 # Comparten la clave `hdl.enlace_al_msg` en vez de tener cada uno la suya, que es
 # como acaba una desactualizada.
 
-def test_los_cuatro_avisos_por_privado_admiten_enlace():
+def test_los_cinco_avisos_por_privado_admiten_enlace():
     for lang in ("es", "en"):
         d = json.loads(Path(f"src/locales/{lang}.json").read_text(encoding="utf-8"))
         for clave in ("hdl.trust_notice_dm", "hdl.ocr_review_dm",
-                      "hdl.review_dm", "report.admin_dm"):
+                      "hdl.review_dm", "report.admin_dm",
+                      # el mismo aviso de confianza, ya resuelto por su autor
+                      "hdl.tn_corregido"):
             assert "{enlace}" in d[clave], f"[{lang}] {clave} sin hueco de enlace"
 
 
-def test_los_cuatro_lo_rellenan_desde_el_codigo():
+def test_los_cinco_lo_rellenan_desde_el_codigo():
     """Un `{enlace}` en la plantilla que nadie rellena revienta el aviso entero
     con un KeyError, y el admin se queda sin enterarse de nada."""
     fuentes = (Path("src/handlers.py").read_text(encoding="utf-8")
                + Path("src/admin_report.py").read_text(encoding="utf-8"))
-    assert fuentes.count('enlace=t("hdl.enlace_al_msg"') == 4
+    assert fuentes.count('enlace=t("hdl.enlace_al_msg"') == 5
 
 
 def test_el_reporte_de_admin_enlaza_al_mensaje_REPORTADO():

@@ -977,6 +977,7 @@
   "hdl.btn.tn_nothing": "👌 Nothing",
   "hdl.btn.tn_warn": "⚠️ Warn",
   "hdl.btn.tn_ban": "🔨 Ban",
+  "hdl.tn_corregido": "✅ <b>Fixed by its author</b>\n\n{name} (id: {uid}) edited their message in {chat} and nothing triggers any more. No need to do anything.{enlace}\n\n<b>Before, it said:</b>\n<code>{antes}</code>",
   "hdl.tn_ack_nothing": "Fine, leaving it.",
   "hdl.tn_ack_warn": "Warning added ({n}).",
   "hdl.tn_ack_ban": "Banned across all your groups.",

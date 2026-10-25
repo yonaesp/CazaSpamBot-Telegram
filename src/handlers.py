@@ -1977,6 +1977,8 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
             reenviado=bool(getattr(msg, "forward_origin", None)))
         await _soltar_aviso_imagen(context, db, cfg, msg, user, _aviso_imagen)
         await errata_mencion.sugerir(context, db, cfg, msg, _erratas)
+        if is_edit:
+            await _aviso_resuelto_al_editar(context, db, msg, user)
         return
 
     # Filtrar reglas suprimidas (admin marcó "no era spam").
@@ -2021,8 +2023,13 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     if (only_borderline and not _motivo_sin_confianza
             and gentle_warning.is_trusted(db, chat_id, user.id)):
         reason = " | ".join(h.reason for h in real)
+        if is_edit and db.hay_aviso_admin(chat_id, msg.message_id):
+            # Editó y sigue igual: ya se le avisó por ESTE mensaje, y repetirlo
+            # dejaría dos avisos en el grupo y otro privado idéntico.
+            log.info("user=%s editó msg=%s sin corregirlo: el aviso suave ya está", user.id, msg.message_id)
+            return
         log.info("user=%s trusted en chat=%s → gentle_warning en lugar de acción", user.id, chat_id)
-        await gentle_warning.send(context, db, msg, reason_hint=reason[:200])
+        _publico = await gentle_warning.send(context, db, msg, reason_hint=reason[:200])
         # Logamos en moderation_log para auditoría
         db.log_action(
             chat_id=chat_id, user_id=user.id, username=user.username,
@@ -2038,12 +2045,16 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         # un enlace a un canal de packs sobrevivió porque su autor llevaba dos años
         # en el grupo, y quien avisó fue otro miembro). Mismo aviso y mismos botones
         # que el atajo por trust alto: nada / avisar / banear.
-        await _send_trust_notice(
+        _aviso = await _send_trust_notice(
             context, db, cfg, msg, user,
             rules=[h.rule for h in real], reason=reason,
             proposed_action="gentle_warn",
             trust=_trust_score_cached(context, db, chat_id, user.id),
         )
+        # Para darlo por resuelto si lo corrige editando (`_aviso_resuelto_al_editar`).
+        if _aviso:
+            db.guardar_aviso_admin(chat_id, msg.message_id, cfg.admin_notify_chat_id, _aviso,
+                                   _publico, (msg.text or msg.caption or "")[:600])
         return
 
     is_first_attack = is_first and any(
@@ -2484,8 +2495,10 @@ async def _send_trust_notice(
     proposed_action: str,
     trust: int,
     avala_historial: bool = True,
-) -> None:
+) -> int | None:
     """Aviso al admin cuando se ha decidido NO castigar algo que había saltado.
+
+    Devuelve el id del privado enviado (None si no se manda).
 
     `avala_historial` elige la cabecera y el pie, y **no es cosmético**: de los
     cuatro sitios que mandan este aviso, dos lo hacen con el trust por los suelos
@@ -2560,12 +2573,54 @@ async def _send_trust_notice(
         InlineKeyboardButton(t("hdl.btn.tn_ban"), callback_data=f"tnote:ban:{base}"),
     ], [notify_prefs.mute_button("trust_skip")]])
     try:
-        await context.bot.send_message(
+        enviado = await context.bot.send_message(
             chat_id=admin_dm, text=info, parse_mode="HTML", reply_markup=kb,
             disable_web_page_preview=True,
         )
     except TelegramError as exc:
         log.warning("trust notice DM fallo: %s", exc)
+        return None
+    return getattr(enviado, "message_id", None)
+
+
+async def _aviso_resuelto_al_editar(context, db: DB, msg, user) -> None:
+    """El autor corrigió editando lo que provocó un aviso suave: se da por resuelto.
+
+    El privado se EDITA (no avisa) en vez de borrarse: si ya lo leíste no desaparece
+    sin explicación, y se queda lo que decía antes, por si era una cuenta robada
+    borrando el rastro. Sin botones, porque ya no hay nada que decidir. El aviso del
+    grupo sí se borra: hablaba de algo que ya no está.
+
+    Solo llega aquí lo del aviso suave (mención o enlace de alguien de confianza),
+    que es lo único que se registra en `avisos_admin`: lo que el bot habría baneado
+    no se da por bueno porque se edite.
+    """
+    row = db.pop_aviso_admin(msg.chat_id, msg.message_id)
+    if row is None:
+        return
+    url = _enlace_al_mensaje(msg)
+    texto = t(
+        "hdl.tn_corregido",
+        name=_h.escape((user.first_name or "user")[:40]), uid=user.id,
+        chat=_h.escape(str(msg.chat.title or msg.chat_id)),
+        enlace=t("hdl.enlace_al_msg", url=url) if url else "",
+        antes=_h.escape((row["texto"] or "")[:300]),
+    )
+    try:
+        await context.bot.edit_message_text(
+            chat_id=row["admin_chat_id"], message_id=row["aviso_msg_id"], text=texto,
+            parse_mode="HTML", reply_markup=None, disable_web_page_preview=True,
+        )
+    except TelegramError as exc:
+        log.info("aviso corregido: no se pudo editar el privado %s: %s", row["aviso_msg_id"], exc)
+    if row["publico_msg_id"]:
+        try:
+            await context.bot.delete_message(chat_id=msg.chat_id, message_id=row["publico_msg_id"])
+        except TelegramError:
+            pass   # el aviso suave se borra solo a los 5 min: puede que ya no esté
+        db.olvidar_gentle_warning(msg.chat_id, msg.message_id, row["publico_msg_id"])
+    log.info("aviso suave resuelto: user=%s corrigió msg=%s editando en chat=%s",
+             user.id, msg.message_id, msg.chat_id)
 
 
 async def on_trust_notice_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -2584,6 +2639,8 @@ async def on_trust_notice_callback(update: Update, context: ContextTypes.DEFAULT
     except Exception as exc:  # noqa: BLE001
         await q.answer(t("hdl.callback_invalid", error=exc))
         return
+    # Ya has decidido: una corrección posterior no reescribe ese aviso.
+    db.pop_aviso_admin(chat_id, msg_id)
 
     if verdicto == "nada":
         db.log_action(

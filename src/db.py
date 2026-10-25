@@ -236,6 +236,19 @@ CREATE TABLE IF NOT EXISTS gentle_warnings (
 );
 CREATE INDEX IF NOT EXISTS idx_gw_botmsg ON gentle_warnings(chat_id, bot_msg_id);
 
+-- Aviso por privado al admin de un aviso suave (mención o enlace de alguien de
+-- confianza), para poder darlo por resuelto si el autor lo corrige editando.
+CREATE TABLE IF NOT EXISTS avisos_admin (
+    chat_id        INTEGER NOT NULL,
+    user_msg_id    INTEGER NOT NULL,
+    admin_chat_id  INTEGER NOT NULL,
+    aviso_msg_id   INTEGER NOT NULL,
+    publico_msg_id INTEGER,
+    texto          TEXT,
+    ts             REAL NOT NULL,
+    PRIMARY KEY (chat_id, user_msg_id)
+);
+
 CREATE TABLE IF NOT EXISTS weekly_msg_log (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     chat_id     INTEGER NOT NULL,
@@ -1533,6 +1546,38 @@ class DB:
                 (chat_id, user_msg_id, bot_msg_id, user_id, time.time(),
                  json.dumps(errata, ensure_ascii=False) if errata else None),
             )
+
+    def olvidar_gentle_warning(self, chat_id: int, user_msg_id: int, bot_msg_id: int) -> None:
+        """Borra la fila solo si sigue siendo la de ESE aviso del bot."""
+        with self._cur() as c:
+            c.execute("DELETE FROM gentle_warnings WHERE chat_id=? AND user_msg_id=? AND bot_msg_id=?",
+                      (chat_id, user_msg_id, bot_msg_id))
+
+    # ------------- avisos_admin -------------
+
+    def guardar_aviso_admin(self, chat_id: int, user_msg_id: int, admin_chat_id: int,
+                            aviso_msg_id: int, publico_msg_id: int | None, texto: str | None) -> None:
+        with self._cur() as c:
+            c.execute(
+                "INSERT OR REPLACE INTO avisos_admin (chat_id, user_msg_id, admin_chat_id, "
+                "aviso_msg_id, publico_msg_id, texto, ts) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (chat_id, user_msg_id, admin_chat_id, aviso_msg_id, publico_msg_id, texto, time.time()),
+            )
+
+    def hay_aviso_admin(self, chat_id: int, user_msg_id: int) -> bool:
+        with self._cur() as c:
+            return c.execute("SELECT 1 FROM avisos_admin WHERE chat_id=? AND user_msg_id=?",
+                             (chat_id, user_msg_id)).fetchone() is not None
+
+    def pop_aviso_admin(self, chat_id: int, user_msg_id: int) -> sqlite3.Row | None:
+        """Saca el aviso pendiente de ese mensaje (o None si no hay o ya se resolvió)."""
+        with self._cur() as c:
+            row = c.execute("SELECT * FROM avisos_admin WHERE chat_id=? AND user_msg_id=?",
+                            (chat_id, user_msg_id)).fetchone()
+            if row:
+                c.execute("DELETE FROM avisos_admin WHERE chat_id=? AND user_msg_id=?",
+                          (chat_id, user_msg_id))
+        return row
 
     def errata_pendiente(self, chat_id: int, user_msg_id: int) -> tuple[int, list] | None:
         """(bot_msg_id, [[escrito, sugerido], …]) si ese mensaje tiene una sugerencia viva."""
