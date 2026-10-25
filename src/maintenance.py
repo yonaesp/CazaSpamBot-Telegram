@@ -406,6 +406,7 @@ async def notify_bot_overlap(context: ContextTypes.DEFAULT_TYPE) -> int:
                 await context.bot.send_message(
                     chat_id=destino, text=texto, parse_mode="HTML",
                     reply_markup=_overlap_keyboard(cid),
+                    disable_notification=notify_prefs.sin_sonido(context.bot_data.get("db"), importante=False),
                 )
             except TelegramError as exc:
                 # Sin marca: se reintenta en la siguiente pasada. Marcar aquí dejaría

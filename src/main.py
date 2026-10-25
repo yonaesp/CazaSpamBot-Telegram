@@ -17,7 +17,7 @@ from telegram.ext import (
     filters,
 )
 
-from . import admin, chat_picker, chat_settings_cmd, config_panel, errata_mencion, group_clean, lang_cmd, maintenance, quienfue_cmd, recien_llegados, scan_cmd, scanuser_cmd, telethon_bridge, topweekly, verification, warns_mod
+from . import admin, chat_picker, chat_settings_cmd, config_panel, errata_mencion, group_clean, lang_cmd, maintenance, notify_prefs, quienfue_cmd, recien_llegados, scan_cmd, scanuser_cmd, telethon_bridge, topweekly, verification, warns_mod
 from .config import load_config
 from .db import DB
 from .handlers import (
@@ -221,6 +221,7 @@ async def _on_error(update: object, context) -> None:
                 error_msg=_html.escape(str(err))[:300],
             ),
             parse_mode="HTML",
+            disable_notification=notify_prefs.sin_sonido(context.bot_data.get("db"), importante=True),
         )
     except Exception:  # noqa: BLE001 — nunca dejar que el error handler lance
         pass

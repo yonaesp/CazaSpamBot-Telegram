@@ -27,7 +27,7 @@ from telegram.error import TelegramError
 from telegram.ext import ContextTypes
 
 from . import borrado_diferido
-from . import user_signals
+from . import notify_prefs, user_signals
 from .db import DB
 from .detectors.unicode_script import non_allowed_ratio
 from .i18n import current_lang, t
@@ -881,6 +881,7 @@ async def _send_suspicious_review(context, db, cfg, chat, user, reasons, sig) ->
         await context.bot.send_message(
             chat_id=cfg.admin_notify_chat_id, text=text, parse_mode="HTML",
             reply_markup=kb, disable_web_page_preview=True,
+            disable_notification=notify_prefs.sin_sonido(db, importante=False),
         )
     except TelegramError as exc:
         log.debug("suspicious review send fallo user=%s: %s", user.id, exc)
@@ -1601,6 +1602,7 @@ async def avisar_han_mudo(context, db, cfg, chat, user, sig) -> None:
             chat_id=cfg.admin_notify_chat_id, text=texto, parse_mode="HTML",
             reply_markup=build_muted_review_keyboard(chat.id, user.id),
             disable_web_page_preview=True,
+            disable_notification=notify_prefs.sin_sonido(db, importante=True),
         )
     except TelegramError as exc:
         log.warning("aviso han mudo falló: %s", exc)

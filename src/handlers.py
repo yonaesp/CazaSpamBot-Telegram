@@ -152,6 +152,7 @@ async def _avisar_si_le_recortan(context, db: DB, cfg: Config, chat, old, new, a
                    perdidos=" · ".join(t(f"hdl.bot_demoted.{p}") for p in perdidos)),
             parse_mode="HTML",
             reply_markup=InlineKeyboardMarkup([[notify_prefs.mute_button("bot_demoted")]]),
+            disable_notification=notify_prefs.sin_sonido(db, importante=True),
         )
     except TelegramError as exc:
         log.warning("aviso de permisos recortados fallo: %s", exc)
@@ -337,7 +338,8 @@ async def _avisar_imagen_dudosa(context, db: DB, cfg: Config, msg, user,
     ], [notify_prefs.mute_button("ocr_review")]])
     try:
         await context.bot.send_message(chat_id=admin_dm, text=info, parse_mode="HTML",
-                                       reply_markup=kb, disable_web_page_preview=True)
+                                       reply_markup=kb, disable_web_page_preview=True,
+                                       disable_notification=notify_prefs.sin_sonido(db, importante=False))
         log.info("OCR: aviso de imagen dudosa user=%s (%s, %d pts)", user.id, motivo, puntos)
     except TelegramError as exc:
         log.warning("OCR: no se pudo avisar de la imagen dudosa: %s", exc)
@@ -769,6 +771,7 @@ async def on_my_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE) 
                 ),
                 parse_mode="HTML",
                 reply_markup=InlineKeyboardMarkup([[notify_prefs.mute_button("bot_removed")]]),
+                disable_notification=notify_prefs.sin_sonido(db, importante=True),
             )
         except TelegramError as exc:
             log.debug("aviso bot expulsado fallo: %s", exc)
@@ -885,6 +888,7 @@ async def _check_admin_ban_abuse(context, db, cfg, cmu) -> None:
         await context.bot.send_message(
             chat_id=cfg.admin_notify_chat_id, text=text, parse_mode="HTML",
             reply_markup=kb, disable_web_page_preview=True,
+            disable_notification=notify_prefs.sin_sonido(db, importante=True),
         )
     except TelegramError as exc:
         log.debug("aviso abuse admin fallo: %s", exc)
@@ -1063,6 +1067,7 @@ async def on_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                         adder_id=(f" (<code>{added_by.id}</code>)" if added_by else ""),
                     ),
                     parse_mode="HTML", disable_web_page_preview=True,
+                    disable_notification=notify_prefs.sin_sonido(db, importante=False),
                 )
             except TelegramError:
                 pass
@@ -1363,6 +1368,7 @@ async def _notify_manual_ban(
                 chat_id=cfg.admin_notify_chat_id, text=text, parse_mode="HTML",
                 reply_markup=InlineKeyboardMarkup([[notify_prefs.mute_button("manual_ban")]]),
                 disable_web_page_preview=True,
+                disable_notification=notify_prefs.sin_sonido(db, importante=False),
             )
         except TelegramError as exc:
             log.debug("manual_ban DM admin fallo: %s", exc)
@@ -1381,6 +1387,7 @@ async def _notify_manual_ban(
                 reason=t("reason.manual_ban_by_admin", admin=actor_label),
                 score=0, original_text=last_msg_text, mode="active",
                 federation_results=None,
+                disable_notification=notify_prefs.sin_sonido(db, importante=False),
             )
         except Exception:  # noqa: BLE001 — la notificación externa es secundaria, no debe romper
             pass
@@ -2576,6 +2583,10 @@ async def _send_trust_notice(
         enviado = await context.bot.send_message(
             chat_id=admin_dm, text=info, parse_mode="HTML", reply_markup=kb,
             disable_web_page_preview=True,
+            # Suena si un veterano habría caído baneado o expulsado (¿cuenta robada?);
+            # el aviso suave y los perdones por falta de evidencia llegan callados.
+            disable_notification=notify_prefs.sin_sonido(
+                db, importante=proposed_action in ("ban", "kick") and avala_historial),
         )
     except TelegramError as exc:
         log.warning("trust notice DM fallo: %s", exc)
@@ -2779,8 +2790,9 @@ async def _send_review_request(
     try:
         await context.bot.send_message(
             chat_id=admin_dm, text=info, parse_mode="HTML",
-            reply_markup=kb, disable_notification=False,
+            reply_markup=kb,
             disable_web_page_preview=True,
+            disable_notification=notify_prefs.sin_sonido(db, importante=True),
         )
     except TelegramError as exc:
         log.warning("review DM admin fallo: %s", exc)
@@ -2982,6 +2994,7 @@ async def _moderate_channel_message(context, db, cfg, msg) -> None:
                     rule=_h.escape(rule),
                 ),
                 parse_mode="HTML", disable_web_page_preview=True,
+                disable_notification=notify_prefs.sin_sonido(db, importante=False),
             )
         except TelegramError:
             pass
@@ -3040,7 +3053,8 @@ async def _moderate_via_bot_message(context, db, cfg, msg, user) -> bool:
     if cfg.admin_notify_chat_id:
         try:
             await context.bot.copy_message(chat_id=cfg.admin_notify_chat_id,
-                                           from_chat_id=msg.chat_id, message_id=msg.message_id)
+                                           from_chat_id=msg.chat_id, message_id=msg.message_id,
+                                           disable_notification=notify_prefs.sin_sonido(db, importante=False))
         except TelegramError as exc:
             log.debug("via_bot copia al admin fallo: %s", exc)
     # Borrar el mensaje
@@ -3070,6 +3084,7 @@ async def _moderate_via_bot_message(context, db, cfg, msg, user) -> bool:
                     botones=_botones_para_aviso(msg),
                 ),
                 parse_mode="HTML", disable_web_page_preview=True,
+                disable_notification=notify_prefs.sin_sonido(db, importante=False),
             )
         except TelegramError:
             pass
@@ -3189,6 +3204,7 @@ async def _antiflood_apply(
                 user_link=user_link, uid=user_id, chat_id=chat_id, hours=mute_hours,
             ),
             parse_mode="HTML", reply_markup=kb, disable_web_page_preview=True,
+            disable_notification=notify_prefs.sin_sonido(context.bot_data.get("db"), importante=False),
         )
         db.flood_mark_review_sent(chat_id, user_id)
     except TelegramError as exc:
@@ -3473,6 +3489,7 @@ async def _apply_action(
                             await context.bot.copy_message(
                                 chat_id=cfg.admin_notify_chat_id,
                                 from_chat_id=chat_id, message_id=message_id,
+                                disable_notification=notify_prefs.sin_sonido(db, importante=False),
                             )
                         display = (first_name or username or str(user_id))
                         name_link = f'<a href="tg://user?id={user_id}">{_h.escape(display)}</a>'
@@ -3502,6 +3519,7 @@ async def _apply_action(
                                 score=decision.score,
                             ),
                             parse_mode="HTML", disable_web_page_preview=True,
+                            disable_notification=notify_prefs.sin_sonido(db, importante=False),
                         )
                     except TelegramError as exc:
                         log.debug("shadow notify fallo: %s", exc)
@@ -3553,6 +3571,7 @@ async def _apply_action(
                                 chat_id=cfg.admin_notify_chat_id,
                                 from_chat_id=chat_id,
                                 message_id=message_id,
+                                disable_notification=notify_prefs.sin_sonido(db, importante=False),
                             )
                             # Perfil clicable (es DM privado al admin, sin riesgo de visibilidad)
                             display = (first_name or username or str(user_id))
@@ -3588,6 +3607,7 @@ async def _apply_action(
                                 ),
                                 parse_mode="HTML",
                                 disable_web_page_preview=True,
+                                disable_notification=notify_prefs.sin_sonido(db, importante=False),
                             )
                         except TelegramError as exc:
                             log.debug("copy_message a admin DM fallo: %s", exc)
@@ -3673,6 +3693,7 @@ async def _apply_action(
             original_text=original_text, mode=mode,
             federation_results=fed_results,
             user_signals_markup=signals_markup,
+            disable_notification=notify_prefs.sin_sonido(db, importante=False),
         )
 
 
@@ -3705,7 +3726,9 @@ async def _avisar_readmision(context, cfg, cmu, objetivo) -> None:
     ]])
     try:
         await context.bot.send_message(chat_id=destino, text=texto, parse_mode="HTML",
-                                       reply_markup=kb, disable_web_page_preview=True)
+                                       reply_markup=kb, disable_web_page_preview=True,
+                                       disable_notification=notify_prefs.sin_sonido(
+                                           context.bot_data.get("db"), importante=True))
     except TelegramError as exc:
         log.warning("aviso de readmisión falló: %s", exc)
 

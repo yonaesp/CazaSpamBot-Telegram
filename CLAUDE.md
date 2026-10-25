@@ -1,7 +1,7 @@
 # CazaSpamBot — Bot Antispam Telegram
 
 Bot de moderación antispam **en producción 24/7**, multi-grupo, federado y **bilingüe** (es/en).
-~23.000 LOC en `src/`, Docker, **1745 tests**, 25 detectores (un módulo cada uno en `src/detectors/`).
+~23.000 LOC en `src/`, Docker, **1759 tests**, 25 detectores (un módulo cada uno en `src/detectors/`).
 
 > **Estado: PRODUCCIÓN.** No es un esqueleto. Cualquier cambio afecta grupos reales con miles de usuarios. **Investiga > Confirma > Actúa.**
 
@@ -75,7 +75,7 @@ nativa; se itera `banChatMember` sobre los chats donde el bot es admin.
 
 **Todo el texto que ve el usuario vive en `src/locales/<código>.json`.** Nada de textos en el código.
 
-- `es.json` / `en.json`, **1.182 claves** cada uno. Idioma GLOBAL de la instancia.
+- `es.json` / `en.json`, **1.185 claves** cada uno. Idioma GLOBAL de la instancia.
 - **Autodescubrimiento**: soltar un `fr.json` basta para que `/idioma fr` funcione. Cero cambios de código.
 - **Fallback por clave** al español: un idioma al 40 % ya es usable.
 - **A prueba de fallos**: un JSON roto se ignora con un log y el bot sigue. Por eso son JSON y no módulos `.py` (un `.py` se ejecuta al importarse: una comilla mal puesta tumbaba el arranque).
@@ -627,6 +627,20 @@ Dos guardas que no se deben quitar: un ajuste **ilegible** cae al lado restricti
 - **Aprendizaje**: `/spam` `/legal` (alias `/ham`)
 - **Info** (chat_admin read-only): `/help` `/comandos` `/stats` `/chats` `/recent` `/samples` `/top` `/topweekly` `/quips` `/scan`
 - **Config**: `/config` `/verificacion` `/welcome` `/setwelcome` `/rules` `/setrules` `/cleanservice` `/setwelcomebutton` `/limpieza` `/idioma` `/alertas` `/sync`
+
+**Qué avisos por privado SUENAN** (`notify_prefs.sin_sonido`, petición del admin
+25-oct-2026: hasta entonces sonaba casi todo, y lo que suena siempre se ignora).
+Primer botón de `/alertas`, en ciclo: **solo lo importante** (defecto) · todo ·
+nada. Importante = necesita que decidas o un grupo queda con menos protección:
+reporte @admin de un miembro, avalancha, me quitan permisos o me echan, un admin
+banea en masa, revisión «¿es spam?», readmiten a un baneado, Han mudo esperando,
+error interno, y el aviso de confianza solo si un veterano habría caído baneado o
+expulsado. Lo ya resuelto por el bot (bans, copias, antiflood) y lo leve (aviso
+suave, OCR, perdones, propuestas) llega callado. ⚠️ **Todo envío nuevo al privado
+tiene que llevar `disable_notification=notify_prefs.sin_sonido(db, importante=…)`**:
+un meta-test (ast) lo exige y fija la lista de importantes; solo se libran las
+respuestas a una orden tuya (`/scan`, acuses). En `/alertas`, «no recibir» es
+dejar de mandarlo y «sonido» es si suena: antes los dos se llamaban «silenciar».
 - **Alias en inglés** (33 comandos en el menú): `/verification` `/language` `/alerts` `/cleanup` `/commands`. **Los nombres en español SIEMPRE deben seguir funcionando.**
 
 ### Bienvenidas
@@ -848,4 +862,4 @@ Si el `gh` de la máquina está autenticado con **otra** cuenta o con un token q
 alcanza a este repo, no hace falta reconfigurar `gh`: basta exportar `GH_TOKEN` con
 el token bueno solo para esa ejecución. `gh` lo prefiere sobre su sesión guardada.
 
-*Actualizado: 2026-10-25 — 25 detectores, 1745 tests, 1.182 claves por idioma.*
+*Actualizado: 2026-10-25 — 25 detectores, 1759 tests, 1.185 claves por idioma.*

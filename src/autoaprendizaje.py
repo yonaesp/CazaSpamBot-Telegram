@@ -38,7 +38,7 @@ import secrets
 import time
 import unicodedata
 
-from . import custom_terms, learning
+from . import custom_terms, learning, notify_prefs
 from .i18n import t
 
 log = logging.getLogger(__name__)
@@ -275,7 +275,8 @@ async def proponer_reglas(context, db, cfg, user_id: int, chat_id: int,
         await context.bot.send_message(
             chat_id=destino, parse_mode="HTML", disable_web_page_preview=True,
             text=_texto_propuesta(motivo, user_id, textos[0], elegidas),
-            reply_markup=_botones(pid, [e["term"] for e in elegidas]))
+            reply_markup=_botones(pid, [e["term"] for e in elegidas]),
+            disable_notification=notify_prefs.sin_sonido(db, importante=False))
         log.info("autoaprendizaje: propuesta %s user=%s motivo=%s terminos=%s",
                  pid, user_id, motivo, [e["term"] for e in elegidas])
         return True

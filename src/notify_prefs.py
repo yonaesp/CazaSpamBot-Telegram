@@ -55,3 +55,34 @@ def default_for(key: str, cfg=None) -> bool:
 def effective(db, key: str, cfg=None) -> bool:
     """Estado real de un aviso: preferencia runtime si existe, si no el default."""
     return is_enabled(db, key, default_for(key, cfg))
+
+
+# ===== Sonido de los avisos por privado (aparte de si se mandan o no) =====
+#
+# Telegram deja mandar un mensaje sin sonido (`disable_notification`). Petición del
+# admin (25-oct-2026): que suene lo que tiene riesgo y llegue callado lo leve. Hasta
+# entonces sonaba casi todo, y lo que suena siempre se acaba ignorando.
+#   importante → necesita que decidas, o un grupo se ha quedado con menos protección
+#   informativo → ya está resuelto (el bot actuó) o es leve
+# Lo que contesta a una orden tuya (/scan, acuses) no entra: lo estás esperando.
+SONIDO_MODOS = ("importante", "todo", "nada")
+SONIDO_PREF = "notify_sonido"
+
+
+def modo_sonido(db) -> str:
+    """'importante' (defecto), 'todo' o 'nada'."""
+    try:
+        v = db.get_text_pref(SONIDO_PREF)
+    except Exception:  # noqa: BLE001 — sin poder leerlo, el defecto
+        return "importante"
+    return v if v in SONIDO_MODOS else "importante"
+
+
+def sin_sonido(db, importante: bool) -> bool:
+    """Valor de `disable_notification` para un aviso al admin."""
+    modo = modo_sonido(db)
+    if modo == "todo":
+        return False
+    if modo == "nada":
+        return True
+    return not importante

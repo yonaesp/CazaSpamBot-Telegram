@@ -42,6 +42,7 @@ from collections import deque
 
 from telegram.error import TelegramError
 
+from . import notify_prefs
 from .i18n import t
 
 log = logging.getLogger(__name__)
@@ -130,6 +131,7 @@ async def avisar(context, cfg, chat_id: int, chat_title: str | None) -> None:
                    ventana=VENTANA_S,
                    minutos=ALERTA_S // 60),
             parse_mode="HTML",
+            disable_notification=notify_prefs.sin_sonido(context.bot_data.get("db"), importante=True),
         )
     except TelegramError as exc:
         log.warning("antiraid: no se pudo avisar: %s", exc)

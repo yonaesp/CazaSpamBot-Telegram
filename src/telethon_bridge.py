@@ -299,7 +299,8 @@ async def _notificar_borrados(client, bot: Bot, db: DB, chat_id: int,
         kb = InlineKeyboardMarkup([[notify_prefs.mute_button("self_delete")]])
     try:
         await bot.send_message(chat_id=admin_id, text=notif, parse_mode="HTML",
-                               reply_markup=kb, disable_web_page_preview=True)
+                               reply_markup=kb, disable_web_page_preview=True,
+                               disable_notification=notify_prefs.sin_sonido(db, importante=False))
     except TelegramError as exc:
         log.debug("manual_delete notif send fallo: %s", exc)
 

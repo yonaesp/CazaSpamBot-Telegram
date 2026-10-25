@@ -65,6 +65,7 @@ class Notifier:
         mode: str,
         federation_results: dict[int, str] | None,
         user_signals_markup: str = "",
+        disable_notification: bool = False,
     ) -> bool:
         if not self.is_configured():
             return False
@@ -118,6 +119,7 @@ class Notifier:
             "parse_mode": "HTML",
             "reply_markup": keyboard,
             "disable_web_page_preview": True,
+            "disable_notification": disable_notification,
         }
         try:
             async with session.post(url, json=payload, timeout=aiohttp.ClientTimeout(total=10)) as resp:

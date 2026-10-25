@@ -28,7 +28,7 @@ from telegram import Message
 from telegram.error import TelegramError
 from telegram.ext import ContextTypes
 
-from . import borrado_diferido, enlaces
+from . import borrado_diferido, enlaces, notify_prefs
 from .db import DB
 from .i18n import t, variant_keys
 
@@ -145,6 +145,7 @@ async def handle_admin_mention(
                 chat_id=cfg.admin_notify_chat_id,
                 from_chat_id=msg.chat_id,
                 message_id=reported_msg_id,
+                disable_notification=notify_prefs.sin_sonido(db, importante=True),
             )
             chat_title = msg.chat.title or str(msg.chat_id)
             reporter_disp = (
@@ -166,6 +167,7 @@ async def handle_admin_mention(
             )
             await context.bot.send_message(
                 chat_id=cfg.admin_notify_chat_id, text=ctx_text, parse_mode="HTML",
+                disable_notification=notify_prefs.sin_sonido(db, importante=True),
             )
         except TelegramError as exc:
             log.debug("admin_report copy to admin DM fallo: %s", exc)

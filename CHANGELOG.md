@@ -4,6 +4,14 @@ Cambios relevantes de CazaSpamBot, lo más reciente arriba. Se anotan hitos, no
 cada commit: para el detalle está el historial de git. Sin números de versión
 porque el bot es un servicio en producción continua, no un paquete que se libera.
 
+## 2026-10 · Solo suena lo importante
+
+Los avisos por privado ya no suenan todos. Por defecto suena lo que necesita que
+decidas o deja un grupo con menos protección (un miembro pide ayuda con @admin,
+una avalancha de entradas, al bot le quitan permisos, una revisión «¿es spam?», un
+error interno…), y lo ya resuelto por el bot o lo leve llega en silencio. Se cambia
+en `/alertas`: solo lo importante, todo o nada.
+
 ## 2026-10 · El aviso se da por resuelto si el autor lo corrige
 
 Cuando alguien de confianza menciona un chat ajeno o pone un enlace, el bot solo

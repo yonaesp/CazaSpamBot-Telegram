@@ -1122,7 +1122,10 @@ async def cmd_notspam(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 
 def _alertas_keyboard(db: DB, cfg: Config):
     from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-    rows = []
+    # Primero el sonido: vale para TODOS los avisos por privado, no solo para los
+    # informativos de debajo. Cada toque pasa al siguiente modo.
+    rows = [[InlineKeyboardButton(t(f"alerts.sonido.{notify_prefs.modo_sonido(db)}"),
+                                  callback_data="npref:son:")]]
     for key in notify_prefs.NOTIFY_TYPES:
         on = notify_prefs.effective(db, key, cfg)
         estado = t("alerts.b.on") if on else t("alerts.b.off")
@@ -1155,6 +1158,16 @@ async def on_notifpref_callback(update: Update, context: ContextTypes.DEFAULT_TY
     parts = q.data.split(":")
     action = parts[1] if len(parts) > 1 else ""
     key = parts[2] if len(parts) > 2 else ""
+    if action == "son":  # sonido: importante → todo → nada → importante
+        modos = notify_prefs.SONIDO_MODOS
+        nuevo = modos[(modos.index(notify_prefs.modo_sonido(db)) + 1) % len(modos)]
+        db.set_text_pref(notify_prefs.SONIDO_PREF, nuevo)
+        await q.answer(t(f"alerts.sonido.{nuevo}"))
+        try:
+            await q.edit_message_reply_markup(reply_markup=_alertas_keyboard(db, cfg))
+        except TelegramError:
+            pass
+        return
     if key not in notify_prefs.NOTIFY_TYPES:
         await q.answer(t("alerts.unknown"))
         return

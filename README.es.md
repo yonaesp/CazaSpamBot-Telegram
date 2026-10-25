@@ -8,7 +8,7 @@
 [![python-telegram-bot](https://img.shields.io/badge/PTB-22.8-26A5E4?logo=telegram&logoColor=white)](https://python-telegram-bot.org/)
 [![Telethon](https://img.shields.io/badge/Telethon-1.44-blueviolet)](https://docs.telethon.dev/)
 [![Idiomas](https://img.shields.io/badge/idiomas-es%20%7C%20en%20%7C%20a%C3%B1ade%20el%20tuyo-orange)](src/locales/README.md)
-[![Tests](https://img.shields.io/badge/tests-1745%20passing-success)](#tests)
+[![Tests](https://img.shields.io/badge/tests-1759%20passing-success)](#tests)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 
 🌍 [**English**](README.md) · **Español**
@@ -335,7 +335,7 @@ Solo el **admin del bot** (`ADMIN_USER_ID`) puede cambiar cosas. Los **admins de
 | `/verificacion` | Verificación humana por grupo |
 | `/setwelcome` `/setrules` `/welcome` `/rules` | Bienvenida y reglas |
 | `/cleanservice` · `/limpieza` | Borrar mensajes de servicio · ocultar y borrar los comandos en el grupo |
-| `/alertas` | Qué avisos te llegan por privado |
+| `/alertas` | Qué avisos te llegan por privado y cuáles suenan (solo lo importante, todo o nada) |
 | `/sync on\|off` | Ajustes iguales en todos los grupos |
 | `/idioma <código>` (`/language`) | Idioma del bot |
 | `/shadow on\|off` | Modo prueba |
@@ -385,7 +385,7 @@ Abre una [incidencia en GitHub](https://github.com/yonaesp/CazaSpamBot-Telegram/
 ## 🧪 Tests
 
 ```bash
-.venv/bin/python -m pytest tests/ -q     # 1745 tests
+.venv/bin/python -m pytest tests/ -q     # 1759 tests
 ```
 
 Cada detector tiene tests de lo que debe cazar **y de lo que no**, con casos reales. Un falso positivo es peor que un falso negativo.
