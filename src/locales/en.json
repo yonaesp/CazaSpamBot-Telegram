@@ -336,6 +336,8 @@
   "hdl.review_public_notice": "🔎 Message flagged as possible spam. An admin will review it shortly.",
   "hdl.review_dm": "🔎 <b>Spam review</b>\n\n👤 <code>{uid}</code> ({name}) · trust {trust}\n📍 {chat}{enlace}\n🚨 Rules: <code>{rules}</code>\n⚖️ Proposed action: <b>{action}</b>\n💬 Reason: {reason}\n\n<b>Message:</b>\n<pre>{text}</pre>",
   "ban.cleanup_header": "🧹 <b>Spam cleanup ({n} banned)</b>\n\n",
+  "errata.linea": "🤔 I can't find <code>@{mal}</code> in this group. Did you mean <code>@{bien}</code>?",
+  "errata.pie": "\n<i>If you fix it by editing your message, this note goes away on its own.</i>",
   "gentle.reason_line": "\n<i>Detected reason: {reason}</i>",
   "warn.reason_line": "\n💬 <b>Reason:</b> {reason}",
   "welcome.footer_wrap": "\n\n<i>{footer}</i>",

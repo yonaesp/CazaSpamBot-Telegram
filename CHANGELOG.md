@@ -4,6 +4,17 @@ Cambios relevantes de CazaSpamBot, lo más reciente arriba. Se anotan hitos, no
 cada commit: para el detalle está el historial de git. Sin números de versión
 porque el bot es un servicio en producción continua, no un paquete que se libera.
 
+## 2026-10 · «¿Quizás te referías a @…?»
+
+Un @ mal escrito ya no se trata como una mención a alguien de fuera. Si el
+@usuario no lo conoce el bot y está a una tecla del de un miembro del grupo
+(`@Moliko` por `@Molkio`, el caso real), no puntúa y el bot responde «No encuentro
+a @Moliko en el grupo. ¿Quizás te referías a @Molkio?», sin avisar a ninguno de
+los dos. Si el autor lo corrige editando, la pregunta se borra; si no, a los 10
+minutos. No se aplica en los primeros mensajes, donde parecerse al @ de un
+miembro es la forma de suplantarlo. Medido sobre 786 textos guardados: de 111
+menciones a desconocidos, solo esta se parece a un miembro.
+
 ## 2026-10 · El clasificador aprendido ya no castiga los mensajes largos
 
 En el Bayes, una palabra que no aparecía en ninguna muestra contaba como señal

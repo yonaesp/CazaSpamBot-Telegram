@@ -231,6 +231,7 @@ CREATE TABLE IF NOT EXISTS gentle_warnings (
     bot_msg_id   INTEGER NOT NULL,
     user_id      INTEGER NOT NULL,
     ts           REAL NOT NULL,
+    errata       TEXT,
     PRIMARY KEY (chat_id, user_msg_id)
 );
 CREATE INDEX IF NOT EXISTS idx_gw_botmsg ON gentle_warnings(chat_id, bot_msg_id);
@@ -468,6 +469,12 @@ class DB:
                 "ALTER TABLE chat_settings ADD COLUMN review_level TEXT DEFAULT NULL")
         if "welcome_msg_id" not in su_cols:
             self._conn.execute("ALTER TABLE seen_users ADD COLUMN welcome_msg_id INTEGER")
+        # Sugerencia «¿quizás te referías a @x?»: JSON con lo escrito y lo sugerido.
+        # NULL en los demás avisos. Va en esta tabla para heredar su borrado en
+        # cascada (si el autor borra su mensaje) y la limpieza al banear.
+        gw_cols = {r[1] for r in self._conn.execute("PRAGMA table_info(gentle_warnings)").fetchall()}
+        if "errata" not in gw_cols:
+            self._conn.execute("ALTER TABLE gentle_warnings ADD COLUMN errata TEXT")
 
     def close(self) -> None:
         self._conn.close()
@@ -1517,12 +1524,49 @@ class DB:
 
     # ------------- gentle_warnings -------------
 
-    def add_gentle_warning(self, chat_id: int, user_msg_id: int, bot_msg_id: int, user_id: int) -> None:
+    def add_gentle_warning(self, chat_id: int, user_msg_id: int, bot_msg_id: int, user_id: int,
+                           errata: list | None = None) -> None:
         with self._cur() as c:
             c.execute(
-                "INSERT OR REPLACE INTO gentle_warnings (chat_id, user_msg_id, bot_msg_id, user_id, ts) VALUES (?, ?, ?, ?, ?)",
-                (chat_id, user_msg_id, bot_msg_id, user_id, time.time()),
+                "INSERT OR REPLACE INTO gentle_warnings (chat_id, user_msg_id, bot_msg_id, user_id, ts, errata) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (chat_id, user_msg_id, bot_msg_id, user_id, time.time(),
+                 json.dumps(errata, ensure_ascii=False) if errata else None),
             )
+
+    def errata_pendiente(self, chat_id: int, user_msg_id: int) -> tuple[int, list] | None:
+        """(bot_msg_id, [[escrito, sugerido], …]) si ese mensaje tiene una sugerencia viva."""
+        with self._cur() as c:
+            row = c.execute(
+                "SELECT bot_msg_id, errata FROM gentle_warnings "
+                "WHERE chat_id=? AND user_msg_id=? AND errata IS NOT NULL",
+                (chat_id, user_msg_id),
+            ).fetchone()
+        if not row:
+            return None
+        try:
+            return int(row["bot_msg_id"]), json.loads(row["errata"])
+        except ValueError:
+            return int(row["bot_msg_id"]), []
+
+    def erratas_vencidas(self, antes_de: float) -> list[sqlite3.Row]:
+        """Sugerencias de errata publicadas antes de `antes_de` (epoch)."""
+        with self._cur() as c:
+            return c.execute(
+                "SELECT chat_id, user_msg_id, bot_msg_id FROM gentle_warnings "
+                "WHERE errata IS NOT NULL AND ts < ?", (antes_de,),
+            ).fetchall()
+
+    def usernames_del_chat(self, chat_id: int) -> list[str]:
+        """@usuario de quien el bot ha visto en ese chat, sin los baneados."""
+        with self._cur() as c:
+            rows = c.execute(
+                "SELECT username FROM seen_users s WHERE chat_id=? AND username IS NOT NULL "
+                "AND NOT EXISTS (SELECT 1 FROM banned_users b "
+                "WHERE b.user_id=s.user_id AND b.revoked_at IS NULL)",
+                (chat_id,),
+            ).fetchall()
+        return [r["username"] for r in rows]
 
     def pop_gentle_warning_by_user_msg(self, chat_id: int, user_msg_id: int) -> int | None:
         """Si existe, devuelve bot_msg_id y borra la fila. Para borrado en cascada."""

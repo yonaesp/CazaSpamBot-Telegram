@@ -8,7 +8,7 @@
 [![python-telegram-bot](https://img.shields.io/badge/PTB-22.8-26A5E4?logo=telegram&logoColor=white)](https://python-telegram-bot.org/)
 [![Telethon](https://img.shields.io/badge/Telethon-1.44-blueviolet)](https://docs.telethon.dev/)
 [![Idiomas](https://img.shields.io/badge/idiomas-es%20%7C%20en%20%7C%20a%C3%B1ade%20el%20tuyo-orange)](src/locales/README.md)
-[![Tests](https://img.shields.io/badge/tests-1712%20passing-success)](#tests)
+[![Tests](https://img.shields.io/badge/tests-1737%20passing-success)](#tests)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 
 🌍 [**English**](README.md) · **Español**
@@ -74,7 +74,7 @@ La cuenta **no se delata**: leer una historia o un canal no cuenta como visualiz
 
 🔗 **Ban en uno, ban en todos tus grupos.** Además consulta las listas mundiales de spammers [CAS](https://cas.chat) y lols.bot, y si quieres reporta el spam claro a Telegram.
 
-🤝 **Respeta a la gente normal.** Cada miembro tiene una confianza del 1 al 10 según su historial en el grupo. Lo dudoso te llega **por privado con botones** (✅ Legítimo / ❌ Spam), y se puede arrancar en **modo prueba**, sin banear a nadie, para ver qué haría.
+🤝 **Respeta a la gente normal.** Cada miembro tiene una confianza del 1 al 10 según su historial en el grupo. Lo dudoso te llega **por privado con botones** (✅ Legítimo / ❌ Spam), y se puede arrancar en **modo prueba**, sin banear a nadie, para ver qué haría. Y si alguien escribe mal el @ de otro miembro (`@Moliko` por `@Molkio`), no lo toma por una mención sospechosa: le pregunta «¿Quizás te referías a @Molkio?» y borra la pregunta en cuanto lo corrige.
 
 🌍 **Para cualquier comunidad.** Viene en español e inglés y otro idioma es un archivo JSON. Tú eliges qué alfabetos son normales en tu grupo.
 
@@ -88,7 +88,7 @@ La cuenta **no se delata**: leer una historia o un canal no cuenta como visualiz
 | Detector | Qué caza |
 |---|---|
 | `unicode_script` | Texto en un alfabeto que tu grupo no usa (`/config` ▸ Alfabetos permitidos) |
-| `external_mention` | Menciones y enlaces a otros grupos o canales |
+| `external_mention` | Menciones y enlaces a otros grupos o canales (un @ mal escrito de un miembro no cuenta: el bot sugiere el bueno) |
 | `url_blocklist` | Acortadores de enlaces típicos del spam |
 | `tg_deeplink` | Enlaces `tg://` de phishing |
 | `link_target` | El enlace lleva a un chat que se anuncia como spam |
@@ -385,7 +385,7 @@ Abre una [incidencia en GitHub](https://github.com/yonaesp/CazaSpamBot-Telegram/
 ## 🧪 Tests
 
 ```bash
-.venv/bin/python -m pytest tests/ -q     # 1712 tests
+.venv/bin/python -m pytest tests/ -q     # 1737 tests
 ```
 
 Cada detector tiene tests de lo que debe cazar **y de lo que no**, con casos reales. Un falso positivo es peor que un falso negativo.

@@ -25,7 +25,7 @@ from . import channel_reader
 from . import desofuscar
 from . import link_reader
 from . import llm_veto
-from . import admin_report, autoaprendizaje, enlaces, gentle_warning, greetings, learning, notify_prefs, quips, rule_explain, story_reader, trust as _trust, user_signals, verification
+from . import admin_report, autoaprendizaje, enlaces, errata_mencion, gentle_warning, greetings, learning, notify_prefs, quips, rule_explain, story_reader, trust as _trust, user_signals, verification
 from .config import Config
 from .db import DB
 from .detectors import Hit
@@ -1428,6 +1428,13 @@ async def _ensure_chat_registered(context: ContextTypes.DEFAULT_TYPE, db: DB, ch
 async def on_edited_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Re-escanea mensajes editados (edit-attack: spammer edita a spam tras pasar filtros)."""
     cfg: Config = context.bot_data["cfg"]
+    # Antes que el re-escaneo y aunque esté apagado: si la edición corrige un @
+    # mal escrito, la sugerencia del bot sobra (ver `errata_mencion`).
+    if update.edited_message and update.edited_message.chat:
+        try:
+            await errata_mencion.al_editar(context, context.bot_data["db"], update.edited_message)
+        except Exception as exc:  # noqa: BLE001
+            log.warning("errata: fallo al editar: %s", exc)
     if not cfg.rescan_edited_messages:
         return
     # PTB v21: update.edited_message está disponible; reaprovechamos on_message.
@@ -1657,6 +1664,15 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     # 2) External mentions / t.me links (con username del propio chat para
     # distinguir enlaces internos al propio grupo)
     own_username = db.chat_username(chat_id)
+    # Un @ a un desconocido a una tecla del de un miembro es una errata, no un
+    # externo: no puntúa y el bot pregunta «¿quizás te referías a…?» si no actúa.
+    # El texto de una historia lo escribió un canal ajeno: ahí no se sugiere nada.
+    _erratas: list = []
+    if not texto_ajeno:
+        try:
+            _erratas = errata_mencion.buscar(db, cfg, msg, user, is_first)
+        except Exception as exc:  # noqa: BLE001 — una ayuda nunca tumba la moderación
+            log.warning("errata: fallo buscando en chat=%s: %s", chat_id, exc, exc_info=True)
     hits.append(_sin_tumbar(lambda: ext_det.check(
         msg, chat_id=chat_id, is_first_msg=is_first,
         detect_user_mentions=cfg.detect_external_mentions,
@@ -1664,6 +1680,7 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         is_user_in_chat=db.known_user_in_chat,
         resolve_username=db.resolve_username,
         own_chat_username=own_username,
+        erratas=_erratas,
     ), "ext"))
     # 3) URL blocklist
     hits.append(_sin_tumbar(lambda: url_det.check(msg, cfg.url_blocklist, is_first_msg=is_first), "url"))
@@ -1959,6 +1976,7 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
             db, chat_id, user.id, text, _trust_score_cached(context, db, chat_id, user.id),
             reenviado=bool(getattr(msg, "forward_origin", None)))
         await _soltar_aviso_imagen(context, db, cfg, msg, user, _aviso_imagen)
+        await errata_mencion.sugerir(context, db, cfg, msg, _erratas)
         return
 
     # Filtrar reglas suprimidas (admin marcó "no era spam").
@@ -1966,6 +1984,7 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     if not real:
         log.info("Hits suprimidos para user %s", user.id)
         await _soltar_aviso_imagen(context, db, cfg, msg, user, _aviso_imagen)
+        await errata_mencion.sugerir(context, db, cfg, msg, _erratas)
         return
 
     # 5) ¿A DÓNDE lleva el enlace? Un t.me a un chat externo es una señal ciega: no
@@ -2044,6 +2063,7 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     # actúa, o se avisa por otra vía (perdón, trust), sobra y además mentiría.
     if decision.action == "noop":
         await _soltar_aviso_imagen(context, db, cfg, msg, user, _aviso_imagen)
+        await errata_mencion.sugerir(context, db, cfg, msg, _erratas)
 
     # ESCRIBIR PRONTO no castiga a quien el bot ya da por legítimo. Caso real
     # (6-oct-2026, Windows 11): «Saizor», cuenta de 2.885 días con 20 fotos (al

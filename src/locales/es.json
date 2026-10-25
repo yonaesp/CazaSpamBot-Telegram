@@ -336,6 +336,8 @@
   "hdl.review_public_notice": "🔎 Mensaje marcado como posible spam. Un administrador lo revisará en breve.",
   "hdl.review_dm": "🔎 <b>Revisión de spam</b>\n\n👤 <code>{uid}</code> ({name}) · confianza {trust}\n📍 {chat}{enlace}\n🚨 Reglas: <code>{rules}</code>\n⚖️ Acción propuesta: <b>{action}</b>\n💬 Razón: {reason}\n\n<b>Mensaje:</b>\n<pre>{text}</pre>",
   "ban.cleanup_header": "🧹 <b>Limpieza de spam ({n} baneados)</b>\n\n",
+  "errata.linea": "🤔 No encuentro a <code>@{mal}</code> en el grupo. ¿Quizás te referías a <code>@{bien}</code>?",
+  "errata.pie": "\n<i>Si lo corriges editando el mensaje, este aviso se borra solo.</i>",
   "gentle.reason_line": "\n<i>Motivo detectado: {reason}</i>",
   "warn.reason_line": "\n💬 <b>Motivo:</b> {reason}",
   "welcome.footer_wrap": "\n\n<i>{footer}</i>",

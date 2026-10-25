@@ -11,6 +11,8 @@ Reglas:
   (ban directo). Antes ese "no parece" estaba clavado al español, así que una
   instalación en inglés se comía la puntuación máxima por escribir en inglés.
   De un idioma sin vocabulario propio se asume que sí: no saber no puede acusar.
+- Erratas (25-oct-2026): un @usuario que nadie conoce y que está a una tecla del
+  de un miembro del chat no es un externo, es un dedo torpe. Ver `posible_errata`.
 """
 from __future__ import annotations
 
@@ -38,11 +40,86 @@ def _text_of(msg: Message) -> str:
     return msg.text or msg.caption or ""
 
 
+def handles_mencionados(msg: Message) -> list[str]:
+    """Los @usuario escritos a mano en el mensaje, sin la arroba."""
+    text = _text_of(msg)
+    return [trozo_entidad(text, e.offset, e.length).lstrip("@")
+            for e in _extract_entities(msg) if e.type == MessageEntity.MENTION]
+
+
+def _distancia(a: str, b: str, tope: int) -> int:
+    """Ediciones para pasar de `a` a `b`, contando como UNA el cruce de dos letras
+    vecinas (Moliko/Molkio). Deja de contar al pasar de `tope`."""
+    if abs(len(a) - len(b)) > tope:
+        return tope + 1
+    antes, fila = None, list(range(len(b) + 1))
+    for i in range(1, len(a) + 1):
+        nueva = [i] + [0] * len(b)
+        for j in range(1, len(b) + 1):
+            nueva[j] = min(fila[j] + 1, nueva[j - 1] + 1,
+                           fila[j - 1] + (a[i - 1] != b[j - 1]))
+            if i > 1 and j > 1 and a[i - 1] == b[j - 2] and a[i - 2] == b[j - 1]:
+                nueva[j] = min(nueva[j], antes[j - 2] + 1)
+        if min(nueva) > tope:
+            return tope + 1
+        antes, fila = fila, nueva
+    return fila[-1]
+
+
+def _tolerancia(n: int) -> int:
+    """Cuántas teclas de error se perdonan según lo largo que es el @usuario."""
+    return 2 if n >= 10 else (1 if n >= 5 else 0)
+
+
+def posible_errata(handle: str, candidatos) -> str | None:
+    """El @usuario de un miembro al que `handle` se parece lo bastante, o None.
+
+    Una tecla de más, de menos, cambiada o dos cruzadas (dos si el nombre pasa de
+    nueve letras). Caso real (24-oct-2026, Domótica): «Era porque @Moliko tenía
+    varios Spot», con el miembro @Molkio, 382 mensajes. Si dos miembros quedan
+    igual de cerca no se adivina: una sugerencia equivocada señala a otra persona.
+    Medido sobre 786 textos guardados: de 111 menciones a desconocidos (casi todas
+    bots de spam con nombres al azar), solo esta se parece a un miembro.
+    """
+    h = handle.lstrip("@").lower()
+    tope = _tolerancia(len(h))
+    if not tope:
+        return None
+    mejor, elegidos = tope + 1, set()
+    for cand in candidatos:
+        d = _distancia(h, cand.lower(), tope)
+        if d == 0 or d > tope or d > mejor:
+            continue
+        if d < mejor:
+            mejor, elegidos = d, set()
+        elegidos.add(cand)
+    if len({c.lower() for c in elegidos}) != 1:
+        return None
+    return next(iter(elegidos))
+
+
+def erratas_de_mencion(msg: Message, resolve_username, candidatos) -> list[tuple[str, str]]:
+    """[(lo escrito, el miembro al que se parece)] de las menciones a desconocidos.
+
+    Solo cuenta un @usuario que el bot NO conoce: si resuelve a alguien, aunque
+    no esté en el grupo, es otra persona real y no una errata.
+    """
+    out: list[tuple[str, str]] = []
+    for handle in handles_mencionados(msg):
+        if resolve_username(handle) is not None:
+            continue
+        bien = posible_errata(handle, candidatos)
+        if bien and all(handle.lower() != m.lower() for m, _ in out):
+            out.append((handle, bien))
+    return out
+
+
 def find_external_user_mentions(
     msg: Message,
     chat_id: int,
     is_user_in_chat,  # callable: (chat_id, user_id) -> bool
     resolve_username,  # callable: (username) -> user_id | None
+    ignorar: set[str] | None = None,  # @usuario (en minúsculas) que no cuentan
 ) -> list[dict]:
     """Devuelve lista de menciones a usuarios que NO están en el grupo."""
     text = _text_of(msg)
@@ -54,6 +131,8 @@ def find_external_user_mentions(
                 out.append({"type": "text_mention", "user_id": uid, "username": ent.user.username})
         elif ent.type == MessageEntity.MENTION:
             handle = trozo_entidad(text, ent.offset, ent.length)
+            if ignorar and handle.lstrip("@").lower() in ignorar:
+                continue
             uid = resolve_username(handle)
             if uid is None or not is_user_in_chat(chat_id, uid):
                 out.append({"type": "mention", "username": handle, "user_id": uid})
@@ -120,13 +199,18 @@ def check(
     is_user_in_chat,
     resolve_username,
     own_chat_username: str | None = None,
+    erratas: list[tuple[str, str]] | None = None,
 ) -> Hit:
+    """`erratas`: menciones que el llamador ya ha dado por dedo torpe (ver
+    `erratas_de_mencion`); no cuentan como externas."""
     payload: dict = {}
     score = 0
     reasons: list[str] = []
 
     if detect_user_mentions:
-        externals = find_external_user_mentions(msg, chat_id, is_user_in_chat, resolve_username)
+        ignorar = {mal.lower() for mal, _ in erratas or ()}
+        externals = find_external_user_mentions(
+            msg, chat_id, is_user_in_chat, resolve_username, ignorar=ignorar)
         if externals:
             payload["external_mentions"] = externals
             # Lógica de contexto: ¿el mensaje lleva texto adicional en español?

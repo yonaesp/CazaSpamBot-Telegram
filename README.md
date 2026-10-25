@@ -8,7 +8,7 @@
 [![python-telegram-bot](https://img.shields.io/badge/PTB-22.8-26A5E4?logo=telegram&logoColor=white)](https://python-telegram-bot.org/)
 [![Telethon](https://img.shields.io/badge/Telethon-1.44-blueviolet)](https://docs.telethon.dev/)
 [![Languages](https://img.shields.io/badge/languages-es%20%7C%20en%20%7C%20add%20yours-orange)](src/locales/README.md)
-[![Tests](https://img.shields.io/badge/tests-1712%20passing-success)](#tests)
+[![Tests](https://img.shields.io/badge/tests-1737%20passing-success)](#tests)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 
 🌍 **English** · [**Español**](README.es.md)
@@ -74,7 +74,7 @@ The account **doesn't give itself away**: reading a story or a channel doesn't c
 
 🔗 **Banned in one, banned in all your groups.** It also checks the worldwide spammer lists [CAS](https://cas.chat) and lols.bot, and can report clear spam to Telegram if you want.
 
-🤝 **Respects normal people.** Every member has a trust level from 1 to 10 based on their history in the group. Doubtful cases reach you **in private, with buttons** (✅ Legit / ❌ Spam), and you can start in **test mode**, banning no one, to see what it would do.
+🤝 **Respects normal people.** Every member has a trust level from 1 to 10 based on their history in the group. Doubtful cases reach you **in private, with buttons** (✅ Legit / ❌ Spam), and you can start in **test mode**, banning no one, to see what it would do. And when someone mistypes another member's @ (`@Moliko` for `@Molkio`), it doesn't treat it as a suspicious mention: it asks "Did you mean @Molkio?" and deletes the question as soon as they fix it.
 
 🌍 **For any community.** Ships in Spanish and English, and another language is one JSON file. You choose which alphabets are normal in your group.
 
@@ -88,7 +88,7 @@ The account **doesn't give itself away**: reading a story or a channel doesn't c
 | Detector | What it catches |
 |---|---|
 | `unicode_script` | Text in an alphabet your group doesn't use (`/config` ▸ Allowed alphabets) |
-| `external_mention` | Mentions and links to other groups or channels |
+| `external_mention` | Mentions and links to other groups or channels (a member's mistyped @ doesn't count: the bot suggests the right one) |
 | `url_blocklist` | Link shorteners typical of spam |
 | `tg_deeplink` | Phishing `tg://` links |
 | `link_target` | The link leads to a chat that advertises itself as spam |
@@ -386,7 +386,7 @@ Open an [issue on GitHub](https://github.com/yonaesp/CazaSpamBot-Telegram/issues
 ## 🧪 Tests
 
 ```bash
-.venv/bin/python -m pytest tests/ -q     # 1712 tests
+.venv/bin/python -m pytest tests/ -q     # 1737 tests
 ```
 
 Every detector has tests for what it must catch **and what it must not**, built from real cases. A false positive is worse than a false negative.
