@@ -1313,6 +1313,52 @@ async def on_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         )
 
 
+async def _perfil_para_aviso(context, target, chat_id: int) -> str:
+    """Bloque «cómo era su perfil» para el aviso de un ban manual.
+
+    Se lee en el momento del ban porque después ya no se puede ver: tras el ban la
+    mención por id deja de abrir el perfil y la persona puede cambiar la bio. Caso
+    real (28-oct-2026): Charlotte, baneada a mano sin escribir nada, llevaba en la
+    bio un espejo de casino que solo se vio leyéndolo después con Telethon.
+    """
+    reporter = context.bot_data.get("reporter")
+    client = reporter.get_client() if reporter else None
+    if client is None:
+        return ""
+    try:
+        sig = await user_signals.fetch(client, target.id, chat_id=chat_id,
+                                       first_name=target.first_name)
+    except Exception as exc:  # noqa: BLE001 — el aviso sale igual sin perfil
+        log.debug("manual_ban perfil user=%s: %s", target.id, exc)
+        sig = None
+    if sig is None:
+        return t("hdl.manual_ban_sin_perfil")
+    partes = [user_signals.render_markup(sig)]
+    if sig.personal_channel_title:
+        partes.append(t("hdl.manual_ban_canal", canal=_h.escape(sig.personal_channel_title)))
+    hit = bio_spam_det.check(sig.bio)
+    if hit and hit.score:
+        partes.append(t("hdl.manual_ban_bio_spam", motivo=_h.escape(hit.reason)))
+    return "\n".join(p for p in partes if p) + "\n"
+
+
+async def _foto_de_perfil(context, db: DB, target, reply_to: int) -> None:
+    """Manda la foto de perfil actual como respuesta al aviso, si la hay."""
+    cfg: Config = context.bot_data["cfg"]
+    try:
+        fotos = await context.bot.get_user_profile_photos(target.id, limit=1)
+        if not fotos.total_count or not fotos.photos:
+            return
+        await context.bot.send_photo(
+            chat_id=cfg.admin_notify_chat_id, photo=fotos.photos[0][-1].file_id,
+            caption=t("hdl.manual_ban_foto", name=_h.escape(target.first_name or str(target.id))),
+            parse_mode="HTML", reply_to_message_id=reply_to,
+            disable_notification=notify_prefs.sin_sonido(db, importante=False),
+        )
+    except TelegramError as exc:
+        log.debug("manual_ban foto user=%s: %s", target.id, exc)
+
+
 async def _notify_manual_ban(
     context: ContextTypes.DEFAULT_TYPE,
     db: DB,
@@ -1357,6 +1403,7 @@ async def _notify_manual_ban(
         target_label=_h.escape(target_label),
         when=last_msg_when,
         last_msg=_h.escape(last_msg_text[:500]),
+        perfil=await _perfil_para_aviso(context, target, chat.id),
     )
 
     # 1) PRIMARIO: DM directo al admin del bot (donde recibe todo lo demás).
@@ -1364,12 +1411,13 @@ async def _notify_manual_ban(
     if cfg.admin_notify_chat_id and notify_prefs.is_enabled(db, "manual_ban", True):
         from telegram import InlineKeyboardMarkup
         try:
-            await context.bot.send_message(
+            aviso = await context.bot.send_message(
                 chat_id=cfg.admin_notify_chat_id, text=text, parse_mode="HTML",
                 reply_markup=InlineKeyboardMarkup([[notify_prefs.mute_button("manual_ban")]]),
                 disable_web_page_preview=True,
                 disable_notification=notify_prefs.sin_sonido(db, importante=False),
             )
+            await _foto_de_perfil(context, db, target, aviso.message_id)
         except TelegramError as exc:
             log.debug("manual_ban DM admin fallo: %s", exc)
 

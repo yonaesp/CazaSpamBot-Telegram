@@ -38,6 +38,23 @@ _EXTERNAL_URL_RE = re.compile(
     r'\b(?:https?://|www\.)\S+',
     re.IGNORECASE,
 )
+# Dominio sin `https://` ni `www.`, con ruta detrás: «stake1036.com/?c=tg». Sin la
+# barra no se cuenta, para no tomar por enlace un «trabajo en Google.com» o un
+# correo. Caso real (28-oct-2026, Charlotte): la bio enlazaba así un espejo de
+# casino y no sumaba ni un punto.
+_BARE_URL_RE = re.compile(
+    r'(?<![@\w.])(?:[a-z0-9-]+\.)+[a-z]{2,10}/\S*',
+    re.IGNORECASE,
+)
+# Enlace con código de campaña o de referido (`?c=tg`, `?ref=`, `utm_source=`…):
+# quien enlaza su web no le pone un rastreador; quien la anuncia, sí. Suma 20, así
+# que ni con el enlace (15) y una llamada a la acción (15) llega a 60: hace falta
+# además algo del tema (casino, contenido adulto…).
+_CAMPAIGN_PARAM_RE = re.compile(
+    r'[?&](?:c|ref|r|aff|affiliate|promo|promocode|code|clickid|subid|'
+    r'utm_source|utm_campaign|utm_medium)=',
+    re.IGNORECASE,
+)
 # Emojis sexuales/promo (escort, OnlyFans, etc.)
 _SEXUAL_EMOJI_RE = re.compile(
     r'[\U0001F608\U0001F525\U0001F975\U0001F48B\U0001F445\U0001F351\U0001F4A6\U0001F608]',
@@ -108,6 +125,7 @@ def check(bio: str | None) -> Hit:
     # sueltos sin `https://`. Al revés quedaba un «https://» huérfano contando como
     # texto latino, que bajaba la proporción y colaba la bio.
     sin_urls = re.sub(r"t\.me/\S+", " ", _EXTERNAL_URL_RE.sub(" ", text))
+    sin_urls = _BARE_URL_RE.sub(" ", sin_urls)
     score = 0
     reasons: list[str] = []
 
@@ -117,9 +135,12 @@ def check(bio: str | None) -> Hit:
     elif _TG_LINK_RE.search(text):
         score += 25
         reasons.append(t("reason.bio_tg_link"))
-    elif _EXTERNAL_URL_RE.search(text):
+    elif _EXTERNAL_URL_RE.search(text) or _BARE_URL_RE.search(text):
         score += 15
         reasons.append(t("reason.bio_external_url"))
+    if _CAMPAIGN_PARAM_RE.search(text):
+        score += 20
+        reasons.append(t("reason.bio_campaign_link"))
 
     if _SEXUAL_EMOJI_RE.search(text):
         score += 20

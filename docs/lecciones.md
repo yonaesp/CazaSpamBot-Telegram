@@ -51,6 +51,7 @@ Una lección nueva va al final, con el número siguiente y su línea en el índi
 - [L43](#l43) · Horas: una sola zona para todo lo que ve una persona
 - [L44](#l44) · Tests que pasan en verde sin comprobar nada
 - [L45](#l45) · Cuando llega un aviso del bot pegado sin ninguna orden
+- [L46](#l46) · Charlotte: el enlace de la bio sin `https://` y un aviso de ban manual que no dejaba ver el perfil
 
 ---
 
@@ -924,3 +925,27 @@ El guion, en este orden:
 Un ban manual de otro admin en el aviso es una **pista de que el bot falló**, no
 el final de la historia: el admin tuvo que hacer a mano lo que debía ser
 automático. Hay que averiguar por qué.
+
+<a id="l46"></a>
+## L46 · Charlotte: el enlace de la bio sin `https://` y un aviso de ban manual que no dejaba ver el perfil
+
+28-oct-2026, Windows 10. Charlotte (id 5031063111) entró a las 19:59, el bot la dio por perfil legítimo (4 fotos
+subidas de una vez en enero de 2022, cuenta de 1.755 días, nombre latino) y a las 20:05 un admin la baneó a mano sin
+que hubiera escrito nada. El aviso de ban manual decía «sin mensajes registrados» y no dejaba ver por qué: tras el ban,
+la mención `tg://user?id=` ya no abre el perfil de quien no es miembro.
+
+Leído después con Telethon, la bio era «Reels are ready when you are — stake1036.com/?c=tg»: un espejo del casino
+Stake con código de campaña. `bio_spam` sumó 0, por dos huecos:
+- `_EXTERNAL_URL_RE` solo veía enlaces con `https://` o `www.`. Ahora `_BARE_URL_RE` cuenta también `dominio.tld/ruta`;
+  exige la barra para no tomar por enlace un «trabajo en Google.com» ni un correo.
+- No había ninguna marca de apuestas en `bio_spam_keywords.txt`. Se añadieron por dominio o marca (`stake\d*.com`,
+  1xbet, mostbet, melbet, 1win, roobet, rollbit, bitstarz, bc.game, pin-up). «stake» suelto no: es una palabra corriente
+  en inglés.
+- Señal nueva, `_CAMPAIGN_PARAM_RE` (`?c=`, `?ref=`, `utm_source=`…), que suma 20: quien enlaza su web no le pone un
+  rastreador. Con 20 y no 30, una tienda con `?ref=` y una llamada a la acción se queda en 50: hace falta además algo del
+  tema. Charlotte da 15 + 20 + 30 = 65.
+
+El aviso de ban manual lee ahora el perfil en el momento (`_perfil_para_aviso`: fotos, bio, canal personal y si la bio
+es spam para `bio_spam`) y responde con la foto de perfil (`_foto_de_perfil`, Bot API). Sin Telethon no añade nada; si
+no puede leerlo, lo dice.
+

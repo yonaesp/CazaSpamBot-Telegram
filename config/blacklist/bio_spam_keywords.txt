@@ -24,3 +24,16 @@ videos?\s+priv
 fotos?\s+priv
 contenido\s+exclusivo
 18\+
+# Casas de apuestas y casinos en línea, por su dominio o marca (caso real, 28-oct-2026:
+# «Reels are ready when you are — stake1036.com/?c=tg»). «stake» solo pegado a su
+# dominio: suelto es una palabra corriente en inglés («at stake», «stakeholder»).
+stake\d*\.(?:com|us|bet|games|io)
+1xbet
+mostbet
+melbet
+1win
+roobet
+rollbit
+bitstarz
+bc\.game
+pin-?up\.(?:casino|bet)

@@ -92,3 +92,37 @@ def test_bio_legit_con_web_no_dispara():
     ):
         hit = det.check(legit)
         assert hit is None or hit.score < 60, legit
+
+
+# Caso real (28-oct-2026): Charlotte entró en Windows 10 con esta bio y el bot no
+# sumó nada: el enlace iba sin `https://` y «stake» no estaba en la lista.
+CHARLOTTE = "Reels are ready when you are — stake1036.com/?c=tg"
+
+
+def test_charlotte_espejo_de_casino_con_campana_dispara():
+    hit = det.check(CHARLOTTE)
+    assert hit.rule == "bio_spam" and hit.score >= 60
+
+
+def test_dominio_sin_esquema_con_ruta_cuenta_como_enlace():
+    assert det._BARE_URL_RE.search("mira stake1036.com/?c=tg")
+    assert det._BARE_URL_RE.search("github.com/juan")
+
+
+def test_dominio_sin_ruta_o_correo_no_es_enlace():
+    assert not det._BARE_URL_RE.search("Ingeniero, trabajo en Google.com")
+    assert not det._BARE_URL_RE.search("escríbeme a juan@gmail.com/")
+
+
+def test_enlace_con_campana_y_llamada_a_la_accion_no_basta():
+    """Una tienda con ?ref= y «click here» se queda en 50: hace falta el tema."""
+    assert det.check("Mi tienda: tienda.com/?ref=tg click here").score == 0
+
+
+def test_stake_como_palabra_inglesa_no_dispara():
+    assert det.check("Everything is at stake. Stakeholder at ACME").score == 0
+    assert det.check("stake.com").score == 0
+
+
+def test_web_personal_sin_campana_no_dispara():
+    assert det.check("github.com/juanperez · Windows y Linux").score == 0
