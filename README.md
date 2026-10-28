@@ -8,7 +8,7 @@
 [![python-telegram-bot](https://img.shields.io/badge/PTB-22.8-26A5E4?logo=telegram&logoColor=white)](https://python-telegram-bot.org/)
 [![Telethon](https://img.shields.io/badge/Telethon-1.44-blueviolet)](https://docs.telethon.dev/)
 [![Languages](https://img.shields.io/badge/languages-es%20%7C%20en%20%7C%20add%20yours-orange)](src/locales/README.md)
-[![Tests](https://img.shields.io/badge/tests-1787%20passing-success)](#tests)
+[![Tests](https://img.shields.io/badge/tests-1791%20passing-success)](#tests)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 
 🌍 **English** · [**Español**](README.es.md)
@@ -99,7 +99,7 @@ The account **doesn't give itself away**: reading a story or a channel doesn't c
 | `external_reply` | Promoting someone else's channel by quoting one of its messages |
 | `cross_post` | The same message at once in several of your groups |
 | `oleada` | Nearly the same text from several new accounts within an hour (a spam network). Only adds points |
-| `calentamiento` | Filler messages first («ok», «hi») and then an outside link or @. Only adds points |
+| `calentamiento` | Filler messages first («ok», «hi») and then a private invite to another group (`t.me/+…`). Only adds points |
 | `forward_first_msg` | First message forwarded from a channel or a bot |
 | `first_msg_media` | First message that's only a photo, video or sticker |
 | `inline_buttons` | A person (not a bot) sending buttons |
@@ -388,7 +388,7 @@ Open an [issue on GitHub](https://github.com/yonaesp/CazaSpamBot-Telegram/issues
 ## 🧪 Tests
 
 ```bash
-.venv/bin/python -m pytest tests/ -q     # 1787 tests
+.venv/bin/python -m pytest tests/ -q     # 1791 tests
 ```
 
 Every detector has tests for what it must catch **and what it must not**, built from real cases. A false positive is worse than a false negative.

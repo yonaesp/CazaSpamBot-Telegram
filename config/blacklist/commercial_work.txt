@@ -25,3 +25,9 @@ trabaj(?:a|á|ando)\s+desde\s+(?:casa|tu\s+(?:celular|m[oó]vil|casa))
 # «trabajo extra» suelto NO: «me supone un trabajo extra configurarlo» es normal.
 tengo\s+un\s+(?:trabajo|empleo|ingreso|negocio)\s+extra
 (?:un|mi)\s+(?:trabajo|empleo)\s+extra\s+(?:al|con\s+el|en\s+el)\s+que
+# Reclutar para la red (simulación del 29-oct: «busco 5 personas serias… se gana
+# entre 200 y 300 euros al día desde el móvil… escribidme por privado» no daba nada).
+# «interesados», «con ganas» o «trabajar desde casa» sueltos NO: los dice cualquiera.
+busco\s+(?:a\s+)?(?:\d+\s+)?(?:personas|gente|chic[oa]s|colaboradores)\s+(?:serias?|responsables?|para\s+(?:trabajar|ganar))
+se\s+(?:busca|necesita[n]?)\s+\d+\s+(?:personas|chic[oa]s|colaboradores)
+gana(?:r|ncias?)?\s+[^.,\n]{0,40}?desde\s+(?:el|tu)\s+(?:m[oó]vil|celular)

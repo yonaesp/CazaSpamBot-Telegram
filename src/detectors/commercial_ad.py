@@ -107,6 +107,9 @@ _DEFAULT_WORK = [
     r"si\s+est[aá]s\s+buscando\s+(?:trabajo|empleo)",
     r"tengo\s+un\s+(?:trabajo|empleo|ingreso|negocio)\s+extra",
     r"(?:un|mi)\s+(?:trabajo|empleo)\s+extra\s+(?:al|con\s+el|en\s+el)\s+que",
+    r"busco\s+(?:a\s+)?(?:\d+\s+)?(?:personas|gente|chic[oa]s|colaboradores)\s+(?:serias?|responsables?|para\s+(?:trabajar|ganar))",
+    r"se\s+(?:busca|necesita[n]?)\s+\d+\s+(?:personas|chic[oa]s|colaboradores)",
+    r"gana(?:r|ncias?)?\s+[^.,\n]{0,40}?desde\s+(?:el|tu)\s+(?:m[oó]vil|celular)",
 ]
 # URL externa (http/https) que NO sea t.me — enlaces a webs de "empleo"/scam.
 _EXTERNAL_URL_RE = re.compile(r'https?://(?!t\.me/|telegram\.me/)\S+', re.IGNORECASE)

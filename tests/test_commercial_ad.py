@@ -254,3 +254,31 @@ def test_trabajo_extra_en_conversacion_normal_no_dispara():
                   "En mi trabajo le dedico pocas horas a esto, si os interesa os paso la "
                   "información del curso de Home Assistant que hice"):
         assert not det.check(_msg(texto), is_first_msg=True), texto
+
+
+# ── Reclutar para la red (simulación del 29-oct-2026) ─────────────────────────
+RED = [
+    "Hola a todos, busco 5 personas serias para un proyecto online, se gana entre 200 y "
+    "300 euros al día desde el móvil, interesados escribidme por privado",
+    "Busco personas serias, se gana 300€ al día desde casa, escribidme por privado",
+    "busco 5 personas para trabajar desde casa, ganancias de 300€ diarios, escribidme al privado",
+]
+
+
+def test_la_red_que_recluta_dispara():
+    """Antes no daba nada: faltaba el lado de quien ofrece («busco personas serias»)."""
+    for texto in RED:
+        hit = det.check(_msg(texto), is_first_msg=True)
+        assert hit and hit.rule == "commercial_ad" and hit.score >= 70, texto
+
+
+def test_quien_busca_gente_sin_dinero_no_dispara():
+    for texto in (
+        "busco personas interesadas en montar un grupo de domótica, escribidme por privado",
+        "uso el portátil para trabajar desde casa, escríbeme por privado y te paso la config",
+        "si tienes ganas de probarlo desde el móvil, escríbeme por privado y te explico",
+        "se necesitan 2 personas para probar la beta de la app, os aviso por aquí",
+        "busco gente con el mismo error para ver si es cosa de la actualización",
+    ):
+        hit = det.check(_msg(texto), is_first_msg=True)
+        assert not hit, texto

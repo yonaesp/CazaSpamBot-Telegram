@@ -1,6 +1,6 @@
 # CazaSpamBot — Bot Antispam Telegram
 
-Bot de moderación antispam **en producción 24/7**, multi-grupo, federado y **bilingüe** (es/en). ~23.000 LOC en `src/`, Podman, **1787 tests**, 27 detectores (un módulo cada uno en `src/detectors/`).
+Bot de moderación antispam **en producción 24/7**, multi-grupo, federado y **bilingüe** (es/en). ~23.000 LOC en `src/`, Podman, **1791 tests**, 27 detectores (un módulo cada uno en `src/detectors/`).
 
 > **Estado: PRODUCCIÓN.** No es un esqueleto. Cualquier cambio afecta grupos reales con miles de usuarios. **Investiga > Confirma > Actúa.**
 
@@ -73,7 +73,7 @@ Todo el texto que ve el usuario vive en `src/locales/<código>.json` (`es.json` 
 
 ## Detectores (`src/detectors/` + `verification.py`)
 
-27 detectores en `src/detectors/`: `bio_spam`, `calentamiento`, `cas`, `commercial_ad`, `contact_spam`, `cross_post`, `dormant_bot_mention`, `emoji_only`, `external_mention`, `external_reply`, `first_msg_media`, `forward_first_msg`, `inline_buttons`, `investment_scam`, `jfm_delta`, `link_target`, `lols_bot`, `offplatform_contact`, `oleada`, `personal_channel`, `photos_batch`, `premium_new_link`, `reaction_farming`, `story_share`, `tg_deeplink`, `unicode_script` (`non_allowed_script`), `url_blocklist`. Fuera de esa carpeta deciden también `obvious_spam_profile` (`verification.py`) y `learned_similarity` (`learning.py`). También banea spam publicado en nombre de un canal (`sender_chat` → `banChatSenderChat`). `oleada` (mismo texto de varias cuentas nuevas en 1 h) y `calentamiento` (relleno y luego un @ o enlace de fuera) solo suman, 35 y 25, por debajo del mute: no subirlos sin medir antes en `moderation_log` (L47).
+27 detectores en `src/detectors/`: `bio_spam`, `calentamiento`, `cas`, `commercial_ad`, `contact_spam`, `cross_post`, `dormant_bot_mention`, `emoji_only`, `external_mention`, `external_reply`, `first_msg_media`, `forward_first_msg`, `inline_buttons`, `investment_scam`, `jfm_delta`, `link_target`, `lols_bot`, `offplatform_contact`, `oleada`, `personal_channel`, `photos_batch`, `premium_new_link`, `reaction_farming`, `story_share`, `tg_deeplink`, `unicode_script` (`non_allowed_script`), `url_blocklist`. Fuera de esa carpeta deciden también `obvious_spam_profile` (`verification.py`) y `learned_similarity` (`learning.py`). También banea spam publicado en nombre de un canal (`sender_chat` → `banChatSenderChat`). `oleada` (mismo texto de varias cuentas nuevas en 1 h) y `calentamiento` (relleno y luego una invitación privada `t.me/+…`; con un @ o un grupo público expulsaba a gente normal) solo suman, 35 y 25: no subirlos sin medir antes en `moderation_log` (L47, L48).
 
 `rule_explain.py` traduce el id técnico de regla a la explicación que lee el admin. **Es el texto más visible del bot** y tiene prioridad sobre el `reason` del detector.
 
@@ -247,4 +247,4 @@ GitHub guarda solo 14 días: `scripts/traffic_log.py` los acumula en `traffic/hi
 
 Lo nuevo va en su apartado temático de este fichero como invariante de 1-3 líneas (qué no hacer, el número medido, el test que lo fija), nunca al final por fecha. El relato (el caso, la medida, lo que se probó) va a `docs/lecciones.md` como lección nueva, con su línea en el índice, y aquí se cita con `(Ln)`. Un procedimiento de varios pasos que se usa a veces, a una skill en `.claude/skills/`. Las preferencias del admin y el estado del trabajo, a la memoria.
 
-*Actualizado: 2026-10-28 — 27 detectores, 1787 tests, 1.200 claves por idioma.*
+*Actualizado: 2026-10-29 — 27 detectores, 1791 tests, 1.200 claves por idioma.*

@@ -53,6 +53,7 @@ Una lección nueva va al final, con el número siguiente y su línea en el índi
 - [L45](#l45) · Cuando llega un aviso del bot pegado sin ninguna orden
 - [L46](#l46) · Charlotte: el enlace de la bio sin `https://` y un aviso de ban manual que no dejaba ver el perfil
 - [L47](#l47) · Repaso del 28-oct: lo que se escapaba, lo que hacen otros bots y lo que se añadió
+- [L48](#l48) · Simulación del 29-oct: `calentamiento` expulsaba a gente normal y una red de reclutamiento no daba nada
 
 ---
 
@@ -978,3 +979,26 @@ avalanchas, `antiraid.py`. Se eligieron tres, con el OK del admin:
 Descartados por ahora: umbral de denuncias de miembros (0 reportes en la base), clasificador transformer local (no hay
 modelo en español y el N100 no va sobrado), y el veto de IA con contexto (gasta API y saca texto del servidor).
 
+## L48 · Simulación del 29-oct: `calentamiento` expulsaba a gente normal y una red de reclutamiento no daba nada
+
+Pedido del admin: «haz una simulación realista». Se pasaron conversaciones completas por `on_chat_member`, `on_message` y
+`on_manual_ban_callback` con el código de `src/`, una copia de la copia nocturna de la base (muestras aprendidas, ajustes
+por chat), updates en el formato exacto de la Bot API, el reloj avanzando de verdad entre mensajes (entrada, «hola» a
+los 5 min, el enlace a los 50) y sin red: Telegram era un doble que apuntaba cada llamada, CAS y lols contestaban «no
+fichado», Telethon apagado y el `.env` real sin cargar.
+
+Dos fallos:
+- **`calentamiento` con cualquier @ o enlace.** «buenas», «gracias!!», «ok» y luego «yo lo pregunté en
+  t.me/WindowsAyuda y me ayudaron» daba 50 + 25 = 75: expulsión de una persona normal, cuando sin la señal era silencio.
+  Con un @ la señal no cambiaba nada (40 + 25 sigue siendo silencio). Ahora solo suma ante una invitación privada
+  (`t.me/+…`, `t.me/joinchat/…`, `calentamiento.es_invitacion`); un grupo público o un @ no cuentan. Hay test.
+- **Reclutamiento sin vocabulario de oferta.** «busco 5 personas serias para un proyecto online, se gana entre 200 y
+  300 euros al día desde el móvil, interesados escribidme por privado» daba 0: cifra periódica (25) + primer mensaje
+  (15) = 40 < 60, y el «escribidme por privado» no cuenta sin `has_work`. Se añadieron a `commercial_work.txt` (y a
+  `_DEFAULT_WORK`) «busco N personas serias/responsables/para trabajar», «se busca(n) N personas» y «gana… desde el
+  móvil»: ahora da 90 (expulsión) y, con `oleada` en la segunda cuenta, 125 (ban). Medido antes sobre 633 mensajes
+  legítimos de la base: 0 coincidencias. Se descartaron «interesados», «con ganas» y «trabajar desde casa» sueltos (los
+  dice quien no ofrece nada), con test.
+
+Lo que salió bien: los botones `mban:` (4 de 4 grupos y «Ya estaba baneado» al repetir) y `oleada`, que solo sumó 35 a
+dos personas que pegaron el mismo error de Windows, sin acción.

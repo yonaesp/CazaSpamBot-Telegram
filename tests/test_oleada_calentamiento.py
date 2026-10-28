@@ -68,14 +68,14 @@ def test_relleno_y_luego_enlace_suma(tmp_db):
     _recien_llegado(tmp_db)
     _previos(tmp_db, ["hi", "ok", "jaja", "nice group"])
     hit = calentamiento.check(tmp_db, -1, 300, 99, msg_count=5, is_first_msg=False,
-                              hay_enlace_externo=True)
+                              hay_invitacion=True)
     assert hit.rule == "calentamiento" and hit.score == calentamiento.SCORE
 
 
 def test_sin_enlace_no_pasa_nada(tmp_db):
     _recien_llegado(tmp_db)
     _previos(tmp_db, ["hi", "ok", "jaja"])
-    assert not calentamiento.check(tmp_db, -1, 300, 99, 4, False, hay_enlace_externo=False)
+    assert not calentamiento.check(tmp_db, -1, 300, 99, 4, False, hay_invitacion=False)
 
 
 def test_si_antes_hablo_de_verdad_no_cuenta(tmp_db):
@@ -105,3 +105,23 @@ def test_entro_hace_mas_de_una_semana_no_cuenta(tmp_db):
     _recien_llegado(tmp_db, dias=10)
     _previos(tmp_db, ["hi", "ok"])
     assert not calentamiento.check(tmp_db, -1, 300, 99, 4, False, True)
+
+
+def test_solo_cuenta_una_invitacion_privada():
+    """Simulación del 29-oct: «buenas», «gracias!!», «ok» y luego un grupo público
+    (t.me/WindowsAyuda) es gente normal; con esta señal pasaba de silencio a expulsión."""
+    assert calentamiento.es_invitacion(["https://t.me/+Ab3dEfGhIjk"])
+    assert calentamiento.es_invitacion(["t.me/joinchat/AAAAAEx"])
+    assert calentamiento.es_invitacion(["https://telegram.me/+xyz"])
+    assert not calentamiento.es_invitacion(["https://t.me/WindowsAyuda"])
+    assert not calentamiento.es_invitacion(["https://t.me/xataka/1234"])
+    assert not calentamiento.es_invitacion(None)
+
+
+def test_el_handler_le_pasa_solo_invitaciones():
+    from pathlib import Path
+    fuente = Path("src/handlers.py").read_text()
+    i = fuente.index("calentamiento_det.check(")
+    bloque = fuente[i - 600:i]
+    assert "calentamiento_det.es_invitacion(" in bloque, (
+        "calentamiento volvería a sumar con cualquier @ o grupo público")

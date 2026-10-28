@@ -12,16 +12,22 @@ Todo a la vez:
 - Ya ha salido de la ventana de primeros mensajes (si no, ya se le mira con lupa).
 - Entró hace ≤ `DIAS_RECIEN_LLEGADO` días (el bot vio la entrada) y lleva
   ≤ `MAX_MENSAJES` mensajes.
-- Este mensaje ya trae un @ externo o un enlace a Telegram de fuera
-  (`external_mention_or_link`). Sin eso no pasa nada: hablar poco no es delito.
+- Este mensaje trae una INVITACIÓN PRIVADA a otro grupo (`t.me/+…`,
+  `t.me/joinchat/…`) que ya ha puntuado en `external_mention_or_link`. Un @ o
+  un grupo público no cuentan: la simulación del 29-oct mostró que una persona
+  normal («buenas», «gracias!!», «ok» y luego «yo lo pregunté en
+  t.me/WindowsAyuda») pasaba de silenciada a expulsada solo por esta señal, y con
+  un @ la señal no cambiaba nada (40 + 25 sigue siendo silencio). Hablar poco no
+  es delito.
 - Todo lo que escribió antes, en las últimas 24 h, son ≥ `MIN_PREVIOS` mensajes de
   ≤ `MAX_PALABRAS` palabras.
 
-Suma `SCORE` (25) al enlace. No decide sola; un perfil con confianza ≥ 70 no se
+Suma `SCORE` (25) a la invitación (50 + 25 = expulsión). No decide sola; un perfil con confianza ≥ 70 no se
 toca, y entre 40 y 69 una acción severa va a revisión del admin.
 """
 from __future__ import annotations
 
+import re
 import time
 
 from ..i18n import t
@@ -34,12 +40,19 @@ MAX_PALABRAS = 3
 VENTANA_S = 24 * 3600
 SCORE = 25
 
+_INVITACION_RE = re.compile(r"(?:t|telegram)\.me/(?:\+|joinchat/)\S", re.I)
+
+
+def es_invitacion(enlaces: list[str] | None) -> bool:
+    """¿Alguno de estos enlaces de Telegram es una invitación privada a un grupo?"""
+    return any(_INVITACION_RE.search(u or "") for u in enlaces or ())
+
 
 def check(db, chat_id: int, user_id: int, msg_id: int, msg_count: int,
-          is_first_msg: bool, hay_enlace_externo: bool,
+          is_first_msg: bool, hay_invitacion: bool,
           ahora: float | None = None) -> Hit:
-    """¿Mensajes vacíos primero y ahora el @ o el enlace?"""
-    if is_first_msg or not hay_enlace_externo or msg_count > MAX_MENSAJES:
+    """¿Mensajes vacíos primero y ahora la invitación a otro grupo?"""
+    if is_first_msg or not hay_invitacion or msg_count > MAX_MENSAJES:
         return Hit.none()
     ahora = ahora if ahora is not None else time.time()
     try:

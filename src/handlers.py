@@ -1873,11 +1873,14 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         hits.append(_sin_tumbar(lambda: crosspost_det.check(db, chat_id, user.id, normalized_text or text), "crosspost"))
         # El mismo texto de VARIAS cuentas nuevas en la misma hora: una red (L47).
         hits.append(_sin_tumbar(lambda: oleada_det.check(db, user.id, text, is_first), "oleada"))
-    # Mensajes vacíos para pasar la ventana de primeros mensajes y luego el @ o el
-    # enlace de fuera. Solo suma si ese enlace ya ha puntuado (L47).
-    _hay_ext = any(h and h.rule == "external_mention_or_link" for h in hits)
+    # Mensajes vacíos para pasar la ventana de primeros mensajes y luego una
+    # invitación privada a otro grupo que ya ha puntuado. Un @ o un grupo público
+    # no cuentan: lo comparte gente normal (L47).
+    _hay_inv = any(h and h.rule == "external_mention_or_link"
+                   and calentamiento_det.es_invitacion((h.payload or {}).get("external_tg_links"))
+                   for h in hits)
     hits.append(_sin_tumbar(lambda: calentamiento_det.check(
-        db, chat_id, user.id, msg.message_id, msg_count, is_first, _hay_ext), "calentamiento"))
+        db, chat_id, user.id, msg.message_id, msg_count, is_first, _hay_inv), "calentamiento"))
 
     # 3d-sext) "Este es mi número de <otra app>, escríbeme ahí". Sin enlace, sin
     # mención y en español correcto, así que ningún otro detector lo veía: hubo que
