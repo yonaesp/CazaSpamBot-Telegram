@@ -178,7 +178,7 @@ sudo -n docker exec cazaspam-bot python -c \
 sudo -n docker exec cazaspam-bot python -c "import sqlite3; ..."
 ```
 
-Si aun así se copia a pelo, los tres ficheros (`.db`, `.db-wal`, `.db-shm`). Ante «este usuario no existe», sospechar primero de la copia y comprobarlo contra la base viva.
+Si aun así se copia a pelo, los tres ficheros (`.db`, `.db-wal`, `.db-shm`). Un script por heredoc va con `docker exec -i`: sin `-i` no le llega nada y sale sin error ni salida (28-oct). Ante «este usuario no existe», sospechar primero de la copia y comprobarlo contra la base viva.
 
 ## Reglas críticas de diseño (lecciones de producción)
 
