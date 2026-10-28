@@ -775,6 +775,29 @@ class DB:
                 (chat_id, user_id, chat_id, user_id, self.MAX_RECIENTES_POR_USUARIO),
             )
 
+    def textos_recientes_de_otros(self, user_id: int, desde_ts: float) -> list[tuple[int, str]]:
+        """(user_id, texto) de lo que han escrito LOS DEMÁS en cualquier chat desde
+        `desde_ts`. Lo usa el detector de oleadas."""
+        with self._cur() as c:
+            filas = c.execute(
+                "SELECT user_id, texto FROM mensajes_recientes "
+                "WHERE user_id != ? AND ts > ? AND texto IS NOT NULL",
+                (user_id, desde_ts),
+            ).fetchall()
+        return [(f["user_id"], f["texto"]) for f in filas]
+
+    def textos_previos(self, chat_id: int, user_id: int, msg_id: int,
+                       desde_ts: float) -> list[str]:
+        """Lo que esta persona escribió en este chat antes de `msg_id`, desde
+        `desde_ts`. Lo usa el detector de calentamiento."""
+        with self._cur() as c:
+            filas = c.execute(
+                "SELECT texto FROM mensajes_recientes WHERE chat_id=? AND user_id=? "
+                "AND msg_id != ? AND ts > ? ORDER BY ts",
+                (chat_id, user_id, msg_id, desde_ts),
+            ).fetchall()
+        return [f["texto"] or "" for f in filas]
+
     def mensajes_para_limpiar(self, user_id: int, desde: float) -> dict[int, list[int]]:
         """{chat_id: [msg_id, …]} de lo que esa persona ha escrito y el bot conoce.
 

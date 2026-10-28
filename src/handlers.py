@@ -40,6 +40,8 @@ from .detectors import commercial_ad as comad_det
 from .detectors import investment_scam as invscam_det
 from .detectors import contact_spam as contact_det
 from .detectors import cross_post as crosspost_det
+from .detectors import oleada as oleada_det
+from .detectors import calentamiento as calentamiento_det
 from .detectors import external_reply as extreply_det
 from .detectors import photos_batch as photos_batch_det
 from .detectors import bio_spam as bio_spam_det
@@ -1359,6 +1361,54 @@ async def _foto_de_perfil(context, db: DB, target, reply_to: int) -> None:
         log.debug("manual_ban foto user=%s: %s", target.id, exc)
 
 
+def _botones_ban_manual(chat_id: int, user_id: int) -> list:
+    """«Banear en todos» / «Solo aquí» del aviso de ban manual."""
+    from telegram import InlineKeyboardButton
+    return [
+        InlineKeyboardButton(t("hdl.mban_btn_todos"), callback_data=f"mban:all:{chat_id}:{user_id}"),
+        InlineKeyboardButton(t("hdl.mban_btn_aqui"), callback_data=f"mban:here:{chat_id}:{user_id}"),
+    ]
+
+
+async def on_manual_ban_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Botones del aviso de ban manual: extenderlo a todos los grupos o dejarlo."""
+    q = update.callback_query
+    if q is None:
+        return
+    cfg: Config = context.bot_data["cfg"]
+    db: DB = context.bot_data["db"]
+    if q.from_user.id != cfg.admin_user_id:
+        await q.answer(t("hdl.only_admin_review"))
+        return
+    try:
+        _, accion, chat_s, uid_s = q.data.split(":", 3)
+        chat_id, user_id = int(chat_s), int(uid_s)
+    except Exception as exc:  # noqa: BLE001
+        await q.answer(t("hdl.callback_invalid", error=exc))
+        return
+    from telegram import InlineKeyboardMarkup
+    sin_botones = InlineKeyboardMarkup([[notify_prefs.mute_button("manual_ban")]])
+    if accion != "all":
+        await q.answer(t("hdl.mban_aqui"))
+    elif db.is_banned(user_id):
+        await q.answer(t("hdl.mban_ya"))
+    else:
+        res = await federate_ban(
+            context.bot, db, user_id, reason=t("reason.manual_ban_federado"),
+            rule="manual_admin_ban", triggered_in_chat=chat_id, shadow=cfg.shadow)
+        ok = sum(1 for v in res.values() if v in ("ok", "shadow"))
+        db.log_action(chat_id=chat_id, user_id=user_id, username=None, message_id=None,
+                      rule="manual_admin_ban", action="ban", score=0,
+                      mode="shadow" if cfg.shadow else "active",
+                      payload={"via": "aviso_ban_manual", "resultados": res})
+        log.info("ban manual extendido a todos: user=%s chats_ok=%d/%d", user_id, ok, len(res))
+        await q.answer(t("hdl.mban_hecho", n=ok, total=len(res)))
+    try:
+        await q.edit_message_reply_markup(reply_markup=sin_botones)
+    except TelegramError:
+        pass
+
+
 async def _notify_manual_ban(
     context: ContextTypes.DEFAULT_TYPE,
     db: DB,
@@ -1410,10 +1460,16 @@ async def _notify_manual_ban(
     # Silenciable en runtime (botón / /alertas); default activado.
     if cfg.admin_notify_chat_id and notify_prefs.is_enabled(db, "manual_ban", True):
         from telegram import InlineKeyboardMarkup
+        filas = [[notify_prefs.mute_button("manual_ban")]]
+        # Un ban de otro admin vale solo en su grupo. Si fue spam, que el dueño lo
+        # extienda a todos con un toque (Charlotte, 28-oct: se hizo a mano).
+        if (cmu.new_chat_member.status == ChatMemberStatus.BANNED
+                and not db.is_banned(target.id)):
+            filas.insert(0, _botones_ban_manual(chat.id, target.id))
         try:
             aviso = await context.bot.send_message(
                 chat_id=cfg.admin_notify_chat_id, text=text, parse_mode="HTML",
-                reply_markup=InlineKeyboardMarkup([[notify_prefs.mute_button("manual_ban")]]),
+                reply_markup=InlineKeyboardMarkup(filas),
                 disable_web_page_preview=True,
                 disable_notification=notify_prefs.sin_sonido(db, importante=False),
             )
@@ -1815,6 +1871,13 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     # caracteres invisibles no sirve para esquivarlo.
     if not texto_ajeno:
         hits.append(_sin_tumbar(lambda: crosspost_det.check(db, chat_id, user.id, normalized_text or text), "crosspost"))
+        # El mismo texto de VARIAS cuentas nuevas en la misma hora: una red (L47).
+        hits.append(_sin_tumbar(lambda: oleada_det.check(db, user.id, text, is_first), "oleada"))
+    # Mensajes vacíos para pasar la ventana de primeros mensajes y luego el @ o el
+    # enlace de fuera. Solo suma si ese enlace ya ha puntuado (L47).
+    _hay_ext = any(h and h.rule == "external_mention_or_link" for h in hits)
+    hits.append(_sin_tumbar(lambda: calentamiento_det.check(
+        db, chat_id, user.id, msg.message_id, msg_count, is_first, _hay_ext), "calentamiento"))
 
     # 3d-sext) "Este es mi número de <otra app>, escríbeme ahí". Sin enlace, sin
     # mención y en español correcto, así que ningún otro detector lo veía: hubo que

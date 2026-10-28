@@ -67,3 +67,73 @@ def test_la_plantilla_tiene_hueco_para_el_perfil():
     for lang in ("es", "en"):
         d = json.loads(Path(f"src/locales/{lang}.json").read_text())
         assert "{perfil}" in d["hdl.manual_ban_alert"]
+
+
+# ── Botones «Banear en todos» / «Solo aquí» ─────────────────────────────────
+
+class _Bot:
+    """Doble de la Bot API con lo que usan federate_ban y el callback."""
+
+    def __init__(self):
+        self.baneos = []
+
+    async def ban_chat_member(self, chat_id, user_id):
+        self.baneos.append((chat_id, user_id))
+
+    async def delete_messages(self, chat_id, message_ids):
+        return True
+
+
+class _Query:
+    def __init__(self, data, uid):
+        self.data = data
+        self.from_user = SimpleNamespace(id=uid)
+        self.respuestas = []
+        self.markup = "sin tocar"
+
+    async def answer(self, texto=None, **k):
+        self.respuestas.append(texto)
+
+    async def edit_message_reply_markup(self, reply_markup=None):
+        self.markup = reply_markup
+
+
+def _ctx_cb(db, bot):
+    cfg = SimpleNamespace(admin_user_id=1, shadow=False)
+    return SimpleNamespace(bot=bot, bot_data={"cfg": cfg, "db": db})
+
+
+def _alta_chats(db):
+    for cid in (-1001, -1002, -1003):
+        db.upsert_bot_chat(cid, f"G{cid}", "supergroup", True, True, True)
+
+
+def test_banear_en_todos_extiende_el_ban_y_lo_registra(tmp_db):
+    _alta_chats(tmp_db)
+    bot = _Bot()
+    q = _Query("mban:all:-1001:5031063111", uid=1)
+    asyncio.run(handlers.on_manual_ban_callback(SimpleNamespace(callback_query=q), _ctx_cb(tmp_db, bot)))
+    assert sorted(c for c, _ in bot.baneos) == [-1003, -1002, -1001]
+    assert tmp_db.is_banned(5031063111)
+    assert q.markup != "sin tocar"  # se quitan los botones
+
+
+def test_solo_aqui_no_banea_nada(tmp_db):
+    _alta_chats(tmp_db)
+    bot = _Bot()
+    q = _Query("mban:here:-1001:5031063111", uid=1)
+    asyncio.run(handlers.on_manual_ban_callback(SimpleNamespace(callback_query=q), _ctx_cb(tmp_db, bot)))
+    assert bot.baneos == [] and not tmp_db.is_banned(5031063111)
+
+
+def test_solo_el_dueno_puede_pulsar(tmp_db):
+    _alta_chats(tmp_db)
+    bot = _Bot()
+    q = _Query("mban:all:-1001:5031063111", uid=999)
+    asyncio.run(handlers.on_manual_ban_callback(SimpleNamespace(callback_query=q), _ctx_cb(tmp_db, bot)))
+    assert bot.baneos == [] and not tmp_db.is_banned(5031063111)
+
+
+def test_callback_data_cabe_en_64_bytes():
+    for b in handlers._botones_ban_manual(-1001008178265, 9999999999):
+        assert len(b.callback_data.encode()) <= 64

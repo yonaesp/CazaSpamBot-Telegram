@@ -8,7 +8,7 @@
 [![python-telegram-bot](https://img.shields.io/badge/PTB-22.8-26A5E4?logo=telegram&logoColor=white)](https://python-telegram-bot.org/)
 [![Telethon](https://img.shields.io/badge/Telethon-1.44-blueviolet)](https://docs.telethon.dev/)
 [![Idiomas](https://img.shields.io/badge/idiomas-es%20%7C%20en%20%7C%20a%C3%B1ade%20el%20tuyo-orange)](src/locales/README.md)
-[![Tests](https://img.shields.io/badge/tests-1769%20passing-success)](#tests)
+[![Tests](https://img.shields.io/badge/tests-1787%20passing-success)](#tests)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 
 🌍 [**English**](README.md) · **Español**
@@ -79,7 +79,7 @@ La cuenta **no se delata**: leer una historia o un canal no cuenta como visualiz
 🌍 **Para cualquier comunidad.** Viene en español e inglés y otro idioma es un archivo JSON. Tú eliges qué alfabetos son normales en tu grupo.
 
 <details>
-<summary><b>🔍 Ver los 25 detectores</b></summary>
+<summary><b>🔍 Ver los 27 detectores</b></summary>
 
 <br>
 
@@ -98,6 +98,8 @@ La cuenta **no se delata**: leer una historia o un canal no cuenta como visualiz
 | `contact_spam` | Una tarjeta de contacto cuyo nombre es el anuncio |
 | `external_reply` | Promocionar un canal ajeno citando un mensaje suyo |
 | `cross_post` | El mismo mensaje a la vez en varios de tus grupos |
+| `oleada` | Casi el mismo texto de varias cuentas nuevas en menos de una hora (una red). Solo suma puntos |
+| `calentamiento` | Mensajes de relleno («ok», «hola») y luego un enlace o un @ de fuera. Solo suma puntos |
 | `forward_first_msg` | Primer mensaje reenviado desde un canal o un bot |
 | `first_msg_media` | Primer mensaje que es solo una foto, un vídeo o un sticker |
 | `inline_buttons` | Una persona (no un bot) que manda botones |
@@ -385,7 +387,7 @@ Abre una [incidencia en GitHub](https://github.com/yonaesp/CazaSpamBot-Telegram/
 ## 🧪 Tests
 
 ```bash
-.venv/bin/python -m pytest tests/ -q     # 1769 tests
+.venv/bin/python -m pytest tests/ -q     # 1787 tests
 ```
 
 Cada detector tiene tests de lo que debe cazar **y de lo que no**, con casos reales. Un falso positivo es peor que un falso negativo.

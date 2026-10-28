@@ -52,6 +52,7 @@ Una lección nueva va al final, con el número siguiente y su línea en el índi
 - [L44](#l44) · Tests que pasan en verde sin comprobar nada
 - [L45](#l45) · Cuando llega un aviso del bot pegado sin ninguna orden
 - [L46](#l46) · Charlotte: el enlace de la bio sin `https://` y un aviso de ban manual que no dejaba ver el perfil
+- [L47](#l47) · Repaso del 28-oct: lo que se escapaba, lo que hacen otros bots y lo que se añadió
 
 ---
 
@@ -948,4 +949,32 @@ Stake con código de campaña. `bio_spam` sumó 0, por dos huecos:
 El aviso de ban manual lee ahora el perfil en el momento (`_perfil_para_aviso`: fotos, bio, canal personal y si la bio
 es spam para `bio_spam`) y responde con la foto de perfil (`_foto_de_perfil`, Bot API). Sin Telethon no añade nada; si
 no puede leerlo, lo dice.
+
+<a id="l47"></a>
+## L47 · Repaso del 28-oct: lo que se escapaba, lo que hacen otros bots y lo que se añadió
+
+Pedido del admin: «investiga a fondo cómo mejorar aún más el bot pero sin exagerar». Medido sobre la base viva, 60 días
+(unas 900 acciones):
+- Los bans manuales (del dueño y de otros admins) que el bot se dejó ya estaban cubiertos por arreglos posteriores
+  (María Casilla, Elxufas, Mila, Charlotte en L46); el único sin regla era «Mahmoudㅤ» (relleno invisible U+3164 en el
+  nombre y «Your use What are its specifications?»). Nombres con relleno invisible en la base: 1 de 1.077. No compensa un
+  detector.
+- La verificación expulsó a 251 sospechosos; ninguno volvió a entrar ni escribió después. Sin falsos positivos a la vista.
+- `learned_similarity` marcó 73 veces a veteranos (Ulises, Molkio…) con score 50 (Bayes), siempre salvados por la
+  confianza; dejó de pasar el 22-oct. Sobre los mensajes de veteranos de la última semana da 0 positivos.
+- Primeros mensajes idénticos de cuentas distintas en toda la historia: 1 (apuestas en chino), ya cazado. Reportes con
+  @admin: 0.
+
+Lo que hacen otros (investigado: `umputun/tg-spam` README y `lib/tgspam/detector.go`, CheeseSpamBot, `Priler/samurai`):
+espaciado anómalo, alfabetos mezclados en una palabra y normalización de invisibles ya los cubre `desofuscar.py`;
+avalanchas, `antiraid.py`. Se eligieron tres, con el OK del admin:
+- **Botones en el aviso de ban manual** (`mban:all` / `mban:here`): Charlotte hubo que extenderla a todos a mano.
+- **`oleada`** (de `--duplicates` de tg-spam): coseno ≥ 0,9, ≥ 40 caracteres y 6 palabras, en 1 h, solo para quien está
+  en sus primeros mensajes. 35 puntos.
+- **`calentamiento`** (de `--max-short-msg-count`): fuera de la ventana de primeros mensajes, entrada vista hace ≤ 7 días,
+  ≤ 8 mensajes, ≥ 2 previos de ≤ 3 palabras en 24 h y un @ o enlace de Telegram de fuera ya puntuado. 25 puntos. Es
+  una hipótesis sin datos que la midan: si empieza a aparecer en `moderation_log` junto a acciones dudosas, se baja.
+
+Descartados por ahora: umbral de denuncias de miembros (0 reportes en la base), clasificador transformer local (no hay
+modelo en español y el N100 no va sobrado), y el veto de IA con contexto (gasta API y saca texto del servidor).
 

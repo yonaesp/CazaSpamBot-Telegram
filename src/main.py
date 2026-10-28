@@ -22,6 +22,7 @@ from .config import load_config
 from .db import DB
 from .handlers import (
     on_readmision_callback,
+    on_manual_ban_callback,
     on_trust_notice_callback,
     on_chat_member,
     on_edited_message,
@@ -387,6 +388,7 @@ def main() -> int:
     app.add_handler(CallbackQueryHandler(autoaprendizaje.on_callback, pattern=r"^rprop:"))
     app.add_handler(CallbackQueryHandler(on_trust_notice_callback, pattern=r"^tnote:"))
     app.add_handler(CallbackQueryHandler(on_readmision_callback, pattern=r"^readm:"))
+    app.add_handler(CallbackQueryHandler(on_manual_ban_callback, pattern=r"^mban:"))
     # Callback de antiflood (botones ✅ No es bot / ❌ Es bot en DM admin)
     from .handlers import on_flood_callback
     app.add_handler(CallbackQueryHandler(on_flood_callback, pattern=r"^flood:"))
