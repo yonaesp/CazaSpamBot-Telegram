@@ -1002,3 +1002,7 @@ Dos fallos:
 
 Lo que salió bien: los botones `mban:` (4 de 4 grupos y «Ya estaba baneado» al repetir) y `oleada`, que solo sumó 35 a
 dos personas que pegaron el mismo error de Windows, sin acción.
+
+El banco de pruebas quedó en `scripts/simular.py`, con la acción esperada de cada escena, y la suite lo pasa con
+`--vacia` (`tests/test_simulacion.py`, en un proceso aparte porque cambia `time.time` y bloquea la red). Con
+`MUTE_SCORE=45` falla en las dos escenas del @, que es lo que tiene que hacer.

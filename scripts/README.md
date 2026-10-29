@@ -12,6 +12,7 @@ mayoría requiere Telethon configurado (ver sección 3 de `.env.example`).
 | `analyze_user.py` | Informe completo de un usuario concreto (`python -m scripts.analyze_user @username`): perfil, historial, señales. |
 | `capture_rose_welcomes.py` | Migración desde el bot Rose: captura el welcome y las rules que tenías configurados en Rose y los importa a la base de datos del bot. Solo útil si vienes de Rose. |
 | `traffic_log.py` | Registra en local el tráfico del repo en GitHub (visitas y clones). GitHub solo guarda 14 días; este script los va acumulando en `traffic/history.json` (gitignored). Ejecútalo un par de veces al mes: `python -m scripts.traffic_log` (lee y fusiona) o `--show` (solo muestra lo guardado). Requiere `gh` autenticado. |
+| `simular.py` | Simulación realista **en el host, no en el contenedor**: conversaciones enteras (entrar, saludar, esperar, soltar el enlace) por el código del bot, sin red ni Telegram de verdad. Cada escena dice qué acción espera y el script sale con 1 si alguna falla. `.venv/bin/python scripts/simular.py --vacia` (lo pasa la suite) o `--base COPIA.db` con una copia de la base; `-v` enseña cada llamada a Telegram. Antes de dar por bueno un detector nuevo, añade su escena. |
 
 > Ninguno de estos scripts ejecuta acciones de moderación por sí mismo: son de
 > diagnóstico/importación. Las acciones siempre pasan por el bot y su auditoría.
