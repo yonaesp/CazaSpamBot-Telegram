@@ -16,6 +16,7 @@ from typing import Any
 from telegram import Bot
 from telegram.error import TelegramError
 
+from . import enlaces
 from .db import DB
 from .i18n import t
 
@@ -147,15 +148,17 @@ async def _quien_borro(client, chat_id: int, msg_ids: set):
                 uname = getattr(actor, "username", None)
                 aid = getattr(actor, "id", "?")
                 tag = f"@{uname}" if uname else nombre
-                return t("tb.actor_info", tag=_h.escape(tag), uid=aid), aid
+                return t("tb.actor_info", uid=aid,
+                         tag=enlaces.al_perfil(aid, _h.escape(tag), uname)), aid
             break
     except Exception as exc:  # noqa: BLE001
         log.debug("manual_delete admin_log lookup fallo chat=%s: %s", chat_id, exc)
-    return "?", None
+    # El registro solo apunta lo que borra un admin: lo demás lo borró su autor.
+    return t("tb.actor_desconocido"), None
 
 
 def _contenido_de(db: DB, chat_id: int, msg_id: int):
-    """(autor_id, autor_nombre, texto) de un mensaje borrado, o None.
+    """(autor_id, autor_nombre, texto, autor_username) de un mensaje borrado, o None.
 
     OJO: `seen_users` guarda solo el ÚLTIMO mensaje de cada persona, así que de un
     lote de diez borrados normalmente solo uno tiene texto recuperable. Los demás
@@ -167,29 +170,32 @@ def _contenido_de(db: DB, chat_id: int, msg_id: int):
     reciente = db.mensaje_reciente(chat_id, msg_id)
     if reciente:
         user_id, texto = reciente
-        return user_id, _nombre_de(db, chat_id, user_id), texto
+        nombre, uname = _nombre_de(db, chat_id, user_id)
+        return user_id, nombre, texto, uname
     # 2) Respaldo: el último mensaje en `seen_users`. Cubre lo escrito ANTES de que
     # existiera el historial corto, que si no se perdería al actualizar.
     with db._cur() as c:
         fila = c.execute(
-            "SELECT user_id, first_name, last_msg_text FROM seen_users "
+            "SELECT user_id, first_name, username, last_msg_text FROM seen_users "
             "WHERE chat_id=? AND last_msg_id=?",
             (chat_id, msg_id),
         ).fetchone()
     if not fila or not fila["last_msg_text"]:
         return None
-    return fila["user_id"], (fila["first_name"] or "?"), fila["last_msg_text"]
+    return (fila["user_id"], (fila["first_name"] or "?"), fila["last_msg_text"],
+            fila["username"])
 
 
-def _nombre_de(db: DB, chat_id: int, user_id: int) -> str:
+def _nombre_de(db: DB, chat_id: int, user_id: int) -> tuple[str, str | None]:
+    """(nombre visible, @usuario o None)."""
     with db._cur() as c:
         fila = c.execute(
             "SELECT first_name, username FROM seen_users WHERE chat_id=? AND user_id=?",
             (chat_id, user_id),
         ).fetchone()
     if not fila:
-        return str(user_id)
-    return fila["first_name"] or fila["username"] or str(user_id)
+        return str(user_id), None
+    return (fila["first_name"] or fila["username"] or str(user_id)), fila["username"]
 
 
 async def _notificar_borrados(client, bot: Bot, db: DB, chat_id: int,
@@ -235,11 +241,15 @@ async def _notificar_borrados(client, bot: Bot, db: DB, chat_id: int,
     if admin_id <= 0:
         return
 
-    chat_title = str(chat_id)
+    chat_title, chat_user = str(chat_id), None
     with db._cur() as c:
-        fila = c.execute("SELECT title FROM bot_chats WHERE chat_id=?", (chat_id,)).fetchone()
-        if fila and fila["title"]:
-            chat_title = fila["title"]
+        fila = c.execute("SELECT title, username FROM bot_chats WHERE chat_id=?",
+                         (chat_id,)).fetchone()
+        if fila:
+            chat_title = fila["title"] or chat_title
+            chat_user = fila["username"]
+    # El grupo y las personas van enlazados: es el privado del admin (enlaces.py).
+    chat = enlaces.al_grupo(chat_id, _h.escape(chat_title), chat_user, min(ids))
 
     con_texto, sin_texto = [], []
     for m in sorted(ids):
@@ -267,31 +277,38 @@ async def _notificar_borrados(client, bot: Bot, db: DB, chat_id: int,
     if len(ids) == 1:
         # Uno solo: el aviso de siempre, que ya estaba bien.
         msg_id, datos = con_texto[0]
-        author_id, author_name, texto = datos
-        enlace = (f'<a href="tg://user?id={author_id}">{_h.escape(author_name)}</a>'
-                  if author_id else _h.escape(author_name))
-        notif = t("tb.manual_delete", chat=_h.escape(chat_title), actor=actor_info,
+        author_id, author_name, texto, author_user = datos
+        enlace = enlaces.al_perfil(author_id, _h.escape(author_name), author_user)
+        notif = t("tb.manual_delete", chat=chat, actor=actor_info,
                   author_link=enlace, author_id=author_id or "?",
                   state=_estado_de(author_id), msg_id=msg_id,
                   content=_h.escape(texto[:600]))
     else:
-        partes = [t("tb.manual_delete_multi", chat=_h.escape(chat_title),
+        partes = [t("tb.manual_delete_multi", chat=chat,
                     actor=actor_info, n=len(ids))]
         # Se reparte el espacio: Telegram corta en 4096 caracteres y perder el
         # final del aviso sería volver al problema de origen.
+        # Se corta por bloques enteros, nunca a mitad: un `<a>` o un `<pre>` sin
+        # cerrar hace que Telegram rechace el aviso completo.
         por_msg = max(120, 2800 // max(1, len(con_texto)))
-        for msg_id, datos in con_texto:
-            author_id, author_name, texto = datos
-            enlace = (f'<a href="tg://user?id={author_id}">{_h.escape(author_name)}</a>'
-                      if author_id else _h.escape(author_name))
-            partes.append(t("tb.manual_delete_item", msg_id=msg_id, author_link=enlace,
-                            author_id=author_id or "?", state=_estado_de(author_id),
-                            content=_h.escape(texto[:por_msg])))
+        cola = []
         if sin_texto:
-            partes.append(t("tb.manual_delete_sin_texto",
-                            n=len(sin_texto),
-                            ids=", ".join(str(m) for m, _ in sin_texto[:30])))
-        notif = "\n".join(partes)[:4000]
+            cola.append(t("tb.manual_delete_sin_texto",
+                          n=len(sin_texto),
+                          ids=", ".join(str(m) for m, _ in sin_texto[:30])))
+        largo = sum(len(p) + 1 for p in partes + cola)
+        for i, (msg_id, datos) in enumerate(con_texto):
+            author_id, author_name, texto, author_user = datos
+            enlace = enlaces.al_perfil(author_id, _h.escape(author_name), author_user)
+            bloque = t("tb.manual_delete_item", msg_id=msg_id, author_link=enlace,
+                       author_id=author_id or "?", state=_estado_de(author_id),
+                       content=_h.escape(texto[:por_msg]))
+            if largo + len(bloque) + 1 > 3900:
+                partes.append(t("tb.manual_delete_recortado", n=len(con_texto) - i))
+                break
+            partes.append(bloque)
+            largo += len(bloque) + 1
+        notif = "\n".join(partes + cola)
 
     kb = None
     if actor_id is None:

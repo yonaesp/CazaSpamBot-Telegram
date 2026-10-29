@@ -1,6 +1,6 @@
 # CazaSpamBot — Bot Antispam Telegram
 
-Bot de moderación antispam **en producción 24/7**, multi-grupo, federado y **bilingüe** (es/en). ~23.000 LOC en `src/`, Podman, **1792 tests**, 27 detectores (un módulo cada uno en `src/detectors/`).
+Bot de moderación antispam **en producción 24/7**, multi-grupo, federado y **bilingüe** (es/en). ~23.000 LOC en `src/`, Podman, **1800 tests**, 27 detectores (un módulo cada uno en `src/detectors/`).
 
 > **Estado: PRODUCCIÓN.** No es un esqueleto. Cualquier cambio afecta grupos reales con miles de usuarios. **Investiga > Confirma > Actúa.**
 
@@ -35,7 +35,7 @@ Todos los identificadores reales viven en `.env` (gitignored), no en el repo. Co
 
 ## Idiomas (i18n)
 
-Todo el texto que ve el usuario vive en `src/locales/<código>.json` (`es.json` / `en.json`, **1.200 claves** cada uno), nunca en el código. Idioma global de la instancia: `/idioma` (persiste) o `BOT_LANG`/`LC_ALL`/`LANG` al arrancar. Soltar un `fr.json` basta para que `/idioma fr` funcione; fallback por clave al español (un idioma al 40 % ya es usable); un JSON roto se ignora con un log (por eso JSON y no `.py`: un `.py` con una comilla mal puesta tumbaba el arranque). Guía para traductores: `src/locales/README.md`.
+Todo el texto que ve el usuario vive en `src/locales/<código>.json` (`es.json` / `en.json`, **1.202 claves** cada uno), nunca en el código. Idioma global de la instancia: `/idioma` (persiste) o `BOT_LANG`/`LC_ALL`/`LANG` al arrancar. Soltar un `fr.json` basta para que `/idioma fr` funcione; fallback por clave al español (un idioma al 40 % ya es usable); un JSON roto se ignora con un log (por eso JSON y no `.py`: un `.py` con una comilla mal puesta tumbaba el arranque). Guía para traductores: `src/locales/README.md`.
 
 1. **Toda clave nueva va a `es.json` y `en.json`** (test de paridad lo exige).
 2. `t(key, _lang=None, **fmt)`. El selector se llama **`_lang` con guion bajo a propósito**: con el nombre `lang` colisionaba con un placeholder llamado igual y el usuario veía `{lang}` literal (bug real).
@@ -100,7 +100,7 @@ Todo el texto que ve el usuario vive en `src/locales/<código>.json` (`es.json` 
 - **No se reporta a Telegram por señales de pura forma**: el reporte quema la reputación de la cuenta secundaria.
 - La prisa sola no castiga a un perfil legítimo (`_solo_prisa_sin_contenido` + `_is_very_legit_profile` tras `decide()`, auditado `noop_prisa_legitimo`) si no hay nada más que la prisa (L28).
 
-**Avisos al privado**: `_send_trust_notice` tiene cuatro llamadores y dos avisan con trust bajo (el perdón y el veto del modelo, `llm_veto`), así que la cabecera la elige `avala_historial`; un test cuenta los llamadores (L21). Los cuatro avisos (`trust_notice_dm`, `ocr_review_dm`, `review_dm`, `report.admin_dm`) enlazan al mensaje con `enlaces.al_mensaje` y una sola clave `hdl.enlace_al_msg`: `t.me/<user>/<id>`, `t.me/c/<id sin -100>/<id>` y nada en un grupo básico; un `{enlace}` sin rellenar revienta el aviso con `KeyError` (hay test) (L22). Los de confianza dicen de dónde sale (`_porque_confianza`) (L23). El de ban manual de otro admin lee el perfil en ese momento, manda la foto (`_perfil_para_aviso`, `_foto_de_perfil`: después del ban ya no se puede abrir) y trae «Banear en todos» / «Solo aquí» (`mban:`, solo el dueño; un ban de otro admin vale solo en su grupo) (L46, L47).
+**Avisos al privado**: `_send_trust_notice` tiene cuatro llamadores y dos avisan con trust bajo (el perdón y el veto del modelo, `llm_veto`), así que la cabecera la elige `avala_historial`; un test cuenta los llamadores (L21). Los cuatro avisos (`trust_notice_dm`, `ocr_review_dm`, `review_dm`, `report.admin_dm`) enlazan al mensaje con `enlaces.al_mensaje` y una sola clave `hdl.enlace_al_msg`: `t.me/<user>/<id>`, `t.me/c/<id sin -100>/<id>` y nada en un grupo básico; un `{enlace}` sin rellenar revienta el aviso con `KeyError` (hay test) (L22). Personas y grupos van enlazados con `enlaces.al_perfil` / `al_grupo`: con @, `https://t.me/<usuario>`; `tg://user?id=` solo de respaldo, porque la Bot API no lo garantiza fuera de un chat donde la persona sea miembro. Un aviso largo se recorta por bloques enteros, nunca a mitad de etiqueta (hay test). Los de confianza dicen de dónde sale (`_porque_confianza`) (L23). El de ban manual de otro admin lee el perfil en ese momento, manda la foto (`_perfil_para_aviso`, `_foto_de_perfil`: después del ban ya no se puede abrir) y trae «Banear en todos» / «Solo aquí» (`mban:`, solo el dueño; un ban de otro admin vale solo en su grupo) (L46, L47).
 
 **Destinos, reglas duras**:
 - La cuenta robada de un veterano la para el destino, no la confianza: `link_target_spam`; «caseros» solo emparejado con su reclamo, nunca suelto. Traza `destino de enlace … → SPAM/limpio/sin ficha` (L23).
@@ -247,4 +247,4 @@ GitHub guarda solo 14 días: `scripts/traffic_log.py` los acumula en `traffic/hi
 
 Lo nuevo va en su apartado temático de este fichero como invariante de 1-3 líneas (qué no hacer, el número medido, el test que lo fija), nunca al final por fecha. El relato (el caso, la medida, lo que se probó) va a `docs/lecciones.md` como lección nueva, con su línea en el índice, y aquí se cita con `(Ln)`. Un procedimiento de varios pasos que se usa a veces, a una skill en `.claude/skills/`. Las preferencias del admin y el estado del trabajo, a la memoria.
 
-*Actualizado: 2026-10-29 — 27 detectores, 1792 tests, 1.200 claves por idioma.*
+*Actualizado: 2026-10-29 — 27 detectores, 1800 tests, 1.202 claves por idioma.*

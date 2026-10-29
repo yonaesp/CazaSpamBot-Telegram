@@ -297,4 +297,104 @@ def test_el_respaldo_cubre_lo_escrito_antes_del_cambio(tmp_path):
     with db._cur() as c:                      # se simula que no existía la tabla
         c.execute("DELETE FROM mensajes_recientes")
     datos = tb._contenido_de(db, CHAT, 500)
-    assert datos and datos[2] == "de antes"
+    assert datos and datos[2] == "de antes" and datos[3] == "Ana"
+
+
+# ------------------------------------------------------------ enlaces (29-oct)
+# El admin (29-oct-2026), con un aviso de Windows 10 en la mano: «Los perfiles y
+# grupos deberían llevar link insertado para verlos». El grupo iba sin enlace,
+# quien borró también, y el autor solo con `tg://user?id=`, que la Bot API no
+# garantiza en un chat del que la persona no es miembro (el privado del admin).
+
+def _sin_user(db, user_id, nombre, msg_id, texto):
+    db.record_join(CHAT, user_id, None, join_ts=time.time() - 3600)
+    db.update_seen_first_name(CHAT, user_id, nombre)
+    db.update_last_message(CHAT, user_id, msg_id, texto)
+
+
+@pytest.mark.asyncio
+async def test_autor_con_usuario_enlaza_a_su_perfil(tmp_path):
+    db = _db(tmp_path)
+    _con_mensaje(db, 7074057696, "MessiCR", 199420, "h")
+    bot = _Bot()
+    await tb._notificar_borrados(_Cliente(ids=[199420]), bot, db, CHAT, [199420])
+    assert '<a href="https://t.me/MessiCR">' in bot.enviados[0]
+
+
+@pytest.mark.asyncio
+async def test_autor_sin_usuario_conserva_la_mencion_por_id(tmp_path):
+    db = _db(tmp_path)
+    _sin_user(db, 42, "Ana", 300, "hola")
+    bot = _Bot()
+    await tb._notificar_borrados(_Cliente(ids=[300]), bot, db, CHAT, [300])
+    assert '<a href="tg://user?id=42">Ana</a>' in bot.enviados[0]
+
+
+@pytest.mark.asyncio
+async def test_grupo_publico_enlaza_al_grupo(tmp_path):
+    db = _db(tmp_path)
+    db.upsert_bot_chat(CHAT, "Windows 10", "supergroup", True, True, True,
+                       username="windows10es")
+    _con_mensaje(db, 1, "Ana", 400, "texto")
+    bot = _Bot()
+    await tb._notificar_borrados(_Cliente(ids=[400]), bot, db, CHAT, [400])
+    assert '<a href="https://t.me/windows10es">Windows 10</a>' in bot.enviados[0]
+
+
+@pytest.mark.asyncio
+async def test_grupo_privado_enlaza_al_punto_del_borrado(tmp_path):
+    db = _db(tmp_path)
+    _con_mensaje(db, 1, "Ana", 400, "texto")
+    bot = _Bot()
+    await tb._notificar_borrados(_Cliente(ids=[400]), bot, db, CHAT, [400])
+    assert '<a href="https://t.me/c/1234567890/400">Windows 11</a>' in bot.enviados[0]
+
+
+@pytest.mark.asyncio
+async def test_quien_borro_va_enlazado(tmp_path):
+    db = _db(tmp_path)
+    _con_mensaje(db, 1, "Ana", 400, "texto")
+    bot = _Bot()
+    await tb._notificar_borrados(_Cliente(actor_user="YonaPN", ids=[400]), bot, db,
+                                 CHAT, [400])
+    assert '<a href="https://t.me/YonaPN">@YonaPN</a>' in bot.enviados[0]
+
+
+@pytest.mark.asyncio
+async def test_sin_actor_no_sale_una_interrogacion(tmp_path, monkeypatch):
+    """«Borrado por: ?» no decía nada: el registro solo apunta lo que borra un
+    admin, así que lo que no consta lo borró casi siempre su autor."""
+    monkeypatch.setenv("NOTIFY_SELF_DELETES", "true")
+    db = _db(tmp_path)
+    _con_mensaje(db, 1, "Ana", 400, "texto")
+    bot = _Bot()
+    await tb._notificar_borrados(_Cliente(actor_id=None, ids=[]), bot, db, CHAT, [400])
+    assert "Borrado por: ?" not in bot.enviados[0]
+    assert "registro de administración" in bot.enviados[0]
+
+
+@pytest.mark.asyncio
+async def test_un_lote_enorme_no_deja_etiquetas_abiertas(tmp_path):
+    """Con los enlaces cada bloque ocupa más, y el recorte a 4000 caracteres a
+    pelo cortaba a mitad de un `<a>` o un `<pre>`: Telegram rechaza entonces el
+    aviso entero y el admin no recibe nada."""
+    db = _db(tmp_path)
+    for i in range(40):
+        _con_mensaje(db, i + 1, f"usuario_largo_{i}", 3000 + i, "x" * 600)
+    bot = _Bot()
+    ids = list(range(3000, 3040))
+    await tb._notificar_borrados(_Cliente(ids=ids), bot, db, CHAT, ids)
+    aviso = bot.enviados[0]
+    assert len(aviso) <= 4096
+    for etiqueta in ("b", "i", "code"):
+        assert aviso.count(f"<{etiqueta}>") == aviso.count(f"</{etiqueta}>")
+    assert aviso.count("<a ") == aviso.count("</a>")
+    assert aviso.count("<pre>") == aviso.count("</pre>")
+    assert "no caben" in aviso
+
+
+def test_enlaces_no_cuelan_un_usuario_raro():
+    from src import enlaces
+    assert enlaces.al_perfil(5, "X", "mal\"usuario") == '<a href="tg://user?id=5">X</a>'
+    assert enlaces.al_perfil(None, "X", None) == "X"
+    assert enlaces.al_grupo(-5, "G", None, 9) == "G"  # grupo básico: no hay enlace
