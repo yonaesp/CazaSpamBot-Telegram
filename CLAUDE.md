@@ -1,6 +1,6 @@
 # CazaSpamBot — Bot Antispam Telegram
 
-Bot de moderación antispam **en producción 24/7**, multi-grupo, federado y **bilingüe** (es/en). ~23.000 LOC en `src/`, Podman, **1800 tests**, 27 detectores (un módulo cada uno en `src/detectors/`).
+Bot de moderación antispam **en producción 24/7**, multi-grupo, federado y **bilingüe** (es/en). ~23.000 LOC en `src/`, Podman, **1812 tests**, 27 detectores (un módulo cada uno en `src/detectors/`).
 
 > **Estado: PRODUCCIÓN.** No es un esqueleto. Cualquier cambio afecta grupos reales con miles de usuarios. **Investiga > Confirma > Actúa.**
 
@@ -35,7 +35,7 @@ Todos los identificadores reales viven en `.env` (gitignored), no en el repo. Co
 
 ## Idiomas (i18n)
 
-Todo el texto que ve el usuario vive en `src/locales/<código>.json` (`es.json` / `en.json`, **1.202 claves** cada uno), nunca en el código. Idioma global de la instancia: `/idioma` (persiste) o `BOT_LANG`/`LC_ALL`/`LANG` al arrancar. Soltar un `fr.json` basta para que `/idioma fr` funcione; fallback por clave al español (un idioma al 40 % ya es usable); un JSON roto se ignora con un log (por eso JSON y no `.py`: un `.py` con una comilla mal puesta tumbaba el arranque). Guía para traductores: `src/locales/README.md`.
+Todo el texto que ve el usuario vive en `src/locales/<código>.json` (`es.json` / `en.json`, **1.204 claves** cada uno), nunca en el código. Idioma global de la instancia: `/idioma` (persiste) o `BOT_LANG`/`LC_ALL`/`LANG` al arrancar. Soltar un `fr.json` basta para que `/idioma fr` funcione; fallback por clave al español (un idioma al 40 % ya es usable); un JSON roto se ignora con un log (por eso JSON y no `.py`: un `.py` con una comilla mal puesta tumbaba el arranque). Guía para traductores: `src/locales/README.md`.
 
 1. **Toda clave nueva va a `es.json` y `en.json`** (test de paridad lo exige).
 2. `t(key, _lang=None, **fmt)`. El selector se llama **`_lang` con guion bajo a propósito**: con el nombre `lang` colisionaba con un placeholder llamado igual y el usuario veía `{lang}` literal (bug real).
@@ -78,7 +78,7 @@ Todo el texto que ve el usuario vive en `src/locales/<código>.json` (`es.json` 
 `rule_explain.py` traduce el id técnico de regla a la explicación que lee el admin. **Es el texto más visible del bot** y tiene prioridad sobre el `reason` del detector.
 
 **Telethon y el perfil**:
-- `bio_spam`, `photos_batch`, `obvious_spam_profile` (parcial) y `personal_channel_spam` leen el perfil vía MTProto: sin Telethon no se activan y el resto sigue (documentado en los dos README) (L13). `bio_spam` cuenta un dominio sin `https://` si lleva ruta y suma 20 por un código de campaña (`?c=`, `?ref=`, `utm_`); las apuestas van por dominio o marca, nunca «stake» suelto (L46).
+- `bio_spam`, `photos_batch`, `obvious_spam_profile` (parcial) y `personal_channel_spam` leen el perfil vía MTProto: sin Telethon no se activan y el resto sigue (documentado en los dos README) (L13). `bio_spam` cuenta un dominio sin `https://` si lleva ruta y suma 20 por un código de campaña (`?c=`, `?ref=`, `utm_`); las apuestas van por dominio o marca, nunca «stake» suelto (L46). Redes: cada enlace privado de una bio se apunta en `bio_enlaces` y suma 15 si otra cuenta lo lleva y 30 si son dos o más; la flecha que apunta al enlace cuenta como llamada a la acción. Enlace + red de dos cuentas sin nada más no banea, y todo `bio_spam.check` de una persona pasa `db` y `user_id` (hay test). El repaso de recién llegados también mira la bio (L49).
 - Historias (`story_reader.py`): la Bot API las da con solo `chat` e `id`. Se leen con `stories.getStoriesByID` (no cuenta como visualización; `incrementStoryViews` sí) y pasan por los mismos detectores. Las entidades MTProto se traducen a la Bot API, porque los detectores de enlaces y menciones solo miran entidades (hay test). Caducan en 6-48 h y `/scan` lo dice en vez de fingir un veredicto (L13).
 - El canal personal (`personal_channel_id`) es un escaparate aparte de la bio; si aparece otro campo de perfil, mirarlo. `personal_channel_spam` no salta por tener canal: la señal es la discordancia (nombre latino + canal en otro alfabeto), más compuestos de la red (nunca sueltos como `结账`) y cadenas a máquina medidas por rachas de mayúsculas, no por vocales (marcaba apellidos checos y polacos). Ninguna señal suelta llega al umbral (L14).
 - `channel_reader.py` lee la descripción y los últimos posts (75 puntos, no deciden solos): solo si el título no basta, sin unirse ni contar como visualización (`messages.getMessagesViews` no se usa), con la entidad de `GetFullUser.chats` y sin `contacts.ResolveUsername` (FloodWait) (L15).
@@ -247,4 +247,4 @@ GitHub guarda solo 14 días: `scripts/traffic_log.py` los acumula en `traffic/hi
 
 Lo nuevo va en su apartado temático de este fichero como invariante de 1-3 líneas (qué no hacer, el número medido, el test que lo fija), nunca al final por fecha. El relato (el caso, la medida, lo que se probó) va a `docs/lecciones.md` como lección nueva, con su línea en el índice, y aquí se cita con `(Ln)`. Un procedimiento de varios pasos que se usa a veces, a una skill en `.claude/skills/`. Las preferencias del admin y el estado del trabajo, a la memoria.
 
-*Actualizado: 2026-10-29 — 27 detectores, 1800 tests, 1.202 claves por idioma.*
+*Actualizado: 2026-10-31 — 27 detectores, 1812 tests, 1.204 claves por idioma.*

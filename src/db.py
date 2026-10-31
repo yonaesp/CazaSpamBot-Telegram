@@ -488,6 +488,13 @@ class DB:
         gw_cols = {r[1] for r in self._conn.execute("PRAGMA table_info(gentle_warnings)").fetchall()}
         if "errata" not in gw_cols:
             self._conn.execute("ALTER TABLE gentle_warnings ADD COLUMN errata TEXT")
+        # Enlaces de invitación PRIVADOS vistos en bios, por cuenta. Una red reparte
+        # el mismo enlace entre perfiles distintos y cada uno, por separado, se queda
+        # en los 40 puntos del enlace (Helen, Gloria y Brook, 31-oct-2026).
+        self._conn.execute(
+            "CREATE TABLE IF NOT EXISTS bio_enlaces ("
+            " enlace TEXT NOT NULL, user_id INTEGER NOT NULL, ts REAL NOT NULL,"
+            " PRIMARY KEY (enlace, user_id))")
 
     def close(self) -> None:
         self._conn.close()
@@ -785,6 +792,20 @@ class DB:
                 (user_id, desde_ts),
             ).fetchall()
         return [(f["user_id"], f["texto"]) for f in filas]
+
+    def registrar_enlace_bio(self, enlace: str, user_id: int) -> int:
+        """Apunta que `user_id` lleva `enlace` en la bio y devuelve cuántas OTRAS
+        cuentas lo llevan. Lo usa `bio_spam` para ver redes."""
+        with self._cur() as c:
+            c.execute(
+                "INSERT OR IGNORE INTO bio_enlaces (enlace, user_id, ts) VALUES (?, ?, ?)",
+                (enlace, user_id, time.time()),
+            )
+            fila = c.execute(
+                "SELECT COUNT(*) FROM bio_enlaces WHERE enlace=? AND user_id != ?",
+                (enlace, user_id),
+            ).fetchone()
+        return int(fila[0])
 
     def textos_previos(self, chat_id: int, user_id: int, msg_id: int,
                        desde_ts: float) -> list[str]:

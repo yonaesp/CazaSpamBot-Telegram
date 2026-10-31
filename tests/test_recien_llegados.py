@@ -334,6 +334,74 @@ def test_el_recuerdo_de_perfiles_leidos_no_crece_sin_fin():
     assert (-100, 1) not in ctx.bot_data[rl._CLAVE_PERFILES]
 
 
+@pytest.mark.asyncio
+async def test_la_bio_de_una_red_se_caza_sin_esperar_a_que_escriba(tmp_path, monkeypatch):
+    """Helen, Gloria y Brook (31-oct-2026): el repaso descargaba la bio y no la
+    miraba. Con el enlace de la red ya visto en otras dos cuentas, cae aquí."""
+    from src.detectors import bio_spam
+    db = _db(tmp_path)
+    enlace = "t.me/+3JVb6dw6WbI0ODk6"
+    bio_spam.check(f"Holidays made simple. Cursway → {enlace}", db=db, user_id=5000166119)
+    bio_spam.check(f"Find warm seas and good flights → {enlace}", db=db, user_id=1930924782)
+    db.record_join(-100, 5020104503, None, join_ts=time.time() - 7200)
+    sig = _Sig()
+    sig.personal_channel_title = None
+    sig.bio = f"Get inspired, then go. Cursway → {enlace}"
+    ctx = _ctx_con_telethon(db, _Bot(), _cfg(lols_enabled=False), sig)
+
+    async def falso_fetch(client, user_id, **kw):
+        return sig
+    monkeypatch.setattr("src.user_signals.fetch", falso_fetch)
+
+    aplicado = {}
+
+    async def falso_apply(context, db_, cfg_, **kw):
+        aplicado.update(kw)
+    monkeypatch.setattr("src.handlers._apply_action", falso_apply)
+
+    await rl.revisar_job(ctx)
+    assert aplicado.get("user_id") == 5020104503
+    assert aplicado["decision"].rule == "bio_spam"
+    assert aplicado["decision"].action == "ban"
+    assert aplicado["decision"].payload["via"] == "recien_llegados"
+
+
+@pytest.mark.asyncio
+async def test_una_bio_con_enlace_privado_sin_mas_no_se_toca(tmp_path, monkeypatch):
+    db = _db(tmp_path)
+    db.record_join(-100, 902, None, join_ts=time.time() - 7200)
+    sig = _Sig()
+    sig.personal_channel_title = None
+    sig.bio = "Grupo de la urbanización: https://t.me/+AbCdEf123456"
+    ctx = _ctx_con_telethon(db, _Bot(), _cfg(lols_enabled=False), sig)
+
+    async def falso_fetch(client, user_id, **kw):
+        return sig
+    monkeypatch.setattr("src.user_signals.fetch", falso_fetch)
+    llamado = []
+    monkeypatch.setattr("src.handlers._apply_action", lambda *a, **k: llamado.append(1))
+    await rl.revisar_job(ctx)
+    assert not llamado
+
+
+def test_los_cuatro_que_miran_la_bio_le_pasan_la_base():
+    """Sin la base no hay memoria de redes: cada llamada a `bio_spam.check` con la
+    bio de una persona concreta pasa `db` y `user_id` (join, repaso, /scan y aviso
+    de ban manual)."""
+    import ast
+    from pathlib import Path
+    vistas = 0
+    for fuente in ("src/handlers.py", "src/recien_llegados.py", "src/scan_cmd.py"):
+        for nodo in ast.walk(ast.parse(Path(fuente).read_text())):
+            if (isinstance(nodo, ast.Call) and isinstance(nodo.func, ast.Attribute)
+                    and nodo.func.attr == "check"
+                    and getattr(nodo.func.value, "id", "") in ("bio_spam", "bio_spam_det")):
+                vistas += 1
+                nombres = {k.arg for k in nodo.keywords}
+                assert {"db", "user_id"} <= nombres, f"{fuente}:{nodo.lineno} sin db/user_id"
+    assert vistas == 4
+
+
 def test_el_repaso_usa_el_mismo_criterio_que_el_join():
     """Sin esto habría dos varas de medir: lo que aquí se banea tiene que ser
     exactamente lo que se habría baneado al entrar."""

@@ -8,6 +8,13 @@ Caso real (2026-05-30): `Hier geht's zu mir😈:https://t.me/+Th8C... 🔥🥵`
 — alemán + invite link + emojis sexuales = spam OnlyFans/escort.
 
 Score acumulado por señales. Una sola NO basta, requiere combinación (≥60).
+
+Caso real (31-oct-2026): «Get inspired, then go. Cursway → t.me/+3JVb…» (Helen),
+«Holidays made simple. Cursway → …» (Gloria) y «Find warm seas and good flights
+→ …» (Brook). Sin emojis ni palabras de spam: cada bio sola son 40 puntos. Lo que
+las delata es la flecha que apunta al enlace y que las tres llevan EL MISMO enlace
+privado (red). Con `db` y `user_id`, `check` apunta los enlaces privados que ve y
+cuenta cuántas cuentas más los llevan.
 """
 from __future__ import annotations
 
@@ -26,8 +33,24 @@ _TG_INVITE_RE = re.compile(
     r't\.me/(?:\+|joinchat/)[A-Za-z0-9_-]+',
     re.IGNORECASE,
 )
+# El código de una invitación privada. Distingue mayúsculas: es la clave del enlace.
+_INVITE_CODE_RE = re.compile(r't\.me/(?:\+|joinchat/)([A-Za-z0-9_-]{6,})', re.IGNORECASE)
 # Cualquier link t.me/ a un canal/grupo (no a user)
 _TG_LINK_RE = re.compile(r't\.me/[A-Za-z0-9_]{4,}', re.IGNORECASE)
+# Una flecha que apunta al enlace («Cursway → t.me/+…», «👉 https://…») es una
+# llamada a la acción sin palabras. Solo cuenta pegada al enlace: una flecha suelta
+# no dice nada. Los dos puntos no cuentan, porque «Web: https://…» es lo normal.
+_FLECHA_AL_ENLACE_RE = re.compile(
+    r'(?:→|⟶|➔|➜|➡|👉|👇|⬇|⤵|»|>>)️?\s*'
+    r'(?:https?://)?(?:t\.me/|www\.|(?:[a-z0-9-]+\.)+[a-z]{2,10}/)',
+    re.IGNORECASE,
+)
+# Red: cuántas cuentas MÁS llevan el mismo enlace privado. Con una suma 15 y con
+# dos o más, 30: el enlace (40) y la red solos llegan a 60 con tres cuentas; con
+# dos hace falta además otra señal (la flecha, un emoji, una palabra…). Dos
+# conocidos con el mismo grupo privado en la bio no bastan para un ban.
+RED_UNA = 15
+RED_VARIAS = 30
 # URLs externas
 # Proporción de alfabeto NO latino a partir de la cual se considera que la bio
 # está escrita en otro sistema de escritura. No vale con «¿hay alguna letra
@@ -115,7 +138,24 @@ _FOREIGN_LANG_HINT_RE = re.compile(
 )
 
 
-def check(bio: str | None) -> Hit:
+def enlaces_privados(bio: str | None) -> list[str]:
+    """Códigos de las invitaciones privadas (t.me/+…, joinchat) de una bio."""
+    return sorted({m.group(1) for m in _INVITE_CODE_RE.finditer(bio or "")})
+
+
+def _otras_cuentas(db, user_id: int, bio: str) -> int:
+    """Apunta los enlaces privados de la bio y devuelve el máximo de cuentas más
+    que lleva alguno. Un fallo de la base cuenta como «ninguna»."""
+    otras = 0
+    for enlace in enlaces_privados(bio):
+        try:
+            otras = max(otras, db.registrar_enlace_bio(enlace, user_id))
+        except Exception:  # noqa: BLE001 — una consulta no puede tumbar la moderación
+            pass
+    return otras
+
+
+def check(bio: str | None, db=None, user_id: int | None = None) -> Hit:
     if not bio or len(bio.strip()) < 5:
         return Hit.none()
 
@@ -148,9 +188,17 @@ def check(bio: str | None) -> Hit:
     if _MONEY_EMOJI_RE.search(text) or _money_re().search(text):
         score += 15
         reasons.append(t("reason.bio_money"))
-    if _cta_re().search(text) or _FOREIGN_LANG_HINT_RE.search(text):
+    if (_cta_re().search(text) or _FOREIGN_LANG_HINT_RE.search(text)
+            or _FLECHA_AL_ENLACE_RE.search(text)):
         score += 15
         reasons.append(t("reason.bio_cta"))
+    otras = _otras_cuentas(db, user_id, text) if db is not None and user_id else 0
+    if otras >= 2:
+        score += RED_VARIAS
+        reasons.append(t("reason.bio_red_varias", n=otras))
+    elif otras == 1:
+        score += RED_UNA
+        reasons.append(t("reason.bio_red_una"))
     # Bio SIN una sola letra latina + enlace a un canal. Las señales de arriba
     # (emojis, CTA, cifras de dinero) están pensadas para texto latino, así que una
     # bio entera en otro alfabeto no sumaba NADA y se quedaba en los 40 del enlace,
@@ -182,5 +230,5 @@ def check(bio: str | None) -> Hit:
         rule="bio_spam",
         score=min(score, 200),
         reason=t("reason.bio_spam", details=" + ".join(reasons)),
-        payload={"bio_preview": text[:200], "score": score},
+        payload={"bio_preview": text[:200], "score": score, "otras_cuentas": otras},
     )

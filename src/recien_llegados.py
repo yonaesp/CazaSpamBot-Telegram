@@ -342,6 +342,27 @@ async def _revisar_perfil(context, db: DB, cfg: Config, fila, espera: int) -> bo
         if await _revisar_canal(context, db, cfg, fila, usuario, sig, client, espera):
             return True
 
+    # La bio, con el mismo detector que en el join. Se descargaba y no se miraba:
+    # la puesta después de entrar, o la de una red cuyo enlace aparece en otra
+    # cuenta días más tarde, no se veía nunca (Helen, Gloria y Brook, 31-oct-2026).
+    if sig is not None and sig.bio:
+        from .detectors import bio_spam
+        hit = bio_spam.check(sig.bio, db=db, user_id=user_id)
+        if hit:
+            log.info("recien_llegados: user=%s bio de spam (%ds tras entrar) → ban directo: %s",
+                     user_id, espera, hit.reason[:200])
+            from .scoring import Decision
+            await _apply_action(
+                context, db, cfg, chat_id=chat_id, chat_title=fila["chat_title"],
+                user_id=user_id, username=usuario.username, message_id=None,
+                decision=Decision(
+                    action="ban", score=hit.score, rule=hit.rule, reason=hit.reason,
+                    payload={**hit.payload, "via": "recien_llegados", "espera_s": espera},
+                ),
+                original_text=None, first_name=usuario.first_name,
+            )
+            return True
+
     if not obvio:
         return False
 

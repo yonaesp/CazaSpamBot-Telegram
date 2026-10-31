@@ -1195,7 +1195,7 @@ async def on_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         # sexuales + idioma extranjero + keywords). Caso real: bio alemán con
         # t.me/+ y emojis 🔥🥵. Aprovecha sig_pre ya cargado.
         if sig_pre is not None and sig_pre.bio:
-            bio_hit = bio_spam_det.check(sig_pre.bio)
+            bio_hit = bio_spam_det.check(sig_pre.bio, db=db, user_id=user.id)
             if bio_hit:
                 log.info(
                     "bio_spam user=%s score=%d → ban directo: %s",
@@ -1338,7 +1338,7 @@ async def _perfil_para_aviso(context, target, chat_id: int) -> str:
     partes = [user_signals.render_markup(sig)]
     if sig.personal_channel_title:
         partes.append(t("hdl.manual_ban_canal", canal=_h.escape(sig.personal_channel_title)))
-    hit = bio_spam_det.check(sig.bio)
+    hit = bio_spam_det.check(sig.bio, db=context.bot_data.get("db"), user_id=target.id)
     if hit and hit.score:
         partes.append(t("hdl.manual_ban_bio_spam", motivo=_h.escape(hit.reason)))
     return "\n".join(p for p in partes if p) + "\n"

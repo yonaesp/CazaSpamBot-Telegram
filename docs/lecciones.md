@@ -54,6 +54,7 @@ Una lección nueva va al final, con el número siguiente y su línea en el índi
 - [L46](#l46) · Charlotte: el enlace de la bio sin `https://` y un aviso de ban manual que no dejaba ver el perfil
 - [L47](#l47) · Repaso del 28-oct: lo que se escapaba, lo que hacen otros bots y lo que se añadió
 - [L48](#l48) · Simulación del 29-oct: `calentamiento` expulsaba a gente normal y una red de reclutamiento no daba nada
+- [L49](#l49) · Helen, Gloria y Brook: una red con el mismo enlace privado en la bio y 40 puntos cada una
 
 ---
 
@@ -1006,3 +1007,28 @@ dos personas que pegaron el mismo error de Windows, sin acción.
 El banco de pruebas quedó en `scripts/simular.py`, con la acción esperada de cada escena, y la suite lo pasa con
 `--vacia` (`tests/test_simulacion.py`, en un proceso aparte porque cambia `time.time` y bloquea la red). Con
 `MUTE_SCORE=45` falla en las dos escenas del @, que es lo que tiene que hacer.
+
+## L49 · Helen, Gloria y Brook: una red con el mismo enlace privado en la bio y 40 puntos cada una
+
+El admin vio el 31-oct a «Helen» en Domótica: foto de modelo, sin @ y en la bio «Get inspired, then go. Cursway →
+t.me/+3JVb6dw6WbI0ODk6». Había entrado a las 05:25, no escribió nunca y seguía dentro (muda por la verificación, pero
+visible en la lista de miembros, que es lo que busca la red). Una muestra de 33 bios de quien nunca había escrito en
+Domótica sacó dos más con el MISMO enlace: Gloria («Holidays made simple. Cursway → …», entró el 29) y Brook («Find
+warm seas and good flights → …», el 28). Las tres: nombre suelto en inglés, sin apellido ni @, 4 fotos subidas en el
+mismo minuto de dic-2021 o ene-2022 (por eso `photos_batch` las perdonaba: cuenta de más de un año) y una entrada cada
+uno o dos días, que no es una oleada.
+
+Por qué no saltó: `bio_spam` daba 40 por el enlace privado y nada más (sin emojis, sin palabras de spam, sin las frases
+de llamada a la acción que conoce) y el umbral es 60. Además el repaso de recién llegados descargaba la bio para mirar el
+canal personal y no la pasaba por `bio_spam`.
+
+Lo que se añadió, probado con las tres bios reales antes de banearlas:
+- **Red**: cada enlace privado de una bio se apunta en `bio_enlaces` (enlace, cuenta). Si otra cuenta lo lleva suma 15;
+  si son dos o más, 30. El código del enlace distingue mayúsculas. Mirar dos veces a la misma cuenta no cuenta como red.
+- **Flecha al enlace** (`→ ➡️ 👉 👇 ⬇️ » >>` pegada a un enlace) cuenta como llamada a la acción (el mismo +15 que las
+  palabras, no se suma dos veces). Los dos puntos no: «Web: https://…» es lo normal. Una flecha sin enlace detrás, tampoco.
+- Con eso, Brook (la primera) se queda en 55; Gloria, con la red de una cuenta, 70; Helen, 85; y Brook, al volver a
+  mirarla el repaso, 85. Dos conocidos con el mismo grupo privado en la bio y nada más dan 55: no basta.
+- El repaso de recién llegados pasa la bio por `bio_spam`, con la base, y banea igual que el join. Los cuatro que miran la
+  bio de una persona (join, repaso, `/scan` y aviso de ban manual) pasan `db` y `user_id`: lo fija un test con `ast`.
+

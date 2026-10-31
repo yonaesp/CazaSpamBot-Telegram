@@ -307,7 +307,7 @@ async def _revisar_autor(context, cfg: Config, db: DB, target) -> list[str]:
             log.debug("scan autor canal: %s", exc)
         if sig.bio:
             try:
-                if bio_spam_det.check(sig.bio):
+                if bio_spam_det.check(sig.bio, db=db, user_id=autor.id):
                     hallazgos.append(t("scan.autor_bio"))
             except Exception as exc:  # noqa: BLE001
                 log.debug("scan autor bio: %s", exc)
