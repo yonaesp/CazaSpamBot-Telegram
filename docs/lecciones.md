@@ -1032,3 +1032,22 @@ Lo que se añadió, probado con las tres bios reales antes de banearlas:
 - El repaso de recién llegados pasa la bio por `bio_spam`, con la base, y banea igual que el join. Los cuatro que miran la
   bio de una persona (join, repaso, `/scan` y aviso de ban manual) pasan `db` y `user_id`: lo fija un test con `ast`.
 
+
+El mismo día, a las 18:44, entró en Windows 10 una cuarta cuenta de la red («Waves, water temp, flights. Cursway → …»)
+y el bot la baneó al segundo de entrar, con 85 puntos (la red ya sumaba 3 cuentas más).
+
+**Barrido en seco de los 4 grupos** (31-oct, con el OK del admin; ni banea ni escribe en la base): 6.534 miembros sin
+admins, leídos uno a uno con `GetFullUser` (la bio no viene en la lista de miembros) con una copia de la sesión. Listar
+1.000 miembros cuesta 0,7 s; cada bio, ~1 s con 1 s de pausa. En 6.534 llamadas hubo un solo FloodWait, de 6 s, tras
+125; con la pausa a 2 s ya no hubo más (unas 4 horas en total). Un `docker compose restart` mata lo lanzado con
+`docker exec`, así que el barrido se reanuda pasando por stdin los ids ya hechos.
+- 703 bios, 67 con algún enlace y 10 con enlace privado. El detector nuevo marca 7 cuentas y el viejo, 5. **Ninguna de
+  las 7 ha escrito nunca** y todas estaban silenciadas hasta 2038; de quien ha escrito alguna vez no marca a nadie. Las
+  3 personas con un enlace privado y nada más se quedan en 40.
+- Una quinta cuenta de la red de Helen (Windows 11, 4 fotos en el mismo minuto) y otra red de 5 cuentas «my blog 18+»
+  con el mismo enlace privado, en Domótica desde sep-2025: el viejo ya cazaba 4 con 70, pero el bot no tenía su entrada
+  y no las había mirado nunca. La quinta solo cae por la red.
+- **1.982 miembros no constan en `seen_users`**: entraron antes que el bot o su entrada no llegó (la quinta de la red
+  entró el 29-oct, según Telegram, sin rastro en la base). El repaso de recién llegados no los ve; solo un barrido sí.
+- Sin cazar: 3 cuentas con el mismo canal PÚBLICO de «señales» de trading en la bio (sin red posible: el canal público
+  lo enlaza también gente normal, p. ej. un admin de comunidad) y un referido a bot con el propio id (`?start=<id>`).
