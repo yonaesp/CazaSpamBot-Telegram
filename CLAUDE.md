@@ -228,12 +228,12 @@ Un ban manual de otro admin en el aviso es una pista de que el bot falló: averi
 ```bash
 .venv/bin/python -m pytest tests/ -q          # suite completa
 .venv/bin/ruff check src/ tests/
-sudo -n docker compose restart                # up -d si cambia .env; up -d --build si cambia requirements
+sudo -n docker compose restart                # up -d si cambia .env; si cambia requirements, build --no-cache + up -d
 sudo -n docker logs cazaspam-bot --tail 5     # verificar "Bot ... listo"
 git add -A && git commit -m "..." && git push
 ```
 
-**`restart` recarga el código (src/ montado por volumen) pero no el `.env`**: para eso hace falta `up -d`, y para las dependencias, `up -d --build` (se instalan al construir la imagen).
+**`restart` recarga el código (src/ montado por volumen) pero no el `.env`**: para eso hace falta `up -d`, y para las dependencias, recompilar (se instalan al construir la imagen). ⚠️ **Compilar a mano, siempre `podman pull` de la base + `build --no-cache`, dentro del `flock`**: con caché, el `apt-get upgrade` salió de una capa vieja y el parche de pyasn1 del 31-oct devolvió libbrotli1 sin su arreglo (CVE crítica); `parcheo-auto` ya compila así.
 
 ## Docs detalladas
 
