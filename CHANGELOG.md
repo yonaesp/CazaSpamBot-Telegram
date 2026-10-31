@@ -4,6 +4,15 @@ Cambios relevantes de CazaSpamBot, lo más reciente arriba. Se anotan hitos, no
 cada commit: para el detalle está el historial de git. Sin números de versión
 porque el bot es un servicio en producción continua, no un paquete que se libera.
 
+## 2026-10 · Redes de bios y barrido semanal
+
+Cuentas distintas con el mismo enlace privado en la bio ya no pasan una a una: el
+bot apunta cada enlace y suma puntos cuando lo ve en otra cuenta, y una flecha que
+señala al enlace cuenta como llamada a la acción. El repaso de los recién llegados
+también mira la bio. Además, cada sábado lee la bio de los miembros que el bot no
+tiene vistos (entraron antes que él o su entrada no llegó) y te manda por privado lo
+que caza, con los botones Permitir y Banear, sin banear a nadie solo.
+
 ## 2026-10 · Solo suena lo importante
 
 Los avisos por privado ya no suenan todos. Por defecto suena lo que necesita que

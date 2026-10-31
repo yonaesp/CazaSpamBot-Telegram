@@ -1051,3 +1051,15 @@ admins, leídos uno a uno con `GetFullUser` (la bio no viene en la lista de miem
   entró el 29-oct, según Telegram, sin rastro en la base). El repaso de recién llegados no los ve; solo un barrido sí.
 - Sin cazar: 3 cuentas con el mismo canal PÚBLICO de «señales» de trading en la bio (sin red posible: el canal público
   lo enlaza también gente normal, p. ej. un admin de comunidad) y un referido a bot con el propio id (`?start=<id>`).
+
+Con el informe, el admin mandó banear las 7 y, por su criterio, las 3 de «señales» (`manual_admin_ban`). Antes de
+banear se releyó cada bio, así que los dos enlaces de red quedaron apuntados (5 cuentas cada uno). El ban solo entró
+en el grupo donde estaba cada una: en los otros, la Bot API responde `Participant_id_invalid` a quien no ha visto nunca.
+Quedan en `banned_users`, y si entran en otro grupo el join las vuelve a banear.
+
+**Barrido semanal** (`barrido_bios.py`, sábado 11:00): lee la bio de quien no está en `seen_users` ni se ha leído ya
+(`barrido_bios`), 400 por pasada a 2 s (~15 min; los ~2.000 de partida salen en cinco semanas) y para con un FloodWait
+de más de 60 s, el que Telethon no espera solo. No banea: lo que caza `bio_spam` va al privado con los botones de la
+revisión de sospechosos (`susrev:`, suena: pide decisión) y queda un `noop` en `moderation_log`. Una bio con enlace
+privado que no llega al umbral no se da por leída: la primera cuenta de una red se queda en 55, y cuando aparece la
+segunda, a la semana siguiente salta también (lo fija un test).

@@ -808,6 +808,7 @@
   "reason.bio_illegal": "servicios ilegales/hacking (piratería informática/etc.)",
   "reason.bio_red_una": "el mismo enlace privado está en la bio de otra cuenta",
   "reason.bio_red_varias": "el mismo enlace privado está en la bio de {n} cuentas más",
+  "barrido.aviso_dm": "🔎 <b>Barrido de bios</b>\n{persona} (id <code>{uid}</code>) en {grupo}. El bot no tiene constancia de su entrada ni de ningún mensaje suyo: entró antes que el bot o su entrada no llegó.\n\n<b>Bio:</b> <code>{bio}</code>\n<b>Motivo:</b> {motivo}\n\nNo se ha hecho nada. ¿Se banea en todos los grupos?",
   "reason.commercial_ad": "Anuncio comercial: {details}",
   "reason.ad_illegal_multi": "servicios ilegales/scam ({n} señales: hacking/acceso cuentas/etc.)",
   "reason.ad_illegal_single": "vocabulario de servicios ilegales/scam",

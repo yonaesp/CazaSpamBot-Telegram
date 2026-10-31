@@ -17,7 +17,7 @@ from telegram.ext import (
     filters,
 )
 
-from . import admin, chat_picker, chat_settings_cmd, config_panel, errata_mencion, group_clean, lang_cmd, maintenance, notify_prefs, quienfue_cmd, recien_llegados, scan_cmd, scanuser_cmd, telethon_bridge, topweekly, verification, warns_mod
+from . import admin, barrido_bios, chat_picker, chat_settings_cmd, config_panel, errata_mencion, group_clean, lang_cmd, maintenance, notify_prefs, quienfue_cmd, recien_llegados, scan_cmd, scanuser_cmd, telethon_bridge, topweekly, verification, warns_mod
 from .config import load_config
 from .db import DB
 from .handlers import (
@@ -161,6 +161,14 @@ async def _post_init(app: Application) -> None:
             time=_dt_time(hour=20, minute=0, tzinfo=topweekly.TZ_MADRID),
             days=(6,),  # 6 = domingo en PTB JobQueue
             name="topweekly",
+        )
+        # Barrido de bios: sábado 11:00 Madrid (weekday 5), de día porque lo que caza
+        # pide decisión y suena. Lee a quien el bot no tiene visto (L49).
+        app.job_queue.run_daily(
+            barrido_bios.barrido_job,
+            time=_dt_time(hour=11, minute=0, tzinfo=topweekly.TZ_MADRID),
+            days=(5,),
+            name="barrido_bios",
         )
 
 

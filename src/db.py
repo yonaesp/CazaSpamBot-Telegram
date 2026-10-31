@@ -495,6 +495,11 @@ class DB:
             "CREATE TABLE IF NOT EXISTS bio_enlaces ("
             " enlace TEXT NOT NULL, user_id INTEGER NOT NULL, ts REAL NOT NULL,"
             " PRIMARY KEY (enlace, user_id))")
+        # Cuentas cuya bio ya leyó el barrido semanal (`barrido_bios`): no se vuelven
+        # a leer. Una bio con enlace privado que no llegó al umbral no se apunta.
+        self._conn.execute(
+            "CREATE TABLE IF NOT EXISTS barrido_bios ("
+            " user_id INTEGER PRIMARY KEY, ts REAL NOT NULL)")
 
     def close(self) -> None:
         self._conn.close()
@@ -806,6 +811,21 @@ class DB:
                 (enlace, user_id),
             ).fetchone()
         return int(fila[0])
+
+    def usuarios_conocidos(self) -> set[int]:
+        """Las cuentas que el bot tiene vistas en algún chat (entrada o mensaje)."""
+        with self._cur() as c:
+            return {r[0] for r in c.execute("SELECT DISTINCT user_id FROM seen_users")}
+
+    def bios_barridas(self) -> set[int]:
+        """Las cuentas cuya bio ya leyó el barrido semanal."""
+        with self._cur() as c:
+            return {r[0] for r in c.execute("SELECT user_id FROM barrido_bios")}
+
+    def marcar_bio_barrida(self, user_id: int) -> None:
+        with self._cur() as c:
+            c.execute("INSERT OR REPLACE INTO barrido_bios (user_id, ts) VALUES (?, ?)",
+                      (user_id, time.time()))
 
     def textos_previos(self, chat_id: int, user_id: int, msg_id: int,
                        desde_ts: float) -> list[str]:
