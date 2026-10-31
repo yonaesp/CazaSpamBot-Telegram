@@ -14,6 +14,10 @@ certifi>=2026.10.19
 # reportes oficiales, bio/fotos de perfil, borrados y lectura de historias.
 telethon==1.44.0
 
+# No lo pide el bot: llega por telethon → rsa. Suelo y no versión exacta, como
+# certifi: la 0.6.4 traía 4 CVE altas (vigía de seguridad del 31-oct-2026).
+pyasn1>=0.6.5
+
 # Variables de entorno
 python-dotenv==1.0.1
 
