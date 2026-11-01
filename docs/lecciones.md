@@ -1091,4 +1091,6 @@ Lo que se hizo, con lo que decidió el admin:
   así que la fecha se pregunta a Telegram, una llamada y solo para quien ya ha dado positivo.
 - La bio en un alfabeto que el grupo no permite y con un enlace también da positivo en el barrido («付费广告» se quedaba en
   25 en `bio_spam`). Los enlaces se quitan antes de medir: sus letras latinas bajaban la proporción por debajo del 70 %.
-
+- El barrido lee también la ficha del grupo o canal que enlaza la bio (`link_reader` + `link_target`, lo mismo que con los
+  enlaces de los mensajes, sin entrar en él). Los enlaces se pasan tal cual: las invitaciones distinguen mayúsculas, así
+  que la clave en minúsculas de `destinos` no sirve para leerlas.

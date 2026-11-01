@@ -221,6 +221,27 @@ async def test_bio_en_otro_alfabeto_con_enlace_da_positivo(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_enlace_a_un_canal_que_se_anuncia_como_spam(tmp_path, monkeypatch):
+    """Lo mismo que con los enlaces de un mensaje: se lee la ficha del destino."""
+    from src import link_reader
+    leidos = []
+
+    async def leer(context, urls, es_moderado=None):
+        leidos.extend(urls)
+        titulo = "Packs caseros exclusivos" if "packs" in urls[0] else "Fondos de pantalla"
+        return link_reader.Destino(titulo=titulo, descripcion="", url=urls[0])
+
+    monkeypatch.setattr(link_reader, "leer", leer)
+    db = _db(tmp_path)
+    bot = _Bot()
+    bios = {8: "Mi canal https://t.me/packsCaseros💋", 9: "https://t.me/dreamswallpapers fondos"}
+    await bb.barrer(_ctx(bot), db, CFG, _Cliente({CHAT: [_u(8), _u(9)]}, bios))
+    assert leidos == ["https://t.me/packsCaseros", "https://t.me/dreamswallpapers"]
+    (aviso,) = bot.enviados
+    assert "id <code>8</code>" in aviso["text"]
+
+
+@pytest.mark.asyncio
 async def test_bio_en_otro_alfabeto_sin_enlace_no(tmp_path):
     db = _db(tmp_path)
     bot = _Bot()

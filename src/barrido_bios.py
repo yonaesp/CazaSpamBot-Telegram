@@ -30,15 +30,16 @@ from __future__ import annotations
 import asyncio
 import html
 import logging
+import re
 import time
 
 from telegram import InlineKeyboardMarkup
 from telegram.error import TelegramError
 
-from . import cuenta_robada, destinos, enlaces, fechas, notify_prefs, verification
+from . import cuenta_robada, destinos, enlaces, fechas, link_reader, notify_prefs, verification
 from .config import Config
 from .db import DB
-from .detectors import bio_spam
+from .detectors import bio_spam, link_target
 from .i18n import t
 
 log = logging.getLogger(__name__)
@@ -48,6 +49,10 @@ log = logging.getLogger(__name__)
 MAX_POR_PASADA = 600
 PAUSA_S = 2.0
 RELECTURA_S = 90 * 86400
+# Enlaces a Telegram de la bio, tal cual (las invitaciones distinguen mayúsculas) y sin
+# lo que venga pegado detrás, como un emoji.
+_TG_RE = re.compile(r"(?:https?://)?(?:www\.)?(?:t\.me|telegram\.me|telegram\.dog)/"
+                    r"(?:joinchat/)?\+?[A-Za-z0-9_-]+", re.IGNORECASE)
 
 
 async def barrido_job(context) -> None:
@@ -109,7 +114,7 @@ async def barrer(context, db: DB, cfg: Config, client) -> dict[str, int]:
             continue
         r["leidas"] += 1
         bio = full.full_user.about or ""
-        positivo = _positivo(db, cfg, cids[0], uid, bio) if bio else None
+        positivo = await _positivo(context, db, cfg, cids[0], uid, bio) if bio else None
         if positivo:
             score, motivo = positivo
             msgs, warns = db.historial(uid)
@@ -141,9 +146,12 @@ async def barrer(context, db: DB, cfg: Config, client) -> dict[str, int]:
     return r
 
 
-def _positivo(db: DB, cfg: Config, chat_id: int, uid: int, bio: str) -> tuple[int, str] | None:
-    """(puntos, motivo) si la bio es de spam: `bio_spam`, o escrita en un alfabeto que el
-    grupo no permite y con un enlace (la de «付费广告» no llegaba a 60 en `bio_spam`)."""
+async def _positivo(context, db: DB, cfg: Config, chat_id: int, uid: int,
+                    bio: str) -> tuple[int, str] | None:
+    """(puntos, motivo) si la bio es de spam: `bio_spam`; escrita en un alfabeto que el
+    grupo no permite y con un enlace (la de «付费广告» no llegaba a 60 en `bio_spam`); o
+    con un enlace a un grupo o canal que se anuncia solo como spam (`link_target`, lo
+    mismo que se hace con los enlaces de los mensajes, sin entrar en él)."""
     hit = bio_spam.check(bio, db=db, user_id=uid)
     if hit:
         return hit.score, hit.reason
@@ -153,6 +161,13 @@ def _positivo(db: DB, cfg: Config, chat_id: int, uid: int, bio: str) -> tuple[in
         sin_urls, verification.allowed_scripts_de(db, chat_id, cfg))
     if otro and sin_urls != bio:
         return 60, t("reason.bio_alfabeto_enlace", alfabeto=otro[0])
+    urls = [m.group(0) for m in _TG_RE.finditer(bio)]
+    if urls:
+        from .handlers import _se_modera
+        destino = await link_reader.leer(context, urls, es_moderado=lambda c: _se_modera(db, cfg, c))
+        hit = link_target.check(destino)
+        if hit:
+            return hit.score, hit.reason
     return None
 
 
