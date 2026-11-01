@@ -23,6 +23,7 @@ from . import borrado_diferido
 from . import antiraid
 from . import channel_reader
 from . import desofuscar
+from . import destinos
 from . import link_reader
 from . import llm_veto
 from . import admin_report, autoaprendizaje, enlaces, errata_mencion, gentle_warning, greetings, learning, notify_prefs, quips, rule_explain, story_reader, trust as _trust, user_signals, verification
@@ -419,7 +420,8 @@ async def _hits_de_la_imagen(context, db: DB, cfg: Config, msg, user,
                 comad_det.check(leido, is_first_msg=True), guard), "commercial_ad/ocr"),
             _sin_tumbar(lambda: _apply_money_guard(
                 invscam_det.check(leido, is_first_msg=True), guard), "investment_scam/ocr"),
-            _sin_tumbar(lambda: url_det.check(leido, cfg.url_blocklist, is_first_msg=True),
+            _sin_tumbar(lambda: url_det.check(leido, cfg.url_blocklist, is_first_msg=True,
+                                                   fichados=destinos.fichados(db)),
                         "url_blocklist/ocr"),
             _sin_tumbar(lambda: offplat_det.check(leido, is_first_msg=True),
                         "offplatform_contact/ocr"),
@@ -1794,7 +1796,8 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         erratas=_erratas,
     ), "ext"))
     # 3) URL blocklist
-    hits.append(_sin_tumbar(lambda: url_det.check(msg, cfg.url_blocklist, is_first_msg=is_first), "url"))
+    hits.append(_sin_tumbar(lambda: url_det.check(
+        msg, cfg.url_blocklist, is_first_msg=is_first, fichados=destinos.fichados(db)), "url"))
     # 3b) tg:// deeplinks phishing
     hits.append(_sin_tumbar(lambda: tgdeep_det.check(msg, is_first_msg=is_first), "tgdeep"))
     # 3c) Premium + nueva cuenta + link en primer msg (señales via Telethon)
@@ -2987,6 +2990,9 @@ async def on_pending_review_callback(update: Update, context: ContextTypes.DEFAU
         decision=decision, original_text=text,
         first_name=(seen["first_name"] if seen else None),
     )
+    if not cfg.shadow:
+        # Lo confirmas tú: sus enlaces quedan fichados (`destinos`).
+        destinos.aprender_de_ban(db, user_id, text, "manual_review_ban")
     # TODOS sus avisos de «un admin lo revisará», no solo el de este mensaje.
     # Caso real (26-sep-2026): una cuenta mandó cuatro reenvíos de spam, se abrieron
     # tres revisiones y al pulsar «Spam» en una se borró solo su aviso; los otros dos
@@ -3020,7 +3026,7 @@ async def _moderate_bot_message(context, db, cfg, msg, user) -> None:
     # bots de moderación legítimos: caso real, @MissRose_bot expulsada de 4 grupos
     # por publicar su aviso de warn, que lleva un botón, tras 685 mensajes buenos.
     # Para un bot solo cuentan señales de spam REAL:
-    hits.append(url_det.check(msg, cfg.url_blocklist, is_first_msg=True))
+    hits.append(url_det.check(msg, cfg.url_blocklist, is_first_msg=True, fichados=destinos.fichados(db)))
     hits.append(comad_det.check(msg, is_first_msg=True))
     real = [h for h in hits if h]
     if not real:
@@ -3066,7 +3072,7 @@ async def _moderate_channel_message(context, db, cfg, msg) -> None:
         return
     hits = [
         buttons_det.check(msg),
-        url_det.check(msg, cfg.url_blocklist, is_first_msg=True),
+        url_det.check(msg, cfg.url_blocklist, is_first_msg=True, fichados=destinos.fichados(db)),
         comad_det.check(msg, is_first_msg=True),
         contact_det.check(msg, _chat_allowed_scripts(db, msg.chat_id, cfg),
                               cfg.non_latin_ratio_threshold),
@@ -3670,6 +3676,9 @@ async def _apply_action(
                         await context.bot.ban_chat_member(chat_id=chat_id, user_id=user_id)
                     autoaprendizaje.aprender_spam_de_ban(
                         db, chat_id, user_id, original_text, decision.rule, decision.score)
+                    destinos.aprender_de_ban(
+                        db, user_id, original_text or (decision.payload or {}).get("bio_preview"),
+                        decision.rule)
                 elif decision.action == "kick":
                     await context.bot.ban_chat_member(chat_id=chat_id, user_id=user_id)
                     await asyncio.sleep(0.5)

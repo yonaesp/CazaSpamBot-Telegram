@@ -127,6 +127,8 @@ async def unfederate_ban(
     # Desbanear es decir «me equivoqué»: lo que el bot aprendió solo de él, fuera.
     from . import autoaprendizaje
     autoaprendizaje.olvidar_spam_automatico(db, user_id)
+    from . import destinos
+    destinos.olvidar(db, user_id)
     results: dict[int, str] = {}
     for chat_id in db.admin_chats():
         if shadow:

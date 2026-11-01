@@ -1315,6 +1315,10 @@ async def on_suspicious_review_callback(update: Update, context: ContextTypes.DE
             triggered_in_chat=chat_id, shadow=cfg.shadow,
         )
         ok = sum(1 for v in (res or {}).values() if v == "ok")
+        if ok and not cfg.shadow:
+            # Lo confirmas tú: los enlaces de su bio quedan fichados (`destinos`).
+            from . import destinos
+            destinos.aprender_de_ban(db, user_id, db.ultima_bio_vista(user_id), "manual_review_ban")
         await q.answer(t("toast.banned", n=ok))
         try:
             await q.edit_message_text(base + t("review.banned", n=ok), parse_mode="HTML")

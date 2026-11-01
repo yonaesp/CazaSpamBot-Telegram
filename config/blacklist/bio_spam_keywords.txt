@@ -37,3 +37,7 @@ rollbit
 bitstarz
 bc\.game
 pin-?up\.(?:casino|bet)
+# Esquemas cripto de referidos, por su marca (caso real, 1-nov-2026: «BITNEST
+# https://bitnest.me/QSZPR» en la bio de una cuenta robada, L50). Suma 30: con la web
+# llega a 45 y no banea sola; con su dominio fichado, sí.
+bitnest

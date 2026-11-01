@@ -425,7 +425,8 @@ def build_panel_keyboard(
         [InlineKeyboardButton(t("cfg.b.welcome_menu", state=_onoff(_b(s, "welcome_enabled"))),
                               callback_data=f"{PREFIX}:wsub:{cid}")],
         [InlineKeyboardButton(t("cfg.b.edit_rules"),
-                              callback_data=f"{PREFIX}:edit:r:{cid}")],
+                              callback_data=f"{PREFIX}:edit:r:{cid}"),
+         InlineKeyboardButton(t("cfg.b.robadas"), callback_data=f"{PREFIX}:rob:{cid}")],
         # «Leer texto en imágenes» comparte fila con «limpiar servicio» a
         # propósito: el panel tiene un test de usabilidad que impide pasar de 14
         # filas, y esta era la única que iba suelta con un botón del mismo ancho.
@@ -969,6 +970,55 @@ async def _show_scripts(msg_edit, db: DB, cfg, chat_id: int) -> None:
         log.debug("no se pudo renderizar el submenú de alfabetos: %s", exc)
 
 
+async def _admins_humanos(bot, chat_id: int, sin: int) -> list:
+    try:
+        return [a.user for a in await bot.get_chat_administrators(chat_id)
+                if not a.user.is_bot and not getattr(a, "is_anonymous", False) and a.user.id != sin]
+    except TelegramError as exc:
+        log.debug("sin lista de admins de %s: %s", chat_id, exc)
+        return []
+
+
+def build_robadas_keyboard(chat_id: int, s, admins: list) -> InlineKeyboardMarkup:
+    """Submenú de cuentas robadas: a quién se menciona, privado y, con «elegidos», quiénes."""
+    from . import cuenta_robada as cr
+    cid = chat_id
+    modo = cr.mencion_de(s)
+    rows = [[InlineKeyboardButton(("✅ " if m == modo else "") + t(f"cfg.robadas.{m}"),
+                                  callback_data=f"{PREFIX}:robm:{m}:{cid}")] for m in cr.MENCIONES]
+    priv = cr.privado_de(s)
+    rows.append([InlineKeyboardButton(t("cfg.robadas.privado", state=_onoff(priv)),
+                                      callback_data=f"{PREFIX}:robp:{int(not priv)}:{cid}")])
+    if modo == "elegidos":
+        elegidos = set(cr.elegidos_de(s))
+        for u in admins:
+            rows.append([InlineKeyboardButton(
+                ("✅ " if u.id in elegidos else "") + (u.first_name or str(u.id))[:30],
+                callback_data=f"{PREFIX}:roba:{u.id}:{cid}")])
+    rows.append([InlineKeyboardButton(t("cfg.b.back"), callback_data=f"{PREFIX}:open:{cid}")])
+    return InlineKeyboardMarkup(rows)
+
+
+async def _show_robadas(msg_edit, bot, db: DB, cfg, chat_id: int) -> None:
+    """Renderiza el submenú de cuentas robadas, con el aviso tal como saldría."""
+    from . import cuenta_robada as cr
+    db.ensure_chat_settings(chat_id)
+    s = db.get_chat_settings(chat_id)
+    modo = cr.mencion_de(s)
+    gente = await cr.destinatarios(bot, db, cfg, chat_id)
+    ejemplo = t("robada.aviso_grupo", nombre="Ana", uid=123456789,
+                admins=", ".join(m for _, m in gente) or "—")
+    txt = t("cfg.robadas_text", title=html.escape(_panel_title(db, chat_id)),
+            mencion=t(f"cfg.robadas.{modo}"), privado=_onoff(cr.privado_de(s)),
+            elige=t("cfg.robadas.elige") if modo == "elegidos" else "", ejemplo=ejemplo)
+    admins = await _admins_humanos(bot, chat_id, cfg.admin_user_id) if modo == "elegidos" else []
+    try:
+        await msg_edit(txt, parse_mode="HTML", disable_web_page_preview=True,
+                       reply_markup=build_robadas_keyboard(chat_id, s, admins))
+    except TelegramError as exc:
+        log.debug("no se pudo renderizar el submenú de cuentas robadas: %s", exc)
+
+
 async def _show_warns(msg_edit, db: DB, chat_id: int) -> None:
     """Renderiza el submenú de warns."""
     db.ensure_chat_settings(chat_id)
@@ -1414,6 +1464,37 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         n = settings_sync.apply_welcome_buttons_clear(db, cid)
         await q.answer(t("cfg.wb.cleared") + (t("cfg.dot_n", n=n) if n > 1 else ""))
         await _show_welcome_buttons(q.edit_message_text, db, cid)
+        return
+
+    if action == "rob":
+        cid = _cid(2)
+        if cid is None:
+            await q.answer(t("cfg.invalid_chat"))
+            return
+        await q.answer()
+        await _show_robadas(q.edit_message_text, context.bot, db, cfg, cid)
+        return
+
+    if action in ("robm", "robp", "roba"):
+        from . import cuenta_robada as cr
+        val = parts[2] if len(parts) > 2 else ""
+        cid = _cid(3)
+        if cid is None:
+            await q.answer(t("cfg.invalid_chat"))
+            return
+        db.ensure_chat_settings(cid)
+        if action == "robm" and val in cr.MENCIONES:
+            n = settings_sync.apply_setting(db, cid, "robada_mencion", val)
+        elif action == "robp" and val in ("0", "1"):
+            n = settings_sync.apply_setting(db, cid, "robada_privado", int(val))
+        elif action == "roba" and val.isdigit():
+            ya = int(val) in cr.elegidos_de(db.get_chat_settings(cid))
+            n = cr.cambiar_elegido(db, cid, int(val), poner=not ya)
+        else:
+            await q.answer(t("cfg.invalid_opt"))
+            return
+        await q.answer("✅" + (t("cfg.dot_n", n=n) if n > 1 else ""))
+        await _show_robadas(q.edit_message_text, context.bot, db, cfg, cid)
         return
 
     if action == "warns":

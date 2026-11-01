@@ -51,6 +51,10 @@ _FLECHA_AL_ENLACE_RE = re.compile(
 # conocidos con el mismo grupo privado en la bio no bastan para un ban.
 RED_UNA = 15
 RED_VARIAS = 30
+# Un destino que ya salió en el spam de una cuenta baneada (`destinos`). Con el enlace
+# más barato (15, una web sin más) llega justo al umbral: la cuenta robada de BitNest
+# llevaba «BITNEST https://bitnest.me/…» y nada más (L50).
+DESTINO_FICHADO = 45
 # URLs externas
 # Proporción de alfabeto NO latino a partir de la cual se considera que la bio
 # está escrita en otro sistema de escritura. No vale con «¿hay alguna letra
@@ -199,6 +203,11 @@ def check(bio: str | None, db=None, user_id: int | None = None) -> Hit:
     elif otras == 1:
         score += RED_UNA
         reasons.append(t("reason.bio_red_una"))
+    from .. import destinos
+    fichados = destinos.fichados_en(db, text) if db is not None else []
+    if fichados:
+        score += DESTINO_FICHADO
+        reasons.append(t("reason.bio_destino_fichado", destinos=", ".join(fichados[:3])))
     # Bio SIN una sola letra latina + enlace a un canal. Las señales de arriba
     # (emojis, CTA, cifras de dinero) están pensadas para texto latino, así que una
     # bio entera en otro alfabeto no sumaba NADA y se quedaba en los 40 del enlace,
@@ -230,5 +239,6 @@ def check(bio: str | None, db=None, user_id: int | None = None) -> Hit:
         rule="bio_spam",
         score=min(score, 200),
         reason=t("reason.bio_spam", details=" + ".join(reasons)),
-        payload={"bio_preview": text[:200], "score": score, "otras_cuentas": otras},
+        payload={"bio_preview": text[:200], "score": score, "otras_cuentas": otras,
+                 "destinos_fichados": fichados},
     )

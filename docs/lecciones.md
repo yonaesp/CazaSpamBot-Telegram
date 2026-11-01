@@ -55,6 +55,7 @@ Una lección nueva va al final, con el número siguiente y su línea en el índi
 - [L47](#l47) · Repaso del 28-oct: lo que se escapaba, lo que hacen otros bots y lo que se añadió
 - [L48](#l48) · Simulación del 29-oct: `calentamiento` expulsaba a gente normal y una red de reclutamiento no daba nada
 - [L49](#l49) · Helen, Gloria y Brook: una red con el mismo enlace privado en la bio y 40 puntos cada una
+- [L50](#l50) · Dos veteranos con la bio de spam tras años callados: cuentas robadas y destinos que se aprenden
 
 ---
 
@@ -1063,3 +1064,31 @@ de más de 60 s, el que Telethon no espera solo. No banea: lo que caza `bio_spam
 revisión de sospechosos (`susrev:`, suena: pide decisión) y queda un `noop` en `moderation_log`. Una bio con enlace
 privado que no llega al umbral no se da por leída: la primera cuenta de una red se queda en 55, y cuando aparece la
 segunda, a la semana siguiente salta también (lo fija un test).
+
+## L50 · Dos veteranos con la bio de spam tras años callados: cuentas robadas y destinos que se aprenden
+
+El informe del barrido (L49) llevaba dos cuentas que sí habían escrito en Domótica: «BITNEST https://bitnest.me/QSZPR»
+(8 mensajes, todos del 20 al 22-dic-2022) y «付费广告 https://t.me/ZOGJ001» («publicidad de pago»; 25 mensajes, del 28 y
+29-dic-2019). El admin las vio el 1-nov: cuentas robadas. Nadie las había mirado, porque el perfil solo se lee al entrar,
+en los 7 días siguientes y con el primer mensaje, y el barrido solo leía a quien no estaba en `seen_users`. Se banearon
+con su OK, sin aviso en el grupo (llevaban años sin escribir).
+
+Lo que no sirvió, medido antes de proponerlo: el admin vio un aviso de phishing al abrir `bitnest.me`, pero desde el
+servidor la página carga sin aviso (HTTP 200, título «BITNEST»), el DNS de seguridad de Cloudflare (`1.1.1.2`) y el
+familiar (`1.1.1.3`) la resuelven normal y Google Safe Browsing la da por limpia. Un comprobador de dominios no la habría
+cazado; se descartó. Banear «cualquier t.me en la bio», tampoco: en el barrido, 9 veteranos legítimos lo llevan.
+
+Lo que se hizo, con lo que decidió el admin:
+- **Destinos fichados** (`destinos.py`): los enlaces de un ban con evidencia de spam quedan fichados por destino concreto
+  (dominio, `t.me/canal` o invitación; `joinchat/X` y `+X` son la misma) y nunca una plataforma compartida. Suman 45 en
+  `bio_spam` (con la web más barata, 15, llega justo a 60: la bio de BitNest) y cuentan como `url_blocklist` en mensajes.
+  Un ban manual a secas no ficha (puede ser por insultar) y al desbanear se olvida lo fichado de esa cuenta.
+- **Cuenta robada** (`cuenta_robada.py`): el barrido relee ahora a todos cada 90 días. Un veterano (≥3 mensajes, sin warns)
+  con la bio de spam y que lleva ≥90 días sin escribir según Telegram se banea en todos los grupos, con un aviso de 24 h en
+  el grupo («si os escribe por privado, no le hagáis caso; si es tu cuenta, escribe a @admin») y el privado con «Bien
+  baneada / Desbanear». Si escribe a menudo o no se puede saber cuándo escribió, solo se avisa: su propio canal en la bio no
+  es una cuenta robada. La mayoría de los veteranos se importaron del historial: 5.816 de 5.941 no tienen `last_msg_ts`,
+  así que la fecha se pregunta a Telegram, una llamada y solo para quien ya ha dado positivo.
+- La bio en un alfabeto que el grupo no permite y con un enlace también da positivo en el barrido («付费广告» se quedaba en
+  25 en `bio_spam`). Los enlaces se quitan antes de medir: sus letras latinas bajaban la proporción por debajo del 70 %.
+

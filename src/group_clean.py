@@ -51,6 +51,7 @@ _ADMIN_MENU = [
     ("warns", "cmd.warns"),
     ("warnlimit", "cmd.warnlimit"),
     ("warnaction", "cmd.warnaction"),
+    ("robadas", "cmd.robadas"),
     ("spam", "cmd.spam"),
     ("legal", "cmd.legal"),
     ("samples", "cmd.samples"),

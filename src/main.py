@@ -17,7 +17,7 @@ from telegram.ext import (
     filters,
 )
 
-from . import admin, barrido_bios, chat_picker, chat_settings_cmd, config_panel, errata_mencion, group_clean, lang_cmd, maintenance, notify_prefs, quienfue_cmd, recien_llegados, scan_cmd, scanuser_cmd, telethon_bridge, topweekly, verification, warns_mod
+from . import admin, barrido_bios, chat_picker, cuenta_robada, chat_settings_cmd, config_panel, errata_mencion, group_clean, lang_cmd, maintenance, notify_prefs, quienfue_cmd, recien_llegados, scan_cmd, scanuser_cmd, telethon_bridge, topweekly, verification, warns_mod
 from .config import load_config
 from .db import DB
 from .handlers import (
@@ -374,6 +374,7 @@ def main() -> int:
     app.add_handler(CommandHandler("rmwarn", warns_mod.cmd_rmwarn))
     app.add_handler(CommandHandler("resetwarns", warns_mod.cmd_resetwarns))
     app.add_handler(CommandHandler("warnlimit", warns_mod.cmd_warnlimit))
+    app.add_handler(CommandHandler("robadas", cuenta_robada.cmd_robadas))
     app.add_handler(CommandHandler("warnaction", warns_mod.cmd_warnaction))
 
     # Callback de verificación
@@ -405,6 +406,7 @@ def main() -> int:
     app.add_handler(CallbackQueryHandler(on_abuse_callback, pattern=r"^abuse:"))
     # Callback de revisión de sospechosos (botones ✅ Permitir / 🔨 Banear)
     app.add_handler(CallbackQueryHandler(admin.on_suspicious_review_callback, pattern=r"^susrev:"))
+    app.add_handler(CallbackQueryHandler(cuenta_robada.on_callback, pattern=r"^robada:"))
     app.add_handler(CallbackQueryHandler(config_panel.on_callback, pattern=r"^cfg:"))
     app.add_handler(CallbackQueryHandler(group_clean.on_clean_callback, pattern=r"^clean:"))
 

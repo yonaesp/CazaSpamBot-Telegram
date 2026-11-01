@@ -21,6 +21,7 @@ IMPORTANTES = {
     ("admin_report.py", "handle_admin_mention"),     # un miembro pide ayuda con @admin
     ("antiraid.py", "avisar"),                       # avalancha de entradas
     ("barrido_bios.py", "_avisar"),                  # bio de spam en un miembro de antes
+    ("cuenta_robada.py", "_avisar_admins"),          # baneé a un veterano por seguridad
     ("handlers.py", "_avisar_si_le_recortan"),       # me quitan permisos
     ("handlers.py", "on_my_chat_member"),            # me echan de un grupo
     ("handlers.py", "_check_admin_ban_abuse"),       # un admin banea en masa

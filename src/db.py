@@ -480,6 +480,11 @@ class DB:
             # tuviera los avisos encendidos no cambia de comportamiento al azar.
             self._conn.execute(
                 "ALTER TABLE chat_settings ADD COLUMN review_level TEXT DEFAULT NULL")
+        # Cuentas robadas (`cuenta_robada`). Las tres NULL = hereda el defecto: se
+        # menciona solo al dueño del bot y se le avisa por privado.
+        for col in ("robada_mencion TEXT", "robada_admins TEXT", "robada_privado INTEGER"):
+            if col.split()[0] not in cs_cols_nv:
+                self._conn.execute(f"ALTER TABLE chat_settings ADD COLUMN {col} DEFAULT NULL")
         if "welcome_msg_id" not in su_cols:
             self._conn.execute("ALTER TABLE seen_users ADD COLUMN welcome_msg_id INTEGER")
         # Sugerencia «¿quizás te referías a @x?»: JSON con lo escrito y lo sugerido.
@@ -500,6 +505,12 @@ class DB:
         self._conn.execute(
             "CREATE TABLE IF NOT EXISTS barrido_bios ("
             " user_id INTEGER PRIMARY KEY, ts REAL NOT NULL)")
+        # Destinos de enlaces (dominio, canal o invitación) de cuentas baneadas por
+        # spam, por cuenta: al desbanear a una se olvida lo que se fichó de ella.
+        self._conn.execute(
+            "CREATE TABLE IF NOT EXISTS destinos_spam ("
+            " destino TEXT NOT NULL, user_id INTEGER NOT NULL, regla TEXT, ts REAL NOT NULL,"
+            " PRIMARY KEY (destino, user_id))")
 
     def close(self) -> None:
         self._conn.close()
@@ -817,15 +828,54 @@ class DB:
         with self._cur() as c:
             return {r[0] for r in c.execute("SELECT DISTINCT user_id FROM seen_users")}
 
-    def bios_barridas(self) -> set[int]:
-        """Las cuentas cuya bio ya leyó el barrido semanal."""
+    def bios_barridas(self, desde_ts: float = 0) -> set[int]:
+        """Las cuentas cuya bio leyó el barrido semanal desde `desde_ts`."""
         with self._cur() as c:
-            return {r[0] for r in c.execute("SELECT user_id FROM barrido_bios")}
+            return {r[0] for r in c.execute("SELECT user_id FROM barrido_bios WHERE ts >= ?",
+                                            (desde_ts,))}
 
     def marcar_bio_barrida(self, user_id: int) -> None:
         with self._cur() as c:
             c.execute("INSERT OR REPLACE INTO barrido_bios (user_id, ts) VALUES (?, ?)",
                       (user_id, time.time()))
+
+    def historial(self, user_id: int) -> tuple[int, int]:
+        """(mensajes en todos los chats, warns en todos los chats) de una cuenta."""
+        with self._cur() as c:
+            msgs = c.execute("SELECT COALESCE(SUM(msg_count), 0) FROM seen_users WHERE user_id=?",
+                             (user_id,)).fetchone()[0]
+            warns = c.execute("SELECT COUNT(*) FROM user_warns WHERE user_id=?",
+                              (user_id,)).fetchone()[0]
+        return int(msgs or 0), int(warns or 0)
+
+    def ultimo_mensaje_ts(self, user_id: int) -> float | None:
+        with self._cur() as c:
+            fila = c.execute("SELECT MAX(last_msg_ts) FROM seen_users WHERE user_id=?",
+                             (user_id,)).fetchone()
+        return float(fila[0]) if fila and fila[0] else None
+
+    def fichar_destino(self, destino: str, user_id: int, regla: str) -> None:
+        with self._cur() as c:
+            c.execute("INSERT OR IGNORE INTO destinos_spam (destino, user_id, regla, ts) "
+                      "VALUES (?, ?, ?, ?)", (destino, user_id, regla, time.time()))
+
+    def destinos_fichados(self) -> set[str]:
+        with self._cur() as c:
+            return {r[0] for r in c.execute("SELECT DISTINCT destino FROM destinos_spam")}
+
+    def olvidar_destinos(self, user_id: int) -> int:
+        with self._cur() as c:
+            c.execute("DELETE FROM destinos_spam WHERE user_id=?", (user_id,))
+            return c.rowcount
+
+    def ultima_bio_vista(self, user_id: int) -> str | None:
+        """La bio más reciente que dejó en `moderation_log` algún detector o el barrido."""
+        with self._cur() as c:
+            fila = c.execute(
+                "SELECT json_extract(payload_json, '$.bio_preview') FROM moderation_log "
+                "WHERE user_id=? AND json_extract(payload_json, '$.bio_preview') IS NOT NULL "
+                "ORDER BY ts DESC LIMIT 1", (user_id,)).fetchone()
+        return fila[0] if fila else None
 
     def textos_previos(self, chat_id: int, user_id: int, msg_id: int,
                        desde_ts: float) -> list[str]:
@@ -1434,7 +1484,7 @@ class DB:
             "verification_reminders_enabled", "verification_kick_normal",
             "verification_review_suspicious", "cleanservice",
             "topweekly_enabled", "quips_enabled", "soft_ban", "money_guard", "allowed_scripts", "verified_ttl_s",
-            "review_level",
+            "review_level", "robada_mencion", "robada_admins", "robada_privado",
         }
         if field not in ALLOWED:
             raise ValueError(f"campo no permitido: {field}")

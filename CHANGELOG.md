@@ -4,6 +4,17 @@ Cambios relevantes de CazaSpamBot, lo más reciente arriba. Se anotan hitos, no
 cada commit: para el detalle está el historial de git. Sin números de versión
 porque el bot es un servicio en producción continua, no un paquete que se libera.
 
+## 2026-11 · Cuentas robadas y destinos que se aprenden
+
+Cuando un miembro con historial que llevaba meses sin escribir aparece con la bio de
+spam, el bot lo trata como una cuenta robada: lo banea en todos los grupos, avisa en
+el grupo de que no hagan caso a sus privados y dice a quién escribir si es un error,
+y te lo cuenta por privado con un botón para desbanear. A quién se menciona y quién
+recibe el privado se elige en el panel (Cuentas robadas) o con /robadas. Además, los
+enlaces de las cuentas baneadas por spam quedan fichados por destino (una web, un
+canal o una invitación concretos, nunca YouTube o Instagram) y la siguiente bio o
+mensaje que los lleve ya no pasa.
+
 ## 2026-10 · Redes de bios y barrido semanal
 
 Cuentas distintas con el mismo enlace privado en la bio ya no pasan una a una: el

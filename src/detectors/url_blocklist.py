@@ -21,10 +21,23 @@ def _iter_urls(msg: Message) -> list[str]:
     return urls
 
 
-def check(msg: Message, blocklist: list[str], is_first_msg: bool) -> Hit:
+def check(msg: Message, blocklist: list[str], is_first_msg: bool,
+          fichados: frozenset[str] = frozenset()) -> Hit:
+    """`fichados`: destinos aprendidos de bans de spam (`destinos`), dominio o
+    `t.me/canal`. Cuentan igual que la lista fija."""
+    from .. import destinos
     bad: list[str] = []
     for raw in _iter_urls(msg):
         url = raw if "://" in raw else "https://" + raw
+        if fichados:
+            try:
+                partes = urlparse(url)
+                k = destinos.clave(partes.netloc or "", partes.path or "")
+            except ValueError:
+                k = None
+            if k and k in fichados:
+                bad.append(k)
+                continue
         # removeprefix, NO lstrip: `lstrip("www.")` recibe un CONJUNTO de caracteres,
         # así que "wa.me" se convertía en "a.me" y "whatsapp.com" en "hatsapp.com".
         # Inofensivo con la lista actual, pero el día que alguien añada wa.me (vector
