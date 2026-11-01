@@ -50,9 +50,14 @@ _SEGUNDO_NIVEL = frozenset({"co", "com", "org", "net", "gob", "gov", "edu", "ac"
 _URL_RE = re.compile(
     r"(?:(?P<esq>https?://)|(?P<www>www\.))?"
     r"(?P<host>(?:[a-z0-9-]+\.)+[a-z]{2,24})\.?"
-    r"(?P<ruta>/[^\s<>\"'()\[\]]*)?",
+    # Solo caracteres de URL: un emoji pegado («t.me/+M9Mb…💋», bio de isabelle) no
+    # es parte del enlace.
+    r"(?P<ruta>/[A-Za-z0-9\-._~/?#@!$&*+,;=%:]*)?",
     re.IGNORECASE,
 )
+
+
+_SEGMENTO_RE = re.compile(r"\+?[A-Za-z0-9_-]+")
 
 
 def _dominio(host: str) -> str:
@@ -72,8 +77,8 @@ def clave(host: str, ruta: str = "") -> str | None:
             return None
         # `joinchat/HASH` y `+HASH` son la misma invitación.
         primero = "+" + trozos[1] if trozos[0].lower() == "joinchat" and len(trozos) > 1 else trozos[0]
-        primero = primero.split("?")[0].split("#")[0]
-        return f"{host}/{primero.lower()}" if primero else None
+        m = _SEGMENTO_RE.match(primero)
+        return f"{host}/{m.group(0).lower()}" if m else None
     dom = _dominio(host)
     if dom in NUNCA or host in NUNCA:
         return None

@@ -27,6 +27,7 @@ CHINO = "付费广告 https://t.me/ZOGJ001"
     ("Cursway → t.me/+3JVb6dw6WbI0ODk6", ["t.me/+3jvb6dw6wbi0odk6"]),
     ("https://t.me/joinchat/AbCd123 y t.me/+abcd123", ["t.me/+abcd123"]),  # la misma invitación
     ("telegram.me/Canal?start=1", ["t.me/canal"]),
+    ("😈Find here👉https://t.me/+M9MbBkVPxxwwZjhi💋", ["t.me/+m9mbbkvpxxwwzjhi"]),  # isabelle
     ("www.messbeard.es", ["messbeard.es"]),
     ("bbc.co.uk/news", ["bbc.co.uk"]),
     # Plataformas compartidas: nunca se fichan.
