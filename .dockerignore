@@ -13,3 +13,7 @@ traffic/
 **/__pycache__/
 **/*.pyc
 *.bak*
+# Lo propio de cada instalación no va en la imagen: las palabras añadidas desde
+# Telegram y las bienvenidas de cada grupo (config/welcomes/<chat_id>.txt).
+config/blacklist/custom/
+config/welcomes/-*.txt

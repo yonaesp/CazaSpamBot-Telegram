@@ -1,0 +1,97 @@
+# Builds and publishes the container image (amd64 and arm64, so it runs on a
+# Raspberry Pi too) to ghcr.io/yonaesp/cazaspambot:
+#   - on every release tag (v1.2.3 → 1.2.3, 1.2, 1 and latest);
+#   - every Monday, the latest release again, to pick up the base system's
+#     security fixes (the Dockerfile runs apt-get upgrade);
+#   - by hand (Actions → Run workflow): the chosen branch, tagged "edge".
+name: Container image
+
+on:
+  push:
+    tags: ["v[0-9]+.[0-9]+.[0-9]+"]
+  schedule:
+    - cron: "17 3 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: image
+  cancel-in-progress: false
+
+env:
+  # So the description also shows on the multi-arch image, not only on each architecture.
+  DOCKER_METADATA_ANNOTATIONS_LEVELS: manifest,index
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Pick what to build
+        id: ref
+        run: |
+          case "$GITHUB_EVENT_NAME" in
+            push) tag="$GITHUB_REF_NAME" ;;
+            schedule) tag=$(git tag -l 'v[0-9]*' --sort=-v:refname | head -n1) ;;
+            *) tag="" ;;
+          esac
+          if [ "$GITHUB_EVENT_NAME" = schedule ] && [ -z "$tag" ]; then
+            echo "No release published yet: nothing to rebuild."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          [ -z "$tag" ] || git checkout -q "$tag"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+        if: steps.ref.outputs.skip != 'true'
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+        if: steps.ref.outputs.skip != 'true'
+
+      - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        if: steps.ref.outputs.skip != 'true'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        if: steps.ref.outputs.skip != 'true'
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/cazaspambot
+          flavor: latest=false
+          tags: |
+            type=semver,pattern={{version}},value=${{ steps.ref.outputs.tag }},enable=${{ steps.ref.outputs.tag != '' }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ steps.ref.outputs.tag }},enable=${{ steps.ref.outputs.tag != '' }}
+            type=semver,pattern={{major}},value=${{ steps.ref.outputs.tag }},enable=${{ steps.ref.outputs.tag != '' }}
+            type=raw,value=latest,enable=${{ steps.ref.outputs.tag != '' }}
+            type=raw,value=edge,enable=${{ steps.ref.outputs.tag == '' }}
+          labels: |
+            org.opencontainers.image.title=CazaSpamBot
+            org.opencontainers.image.description=Self-hosted anti-spam bot for Telegram groups that checks who is posting, not just what they post.
+          annotations: |
+            org.opencontainers.image.title=CazaSpamBot
+            org.opencontainers.image.description=Self-hosted anti-spam bot for Telegram groups that checks who is posting, not just what they post.
+
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        if: steps.ref.outputs.skip != 'true'
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          pull: true
+          # Without cache, apt-get upgrade always runs: a cached layer would keep
+          # old packages after their security fixes are out.
+          no-cache: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          annotations: ${{ steps.meta.outputs.annotations }}

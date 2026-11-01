@@ -30,9 +30,11 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -U setuptools wheel \
     && pip install --no-cache-dir -r requirements.txt
 
-RUN mkdir -p /app/data
-
 COPY src/ /app/src/
 COPY scripts/ /app/scripts/
+# Las listas y bienvenidas que vienen con el bot, para quien usa la imagen publicada
+# sin clonar el repo. Desde el código, docker-compose.yml monta encima las del repo.
+COPY config/ /app/config/
+RUN mkdir -p /app/data /app/config/blacklist/custom
 
 CMD ["python", "-m", "src.main"]

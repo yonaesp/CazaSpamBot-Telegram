@@ -56,6 +56,7 @@ Una lección nueva va al final, con el número siguiente y su línea en el índi
 - [L48](#l48) · Simulación del 29-oct: `calentamiento` expulsaba a gente normal y una red de reclutamiento no daba nada
 - [L49](#l49) · Helen, Gloria y Brook: una red con el mismo enlace privado en la bio y 40 puntos cada una
 - [L50](#l50) · Dos veteranos con la bio de spam tras años callados: cuentas robadas y destinos que se aprenden
+- [L51](#l51) · Versiones, `update.sh` y la imagen para ARM: que otros la monten y la mantengan al día
 
 ---
 
@@ -981,6 +982,7 @@ avalanchas, `antiraid.py`. Se eligieron tres, con el OK del admin:
 Descartados por ahora: umbral de denuncias de miembros (0 reportes en la base), clasificador transformer local (no hay
 modelo en español y el N100 no va sobrado), y el veto de IA con contexto (gasta API y saca texto del servidor).
 
+<a id="l48"></a>
 ## L48 · Simulación del 29-oct: `calentamiento` expulsaba a gente normal y una red de reclutamiento no daba nada
 
 Pedido del admin: «haz una simulación realista». Se pasaron conversaciones completas por `on_chat_member`, `on_message` y
@@ -1009,6 +1011,7 @@ El banco de pruebas quedó en `scripts/simular.py`, con la acción esperada de c
 `--vacia` (`tests/test_simulacion.py`, en un proceso aparte porque cambia `time.time` y bloquea la red). Con
 `MUTE_SCORE=45` falla en las dos escenas del @, que es lo que tiene que hacer.
 
+<a id="l49"></a>
 ## L49 · Helen, Gloria y Brook: una red con el mismo enlace privado en la bio y 40 puntos cada una
 
 El admin vio el 31-oct a «Helen» en Domótica: foto de modelo, sin @ y en la bio «Get inspired, then go. Cursway →
@@ -1065,6 +1068,7 @@ revisión de sospechosos (`susrev:`, suena: pide decisión) y queda un `noop` en
 privado que no llega al umbral no se da por leída: la primera cuenta de una red se queda en 55, y cuando aparece la
 segunda, a la semana siguiente salta también (lo fija un test).
 
+<a id="l50"></a>
 ## L50 · Dos veteranos con la bio de spam tras años callados: cuentas robadas y destinos que se aprenden
 
 El informe del barrido (L49) llevaba dos cuentas que sí habían escrito en Domótica: «BITNEST https://bitnest.me/QSZPR»
@@ -1094,3 +1098,37 @@ Lo que se hizo, con lo que decidió el admin:
 - El barrido lee también la ficha del grupo o canal que enlaza la bio (`link_reader` + `link_target`, lo mismo que con los
   enlaces de los mensajes, sin entrar en él). Los enlaces se pasan tal cual: las invitaciones distinguen mayúsculas, así
   que la clave en minúsculas de `destinos` no sirve para leerlas.
+
+<a id="l51"></a>
+## L51 · Versiones, `update.sh` y la imagen para ARM: que otros la monten y la mantengan al día
+
+El admin (1-nov-2026) quiere que el código lo aproveche cuanta más gente mejor y que sea fácil de integrar, con
+actualizaciones opcionales o automáticas. Hasta entonces no había versiones (el CHANGELOG lo decía a propósito: «servicio
+en producción continua») y quien instalaba seguía `main` con `git pull`: se llevaba cada commit el mismo día, también los
+que salían con la suite en rojo (0914fa6), sin aviso de que hubiera algo nuevo ni vuelta atrás si no arrancaba.
+
+Lo que eligió, con sus razones:
+- **Dos canales.** `main` es lo que corre en la instalación de referencia; `stable` apunta a la última versión
+  (`vX.Y.Z`, SemVer), que sale cuando el cambio lleva ≥48 h en ese bot sin errores. La v1.0.0, también tras 48 h.
+- **`update.sh`** sirve para las dos formas de instalar (clon de git o imagen publicada): copia la base (`VACUUM INTO`, a
+  `data/backups/preupdate-*.db`, 3 copias; con el prefijo `antispam-` la rotación diaria las habría tomado por las más
+  recientes y se habría comido las diarias), recrea el contenedor y da por buena la versión si el latido
+  (`data/heartbeat`) llega ≥31 s después de arrancar: dos latidos, o sea que pasó el arranque. Si no, vuelve a la anterior
+  (`git reset --keep` o reetiquetar la imagen vieja) y apunta la versión en `.update-failed` para que la noche no la
+  repita. Si tampoco arranca la anterior, avisa por Telegram con el token por stdin (`curl -K -`), nunca en la línea de
+  órdenes. `--auto` (temporizador de systemd, 04:00 + hasta 1 h al azar) solo en `stable` y sin saltar de versión mayor.
+  En la carpeta de producción no se usa: va por `main` y dice «ya tienes la última».
+- **El bot avisa** (`actualizaciones.py`, `UPDATE_CHECK`, encendido): una consulta anónima al día a la API de GitHub, un
+  privado silencioso por versión. Antes de reiniciar, `update.sh` deja `data/update-pending.json` y el bot que arranca
+  cuenta si se quedó la nueva o volvió a la anterior. Se escribe con `exec` dentro del contenedor (uid 10112): desde el
+  host, `data/` no es escribible ni con Docker ni con Podman sin root. La pregunta «¿salen mis datos?» del README y de la
+  web lo menciona.
+- **Imagen para amd64 y arm64** (Raspberry Pi con sistema de 64 bits), publicada por GitHub Actions en
+  `ghcr.io/yonaesp/cazaspambot` con cada etiqueta y cada lunes con los parches del sistema base (`no-cache`, por el
+  `apt-get upgrade`). Las acciones van fijadas por SHA: una etiqueta se puede mover a otro código; un SHA, no.
+  La imagen lleva `config/` (sin `custom/` ni las bienvenidas de cada grupo); `docker-compose.image.yml` usa `:1`.
+- **CONTRIBUTING y SECURITY** (con el aviso privado de vulnerabilidades de GitHub), sin plantillas de issues ni CI.
+
+Trampa que cazó el test: `def f(ruta=PENDIENTE)` fija el valor al definir la función, y un `monkeypatch` del módulo no
+llega. Se resuelve al llamar (`ruta or PENDIENTE`). Cómo se publica una versión y cómo se escribe hacia fuera (notas,
+listas, PR ajenos): skill `publicar`.

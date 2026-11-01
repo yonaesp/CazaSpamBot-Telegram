@@ -8,7 +8,7 @@
 [![python-telegram-bot](https://img.shields.io/badge/PTB-22.8-26A5E4?logo=telegram&logoColor=white)](https://python-telegram-bot.org/)
 [![Telethon](https://img.shields.io/badge/Telethon-1.44-blueviolet)](https://docs.telethon.dev/)
 [![Languages](https://img.shields.io/badge/languages-es%20%7C%20en%20%7C%20add%20yours-orange)](src/locales/README.md)
-[![Tests](https://img.shields.io/badge/tests-1861%20passing-success)](#tests)
+[![Tests](https://img.shields.io/badge/tests-1913%20passing-success)](#tests)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 
 🌍 **English** · [**Español**](README.es.md)
@@ -204,12 +204,12 @@ sed -i 's/^MODE=.*/MODE=active/' .env && sudo docker compose up -d
 | I want to… | Command |
 |---|---|
 | See what it's doing | `sudo docker compose logs -f` |
-| Update to the latest version | `git pull && sudo docker compose up -d --build` |
+| Update to the latest version | `./update.sh` (it backs up the database first and goes back on its own if the new version doesn't start) |
 | Apply a change to `.env` | `sudo docker compose up -d` (`restart` doesn't reload `.env`) |
 | Restart it | `sudo docker compose restart` |
 | Stop it | `sudo docker compose down` (everything in `data/` is kept) |
 
-**Updating loses nothing**: your `.env`, the database (`data/`) and the words you added from Telegram (`config/blacklist/custom/`) live outside git, and anything new in the database is created on startup. If you hand-edited a versioned list in `config/blacklist/` and git reports a conflict: `git stash && git pull && git stash pop`.
+**Updating loses nothing**: your `.env`, the database (`data/`) and the words you added from Telegram (`config/blacklist/custom/`) live outside git, and anything new in the database is created on startup. If you hand-edited a list that comes with the bot, `update.sh` stops and tells you how to keep your changes; your own words belong in `config/blacklist/custom/`. The bot tells you in private when a new version is out.
 
 **Back up** the `data/` folder and your `.env`: that's all you need to bring it back on another machine. The bot already keeps a daily database backup in `data/backups/` (7 days).
 
@@ -369,13 +369,16 @@ That's what it tries hardest to avoid. Members with history in the group are pro
 A captcha only stops dumb bots at the door. Here verification is optional and ships off, because today's spam gets past it and then posts at leisure. What matters is looking at who they are and what they post, days later too.
 
 **Does my data leave my server?**
-No. Learning and OCR run locally. Outside Telegram, the only things that go out are lookups to the CAS and lols.bot lists (with the user's id) and, if you turn them on, reports to Telegram.
+No. Learning and OCR run locally. Outside Telegram, the only things that go out are lookups to the CAS and lols.bot lists (with the user's id), a daily check on GitHub for new versions (anonymous; `UPDATE_CHECK=false` turns it off) and, if you turn them on, reports to Telegram.
 
 **Is it free? Does it work in other languages?**
 Yes, free and open source (GPL-3.0). Detection doesn't depend on the group's language, the interface ships in Spanish and English, and adding a language is one JSON file ([translator guide](src/locales/README.md)).
 
 **Where can I get help?**
 Ask in [Discussions](https://github.com/yonaesp/CazaSpamBot-Telegram/discussions) or open an [issue](https://github.com/yonaesp/CazaSpamBot-Telegram/issues). Support is free.
+
+**How can I help?**
+Telling us about a legitimate member it banned is as useful as code: [CONTRIBUTING.md](CONTRIBUTING.md) explains how, and how to add a language.
 
 ---
 
@@ -384,13 +387,14 @@ Ask in [Discussions](https://github.com/yonaesp/CazaSpamBot-Telegram/discussions
 - Runs **without root**, as a uid nobody owns on your machine, with the code and configuration **read-only**.
 - Secrets live only in `.env` (permissions `600`, outside git). The secondary account's session is never committed.
 - The secondary account reports under strict criteria (specific rules, high score and an hourly limit) to protect its reputation on Telegram.
+- Found a vulnerability? Report it privately, as explained in [SECURITY.md](SECURITY.md).
 
 <a id="tests"></a>
 
 ## 🧪 Tests
 
 ```bash
-.venv/bin/python -m pytest tests/ -q     # 1861 tests
+.venv/bin/python -m pytest tests/ -q     # 1913 tests
 ```
 
 Every detector has tests for what it must catch **and what it must not**, built from real cases. A false positive is worse than a false negative.

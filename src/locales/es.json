@@ -245,8 +245,8 @@
   "forget.done": "🗑️ Muestra #{sid} borrada.",
   "forget.notfound": "No existe #{sid}.",
   "dm.hint": "👋 Hola. Soy <b>CazaSpamBot</b>, tu bot de moderación.\n\nSolo respondo a comandos. Usa /help para ver la lista completa,\no /start para un resumen rápido del estado.",
-  "publico.dm": "👋 ¡Hola! Soy <b>CazaSpamBot</b>, el bot antispam privado de unos grupos concretos. Si me añades a tu grupo no voy a funcionar allí.\n\n✨ Pero soy <b>de código abierto y gratuito</b>: puedes montar tu propia copia en tu servidor y adaptarla como quieras.\n\n🛡️ 21 detectores de spam (estafas, anuncios, perfiles falsos…)\n🔍 Lee el texto dentro de las imágenes\n🧠 Aprende de tus decisiones\n🌐 Varios grupos conectados: un ban en uno vale en todos\n👋 Bienvenidas y verificación de nuevos\n⚙️ Todo desde un panel en Telegram, en español o inglés\n\n👉 Instrucciones y soporte gratuito: {url}",
-  "publico.descripcion": "🛡️ Bot antispam privado de unos grupos concretos: si lo añades a tu grupo NO funcionará allí.\n\n✨ Es de código abierto y gratuito. Monta tu propia copia en tu servidor, totalmente personalizable: 21 detectores de spam, lectura de texto en imágenes, aprendizaje, bans compartidos entre grupos, bienvenidas, verificación y panel en Telegram.\n\n👉 Instrucciones y soporte gratuito: {url}",
+  "publico.dm": "👋 ¡Hola! Soy <b>CazaSpamBot</b>, el bot antispam privado de unos grupos concretos. Si me añades a tu grupo no voy a funcionar allí.\n\n✨ Pero soy <b>de código abierto y gratuito</b>: puedes montar tu propia copia en tu servidor y adaptarla como quieras.\n\n🛡️ 27 detectores de spam (estafas, anuncios, perfiles falsos…)\n🔍 Lee el texto dentro de las imágenes\n🧠 Aprende de tus decisiones\n🌐 Varios grupos conectados: un ban en uno vale en todos\n👋 Bienvenidas y verificación de nuevos\n⚙️ Todo desde un panel en Telegram, en español o inglés\n\n👉 Instrucciones y soporte gratuito: {url}",
+  "publico.descripcion": "🛡️ Bot antispam privado de unos grupos concretos: si lo añades a tu grupo NO funcionará allí.\n\n✨ Es de código abierto y gratuito. Monta tu propia copia en tu servidor, totalmente personalizable: 27 detectores de spam, lectura de texto en imágenes, aprendizaje, bans compartidos entre grupos, bienvenidas, verificación y panel en Telegram.\n\n👉 Instrucciones y soporte gratuito: {url}",
   "publico.descripcion_corta": "🛡️ Antispam de código abierto. Móntate el tuyo gratis: {url}",
   "chats.empty": "Sin chats registrados todavía.",
   "recent.empty": "Sin acciones registradas.",
@@ -1233,5 +1233,10 @@
   "cfg.robadas.todos": "Todos los admins",
   "cfg.robadas.privado": "🔔 Privado: {state}",
   "cfg.robadas.elige": "\n\n<i>Toca los admins que quieres mencionar además del dueño.</i>",
-  "cmd.robadas": "Cuentas robadas: a quién se menciona y aviso por privado"
+  "cmd.robadas": "Cuentas robadas: a quién se menciona y aviso por privado",
+  "act.nueva": "🆕 <b>CazaSpamBot {nueva}</b> ya está disponible. Tienes la {actual}.\n\n<a href=\"{url}\">Qué trae de nuevo</a>\n\nPara instalarla, en la carpeta del bot en tu servidor: <code>./update.sh</code>",
+  "act.auto": "Si activaste las actualizaciones automáticas, se instalará sola esta noche.",
+  "act.mayor": "⚠️ Es una versión mayor: lee las novedades antes de instalarla, porque puede pedirte algún cambio. Las actualizaciones automáticas no la instalan.",
+  "act.hecha": "✅ CazaSpamBot actualizado a la <b>{nueva}</b> (antes, {antes}). Funciona con normalidad.",
+  "act.fallida": "⚠️ La actualización a la <b>{nueva}</b> no arrancó bien y se ha vuelto a la {actual}, que sigue protegiendo tus grupos. Las actualizaciones automáticas no volverán a intentar esa versión. Lo que pasó está en el log de <code>update.sh</code>."
 }

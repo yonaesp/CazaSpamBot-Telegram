@@ -8,7 +8,7 @@
 [![python-telegram-bot](https://img.shields.io/badge/PTB-22.8-26A5E4?logo=telegram&logoColor=white)](https://python-telegram-bot.org/)
 [![Telethon](https://img.shields.io/badge/Telethon-1.44-blueviolet)](https://docs.telethon.dev/)
 [![Idiomas](https://img.shields.io/badge/idiomas-es%20%7C%20en%20%7C%20a%C3%B1ade%20el%20tuyo-orange)](src/locales/README.md)
-[![Tests](https://img.shields.io/badge/tests-1861%20passing-success)](#tests)
+[![Tests](https://img.shields.io/badge/tests-1913%20passing-success)](#tests)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 
 🌍 [**English**](README.md) · **Español**
@@ -203,12 +203,12 @@ sed -i 's/^MODE=.*/MODE=active/' .env && sudo docker compose up -d
 | Quiero… | Comando |
 |---|---|
 | Ver qué está haciendo | `sudo docker compose logs -f` |
-| Actualizar a la última versión | `git pull && sudo docker compose up -d --build` |
+| Actualizar a la última versión | `./update.sh` (copia antes la base de datos y vuelve sola a la anterior si la nueva no arranca) |
 | Aplicar un cambio del `.env` | `sudo docker compose up -d` (`restart` no relee el `.env`) |
 | Reiniciarlo | `sudo docker compose restart` |
 | Pararlo | `sudo docker compose down` (lo de `data/` se conserva) |
 
-**Al actualizar no pierdes nada**: tu `.env`, la base de datos (`data/`) y las palabras que añadiste desde Telegram (`config/blacklist/custom/`) viven fuera de git, y lo nuevo de la base de datos se crea solo al arrancar. Si editaste a mano una lista versionada de `config/blacklist/` y git da conflicto: `git stash && git pull && git stash pop`.
+**Al actualizar no pierdes nada**: tu `.env`, la base de datos (`data/`) y las palabras que añadiste desde Telegram (`config/blacklist/custom/`) viven fuera de git, y lo nuevo de la base de datos se crea solo al arrancar. Si editaste a mano una lista que viene con el bot, `update.sh` se para y te dice cómo conservar tus cambios; tus palabras van en `config/blacklist/custom/`. El bot te avisa por privado cuando sale una versión nueva.
 
 **Haz copia** de la carpeta `data/` y del `.env`: es todo lo que necesitas para recuperarlo en otra máquina. El bot ya deja una copia diaria de la base de datos en `data/backups/` (7 días).
 
@@ -368,13 +368,16 @@ Es lo que más se esfuerza en evitar. Quien tiene historial en el grupo está pr
 Un captcha solo frena a los bots tontos al entrar. Aquí la verificación es opcional y viene apagada, porque el spam de hoy la supera y luego escribe con calma. Lo importante es mirar quién es y qué publica, también días después.
 
 **¿Mis datos salen del servidor?**
-No. El aprendizaje y el OCR son locales. Fuera de Telegram, lo único que sale son las consultas a las listas CAS y lols.bot (con el id del usuario) y, si los activas, los reportes a Telegram.
+No. El aprendizaje y el OCR son locales. Fuera de Telegram, lo único que sale son las consultas a las listas CAS y lols.bot (con el id del usuario), una consulta diaria a GitHub para saber si hay versión nueva (anónima; se apaga con `UPDATE_CHECK=false`) y, si los activas, los reportes a Telegram.
 
 **¿Es gratis? ¿Funciona en otros idiomas?**
 Sí, gratis y de código abierto (GPL-3.0). La detección no depende del idioma del grupo, la interfaz viene en español e inglés, y añadir un idioma es un archivo JSON ([guía para traductores](src/locales/README.md)).
 
 **¿Dónde pido ayuda?**
 Pregunta en [Discussions](https://github.com/yonaesp/CazaSpamBot-Telegram/discussions) o abre una [incidencia](https://github.com/yonaesp/CazaSpamBot-Telegram/issues). El soporte es gratuito.
+
+**¿Cómo puedo ayudar?**
+Contarnos que baneó a alguien legítimo vale tanto como el código: [CONTRIBUTING.md](CONTRIBUTING.md) explica cómo hacerlo y cómo añadir un idioma.
 
 ---
 
@@ -383,13 +386,14 @@ Pregunta en [Discussions](https://github.com/yonaesp/CazaSpamBot-Telegram/discus
 - Corre **sin root**, con un uid que no es de nadie en tu máquina, y con el código y la configuración en **solo lectura**.
 - Los secretos viven solo en `.env` (permisos `600`, fuera de git). La sesión de la cuenta secundaria nunca se sube.
 - La cuenta secundaria reporta con criterios estrictos (reglas concretas, puntuación alta y límite por hora) para cuidar su reputación en Telegram.
+- ¿Has encontrado una vulnerabilidad? Avisa en privado, como explica [SECURITY.md](SECURITY.md).
 
 <a id="tests"></a>
 
 ## 🧪 Tests
 
 ```bash
-.venv/bin/python -m pytest tests/ -q     # 1861 tests
+.venv/bin/python -m pytest tests/ -q     # 1913 tests
 ```
 
 Cada detector tiene tests de lo que debe cazar **y de lo que no**, con casos reales. Un falso positivo es peor que un falso negativo.

@@ -17,7 +17,7 @@ from telegram.ext import (
     filters,
 )
 
-from . import admin, barrido_bios, chat_picker, cuenta_robada, chat_settings_cmd, config_panel, errata_mencion, group_clean, lang_cmd, maintenance, notify_prefs, quienfue_cmd, recien_llegados, scan_cmd, scanuser_cmd, telethon_bridge, topweekly, verification, warns_mod
+from . import actualizaciones, admin, barrido_bios, chat_picker, cuenta_robada, chat_settings_cmd, config_panel, errata_mencion, group_clean, lang_cmd, maintenance, notify_prefs, quienfue_cmd, recien_llegados, scan_cmd, scanuser_cmd, telethon_bridge, topweekly, verification, warns_mod
 from .config import load_config
 from .db import DB
 from .handlers import (
@@ -34,6 +34,7 @@ from .handlers import (
 from .i18n import t
 from .notifier import Notifier
 from .reporter import SpamReporter
+from .version import __version__
 
 
 def _warn_telethon_requirements(cfg, telethon_ready: bool) -> None:
@@ -127,8 +128,8 @@ async def _post_init(app: Application) -> None:
 
     me = await app.bot.get_me()
     logging.getLogger("antispam").info(
-        "Bot @%s (id=%s) listo. Modo=%s. Privacy=%s. Telethon=%s. Reportes=%s",
-        me.username, me.id, cfg.mode,
+        "Bot @%s (id=%s) listo. v%s. Modo=%s. Privacy=%s. Telethon=%s. Reportes=%s",
+        me.username, me.id, __version__, cfg.mode,
         "off" if me.can_read_all_group_messages else "ON (¡desactiva en BotFather!)",
         "conectado" if reporter.is_ready() else "off",
         "activos" if reporter.reporting_ready() else "off",
@@ -151,6 +152,11 @@ async def _post_init(app: Application) -> None:
         # Cada 5 min: sugerencias «¿quizás te referías a @x?» vencidas que un
         # reinicio dejó sin su borrado programado.
         app.job_queue.run_repeating(errata_mencion.barrido_job, interval=300, first=120)
+        # Versiones (L51): al minuto, cómo fue la actualización que acaba de hacer
+        # update.sh; a los 10 min y cada día, si hay una versión nueva que avisar.
+        app.job_queue.run_once(actualizaciones.informar_job, when=60)
+        app.job_queue.run_repeating(actualizaciones.comprobar_job, interval=86400, first=600,
+                                    name="actualizaciones")
         # Cada 24h: cleanup nightly de tablas viejas (reaction_events, gentle_warnings,
         # pending_verifications, cas_cache, suppressions)
         app.job_queue.run_repeating(maintenance.cleanup_nightly_job, interval=86400, first=3600)

@@ -245,8 +245,8 @@
   "forget.done": "🗑️ Sample #{sid} deleted.",
   "forget.notfound": "#{sid} doesn't exist.",
   "dm.hint": "👋 Hi. I'm <b>CazaSpamBot</b>, your moderation bot.\n\nI only answer commands. Use /help for the full list,\nor /start for a quick status summary.",
-  "publico.dm": "👋 Hi! I'm <b>CazaSpamBot</b>, the private antispam bot of a few specific groups. If you add me to your group I won't work there.\n\n✨ But I'm <b>open source and free</b>: you can run your own copy on your server and customise it as you like.\n\n🛡️ 21 spam detectors (scams, ads, fake profiles…)\n🔍 Reads the text inside images\n🧠 Learns from your decisions\n🌐 Linked groups: a ban in one applies to all\n👋 Welcomes and new member verification\n⚙️ Everything from a panel in Telegram, in English or Spanish\n\n👉 Setup guide and free support: {url}",
-  "publico.descripcion": "🛡️ Private antispam bot for a few specific groups: if you add it to your group it will NOT work there.\n\n✨ It's open source and free. Run your own fully customisable copy on your server: 21 spam detectors, text reading in images, learning, bans shared across groups, welcomes, verification and an in-Telegram panel.\n\n👉 Setup guide and free support: {url}",
+  "publico.dm": "👋 Hi! I'm <b>CazaSpamBot</b>, the private antispam bot of a few specific groups. If you add me to your group I won't work there.\n\n✨ But I'm <b>open source and free</b>: you can run your own copy on your server and customise it as you like.\n\n🛡️ 27 spam detectors (scams, ads, fake profiles…)\n🔍 Reads the text inside images\n🧠 Learns from your decisions\n🌐 Linked groups: a ban in one applies to all\n👋 Welcomes and new member verification\n⚙️ Everything from a panel in Telegram, in English or Spanish\n\n👉 Setup guide and free support: {url}",
+  "publico.descripcion": "🛡️ Private antispam bot for a few specific groups: if you add it to your group it will NOT work there.\n\n✨ It's open source and free. Run your own fully customisable copy on your server: 27 spam detectors, text reading in images, learning, bans shared across groups, welcomes, verification and an in-Telegram panel.\n\n👉 Setup guide and free support: {url}",
   "publico.descripcion_corta": "🛡️ Open source antispam. Run your own for free: {url}",
   "chats.empty": "No chats registered yet.",
   "recent.empty": "No actions logged.",
@@ -1233,5 +1233,10 @@
   "cfg.robadas.todos": "All admins",
   "cfg.robadas.privado": "🔔 Private: {state}",
   "cfg.robadas.elige": "\n\n<i>Tap the admins you want to mention besides the owner.</i>",
-  "cmd.robadas": "Stolen accounts: who is mentioned and private notice"
+  "cmd.robadas": "Stolen accounts: who is mentioned and private notice",
+  "act.nueva": "🆕 <b>CazaSpamBot {nueva}</b> is out. You have {actual}.\n\n<a href=\"{url}\">What's new</a>\n\nTo install it, in the bot's folder on your server: <code>./update.sh</code>",
+  "act.auto": "If you turned on automatic updates, it will install itself tonight.",
+  "act.mayor": "⚠️ This is a major version: read what's new before installing it, as it may ask you to change something. Automatic updates won't install it.",
+  "act.hecha": "✅ CazaSpamBot updated to <b>{nueva}</b> (was {antes}). Running normally.",
+  "act.fallida": "⚠️ The update to <b>{nueva}</b> didn't start properly, so it went back to {actual}, which keeps protecting your groups. Automatic updates won't try that version again. The details are in the <code>update.sh</code> log."
 }

@@ -1,0 +1,36 @@
+# CazaSpamBot with the published image: nothing to build, works on x86 and on ARM
+# (Raspberry Pi 3, 4, 5 and Zero 2 W with a 64-bit system). Save it as
+# docker-compose.yml in an empty folder, next to your .env. See the README, "Install".
+#
+# `:1` follows every 1.x version: updates never jump to a new major version, which
+# may ask you to change something. Update with ./update.sh (or ./update.sh --auto).
+services:
+  antispam-bot:
+    image: ghcr.io/yonaesp/cazaspambot:1
+    container_name: cazaspam-bot
+    restart: unless-stopped
+    # Runs without root, as a uid nobody owns on your machine. Create the folders
+    # with: sudo install -d -o 10112 -g 10112 data custom
+    user: "${APP_UID:-10112}:${APP_GID:-10112}"
+    env_file: .env
+    environment:
+      - TZ=${TZ:-Europe/Madrid}
+    volumes:
+      # Database, the secondary account's session and daily backups.
+      - ./data:/app/data
+      # The words you add from Telegram.
+      - ./custom:/app/config/blacklist/custom
+      # Optional: your own welcomes. Copy the repo's config/welcomes/ folder to
+      # ./welcomes, edit it (one <chat_id>.txt per group) and uncomment this line.
+      # - ./welcomes:/app/config/welcomes:ro
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import os,time; p='/app/data/heartbeat'; exit(0 if os.path.exists(p) and time.time()-os.path.getmtime(p)<300 else 1)\""]
+      interval: 2m
+      timeout: 10s
+      retries: 3
+      start_period: 1m
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"

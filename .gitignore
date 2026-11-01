@@ -72,3 +72,8 @@ Thumbs.db
 # Histórico local del trafico del repo en GitHub (dato del despliegue, se acumula
 # con scripts/traffic_log.py). No es del codigo, no se versiona.
 traffic/
+
+# update.sh: su cerrojo y la versión que falló (no se reintenta de noche)
+.update.lock
+.update-failed
+update.log
