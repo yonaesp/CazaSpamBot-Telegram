@@ -1,6 +1,6 @@
 # CazaSpamBot — Bot Antispam Telegram
 
-Bot de moderación antispam **en producción 24/7**, multi-grupo, federado y **bilingüe** (es/en). ~23.000 LOC en `src/`, Podman, **1859 tests**, 27 detectores (un módulo cada uno en `src/detectors/`).
+Bot de moderación antispam **en producción 24/7**, multi-grupo, federado y **bilingüe** (es/en). ~23.000 LOC en `src/`, Podman, **1860 tests**, 27 detectores (un módulo cada uno en `src/detectors/`).
 
 > **Estado: PRODUCCIÓN.** No es un esqueleto. Cualquier cambio afecta grupos reales con miles de usuarios. **Investiga > Confirma > Actúa.**
 
@@ -250,4 +250,4 @@ GitHub guarda solo 14 días: `scripts/traffic_log.py` los acumula en `traffic/hi
 
 Lo nuevo va en su apartado temático de este fichero como invariante de 1-3 líneas (qué no hacer, el número medido, el test que lo fija), nunca al final por fecha. El relato (el caso, la medida, lo que se probó) va a `docs/lecciones.md` como lección nueva, con su línea en el índice, y aquí se cita con `(Ln)`. Un procedimiento de varios pasos que se usa a veces, a una skill en `.claude/skills/`. Las preferencias del admin y el estado del trabajo, a la memoria.
 
-*Actualizado: 2026-11-01 — 27 detectores, 1859 tests, 1.235 claves por idioma.*
+*Actualizado: 2026-11-01 — 27 detectores, 1860 tests, 1.235 claves por idioma.*
