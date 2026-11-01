@@ -232,8 +232,8 @@ Un ban manual de otro admin en el aviso es una pista de que el bot falló: averi
 .venv/bin/python -m pytest tests/ -q          # suite completa
 .venv/bin/ruff check src/ tests/
 sudo -n docker compose restart                # up -d si cambia .env; si cambia requirements, build --no-cache + up -d
-sudo -n docker logs cazaspam-bot --tail 5     # verificar "Bot ... listo"
-git add -A && git commit -m "..." && git push
+sudo -n docker logs --tail 5 cazaspam-bot     # verificar "Bot ... listo"; las opciones ANTES del nombre (--since detrás: «no container --since»)
+git add -A && git commit -m "..." && git push   # nunca tras `pytest | tail`: el tail se traga el rc y el commit sale con la suite en rojo (1-nov)
 ```
 
 **`restart` recarga el código (src/ montado por volumen) pero no el `.env`**: para eso hace falta `up -d`, y para las dependencias, recompilar (se instalan al construir la imagen). ⚠️ **Compilar a mano, siempre `podman pull` de la base + `build --no-cache`, dentro del `flock`**: con caché, el `apt-get upgrade` salió de una capa vieja y el parche de pyasn1 del 31-oct devolvió libbrotli1 sin su arreglo (CVE crítica); `parcheo-auto` ya compila así.
@@ -243,6 +243,8 @@ git add -A && git commit -m "..." && git push
 `docs/ARCHITECTURE.md`, `docs/ECOSYSTEM.md`, `docs/ROADMAP.md`, `docs/LEARNING.md`. `docs/lecciones.md` (el relato de cada regla, `Ln`). `CHANGELOG.md` (hitos por fecha, lo más reciente arriba). `src/locales/README.md` (traductores) · `config/blacklist/README.md` (listas) · `config/welcomes/README.md`.
 
 ## Tráfico del repo (visitas y clones)
+
+Web (SEO): el código vive en `site/` (en/es, `og.png` 1280×640) y se publica en la rama `gh-pages` con `git subtree split --prefix site -b tmp && git push -f origin tmp:gh-pages`; sin workflow, porque el token no tiene ese permiso. Sin rayas ni cifras que no salgan del README.
 
 GitHub guarda solo 14 días: `scripts/traffic_log.py` los acumula en `traffic/history.json` (gitignored) y hay que pasarlo un par de veces al mes. Receta, permisos del token y `GH_TOKEN`: skill `trafico-repo`.
 

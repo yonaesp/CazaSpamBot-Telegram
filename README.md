@@ -13,7 +13,7 @@
 
 🌍 **English** · [**Español**](README.es.md)
 
-**[What makes it different](#different)** · **[Install in 5 minutes](#install)** · **[FAQ](#faq)**
+**[What makes it different](#different)** · **[Install in 5 minutes](#install)** · **[FAQ](#faq)** · **[Website](https://yonaesp.github.io/CazaSpamBot-Telegram/)**
 
 </div>
 
@@ -75,6 +75,8 @@ The account **doesn't give itself away**: reading a story or a channel doesn't c
 🔗 **Banned in one, banned in all your groups.** It also checks the worldwide spammer lists [CAS](https://cas.chat) and lols.bot, and can report clear spam to Telegram if you want.
 
 🤝 **Respects normal people.** Every member has a trust level from 1 to 10 based on their history in the group. Doubtful cases reach you **in private, with buttons** (✅ Legit / ❌ Spam) and update themselves if the author fixes the message by editing. You can start in **test mode**, banning no one, to see what it would do. And when someone mistypes another member's @ (`@Moliko` for `@Molkio`), it doesn't treat it as a suspicious mention: it asks "Did you mean @Molkio?" and deletes the question as soon as they fix it.
+
+🔐 **Spots stolen accounts.** A member who used to write, went quiet for months and comes back with a spam bio is banned in all your groups for safety. The group is told not to answer its private messages and whom to write to if it's a mistake, and you get a button to undo it. The links of banned spammers are learned too (a specific site, channel or invite, never YouTube or Instagram), so the next profile or message carrying them doesn't get through.
 
 🌍 **For any community.** Ships in Spanish and English, and another language is one JSON file. You choose which alphabets are normal in your group.
 
@@ -373,7 +375,7 @@ No. Learning and OCR run locally. Outside Telegram, the only things that go out 
 Yes, free and open source (GPL-3.0). Detection doesn't depend on the group's language, the interface ships in Spanish and English, and adding a language is one JSON file ([translator guide](src/locales/README.md)).
 
 **Where can I get help?**
-Open an [issue on GitHub](https://github.com/yonaesp/CazaSpamBot-Telegram/issues). Support is free.
+Ask in [Discussions](https://github.com/yonaesp/CazaSpamBot-Telegram/discussions) or open an [issue](https://github.com/yonaesp/CazaSpamBot-Telegram/issues). Support is free.
 
 ---
 

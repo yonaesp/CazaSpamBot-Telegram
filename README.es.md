@@ -13,7 +13,7 @@
 
 🌍 [**English**](README.md) · **Español**
 
-**[Qué lo hace distinto](#distinto)** · **[Instalar en 5 minutos](#instalacion)** · **[Preguntas frecuentes](#faq)**
+**[Qué lo hace distinto](#distinto)** · **[Instalar en 5 minutos](#instalacion)** · **[Preguntas frecuentes](#faq)** · **[Web](https://yonaesp.github.io/CazaSpamBot-Telegram/es/)**
 
 </div>
 
@@ -75,6 +75,8 @@ La cuenta **no se delata**: leer una historia o un canal no cuenta como visualiz
 🔗 **Ban en uno, ban en todos tus grupos.** Además consulta las listas mundiales de spammers [CAS](https://cas.chat) y lols.bot, y si quieres reporta el spam claro a Telegram.
 
 🤝 **Respeta a la gente normal.** Cada miembro tiene una confianza del 1 al 10 según su historial en el grupo. Lo dudoso te llega **por privado con botones** (✅ Legítimo / ❌ Spam) y se actualiza solo si el autor lo corrige editando. Se puede arrancar en **modo prueba**, sin banear a nadie, para ver qué haría. Y si alguien escribe mal el @ de otro miembro (`@Moliko` por `@Molkio`), no lo toma por una mención sospechosa: le pregunta «¿Quizás te referías a @Molkio?» y borra la pregunta en cuanto lo corrige.
+
+🔐 **Detecta cuentas robadas.** Un miembro que escribía, llevaba meses callado y aparece con la bio de spam se banea en todos tus grupos por seguridad. En el grupo se avisa de que no hagan caso a sus privados y a quién escribir si es un error, y a ti te llega un botón para deshacerlo. También aprende los enlaces de los spammers baneados (una web, un canal o una invitación concretos, nunca YouTube o Instagram), así que el siguiente perfil o mensaje que los lleve ya no pasa.
 
 🌍 **Para cualquier comunidad.** Viene en español e inglés y otro idioma es un archivo JSON. Tú eliges qué alfabetos son normales en tu grupo.
 
@@ -372,7 +374,7 @@ No. El aprendizaje y el OCR son locales. Fuera de Telegram, lo único que sale s
 Sí, gratis y de código abierto (GPL-3.0). La detección no depende del idioma del grupo, la interfaz viene en español e inglés, y añadir un idioma es un archivo JSON ([guía para traductores](src/locales/README.md)).
 
 **¿Dónde pido ayuda?**
-Abre una [incidencia en GitHub](https://github.com/yonaesp/CazaSpamBot-Telegram/issues). El soporte es gratuito.
+Pregunta en [Discussions](https://github.com/yonaesp/CazaSpamBot-Telegram/discussions) o abre una [incidencia](https://github.com/yonaesp/CazaSpamBot-Telegram/issues). El soporte es gratuito.
 
 ---
 
