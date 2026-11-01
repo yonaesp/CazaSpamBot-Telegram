@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CazaSpamBot: free open source anti-spam bot for Telegram</title>
+<meta name="description" content="Stop crypto scams, porn bots and phishing in your Telegram groups. A free, open source, self-hosted anti-spam bot that checks who posts, not just what.">
+<link rel="canonical" href="https://yonaesp.github.io/CazaSpamBot-Telegram/">
+<link rel="alternate" hreflang="en" href="https://yonaesp.github.io/CazaSpamBot-Telegram/">
+<link rel="alternate" hreflang="es" href="https://yonaesp.github.io/CazaSpamBot-Telegram/es/">
+<link rel="alternate" hreflang="x-default" href="https://yonaesp.github.io/CazaSpamBot-Telegram/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="CazaSpamBot">
+<meta property="og:title" content="CazaSpamBot: free open source anti-spam bot for Telegram">
+<meta property="og:description" content="Checks who is posting, not just what they post. Self-hosted, English and Spanish.">
+<meta property="og:url" content="https://yonaesp.github.io/CazaSpamBot-Telegram/">
+<meta property="og:image" content="https://yonaesp.github.io/CazaSpamBot-Telegram/og.png">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:locale" content="en_US">
+<meta property="og:locale:alternate" content="es_ES">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#1e1e2e">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="estilo.css">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "CazaSpamBot",
+  "description": "Free, open source anti-spam bot for Telegram groups. Checks the sender's profile, the text inside images and shared stories, not just the message.",
+  "applicationCategory": "SecurityApplication",
+  "operatingSystem": "Linux",
+  "isAccessibleForFree": true,
+  "offers": {"@type": "Offer", "price": "0", "priceCurrency": "EUR"},
+  "license": "https://www.gnu.org/licenses/gpl-3.0.html",
+  "inLanguage": ["en", "es"],
+  "url": "https://yonaesp.github.io/CazaSpamBot-Telegram/",
+  "sameAs": "https://github.com/yonaesp/CazaSpamBot-Telegram"
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {"@type": "Question", "name": "Can I just add @CazaSpamBot to my group?",
+     "acceptedAnswer": {"@type": "Answer", "text": "No: that copy is private and only moderates its owner's groups. The code is free, so you run your own bot with your own token, and it's fully yours. It takes about 5 minutes."}},
+    {"@type": "Question", "name": "Will it ban legitimate members?",
+     "acceptedAnswer": {"@type": "Answer", "text": "That's what it tries hardest to avoid. Members with history in the group are protected by their trust level, doubtful cases reach you with buttons instead of ending in a ban, and you can start in test mode."}},
+    {"@type": "Question", "name": "How is it different from a captcha bot?",
+     "acceptedAnswer": {"@type": "Answer", "text": "A captcha only stops dumb bots at the door. Today's spam gets past it and then posts at leisure. CazaSpamBot looks at who they are and what they post, days later too."}},
+    {"@type": "Question", "name": "Does my data leave my server?",
+     "acceptedAnswer": {"@type": "Answer", "text": "No. Learning and OCR run locally. Outside Telegram, the only things that go out are lookups to the CAS and lols.bot spammer lists and, if you turn them on, reports to Telegram."}},
+    {"@type": "Question", "name": "Is it free?",
+     "acceptedAnswer": {"@type": "Answer", "text": "Yes, free and open source under the GPL-3.0 license. The interface ships in English and Spanish, and adding a language is one JSON file."}}
+  ]
+}
+</script>
+</head>
+<body>
+<header>
+  <nav>
+    <a class="marca" href="./">🛡️ CazaSpamBot</a>
+    <a class="idioma" href="es/" hreflang="es" lang="es">Español</a>
+  </nav>
+</header>
+<main>
+  <div class="hero">
+    <h1>Free anti-spam bot for Telegram groups</h1>
+    <p class="lema">Checks who is posting, not just what they post. Open source, runs on your own server, in English and Spanish.</p>
+    <div class="botones">
+      <a class="boton" href="https://github.com/yonaesp/CazaSpamBot-Telegram#install">Install in 5 minutes</a>
+      <a class="boton secundario" href="https://github.com/yonaesp/CazaSpamBot-Telegram">View on GitHub</a>
+    </div>
+  </div>
+
+  <section aria-labelledby="cifras">
+    <h2 id="cifras">In production</h2>
+    <div class="cifras">
+      <div class="cifra"><b>1,300+</b><span>suspicious or spam accounts removed on its own</span></div>
+      <div class="cifra"><b>9 in 10</b><span>caught before they wrote a single word</span></div>
+      <div class="cifra"><b>41 → 4-5</b><span>bans the admins had to make by hand each month (May vs. now)</span></div>
+    </div>
+    <p class="nota">Reference install: 4 groups, May to October 2026.</p>
+  </section>
+
+  <section aria-labelledby="diferencia">
+    <h2 id="diferencia">Why it catches more spam than a regular bot</h2>
+    <p>A Telegram bot only sees the message. With an optional secondary account that you authorize, CazaSpamBot also sees <strong>who wrote it</strong>.</p>
+    <table class="tabla">
+      <thead><tr><th>What it checks</th><th>A regular bot</th><th>CazaSpamBot</th></tr></thead>
+      <tbody>
+        <tr><td>The message text</td><td class="si">✓</td><td class="si">✓</td></tr>
+        <tr><td>The profile bio</td><td class="no">✗</td><td class="si">✓</td></tr>
+        <tr><td>The profile's personal channel</td><td class="no">✗</td><td class="si">✓</td></tr>
+        <tr><td>When each profile photo was uploaded</td><td class="no">✗</td><td class="si">✓</td></tr>
+        <tr><td>What a shared story says</td><td class="no">✗</td><td class="si">✓</td></tr>
+        <tr><td>The text inside images (OCR)</td><td class="no">✗</td><td class="si">✓</td></tr>
+      </tbody>
+    </table>
+    <p class="nota">On the reference install, 165 spammers were given away by their profile alone.</p>
+  </section>
+
+  <section aria-labelledby="funciones">
+    <h2 id="funciones">What it does</h2>
+    <div class="rejilla">
+      <div class="tarjeta"><h3>🖼️ Reads text in images</h3><p>A poster with "message me privately" has no typed letters. The bot reads it with OCR, without a GPU, in 0.6 s.</p></div>
+      <div class="tarjeta"><h3>💸 Understands the scam</h3><p>The "I gave 500 and got 5,000 back" testimonial, the fake happy customer, the crypto giveaway that sends you elsewhere.</p></div>
+      <div class="tarjeta"><h3>🎭 Sees through the disguise</h3><p>Joining with a normal name and switching it before posting: it watches newcomers for 7 days.</p></div>
+      <div class="tarjeta"><h3>🔐 Spots stolen accounts</h3><p>A member who went quiet for months and comes back with a spam bio is banned for safety, and the group is told why.</p></div>
+      <div class="tarjeta"><h3>🧠 Learns on its own</h3><p>From your decisions, from safe bans and from the links of banned spammers. No external AI: it all stays on your server.</p></div>
+      <div class="tarjeta"><h3>🔗 Banned in one, banned in all</h3><p>One ban covers all your groups, and it checks the worldwide CAS and lols.bot spammer lists.</p></div>
+      <div class="tarjeta"><h3>🤝 Respects normal people</h3><p>Trust levels from 1 to 10, doubtful cases in private with buttons, and a test mode that bans no one.</p></div>
+      <div class="tarjeta"><h3>🌍 For any community</h3><p>English and Spanish built in, any other language is one JSON file. You choose the alphabets your group uses.</p></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="instalar">
+    <h2 id="instalar">Install it on your server</h2>
+    <p>You need a Linux machine that stays on (a cheap VPS, a mini PC or a home server). It uses less than 100 MB of RAM.</p>
+    <ol class="pasos">
+      <li>Create your bot with <code>@BotFather</code> and get your Telegram user id.</li>
+      <li>Install Docker, download the code and fill in <code>.env</code>.</li>
+      <li>Start it with <code>docker compose up -d</code> and add it as admin to your groups.</li>
+    </ol>
+    <p><a href="https://github.com/yonaesp/CazaSpamBot-Telegram#install">Step-by-step guide on GitHub</a></p>
+  </section>
+
+  <section aria-labelledby="faq">
+    <h2 id="faq">FAQ</h2>
+    <details><summary>Can I just add @CazaSpamBot to my group?</summary><p>No: that copy is private and only moderates its owner's groups. The code is free, so you run your own bot with your own token, and it's fully yours. It takes about 5 minutes.</p></details>
+    <details><summary>Will it ban legitimate members?</summary><p>That's what it tries hardest to avoid. Members with history in the group are protected by their trust level, doubtful cases reach you with buttons instead of ending in a ban, and you can start in test mode.</p></details>
+    <details><summary>How is it different from a captcha bot?</summary><p>A captcha only stops dumb bots at the door. Today's spam gets past it and then posts at leisure. CazaSpamBot looks at who they are and what they post, days later too.</p></details>
+    <details><summary>Does my data leave my server?</summary><p>No. Learning and OCR run locally. Outside Telegram, the only things that go out are lookups to the CAS and lols.bot spammer lists and, if you turn them on, reports to Telegram.</p></details>
+    <details><summary>Is it free?</summary><p>Yes, free and open source under the GPL-3.0 license. The interface ships in English and Spanish, and adding a language is one JSON file.</p></details>
+  </section>
+</main>
+<footer>
+  <p>CazaSpamBot is free software under the <a href="https://github.com/yonaesp/CazaSpamBot-Telegram/blob/main/LICENSE">GPL-3.0</a> license. · <a href="https://github.com/yonaesp/CazaSpamBot-Telegram">GitHub</a> · <a href="https://github.com/yonaesp/CazaSpamBot-Telegram/discussions">Discussions</a> · <a href="es/" hreflang="es" lang="es">Español</a></p>
+</footer>
+</body>
+</html>

@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://yonaesp.github.io/CazaSpamBot-Telegram/sitemap.xml
