@@ -18,6 +18,7 @@ KNOWN_RULES: frozenset[str] = frozenset({
     "cuenta_robada",
     "photos_batch_upload",
     "personal_channel_spam",
+    "posts_spam",
     "premium_new_link",
     "story_share",
     "han_pending_review",

@@ -1234,6 +1234,19 @@ async def on_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 )
                 return
 
+        # Los «Posts» del perfil (historias fijadas), con OCR de las fotos. En una
+        # tarea aparte: son varios segundos y aquí congelarían el bot entero (PTB
+        # procesa los updates de uno en uno). El join sigue su camino; si los posts
+        # son un catálogo de spam, la tarea banea por su cuenta. Caso ZERO.
+        if (sig_pre is not None and getattr(sig_pre, "tiene_posts", False)
+                and client_pre is not None):
+            from . import recien_llegados
+            context.application.create_task(
+                recien_llegados.revisar_posts_aparte(
+                    context, cmu.chat, user, sig_pre, client_pre),
+                update=None,
+            )
+
     session: aiohttp.ClientSession = context.bot_data.get("http")
     # Lookup en lols.bot (complementario a CAS, gratis)
     if cfg.lols_enabled and session is not None:
@@ -2020,6 +2033,18 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
                     ))
                 except Exception as exc:  # noqa: BLE001
                     log.debug("canal personal en primer mensaje user=%s: %s", user.id, exc)
+            # Los posts del perfil, igual que en el join: en una tarea aparte, porque
+            # con OCR son segundos. Si el join fue hace menos de una hora, la lectura
+            # sale de la caché de `posts_reader` y no cuesta nada.
+            if (sig_perfil is not None and getattr(sig_perfil, "tiene_posts", False)
+                    and client_perfil is not None):
+                from . import recien_llegados
+                context.application.create_task(
+                    recien_llegados.revisar_posts_aparte(
+                        context, msg.chat, user, sig_perfil, client_perfil,
+                        via="primer_mensaje"),
+                    update=None,
+                )
 
     # 3d ter) EL TEXTO QUE VA DENTRO DE LA IMAGEN.
     #

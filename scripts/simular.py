@@ -318,6 +318,8 @@ async def escenas(s: Sim) -> None:
     await s.escena("Dos personas pegan el mismo error (1/2)", c1, _nuevo(30, "Jorge Peña", "jorgep"), [(15, error)], None)
     await s.escena("Dos personas pegan el mismo error (2/2)", c4, _nuevo(31, "Elena Sanz", "elenasanz"), [(20, error)], None)
 
+    await escenas_posts(s, c3)
+
     # Ban manual de otro admin y los botones del aviso (L47).
     from src import handlers
     print("\n== Otro admin banea a mano y pulsas «Banear en todos» ==")
@@ -347,6 +349,54 @@ async def escenas(s: Sim) -> None:
         ll = await _pulsa()
         _comprueba(s, "la segunda pulsación no repite el ban",
                    not any(ep == "banChatMember" for ep, _ in ll))
+
+
+async def escenas_posts(s: Sim, cid: int) -> None:
+    """Los «Posts» del perfil (L52): entra y no escribe nada; lo que cuenta es lo que
+    tiene fijado en el perfil. Telethon está apagado en la simulación, así que aquí
+    se imitan las dos lecturas que haría (perfil y posts) y nada más."""
+    from src import posts_reader, user_signals
+    from src import recien_llegados as rl
+    posts_de = {
+        # ZERO (1-nov-2026): pies y OCR reales, recortados.
+        _nuevo(50, "ZERO", "zerotrace505")["id"]: [
+            "La recuperación del dinero aquí está asegurada", "Activo para tu servicio",
+            "Vincula WhatsApp a tu dispositivo y espía", "Espionaje🎭",
+            "NUESTRO SERVICIO Y) Recuperación de estafas de criptomonedas Y) Recuperación de "
+            "billeteras perdidas"],
+        # Persona normal de un grupo de informática, con posts.
+        _nuevo(51, "Iván Ortega", "ivanort")["id"]: [
+            "Mi setup nuevo 🖥️", "Cuando el hacker de la peli entra en el Pentágono con 3 líneas",
+            "Nuestros servicios: reparación de ordenadores. Contáctanos", "Domingo de playa"],
+    }
+    fetch_real, leer_real, espera_real = user_signals.fetch, posts_reader.leer, rl._ESPERA_JOIN_S
+    reporter_real = s.app.bot_data["reporter"]
+
+    async def fetch(client, user_id, **kw):
+        return user_signals.UserSignals(user_id=user_id, photo_count=1,
+                                        tiene_posts=user_id in posts_de, entidad=object())
+
+    async def leer(client, entidad, user_id):
+        return [posts_reader.Post(id=i, pie=x) for i, x in enumerate(posts_de.get(user_id, []))]
+
+    user_signals.fetch, posts_reader.leer, rl._ESPERA_JOIN_S = fetch, leer, 0.2
+    s.app.bot_data["reporter"] = types.SimpleNamespace(get_client=lambda: object(),
+                                                       is_ready=lambda: False)
+    try:
+        for i, nombre, username, esperada in ((50, "ZERO", "zerotrace505", "ban"),
+                                              (51, "Iván Ortega", "ivanort", None)):
+            print(f"\n== Posts del perfil: {nombre} entra y no escribe ==")
+            u = _nuevo(i, nombre, username)
+            t0, antes = RELOJ[0], len(LLAMADAS)
+            await s.entra(cid, u)
+            await asyncio.sleep(0.6)           # la tarea aparte que lanza el join
+            _detalle_llamadas(LLAMADAS[antes:])
+            accion, detalle = s.accion(cid, u["id"], t0)
+            _comprueba(s, f"{nombre}: {accion or 'nada'}{f' [{detalle}]' if detalle else ''}"
+                          f" (se esperaba {esperada or 'nada'})", accion == esperada)
+    finally:
+        user_signals.fetch, posts_reader.leer, rl._ESPERA_JOIN_S = fetch_real, leer_real, espera_real
+        s.app.bot_data["reporter"] = reporter_real
 
 
 def _comprueba(s: Sim, que: str, ok: bool) -> None:

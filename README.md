@@ -8,7 +8,7 @@
 [![python-telegram-bot](https://img.shields.io/badge/PTB-22.8-26A5E4?logo=telegram&logoColor=white)](https://python-telegram-bot.org/)
 [![Telethon](https://img.shields.io/badge/Telethon-1.44-blueviolet)](https://docs.telethon.dev/)
 [![Languages](https://img.shields.io/badge/languages-es%20%7C%20en%20%7C%20add%20yours-orange)](src/locales/README.md)
-[![Tests](https://img.shields.io/badge/tests-1913%20passing-success)](#tests)
+[![Tests](https://img.shields.io/badge/tests-1942%20passing-success)](#tests)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 
 🌍 **English** · [**Español**](README.es.md)
@@ -81,7 +81,7 @@ The account **doesn't give itself away**: reading a story or a channel doesn't c
 🌍 **For any community.** Ships in Spanish and English, and another language is one JSON file. You choose which alphabets are normal in your group.
 
 <details>
-<summary><b>🔍 See the 27 detectors</b></summary>
+<summary><b>🔍 See the 28 detectors</b></summary>
 
 <br>
 
@@ -113,6 +113,7 @@ The account **doesn't give itself away**: reading a story or a channel doesn't c
 | `story_share` | Sharing another channel's story right after joining (no secondary account needed) |
 | `bio_spam` 🔑 | Bio promoting porn, commercial or hacking services |
 | `personal_channel` 🔑 | The profile's channel used as a spam shopfront |
+| `posts_perfil` 🔑 | The profile's «Posts» (pinned stories, also read inside the pictures) used as a catalogue of illegal services |
 | `photos_batch` 🔑 | Several profile photos uploaded within minutes: a built account |
 | `cas` · `lols_bot` | Spammers flagged on the worldwide lists |
 
@@ -394,7 +395,7 @@ Telling us about a legitimate member it banned is as useful as code: [CONTRIBUTI
 ## 🧪 Tests
 
 ```bash
-.venv/bin/python -m pytest tests/ -q     # 1913 tests
+.venv/bin/python -m pytest tests/ -q     # 1942 tests
 ```
 
 Every detector has tests for what it must catch **and what it must not**, built from real cases. A false positive is worse than a false negative.

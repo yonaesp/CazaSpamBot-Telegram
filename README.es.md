@@ -8,7 +8,7 @@
 [![python-telegram-bot](https://img.shields.io/badge/PTB-22.8-26A5E4?logo=telegram&logoColor=white)](https://python-telegram-bot.org/)
 [![Telethon](https://img.shields.io/badge/Telethon-1.44-blueviolet)](https://docs.telethon.dev/)
 [![Idiomas](https://img.shields.io/badge/idiomas-es%20%7C%20en%20%7C%20a%C3%B1ade%20el%20tuyo-orange)](src/locales/README.md)
-[![Tests](https://img.shields.io/badge/tests-1913%20passing-success)](#tests)
+[![Tests](https://img.shields.io/badge/tests-1942%20passing-success)](#tests)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 
 🌍 [**English**](README.md) · **Español**
@@ -81,7 +81,7 @@ La cuenta **no se delata**: leer una historia o un canal no cuenta como visualiz
 🌍 **Para cualquier comunidad.** Viene en español e inglés y otro idioma es un archivo JSON. Tú eliges qué alfabetos son normales en tu grupo.
 
 <details>
-<summary><b>🔍 Ver los 27 detectores</b></summary>
+<summary><b>🔍 Ver los 28 detectores</b></summary>
 
 <br>
 
@@ -113,6 +113,7 @@ La cuenta **no se delata**: leer una historia o un canal no cuenta como visualiz
 | `story_share` | Compartir la historia de otro canal nada más entrar (sin cuenta secundaria) |
 | `bio_spam` 🔑 | Bio con promoción porno, comercial o de hacking |
 | `personal_channel` 🔑 | El canal del perfil usado como escaparate de spam |
+| `posts_perfil` 🔑 | Los «Posts» del perfil (historias fijadas, leídas también dentro de la imagen) usados como catálogo de servicios ilegales |
 | `photos_batch` 🔑 | Varias fotos de perfil subidas en minutos: cuenta montada |
 | `cas` · `lols_bot` | Spammers fichados en las listas mundiales |
 
@@ -393,7 +394,7 @@ Contarnos que baneó a alguien legítimo vale tanto como el código: [CONTRIBUTI
 ## 🧪 Tests
 
 ```bash
-.venv/bin/python -m pytest tests/ -q     # 1913 tests
+.venv/bin/python -m pytest tests/ -q     # 1942 tests
 ```
 
 Cada detector tiene tests de lo que debe cazar **y de lo que no**, con casos reales. Un falso positivo es peor que un falso negativo.

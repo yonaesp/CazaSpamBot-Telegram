@@ -11,3 +11,22 @@ robo\s+de\s+(?:cuentas?|datos)
 espionaje
 spyware
 recupera(?:r|ci[oó]n)\s+(?:cuentas?|contrase[ñn]as?|dinero)
+
+# --- Servicios a terceros anunciados en el perfil (1-nov-2026, «ZERO») ---
+# Sus posts fijados ofrecían «Recuperación de estafas de criptomonedas», «La
+# recuperación del dinero aquí está asegurada», «Vincula WhatsApp a tu dispositivo
+# y espía» y «clonación WhatsApp». La línea de arriba pedía «recuperación dinero»,
+# sin el «de», y «espía» con tilde no casaba con nada.
+recuperaci[oó]n\s+de(?:l)?\s+(?:tu\s+|su\s+)?(?:dinero|fondos|criptomonedas?|billeteras?|inversiones|estafas?)
+esp[ií]a(?:r)?\s+(?:el\s+|su\s+|tu\s+|a\s+tu\s+)?(?:whatsapp|m[oó]vil|tel[eé]fono|celular|pareja|novi[oa])
+whatsapp[\s\S]{0,40}\sy\s+esp[ií]a(?:r)?
+clonaci[oó]n\s+(?:de\s+)?(?:whatsapp|tarjetas?|sim)
+# Medido el 2-nov-2026 en los posts de tres cuentas ya baneadas de la misma familia:
+# «Contáctame para recuperar tu dinero», «Recuperar Facebook», «WhatsApp HACKEADO»,
+# «Hackear Snapchat», «Pirater WhatsApp» y «¿Está su pareja mintiéndole?».
+recuperar\s+(?:tu|su)\s+(?:dinero|fondos|cuentas?)
+recupera(?:r|ci[oó]n\s+de)\s+(?:tu\s+|su\s+)?(?:cuenta\s+de\s+)?(?:facebook|instagram|whatsapp|tiktok|snapchat|gmail|telegram)
+(?:hackear|hackeo\s+de|hackeamos|piratear|pirater)\s+(?:el\s+|tu\s+|su\s+|la\s+)?(?:cuentas?\s+de\s+)?(?:facebook|instagram|whatsapp|tiktok|snapchat|twitter|messenger|gmail|telegram)
+(?:facebook|instagram|whatsapp|tiktok|snapchat|twitter|messenger|gmail|telegram)\s+hackead[oa]s?
+(?:tu|su)\s+pareja\s+(?:te|le)\s+(?:engaña|es\s+infiel|miente)
+est[aá]\s+(?:tu|su)\s+pareja[\s\S]{0,12}minti[eé]ndo(?:te|le)

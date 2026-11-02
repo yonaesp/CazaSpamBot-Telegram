@@ -8,6 +8,8 @@
 hack(?:ing)?\s+(?:services?|tools?|jobs?)
 professional\s+hack(?:er|ing)
 (?:instagram|facebook|whatsapp|snapchat|tiktok|telegram|gmail)\s+hack(?:ing|er)?
+social\s+media\s+(?:account\s+)?hack(?:ing|er)?
+hack(?:ing)?\s*/?\s*recovery
 password\s+(?:cracking|recovery\s+service)
 account\s+(?:recovery|retrieval)\s+(?:expert|specialist|service|agent)
 

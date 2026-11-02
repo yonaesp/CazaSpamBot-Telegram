@@ -69,6 +69,11 @@ class UserSignals:
     # FloodWait de todas. `repr=False` porque es un objeto de Telethon y no tiene
     # ninguna gracia que aparezca entero en un log.
     personal_channel_entity: object = field(default=None, repr=False, compare=False)
+    # Tiene «Posts» (historias fijadas en el perfil): otro escaparate que la Bot
+    # API no ve. Viene gratis en `GetFullUser` (`stories_pinned_available`); los
+    # lee `posts_reader` con la entidad ya resuelta, sin otra resolución.
+    tiene_posts: bool = False
+    entidad: object = field(default=None, repr=False, compare=False)
 
     @property
     def account_age_days(self) -> Optional[int]:
@@ -185,6 +190,7 @@ async def _fetch(client, user_id: int, chat_id: Optional[int] = None,
         entity = await _resolve_entity(client, user_id, chat_id, first_name)
         if entity is None:
             return None
+        sig.entidad = entity
         # Fotos: get_profile_photos devuelve Photo[] con .date
         try:
             photos = await _con_tope(
@@ -205,6 +211,7 @@ async def _fetch(client, user_id: int, chat_id: Optional[int] = None,
             if full is None:
                 raise TimeoutError("GetFullUser sin respuesta")
             sig.bio = (full.full_user.about or "").strip()[:300] or None
+            sig.tiene_posts = bool(getattr(full.full_user, "stories_pinned_available", False))
             # El canal personal viene en full_user; su TÍTULO hay que buscarlo en
             # full.chats, que trae las entidades relacionadas.
             ch_id = getattr(full.full_user, "personal_channel_id", None)

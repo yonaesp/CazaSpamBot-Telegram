@@ -57,6 +57,7 @@ Una lección nueva va al final, con el número siguiente y su línea en el índi
 - [L49](#l49) · Helen, Gloria y Brook: una red con el mismo enlace privado en la bio y 40 puntos cada una
 - [L50](#l50) · Dos veteranos con la bio de spam tras años callados: cuentas robadas y destinos que se aprenden
 - [L51](#l51) · Versiones, `update.sh` y la imagen para ARM: que otros la monten y la mantengan al día
+- [L52](#l52) · ZERO: los «Posts» del perfil, un escaparate con OCR que el bot no miraba
 
 ---
 
@@ -1132,3 +1133,50 @@ Lo que eligió, con sus razones:
 Trampa que cazó el test: `def f(ruta=PENDIENTE)` fija el valor al definir la función, y un `monkeypatch` del módulo no
 llega. Se resuelve al llamar (`ruta or PENDIENTE`). Cómo se publica una versión y cómo se escribe hacia fuera (notas,
 listas, PR ajenos): skill `publicar`.
+
+## L52 · ZERO: los «Posts» del perfil, un escaparate con OCR que el bot no miraba
+
+1-nov-2026, Windows 10: «𝐙𝐄𝐑𝐎» (@zerotrace505) entró a las 21:36:45, la verificación lo marcó sospechoso y la pasó en
+6 s, no escribió nada y a las 21:38:40 otro admin lo baneó a mano. Con el aviso del ban manual el admin pegó una captura
+de su perfil: en la pestaña «Posts», carteles de «Recuperación de fondos», «Alerta de estafadores», «Quieres saber si tu
+pareja te engaña», un WhatsApp con código OTP. Bio vacía, sin canal y nombre normal: nada de lo que el bot miraba. Pidió
+«implementar el OCR a los posts de los usuarios».
+
+Lo comprobado antes de escribir nada, leyendo sus posts con la cuenta secundaria:
+- Los «Posts» son las historias que se dejan fijadas: `stories.getPinnedStories`. `GetFullUser`, que ya se pedía por la
+  bio, trae `stories_pinned_available`: quien no tiene no cuesta ni una llamada. Ni la lista ni la descarga cuentan como
+  vista (eso es `incrementStoryViews`/`readStories`).
+- 12 de sus 15 posts en 0,09 s; cada foto (32-153 KB) en 0,05-0,23 s y su OCR en 0,3-2 s. Las miniaturas de los vídeos
+  (3-15 KB) no dieron texto legible: de un vídeo cuenta solo el pie.
+- El pie solo ya lo delataba («La recuperación de dinero es segura», «Vincula WhatsApp a tu dispositivo y espía»,
+  «Espionaje🎭»), y el OCR añadía «NUESTRO SERVICIO · Recuperación de estafas de criptomonedas…» y «COMUNICATE CON
+  NOSOTROS».
+- Pero pasados post a post por los detectores de mensajes (`commercial_ad`, `investment_scam`, `offplatform_contact`)
+  **ninguno puntuaba**: cada pie es una frase corta y suelta. Juntos, `commercial_ad` daba 60 y por las mayúsculas. Pasar
+  OCR a los posts no bastaba: hacía falta juzgar el CONJUNTO, como con la bio.
+
+Lo que se hizo:
+- `posts_reader.py` lee 10 posts (pie, URL de las pegatinas de enlace y OCR de las fotos). El OCR de cada post se
+  recuerda por (persona, post) y la lectura entera, 1 h.
+- `detectors/posts_perfil.py` (`posts_spam`), molde de `investment_scam`: servicios ilegales en ≥2 posts distintos 60
+  (uno, 30), ofrecerse a terceros 40, garantizar que se recupera el dinero estafado 45 (ancla estructural; su trozo no
+  cuenta además como vocabulario, L33). Umbral 100; ninguna señal llega sola. El vocabulario es el de `bio_spam` y
+  `commercial_ad` (sin lista nueva); «hacker», «hacking» o «hackeo» a secas no cuentan: en grupos de informática salen
+  en memes y en cursos de hacking ético.
+- **Nunca en la ruta de un update**: con OCR son segundos y PTB procesa los updates de uno en uno. El join y el primer
+  mensaje lanzan `recien_llegados.revisar_posts_aparte` con `create_task` (espera 5 s para no dejar publicada una
+  bienvenida de alguien ya baneado) y el repaso de recién llegados los mira con su presupuesto. Test con `ast`:
+  `posts_reader.leer` solo se llama desde `recien_llegados`. `/scan` solo dice si los hay. El barrido semanal de bios no
+  los lee (600 perfiles con OCR por pasada no compensan).
+- No es reportable a Telegram (regla 9) hasta ver qué caza.
+
+Medido el 2-nov-2026 antes de activarlo, leyendo con la cuenta secundaria a 524 cuentas: las 244 baneadas en 30 días y
+las 280 no baneadas con actividad en 30 días (2 s entre cuentas, sin un solo FloodWait). Tienen Posts 12 baneadas (4,9 %)
+y 22 no baneadas (7,9 %), una de ellas ZERO (su ban manual fue solo en un grupo y no estaba en `banned_users`).
+- Con el vocabulario de partida cazaba a ZERO (145) y se quedaba en 45-70 con tres baneadas de la misma familia
+  (hackeo de cuentas, «recuperación», espiar a la pareja). Con las frases que llevaban de verdad, añadidas a
+  `bio_illegal_services.txt` («recuperar tu dinero», «Recuperar Facebook», «WhatsApp HACKEADO», «Pirater WhatsApp»,
+  «¿Está su pareja mintiéndole?», «hacking/Recovery»), suben a 100, 105 y 100 sin tocar los umbrales. Las otras 9
+  baneadas tenían fotos normales o un anuncio de otra cosa (un taxi): eso no es de este detector.
+- De las 21 legítimas con posts, ninguna da ni una señal suelta (0 puntos todas).
+- Las tres están en los tests con su texto (sin identificadores) y ZERO, en la escena de `scripts/simular.py`.

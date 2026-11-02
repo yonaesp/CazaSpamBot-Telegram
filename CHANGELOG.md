@@ -4,6 +4,15 @@ Cambios relevantes de CazaSpamBot, lo más reciente arriba. Se anotan hitos, no
 cada commit: para el detalle está el historial de git. Sin números de versión
 porque el bot es un servicio en producción continua, no un paquete que se libera.
 
+## 2026-11 · Los «Posts» del perfil
+
+Con la cuenta secundaria, el bot mira también los «Posts» del perfil (las historias
+que se dejan fijadas), con su pie y el texto que va dentro de cada foto. Si son un
+catálogo de servicios ilegales (el mismo negocio en varios posts, ofreciéndose o
+prometiendo recuperar dinero estafado), banea al que acaba de entrar aunque no haya
+escrito nada. Se lee en segundo plano, sin frenar al bot, sin que la otra persona vea
+quién ha mirado, y sin mandar nada fuera del servidor.
+
 ## 2026-11 · Cuentas robadas y destinos que se aprenden
 
 Cuando un miembro con historial que llevaba meses sin escribir aparece con la bio de

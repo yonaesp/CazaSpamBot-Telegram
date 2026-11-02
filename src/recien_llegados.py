@@ -363,6 +363,10 @@ async def _revisar_perfil(context, db: DB, cfg: Config, fila, espera: int) -> bo
             )
             return True
 
+    # Los «Posts» del perfil, el escaparate que más cabe (pie + OCR de la foto).
+    if await _revisar_posts(context, db, cfg, fila, usuario, sig, client, espera):
+        return True
+
     if not obvio:
         return False
 
@@ -449,6 +453,80 @@ async def _revisar_canal(context, db: DB, cfg: Config, fila, usuario, sig, clien
         original_text=None, first_name=usuario.first_name,
     )
     return True
+
+
+async def _revisar_posts(context, db: DB, cfg: Config, fila, usuario, sig, client,
+                         espera: int, via: str = "recien_llegados") -> bool:
+    """Los «Posts» del perfil (historias fijadas), juzgados por `posts_perfil`.
+
+    Solo si `GetFullUser` dice que los hay (`sig.tiene_posts`): quien no tiene no
+    cuesta ni una llamada. Leerlos con OCR lleva segundos, así que esto se llama
+    solo desde trabajos de fondo, nunca en la ruta de un mensaje.
+    """
+    if sig is None or not getattr(sig, "tiene_posts", False) or client is None:
+        return False
+    from . import posts_reader
+    from .detectors import posts_perfil
+    from .handlers import _apply_action
+    from .wordlists import modo_ocr
+    chat_id, user_id = fila["chat_id"], fila["user_id"]
+    posts = await posts_reader.leer(client, sig.entidad, user_id)
+    if not posts:
+        return False
+    # `modo_ocr` es un indicador global: dentro no puede haber ningún await.
+    with modo_ocr():
+        hit = posts_perfil.check([p.texto for p in posts])
+    if not hit:
+        return False
+    if db.is_banned(user_id):
+        return True
+    log.info("%s: user=%s posts del perfil de spam (%ds tras entrar) → ban: %s",
+             via, user_id, espera, hit.reason[:200])
+    from .scoring import Decision
+    await _apply_action(
+        context, db, cfg, chat_id=chat_id, chat_title=fila["chat_title"],
+        user_id=user_id, username=usuario.username, message_id=None,
+        decision=Decision(
+            action="ban", score=hit.score, rule=hit.rule, reason=hit.reason,
+            payload={**(hit.payload or {}), "via": via, "espera_s": espera},
+        ),
+        original_text=None, first_name=usuario.first_name,
+    )
+    return True
+
+
+# Espera antes de juzgar los posts tras un join: deja que el flujo del join
+# (bienvenida, verificación) termine antes de banear, para que no quede una
+# bienvenida publicada para alguien ya baneado. Leer los posts con OCR tarda más
+# que esto casi siempre; sin fotos, la lista llega en 0,1 s.
+_ESPERA_JOIN_S = 5.0
+
+
+async def revisar_posts_aparte(context, chat, user, sig, client, via: str = "join") -> bool:
+    """Tarea aparte para los posts del perfil (join y primer mensaje). True si se actuó.
+
+    En el join no se puede esperar al OCR: PTB procesa los updates de uno en uno
+    y diez fotos son varios segundos sin moderar nada. Así sale en paralelo y el
+    join sigue su camino. Caso que lo motivó: ZERO, baneado a mano por otro admin
+    dos minutos después de entrar; el repaso de recién llegados habría tardado
+    hasta 15 min.
+    """
+    import asyncio
+    try:
+        await asyncio.sleep(_ESPERA_JOIN_S)
+        db: DB = context.bot_data["db"]
+        cfg: Config = context.bot_data["cfg"]
+        fila = {"chat_id": chat.id, "chat_title": getattr(chat, "title", None),
+                "user_id": user.id, "username": user.username,
+                "first_name": user.first_name}
+        if db.is_banned(user.id):
+            return False
+        # El repaso de dentro de 15 min no repite el trabajo: `posts_reader`
+        # guarda la lectura una hora y el OCR de cada post para siempre.
+        return await _revisar_posts(context, db, cfg, fila, user, sig, client, 0, via)
+    except Exception as exc:  # noqa: BLE001 — una tarea suelta nunca tumba el bot
+        log.warning("revisar_posts_aparte: fallo con user=%s: %s", user.id, exc)
+        return False
 
 
 # ---------------------------------------------------------------------------

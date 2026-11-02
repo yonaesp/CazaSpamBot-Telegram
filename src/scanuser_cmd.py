@@ -187,6 +187,10 @@ async def _componer(context, cfg: Config, db: DB, chat_id: int, user_id: int) ->
         if sig.personal_channel_title:
             L.append(t("scanuser.channel",
                        title=_h.escape(sig.personal_channel_title[:60])))
+        if getattr(sig, "tiene_posts", False):
+            # Solo se dice que los hay: leerlos con OCR son segundos y esto corre en
+            # la ruta de un update. Los juzga el repaso de recién llegados (L52).
+            L.append(t("scanuser.posts"))
         if sig.is_premium:
             L.append(t("scanuser.premium"))
 
