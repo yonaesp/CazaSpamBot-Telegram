@@ -1136,7 +1136,7 @@ listas, PR ajenos): skill `publicar`.
 
 ## L52 · ZERO: los «Posts» del perfil, un escaparate con OCR que el bot no miraba
 
-1-nov-2026, Windows 10: «𝐙𝐄𝐑𝐎» (@zerotrace505) entró a las 21:36:45, la verificación lo marcó sospechoso y la pasó en
+1-nov-2026, Windows 11: «𝐙𝐄𝐑𝐎» (@zerotrace505) entró a las 21:36:45, la verificación lo marcó sospechoso y la pasó en
 6 s, no escribió nada y a las 21:38:40 otro admin lo baneó a mano. Con el aviso del ban manual el admin pegó una captura
 de su perfil: en la pestaña «Posts», carteles de «Recuperación de fondos», «Alerta de estafadores», «Quieres saber si tu
 pareja te engaña», un WhatsApp con código OTP. Bio vacía, sin canal y nombre normal: nada de lo que el bot miraba. Pidió
@@ -1172,7 +1172,7 @@ Lo que se hizo:
 
 Medido el 2-nov-2026 antes de activarlo, leyendo con la cuenta secundaria a 524 cuentas: las 244 baneadas en 30 días y
 las 280 no baneadas con actividad en 30 días (2 s entre cuentas, sin un solo FloodWait). Tienen Posts 12 baneadas (4,9 %)
-y 22 no baneadas (7,9 %), una de ellas ZERO (su ban manual fue solo en un grupo y no estaba en `banned_users`).
+y 22 no baneadas (7,9 %), una de ellas ZERO (al medir, su ban manual aún no estaba en `banned_users`).
 - Con el vocabulario de partida cazaba a ZERO (145) y se quedaba en 45-70 con tres baneadas de la misma familia
   (hackeo de cuentas, «recuperación», espiar a la pareja). Con las frases que llevaban de verdad, añadidas a
   `bio_illegal_services.txt` («recuperar tu dinero», «Recuperar Facebook», «WhatsApp HACKEADO», «Pirater WhatsApp»,

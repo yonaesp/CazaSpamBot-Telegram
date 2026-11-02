@@ -1,6 +1,6 @@
 """Los «Posts» del perfil (historias fijadas) como escaparate de spam.
 
-Caso real (1-nov-2026, Windows 10): «𝐙𝐄𝐑𝐎» (@zerotrace505) entró, se verificó en
+Caso real (1-nov-2026, Windows 11): «𝐙𝐄𝐑𝐎» (@zerotrace505) entró, se verificó en
 6 s y lo baneó a mano otro admin dos minutos después. Bio vacía, sin canal: para
 el bot estaba limpio. Sus posts eran un catálogo de la estafa de «recuperación» y
 de espionaje de WhatsApp. Los textos de abajo son los leídos de verdad (pie y OCR)
@@ -300,7 +300,7 @@ def test_las_caches_no_crecen_sin_fin():
 
 def _db(tmp_path) -> DB:
     db = DB(str(tmp_path / "t.db"))
-    db.upsert_bot_chat(-100, "Windows 10", "supergroup", True, True, True)
+    db.upsert_bot_chat(-100, "Windows 11", "supergroup", True, True, True)
     return db
 
 
@@ -397,7 +397,7 @@ async def test_la_tarea_del_join_banea_por_su_cuenta(tmp_path, monkeypatch):
         aplicado.update(kw)
     monkeypatch.setattr("src.handlers._apply_action", falso_apply)
 
-    chat = SimpleNamespace(id=-100, title="Windows 10")
+    chat = SimpleNamespace(id=-100, title="Windows 11")
     user = SimpleNamespace(id=5540199905, username="zerotrace505", first_name="ZERO")
     assert await rl.revisar_posts_aparte(_ctx(db, _sig()), chat, user, _sig(), object())
     assert aplicado["decision"].rule == "posts_spam"
@@ -413,7 +413,7 @@ async def test_la_tarea_del_join_no_vuelve_a_banear_al_ya_baneado(tmp_path, monk
     monkeypatch.setattr(rl, "_ESPERA_JOIN_S", 0)
     llamado = []
     monkeypatch.setattr("src.handlers._apply_action", lambda *a, **k: llamado.append(1))
-    chat = SimpleNamespace(id=-100, title="Windows 10")
+    chat = SimpleNamespace(id=-100, title="Windows 11")
     user = SimpleNamespace(id=5540199905, username="zerotrace505", first_name="ZERO")
     assert not await rl.revisar_posts_aparte(_ctx(db, _sig()), chat, user, _sig(), object())
     assert not llamado

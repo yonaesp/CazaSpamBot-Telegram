@@ -1,7 +1,7 @@
 """Detector: los «Posts» del perfil usados como catálogo de servicios ilegales.
 
 Los posts son las historias que la persona deja fijadas en su perfil (los lee
-`posts_reader`, pie + OCR de la foto). Caso real (1-nov-2026, Windows 10):
+`posts_reader`, pie + OCR de la foto). Caso real (1-nov-2026, Windows 11):
 «𝐙𝐄𝐑𝐎», sin bio ni canal, con quince posts que ofrecían «Recuperación de estafas
 de criptomonedas», «La recuperación de dinero es segura», «Vincula WhatsApp a tu
 dispositivo y espía» y «Quieres saber si tu pareja te engaña, comunícate con

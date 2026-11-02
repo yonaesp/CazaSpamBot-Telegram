@@ -4,7 +4,7 @@ Telegram enseña en el perfil una pestaña «Posts» con las historias fijadas, 
 no caducan. Es un escaparate más, como la bio o el canal personal, y el que más
 cabe: fotos y vídeos con su pie, sin límite de caracteres. La Bot API no lo ve.
 
-Caso que lo motivó (1-nov-2026, Windows 10): «𝐙𝐄𝐑𝐎» (@zerotrace505) entró a las
+Caso que lo motivó (1-nov-2026, Windows 11): «𝐙𝐄𝐑𝐎» (@zerotrace505) entró a las
 21:36, pasó la verificación en 6 s, no escribió nada y lo baneó a mano otro admin
 dos minutos después. Bio vacía, sin canal, nombre normal: para el bot, limpio.
 Sus 15 posts eran un catálogo entero: «Recuperación de estafas de criptomonedas»,
