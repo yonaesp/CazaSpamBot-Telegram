@@ -4,6 +4,7 @@
 
 ### Checks who is posting, not just what they post.
 
+[![Release](https://img.shields.io/github/v/release/yonaesp/CazaSpamBot-Telegram?label=release)](https://github.com/yonaesp/CazaSpamBot-Telegram/releases/latest)
 [![Python](https://img.shields.io/badge/Python-3.11-blue?logo=python&logoColor=white)](https://www.python.org/)
 [![python-telegram-bot](https://img.shields.io/badge/PTB-22.8-26A5E4?logo=telegram&logoColor=white)](https://python-telegram-bot.org/)
 [![Telethon](https://img.shields.io/badge/Telethon-1.44-blueviolet)](https://docs.telethon.dev/)
@@ -141,9 +142,11 @@ You need a Linux machine that stays on (a cheap VPS, a mini PC or a home server)
 ```bash
 sudo apt update && sudo apt install -y git curl python3
 curl -fsSL https://get.docker.com | sudo sh
-git clone https://github.com/yonaesp/CazaSpamBot-Telegram.git
+git clone -b stable https://github.com/yonaesp/CazaSpamBot-Telegram.git
 cd CazaSpamBot-Telegram
 ```
+
+`stable` is the latest release: each one runs at least 48 hours on the reference install before it's published. To get every change the day it lands, clone without `-b stable` and you'll follow `main`. On a Raspberry Pi, the ready-made image is easier: see "With the ready-made image" below.
 
 ### Step 2 · Configure it
 
@@ -206,6 +209,7 @@ sed -i 's/^MODE=.*/MODE=active/' .env && sudo docker compose up -d
 |---|---|
 | See what it's doing | `sudo docker compose logs -f` |
 | Update to the latest version | `./update.sh` (it backs up the database first and goes back on its own if the new version doesn't start) |
+| Update on its own every night | `./update.sh --auto` (follows `stable` or the image and never jumps to a new major version; `--no-auto` turns it off) |
 | Apply a change to `.env` | `sudo docker compose up -d` (`restart` doesn't reload `.env`) |
 | Restart it | `sudo docker compose restart` |
 | Stop it | `sudo docker compose down` (everything in `data/` is kept) |
@@ -235,6 +239,28 @@ podman compose up -d --build
 - **Folders go through `podman unshare`**: rootless Podman maps the container's uid 10112 to a different one on your machine, so step 3's `sudo install` doesn't apply here.
 - **To start again after a server reboot**, once: `systemctl --user enable --now podman-restart.service` and `loginctl enable-linger $USER`.
 - **Fedora, RHEL and derivatives (SELinux)**: if it can't read `config/` or write to `data/`, add `Z` to each volume in `docker-compose.yml`, e.g. `./data:/app/data:Z` and `./config:/app/config:ro,Z`.
+
+</details>
+
+<details>
+<summary><b>With the ready-made image (Raspberry Pi, nothing to build)</b></summary>
+
+<br>
+
+The image is published for x86 and ARM, so it also runs on a Raspberry Pi 3, 4, 5 or Zero 2 W with a 64-bit system. Nothing is built on your machine: three files in an empty folder are enough.
+
+```bash
+mkdir cazaspambot && cd cazaspambot
+URL=https://raw.githubusercontent.com/yonaesp/CazaSpamBot-Telegram/stable
+curl -fsSL -o docker-compose.yml $URL/docker-compose.image.yml
+curl -fsSL -o update.sh $URL/update.sh && chmod +x update.sh
+curl -fsSL -o .env $URL/.env.example && chmod 600 .env
+nano .env                 # the two mandatory values: see "Configure by hand"
+sudo install -d -o 10112 -g 10112 data custom
+sudo docker compose up -d
+```
+
+The secondary account connects with the same commands as in step 5. `./update.sh` pulls the new image and `./update.sh --auto` does it every night; the image follows every 1.x version and never jumps to a new major version on its own. For your own welcomes, see the comments in `docker-compose.yml`.
 
 </details>
 

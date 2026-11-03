@@ -1,8 +1,9 @@
 # Changelog
 
 Cambios relevantes de CazaSpamBot, lo más reciente arriba. Se anotan hitos, no
-cada commit: para el detalle está el historial de git. Sin números de versión
-porque el bot es un servicio en producción continua, no un paquete que se libera.
+cada commit: para el detalle está el historial de git. Desde la v1.0.0 cada versión
+publicada lleva su número (`stable` apunta a la última); los hitos de antes, solo
+la fecha.
 
 ## 2026-11 · Los «Posts» del perfil
 
@@ -12,6 +13,17 @@ catálogo de servicios ilegales (el mismo negocio en varios posts, ofreciéndose
 prometiendo recuperar dinero estafado), banea al que acaba de entrar aunque no haya
 escrito nada. Se lee en segundo plano, sin frenar al bot, sin que la otra persona vea
 quién ha mirado, y sin mandar nada fuera del servidor.
+
+## v1.0.0 · 2026-11-03 · Versiones y actualizaciones que vuelven atrás solas
+
+Primera versión con número. Hasta ahora quien instalaba el bot seguía `main`, que
+cambia casi a diario. Ahora la rama `stable` apunta a la última versión, que sale
+después de al menos 48 horas en la instalación de referencia sin errores.
+`./update.sh` copia la base de datos, instala la versión nueva y vuelve sola a la
+anterior si no arranca, y `./update.sh --auto` lo hace cada noche sin saltar nunca a
+una versión mayor. El bot te avisa por privado, en silencio y una vez por versión,
+cuando sale una nueva. Y hay imagen publicada para x86 y ARM: funciona en una
+Raspberry Pi con sistema de 64 bits sin compilar nada.
 
 ## 2026-11 · Cuentas robadas y destinos que se aprenden
 
