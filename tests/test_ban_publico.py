@@ -105,9 +105,13 @@ async def test_en_shadow_no_toca_el_grupo(tmp_path):
     assert not en_grupo, "publicó en el grupo estando en shadow"
 
 
-def test_el_aviso_es_permanente_por_defecto():
-    """0 = no se programa borrado. Si te molestaste en escribir el motivo, queda."""
+def test_el_aviso_es_permanente_por_defecto(monkeypatch):
+    """0 = no se programa borrado. Si te molestaste en escribir el motivo, queda.
+
+    Sin depender del `.env` real: en un clon recién hecho no hay token y
+    `load_config()` sale con SystemExit (falló así al probar la v1.0.0 limpia).
+    """
     from src.config import load_config
-    import os
-    os.environ.pop("BAN_NOTICE_DELETE_AFTER_S", None)
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "123:prueba")
+    monkeypatch.delenv("BAN_NOTICE_DELETE_AFTER_S", raising=False)
     assert load_config().ban_notice_delete_after_s == 0
