@@ -1217,7 +1217,28 @@ Lo que se hizo (`bots_invitados.py`), sin depender de esa duda:
 - Llamar a un bot no es spam por sí solo: si quien lo llama no está baneado, el mensaje del bot sigue la ruta de bots de
   siempre.
 
-Lo que no se hizo: ni vigilar los mensajes con la cuenta secundaria (sería el primer uso de Telethon para leer el grupo
-en directo; decide el admin) ni banear por el texto en otro alfabeto de un mensaje (los alfabetos solo deciden en el
-nombre, la bio y el canal).
+Ese mismo día, a la vista de esto, el admin decidió la regla general: **«debería de banear a cualquier bot que escriba
+directamente si no ha sido añadido por un admin ese bot al grupo […] y si el bot nuestro no lo detecta solo, la cuenta
+secundaria real de MTProto debería»**. Lo que se cambió:
+- Al entrar, un bot añadido por alguien que no es admin de ese grupo se banea (`bot_no_autorizado`); lo que añade un admin
+  se queda. Antes se expulsaba a todo bot, también al de un admin, y se le pedía volver a añadirlo.
+- Al escribir, un bot que no es miembro se banea lo llame quien lo llame (antes, solo si quien lo llamó estaba baneado).
+  Un bot miembro sigue la ruta de bots de siempre: quién lo añadió solo se sabe al entrar (la Bot API lo da en el
+  `chat_member`; MTProto no guarda quién invitó a un miembro normal, y el registro de administración solo guarda 48 h).
+- La cuenta secundaria mira los mensajes nuevos de los grupos moderados (`telethon_bridge._attach_bots_ajenos`): el de una
+  persona se descarta sin ninguna llamada y solo el de un bot pasa a la misma regla. Es lo único que lee en directo.
+- Los dos bans son solo de ese grupo. Federados, un bot legítimo que un miembro invocase caería también en el grupo
+  donde lo metió un admin y quedaría en la lista federada, que lo rebanearía al entrar.
+- «Algo que no permita a los bots escribir»: para los invitados no existe (ni en `ChatBannedRights` ni en
+  `ChatPermissions`). Para los que añade un miembro, sí: quitar a los miembros el permiso «Añadir miembros».
+
+Trampa cazada antes de desplegar: en un grupo, lo que se manda en nombre de un chat (un admin anónimo, un canal)
+llega por la Bot API con un remitente FALSO que es un bot y no es miembro (`@GroupAnonymousBot`, `@Channel_Bot`; PTB lo
+documenta como compatibilidad hacia atrás). `on_message` solo desviaba a la ruta de canales los mensajes sin `from`, así
+que estos iban a la ruta de bots desde siempre (sin consecuencias: 0 acciones registradas sobre esas cuentas); con la
+regla nueva se habría baneado al bot de los admins anónimos y borrado sus mensajes. Ahora se desvía por `sender_chat` y
+esas cuentas (y 777000) no se tocan nunca.
+
+Lo que sigue sin hacerse: banear por el texto en otro alfabeto de un mensaje (los alfabetos solo deciden en el nombre,
+la bio y el canal).
 

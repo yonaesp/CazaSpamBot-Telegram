@@ -20,6 +20,7 @@ KNOWN_RULES: frozenset[str] = frozenset({
     "personal_channel_spam",
     "posts_spam",
     "bot_invitado",
+    "bot_no_autorizado",
     "premium_new_link",
     "story_share",
     "han_pending_review",

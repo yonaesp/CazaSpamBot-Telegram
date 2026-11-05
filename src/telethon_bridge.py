@@ -56,6 +56,7 @@ def attach(client, bot: Bot, db: DB, context=None) -> None:
 
     if context is not None:
         _attach_cambio_de_nombre(client, events, context)
+        _attach_bots_ajenos(client, events, context)
 
     @client.on(events.MessageDeleted)
     async def _on_deleted(event: Any) -> None:
@@ -320,6 +321,44 @@ async def _notificar_borrados(client, bot: Bot, db: DB, chat_id: int,
                                disable_notification=notify_prefs.sin_sonido(db, importante=False))
     except TelegramError as exc:
         log.debug("manual_delete notif send fallo: %s", exc)
+
+
+def _attach_bots_ajenos(client, events, context) -> None:
+    """La cuenta secundaria vigila lo que escriben los bots en los grupos moderados.
+
+    Decisión del admin (5-nov-2026): un bot que no metió un admin no escribe en el
+    grupo, y si el bot no lo ve, que lo vea la cuenta secundaria. Caso: los bots
+    invitados (`bots_invitados`), que contestan en un grupo sin ser miembros; no está
+    comprobado que la Bot API le entregue esos mensajes a nuestro bot.
+
+    Es el único sitio donde la cuenta secundaria lee mensajes en directo. Barato a
+    propósito: un mensaje de una persona se descarta sin ninguna llamada (el autor
+    viene en el propio update) y solo uno de un bot, o con `guestchat_via_from`,
+    pasa a `handlers.revisar_bot_desde_mtproto`, que decide con la misma regla que
+    la ruta de bots. Nunca decide nada sobre personas.
+    """
+    @client.on(events.NewMessage(incoming=True, func=lambda e: e.is_group))
+    async def _on_mensaje(event: Any) -> None:  # noqa: ANN401
+        try:
+            m = event.message
+            guest = getattr(m, "guestchat_via_from", None)
+            autor = event.sender  # del propio update: sin llamada a la red
+            if guest is None and not getattr(autor, "bot", False):
+                return
+            bot_id = getattr(autor, "id", None) or getattr(m, "sender_id", None)
+            if not bot_id or not event.chat_id:
+                return
+            from . import handlers
+            await handlers.revisar_bot_desde_mtproto(
+                context, chat_id=_marked_chat_id(event.chat_id), message_id=m.id,
+                bot_id=bot_id, username=getattr(autor, "username", None),
+                first_name=getattr(autor, "first_name", None),
+                llamado_por=getattr(guest, "user_id", None), texto=m.message,
+            )
+        except Exception as exc:  # noqa: BLE001 — un handler suelto jamás tumba el bot
+            log.warning("bots ajenos (cuenta secundaria) exc: %s", exc)
+
+    log.info("Telethon: vigilando los mensajes de bots en los grupos (bots_invitados)")
 
 
 def _attach_cambio_de_nombre(client, events, context) -> None:

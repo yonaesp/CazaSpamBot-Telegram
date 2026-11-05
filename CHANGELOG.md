@@ -5,14 +5,16 @@ cada commit: para el detalle está el historial de git. Desde la v1.0.0 cada ver
 publicada lleva su número (`stable` apunta a la última); los hitos de antes, solo
 la fecha.
 
-## 2026-11 · Bots que contestan sin estar en el grupo
+## 2026-11 · Solo escriben los bots que mete un admin
 
 Telegram permite ahora mencionar un bot en un grupo donde no está y que conteste allí
 mismo, sin entrar. Un spammer lo usa así: escribe los @ de varios bots suyos y, aunque
 el bot lo banee al momento, los bots ya han recibido la llamada y publican su anuncio
-segundos después. Ahora, cuando el bot banea a alguien que mencionó bots, vuelve a
-mirar durante medio minuto y banea lo que hayan publicado esos bots, siempre que no
-sean miembros del grupo: un bot tuyo que el spammer mencione no se toca.
+segundos después. Ahora un bot solo puede escribir en tus grupos si lo añadió un
+admin: el que añade otra persona se banea al entrar, y el que escribe sin ser miembro,
+en cuanto escribe. Si la cuenta secundaria está conectada, también vigila lo que
+escriben los bots, por si al bot no le llegan esos mensajes. Los bans de bots son solo
+del grupo donde pasó, y un bot que añadiste tú no se toca.
 
 ## 2026-11 · Los «Posts» del perfil
 

@@ -941,6 +941,53 @@ async def on_abuse_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             pass
 
 
+async def _bot_añadido(context: ContextTypes.DEFAULT_TYPE, db: DB, cfg: Config, cmu, user) -> None:
+    """Un bot entra al grupo: se queda si lo añadió un admin; si no, ban solo aquí + aviso."""
+    # Bot añadido al grupo. Regla del admin (5-nov-2026): un bot solo se queda si
+    # lo añadió un administrador de ESE grupo; si no, ban (solo aquí: puede ser
+    # legítimo en otro grupo donde sí lo metió un admin) + aviso. Si no se puede
+    # comprobar si quien lo añadió es admin, `_is_admin_of_chat` dice que sí y el
+    # bot se queda: mejor un bot de más que echar el de un admin.
+    added_by = cmu.from_user
+    bots_invitados.olvidar(cmu.chat.id, user.id)
+    if added_by is not None and await _is_admin_of_chat(context, cmu.chat.id, added_by.id):
+        log.info("Bot añadido user=%s (@%s) chat=%s por el admin %s → se queda",
+                 user.id, user.username, cmu.chat.id, added_by.id)
+        return
+    log.info("Bot añadido user=%s (@%s) chat=%s por %s (no admin) → ban + aviso",
+             user.id, user.username, cmu.chat.id, added_by.id if added_by else "?")
+    await _apply_action(
+        context, db, cfg, chat_id=cmu.chat.id, chat_title=cmu.chat.title,
+        user_id=user.id, username=user.username, message_id=None,
+        decision=Decision(
+            action="ban", score=100, rule="bot_no_autorizado",
+            reason=t("reason.bot_no_autorizado", adder=added_by.id if added_by else "?"),
+            payload={"is_bot": True, "solo_aqui": True,
+                     "añadido_por": added_by.id if added_by else None},
+        ),
+        original_text=None, first_name=user.first_name,
+    )
+    if cfg.admin_notify_chat_id:
+        who = (f'@{added_by.username}' if added_by and added_by.username
+               else (added_by.first_name if added_by else "?"))
+        try:
+            await context.bot.send_message(
+                chat_id=cfg.admin_notify_chat_id,
+                text=t(
+                    "hdl.bot_added_kicked",
+                    chat=cmu.chat.title or cmu.chat.id,
+                    bot_username=user.username or "?",
+                    bot_id=user.id,
+                    adder=_h.escape(who),
+                    adder_id=(f" (<code>{added_by.id}</code>)" if added_by else ""),
+                ),
+                parse_mode="HTML", disable_web_page_preview=True,
+                disable_notification=notify_prefs.sin_sonido(db, importante=False),
+            )
+        except TelegramError:
+            pass
+
+
 async def on_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Detectar JOINs y BANS de usuarios al grupo."""
     cfg: Config = context.bot_data["cfg"]
@@ -1041,41 +1088,9 @@ async def on_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         )
         return
 
-    # NUEVO: bot añadido al grupo. Los bots no pulsan SOY HUMANO y los spam-bots
-    # postean porno/promo. Auto-kick + aviso al admin (los bots legítimos los
-    # añade el admin, que puede re-añadirlos; mejor pecar de cauto).
+    # Un bot solo se queda si lo añadió un admin (`_bot_añadido`).
     if user.is_bot and user.id != context.bot.id:
-        added_by = cmu.from_user
-        log.info("Bot añadido user=%s (@%s) chat=%s por %s → kick + aviso",
-                 user.id, user.username, cmu.chat.id, added_by.id if added_by else "?")
-        # En shadow no expulsamos (contrato: sin acciones reales); el aviso al
-        # admin sí se manda, es informativo.
-        if not cfg.shadow:
-            try:
-                await context.bot.ban_chat_member(chat_id=cmu.chat.id, user_id=user.id)
-                await asyncio.sleep(0.3)
-                await context.bot.unban_chat_member(chat_id=cmu.chat.id, user_id=user.id, only_if_banned=True)
-            except TelegramError as exc:
-                log.warning("auto-kick bot fallo: %s", exc)
-        if cfg.admin_notify_chat_id:
-            who = (f'@{added_by.username}' if added_by and added_by.username
-                   else (added_by.first_name if added_by else "?"))
-            try:
-                await context.bot.send_message(
-                    chat_id=cfg.admin_notify_chat_id,
-                    text=t(
-                        "hdl.bot_added_kicked",
-                        chat=cmu.chat.title or cmu.chat.id,
-                        bot_username=user.username or "?",
-                        bot_id=user.id,
-                        adder=_h.escape(who),
-                        adder_id=(f" (<code>{added_by.id}</code>)" if added_by else ""),
-                    ),
-                    parse_mode="HTML", disable_web_page_preview=True,
-                    disable_notification=notify_prefs.sin_sonido(db, importante=False),
-                )
-            except TelegramError:
-                pass
+        await _bot_añadido(context, db, cfg, cmu, user)
         return
 
     # Trust score precalculado: si el user reentró tras salir, puede tener
@@ -1597,10 +1612,14 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     msg = update.effective_message
     if msg is None:
         return
-    if msg.from_user is None:
+    if msg.from_user is None or getattr(msg, "sender_chat", None) is not None:
         # Mensaje "en nombre de un canal" (sender_chat): dentro se ignoran el post
         # auto-reenviado que encabeza los comentarios y los admins anónimos; un
         # canal externo comentando spam se banea con banChatSenderChat.
+        # OJO: en un grupo la Bot API NO deja `from` vacío en estos mensajes: pone un
+        # remitente falso (@GroupAnonymousBot, @Channel_Bot) que es un bot y no es
+        # miembro. Mirando solo `from_user is None` caían en la ruta de bots, y con la
+        # regla de bots ajenos (5-nov-2026) se habría baneado al de los admins anónimos.
         await _moderate_channel_message(context, db, cfg, msg)
         return
     chat_id = msg.chat_id
@@ -3045,20 +3064,24 @@ async def _moderate_bot_message(context, db, cfg, msg, user) -> None:
     """Modera un mensaje de un BOT externo miembro del grupo. Si tiene botones
     inline (spam típico) o URL en blocklist → ban federado del bot + delete.
     Silencioso (auto-ban). Los bots legítimos sin spam no disparan nada."""
-    # Bot INVITADO: no es miembro, contesta porque alguien lo mencionó. Se deja traza
-    # siempre (no está comprobado que la Bot API los entregue: la primera línea de
-    # este log lo dirá) y, si quien lo llamó ya está baneado, fuera (bots_invitados).
+    # Un bot solo escribe aquí si lo metió un admin (regla del admin, 5-nov-2026).
+    # El que no es miembro es un bot INVITADO (contesta porque alguien lo mencionó):
+    # fuera, lo llame quien lo llame. Se deja traza siempre, porque no está
+    # comprobado que la Bot API los entregue: la primera línea de este log lo dirá.
+    if user.id in bots_invitados.REMITENTES_DE_TELEGRAM:
+        return
     llamado_por = bots_invitados.llamante(msg)
-    if llamado_por is not None:
-        log.info("bot invitado @%s (id=%s) llamado por user=%s chat=%s msg=%s",
+    if llamado_por is not None or not await bots_invitados.es_miembro(
+            context.bot, msg.chat_id, user.id):
+        log.info("bot invitado @%s (id=%s) llamado por user=%s chat=%s msg=%s (Bot API)",
                  user.username, user.id, llamado_por, msg.chat_id, msg.message_id)
-        if db.is_banned(llamado_por):
+        if bots_invitados.marcar(msg.chat_id, msg.message_id):
             await _banear_bot_invitado(
                 context, db, cfg, chat_id=msg.chat_id, chat_title=msg.chat.title,
                 message_id=msg.message_id, bot_user=user, llamado_por=llamado_por,
-                texto=msg.text or msg.caption, via="mensaje",
+                texto=msg.text or msg.caption, via="bot_api",
             )
-            return
+        return
     hits = []
     # OJO: NO se usa buttons_det aquí. Los botones inline son señal de spam cuando
     # los manda un HUMANO (no puede crearlos: implica forward de canal promocional),
@@ -3431,18 +3454,51 @@ async def _banear_bot_invitado(
     chat_title: str | None, message_id: int, bot_user, llamado_por: int,
     texto: str | None, via: str,
 ) -> None:
-    """Ban (sin frase pública) del bot invitado que llamó un baneado, y su mensaje fuera."""
+    """Ban del bot que escribe sin ser miembro, solo en este grupo y sin frase pública.
+
+    `llamado_por` puede ser None: la sonda tardía y un bot que no trae el campo.
+    """
     await _apply_action(
         context, db, cfg, chat_id=chat_id, chat_title=chat_title,
         user_id=bot_user.id, username=getattr(bot_user, "username", None),
         message_id=message_id,
         decision=Decision(
             action="ban", score=100, rule="bot_invitado",
-            reason=t("reason.bot_invitado", caller=llamado_por),
-            payload={"is_bot": True, "llamado_por": llamado_por, "via": via},
+            reason=t("reason.bot_invitado", caller=llamado_por or "?"),
+            payload={"is_bot": True, "llamado_por": llamado_por, "via": via,
+                     "solo_aqui": True},
         ),
         original_text=texto, first_name=getattr(bot_user, "first_name", None),
     )
+    bots_invitados.olvidar(chat_id, bot_user.id)
+
+
+async def revisar_bot_desde_mtproto(
+    context, *, chat_id: int, message_id: int, bot_id: int, username: str | None,
+    first_name: str | None, llamado_por: int | None, texto: str | None,
+) -> bool:
+    """La cuenta secundaria vio escribir a un bot: misma regla que la ruta de bots.
+
+    Por si la Bot API no entrega los mensajes de un bot invitado (`telethon_bridge`).
+    Devuelve True si actuó. Un bot miembro no se toca aquí: ese caso lo ve la Bot API.
+    """
+    db: DB = context.bot_data["db"]
+    cfg: Config = context.bot_data["cfg"]
+    if (bot_id == context.bot.id or bot_id in bots_invitados.REMITENTES_DE_TELEGRAM
+            or not _se_modera(db, cfg, chat_id)):
+        return False
+    if llamado_por is None and await bots_invitados.es_miembro(context.bot, chat_id, bot_id):
+        return False
+    if not bots_invitados.marcar(chat_id, message_id):
+        return False
+    log.info("bot invitado @%s (id=%s) llamado por user=%s chat=%s msg=%s (cuenta secundaria)",
+             username, bot_id, llamado_por, chat_id, message_id)
+    await _banear_bot_invitado(
+        context, db, cfg, chat_id=chat_id, chat_title=None, message_id=message_id,
+        bot_user=SimpleNamespace(id=bot_id, username=username, first_name=first_name),
+        llamado_por=llamado_por, texto=texto, via="mtproto",
+    )
+    return True
 
 
 async def _safe_cleanup_consecutive(
@@ -3749,7 +3805,11 @@ async def _apply_action(
                 # 3) Cleanup retrospectivo de la ráfaga.
                 banned_msg_ts = time.time()
                 if decision.action == "ban":
-                    if cfg.federation_enabled:
+                    # `solo_aqui`: los bots ajenos (bots_invitados) se banean solo en
+                    # el grupo donde escribieron. Federado, un bot legítimo que un
+                    # miembro llamó como invitado quedaría fuera también del grupo
+                    # donde lo metió un admin, y lo rebanearía cada entrada.
+                    if cfg.federation_enabled and not (decision.payload or {}).get("solo_aqui"):
                         fed_results = await federate_ban(
                             context.bot, db, user_id=user_id,
                             reason=decision.reason, rule=decision.rule,
@@ -3848,7 +3908,8 @@ async def _apply_action(
 
     # En modo shadow, simular resultados federados para que la notificación
     # muestre cuántos chats SE habrían afectado.
-    if cfg.shadow and decision.action == "ban" and cfg.federation_enabled:
+    if (cfg.shadow and decision.action == "ban" and cfg.federation_enabled
+            and not (decision.payload or {}).get("solo_aqui")):
         fed_results = await federate_ban(
             context.bot, db, user_id=user_id, reason=decision.reason,
             rule=decision.rule, triggered_in_chat=chat_id, shadow=True,

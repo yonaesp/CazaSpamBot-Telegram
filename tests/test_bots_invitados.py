@@ -1,4 +1,8 @@
-"""Bots invitados: el bot que contesta en un grupo del que no es miembro.
+"""Bots ajenos: el bot que escribe en un grupo sin que lo haya metido un admin.
+
+Regla del admin (5-nov-2026): un bot solo escribe si lo añadió un admin; el que
+entra de la mano de otro, o escribe sin ser miembro (bot invitado), fuera, y solo de
+ese grupo. Si el bot no lo ve, lo ve la cuenta secundaria.
 
 Caso real (5-nov-2026, Domótica/Alexa): una cuenta nueva escribió «@xcb1cv5fdbot
 @dsfsfds56bot @cxvxcrfdsfbot» y fue baneada en 1 s, pero dos de esos bots
@@ -25,6 +29,8 @@ def _sin_esperas(monkeypatch):
     async def _nada(_s):
         return None
     monkeypatch.setattr(bots_invitados.asyncio, "sleep", _nada)
+    bots_invitados._miembro_cache.clear()
+    bots_invitados._actuados.clear()
 
 
 def test_mencionados_saca_los_bots_de_la_llamada_real():
@@ -203,6 +209,7 @@ async def test_lo_que_encuentra_la_pasada_se_banea_como_bot_invitado(monkeypatch
     assert (kw["user_id"], kw["message_id"]) == (BOT_SPAM.id, 451503)
     assert kw["decision"].rule == "bot_invitado" and kw["decision"].action == "ban"
     assert kw["decision"].payload["llamado_por"] == 8886885856
+    assert kw["decision"].payload["solo_aqui"] is True
 
 
 def _msg_invitado(llamado_por):
@@ -210,31 +217,181 @@ def _msg_invitado(llamado_por):
               guest_bot_caller_user=NS(id=llamado_por))
 
 
+@pytest.mark.parametrize("llamado_por", [8886885856, 42])
 @pytest.mark.asyncio
-async def test_si_llega_por_la_bot_api_y_lo_llamo_un_baneado_fuera(monkeypatch):
-    ctx, db = _ctx()
-    aplicar = AsyncMock()
-    monkeypatch.setattr(handlers, "_apply_action", aplicar)
-    await handlers._moderate_bot_message(ctx, db, ctx.bot_data["cfg"], _msg_invitado(8886885856), BOT_SPAM)
-    kw = aplicar.await_args.kwargs
-    assert kw["decision"].rule == "bot_invitado" and kw["message_id"] == 451503
-    db.is_banned.assert_called_once_with(8886885856)
-
-
-@pytest.mark.asyncio
-async def test_bot_invitado_por_alguien_no_baneado_sigue_la_ruta_de_siempre(monkeypatch):
-    """Llamar a un bot no es spam: si quien lo llama no está baneado, solo cuenta el
-    spam real del mensaje, como con cualquier bot (la ruta de bots de L40)."""
+async def test_bot_invitado_por_la_bot_api_fuera_lo_llame_quien_lo_llame(monkeypatch, llamado_por):
+    """Regla del admin: ningún admin lo metió, así que no escribe. Da igual quién lo
+    llamara (antes solo si el que llamaba estaba baneado)."""
     ctx, db = _ctx()
     db.is_banned.return_value = False
+    aplicar = AsyncMock()
+    monkeypatch.setattr(handlers, "_apply_action", aplicar)
+    await handlers._moderate_bot_message(ctx, db, ctx.bot_data["cfg"], _msg_invitado(llamado_por), BOT_SPAM)
+    kw = aplicar.await_args.kwargs
+    assert kw["decision"].rule == "bot_invitado" and kw["message_id"] == 451503
+    assert kw["decision"].payload["solo_aqui"] is True
+
+
+@pytest.mark.asyncio
+async def test_un_bot_que_no_es_miembro_y_no_trae_el_campo_tambien_fuera(monkeypatch):
+    ctx, db = _ctx()
+    ctx.bot.get_chat_member = AsyncMock(return_value=NS(status="left"))
+    aplicar = AsyncMock()
+    monkeypatch.setattr(handlers, "_apply_action", aplicar)
+    msg = NS(chat_id=CHAT, chat=NS(title="Alexa"), message_id=451503, text=SPAM, caption=None)
+    await handlers._moderate_bot_message(ctx, db, ctx.bot_data["cfg"], msg, BOT_SPAM)
+    assert aplicar.await_args.kwargs["decision"].rule == "bot_invitado"
+
+
+@pytest.mark.asyncio
+async def test_un_bot_de_la_casa_sigue_la_ruta_de_siempre(monkeypatch):
+    """El de warns es miembro (lo metió un admin): solo cuenta el spam real (L40)."""
+    ctx, db = _ctx()
+    ctx.bot.get_chat_member = AsyncMock(return_value=NS(status="administrator"))
     aplicar = AsyncMock()
     monkeypatch.setattr(handlers, "_apply_action", aplicar)
     monkeypatch.setattr(handlers.url_det, "check", lambda *a, **k: handlers.Hit.none())
     monkeypatch.setattr(handlers.comad_det, "check", lambda *a, **k: handlers.Hit.none())
     monkeypatch.setattr(handlers.destinos, "fichados", lambda db: set())
     ctx.bot_data["cfg"].url_blocklist = []
-    await handlers._moderate_bot_message(ctx, db, ctx.bot_data["cfg"], _msg_invitado(42), BOT_SPAM)
+    rose = NS(id=609517172, username="MissRose_bot", is_bot=True, first_name="Rose")
+    msg = NS(chat_id=CHAT, chat=NS(title="Alexa"), message_id=9, text="warn 1/3", caption=None)
+    for _ in range(3):
+        await handlers._moderate_bot_message(ctx, db, ctx.bot_data["cfg"], msg, rose)
     aplicar.assert_not_awaited()
+    assert ctx.bot.get_chat_member.await_count == 1, "sin caché: un getChatMember por mensaje"
+
+
+# ------------------------------------------------------- la cuenta secundaria
+
+@pytest.mark.asyncio
+async def test_la_cuenta_secundaria_actua_si_el_bot_no_lo_vio(monkeypatch):
+    ctx, _ = _ctx()
+    monkeypatch.setattr(handlers, "_se_modera", lambda db, cfg, cid: True)
+    aplicar = AsyncMock()
+    monkeypatch.setattr(handlers, "_apply_action", aplicar)
+    args = dict(chat_id=CHAT, message_id=451503, bot_id=BOT_SPAM.id, username="cxvxcrfdsfbot",
+                first_name="wdsfsdg", llamado_por=8886885856, texto=SPAM)
+    assert await handlers.revisar_bot_desde_mtproto(ctx, **args) is True
+    kw = aplicar.await_args.kwargs
+    assert (kw["user_id"], kw["message_id"], kw["decision"].payload["via"]) == (BOT_SPAM.id, 451503, "mtproto")
+    # Si la Bot API también lo ve (o llega dos veces), no se actúa otra vez.
+    assert await handlers.revisar_bot_desde_mtproto(ctx, **args) is False
+    assert aplicar.await_count == 1
+
+
+@pytest.mark.asyncio
+async def test_la_cuenta_secundaria_no_toca_bots_de_la_casa_ni_al_nuestro_ni_otros_grupos(monkeypatch):
+    ctx, _ = _ctx()
+    ctx.bot.get_chat_member = AsyncMock(return_value=NS(status="member"))
+    aplicar = AsyncMock()
+    monkeypatch.setattr(handlers, "_apply_action", aplicar)
+    monkeypatch.setattr(handlers, "_se_modera", lambda db, cfg, cid: cid == CHAT)
+    base = dict(message_id=1, username="x", first_name="x", llamado_por=None, texto="hola")
+    assert not await handlers.revisar_bot_desde_mtproto(ctx, chat_id=CHAT, bot_id=609517172, **base)
+    assert not await handlers.revisar_bot_desde_mtproto(ctx, chat_id=CHAT, bot_id=ctx.bot.id, **base)
+    assert not await handlers.revisar_bot_desde_mtproto(
+        ctx, chat_id=-1002067804909, bot_id=BOT_SPAM.id, **{**base, "llamado_por": 5})
+    aplicar.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_el_puente_solo_pasa_mensajes_de_bots(monkeypatch):
+    """Una persona se descarta sin llamar a nada; un bot o un invitado, sí pasan."""
+    from src import telethon_bridge
+    handlers_capturados = []
+
+    class _Cliente:
+        def on(self, _ev):
+            def deco(f):
+                handlers_capturados.append(f)
+                return f
+            return deco
+
+    class _Events:
+        @staticmethod
+        def NewMessage(**kw):
+            return kw
+
+    revisar = AsyncMock(return_value=True)
+    monkeypatch.setattr(handlers, "revisar_bot_desde_mtproto", revisar)
+    telethon_bridge._attach_bots_ajenos(_Cliente(), _Events, object())
+    on_msg = handlers_capturados[0]
+
+    persona = NS(message=NS(id=1, message="hola", guestchat_via_from=None, sender_id=7),
+                 sender=NS(id=7, bot=False, username="ana", first_name="Ana"), chat_id=CHAT)
+    await on_msg(persona)
+    revisar.assert_not_awaited()
+
+    invitado = NS(message=NS(id=451503, message=SPAM, guestchat_via_from=NS(user_id=8886885856),
+                             sender_id=BOT_SPAM.id),
+                  sender=NS(id=BOT_SPAM.id, bot=True, username="cxvxcrfdsfbot", first_name="wdsfsdg"),
+                  chat_id=CHAT)
+    await on_msg(invitado)
+    kw = revisar.await_args.kwargs
+    assert (kw["chat_id"], kw["message_id"], kw["bot_id"], kw["llamado_por"]) == (
+        CHAT, 451503, BOT_SPAM.id, 8886885856)
+
+
+# ------------------------------------------------------------------ la puerta
+
+def _cmu(adder_id):
+    return NS(chat=NS(id=CHAT, title="Alexa"), from_user=NS(id=adder_id, username="x", first_name="X"))
+
+
+@pytest.mark.asyncio
+async def test_bot_que_añade_un_admin_se_queda(monkeypatch):
+    ctx, db = _ctx()
+    monkeypatch.setattr(handlers, "_is_admin_of_chat", AsyncMock(return_value=True))
+    aplicar = AsyncMock()
+    monkeypatch.setattr(handlers, "_apply_action", aplicar)
+    await handlers._bot_añadido(ctx, db, ctx.bot_data["cfg"], _cmu(345), BOT_SPAM)
+    aplicar.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_bot_que_añade_un_miembro_se_banea_solo_aqui(monkeypatch):
+    ctx, db = _ctx()
+    ctx.bot.send_message = AsyncMock()
+    monkeypatch.setattr(handlers, "_is_admin_of_chat", AsyncMock(return_value=False))
+    aplicar = AsyncMock()
+    monkeypatch.setattr(handlers, "_apply_action", aplicar)
+    monkeypatch.setattr(handlers.notify_prefs, "sin_sonido", lambda db, importante: True)
+    await handlers._bot_añadido(ctx, db, ctx.bot_data["cfg"], _cmu(8886885856), BOT_SPAM)
+    d = aplicar.await_args.kwargs["decision"]
+    assert (d.action, d.rule, d.payload["solo_aqui"], d.payload["añadido_por"]) == (
+        "ban", "bot_no_autorizado", True, 8886885856)
+    ctx.bot.send_message.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_un_ban_solo_aqui_no_se_federa(tmp_path):
+    """Un bot legítimo que un miembro llamó como invitado no puede quedar fuera
+    también del grupo donde lo metió un admin."""
+    from tests.test_protecciones_criticas import _cfg, _db
+    db = _db(tmp_path, n_chats=3)
+    cfg = _cfg()
+    assert cfg.federation_enabled
+    ctx = MagicMock()
+    ctx.bot.ban_chat_member = AsyncMock(return_value=True)
+    ctx.bot.delete_message = AsyncMock(return_value=True)
+    ctx.bot.copy_message = AsyncMock()
+    ctx.bot.send_message = AsyncMock()
+    ctx.bot.get_chat_member = AsyncMock(return_value=NS(status="left"))
+    notifier = MagicMock()
+    notifier.is_configured.return_value = False
+    ctx.bot_data = {"cfg": cfg, "db": db, "notifier": notifier}
+    ctx.application = MagicMock()
+    ctx.application.job_queue = None
+    ctx.application.create_task = lambda coro, **kw: coro.close()
+    decision = NS(action="ban", rule="bot_invitado", score=100, reason="prueba",
+                  payload={"is_bot": True, "solo_aqui": True})
+    await handlers._apply_action(ctx, db, cfg, chat_id=-100100, chat_title="G0", user_id=BOT_SPAM.id,
+                                 username="cxvxcrfdsfbot", message_id=5, decision=decision,
+                                 original_text=SPAM)
+    chats = {c.kwargs.get("chat_id") for c in ctx.bot.ban_chat_member.await_args_list}
+    assert chats == {-100100}, f"se federó: {chats}"
+    assert not db.is_banned(BOT_SPAM.id), "quedó en la lista federada: se rebanearía al entrar en otro"
 
 
 def test_apply_action_le_pasa_el_texto_a_la_sonda():
@@ -253,3 +410,39 @@ def test_bot_invitado_no_es_reportable_ni_tiene_frase_publica():
     from src import quips
     assert "bot_invitado" not in quips._RULES
     assert "bot_invitado" not in handlers._REPORTABLE_RULES
+
+
+# ------------------------------------------- los remitentes falsos de Telegram
+
+@pytest.mark.asyncio
+async def test_un_admin_anonimo_va_por_la_ruta_de_canales_no_por_la_de_bots(monkeypatch):
+    """En un grupo la Bot API pone de remitente a @GroupAnonymousBot, que es un bot
+    y no es miembro: con la regla de bots ajenos lo habría baneado."""
+    ctx, db = _ctx()
+    canal = AsyncMock()
+    bots = AsyncMock()
+    monkeypatch.setattr(handlers, "_moderate_channel_message", canal)
+    monkeypatch.setattr(handlers, "_moderate_bot_message", bots)
+    anonimo = NS(id=1087968824, is_bot=True, username="GroupAnonymousBot", first_name="Group")
+    msg = NS(from_user=anonimo, sender_chat=NS(id=CHAT, type="supergroup"), chat_id=CHAT,
+             chat=NS(id=CHAT, type="supergroup", title="Alexa"), text="aviso del admin")
+    await handlers.on_message(NS(effective_message=msg), ctx)
+    canal.assert_awaited_once()
+    bots.assert_not_awaited()
+
+
+@pytest.mark.parametrize("uid", sorted(bots_invitados.REMITENTES_DE_TELEGRAM))
+@pytest.mark.asyncio
+async def test_los_remitentes_de_telegram_nunca_se_tocan(monkeypatch, uid):
+    ctx, db = _ctx()
+    ctx.bot.get_chat_member = AsyncMock(return_value=NS(status="left"))
+    aplicar = AsyncMock()
+    monkeypatch.setattr(handlers, "_apply_action", aplicar)
+    monkeypatch.setattr(handlers, "_se_modera", lambda db, cfg, cid: True)
+    falso = NS(id=uid, is_bot=True, username="x", first_name="x")
+    msg = NS(chat_id=CHAT, chat=NS(title="Alexa"), message_id=7, text="hola", caption=None)
+    await handlers._moderate_bot_message(ctx, db, ctx.bot_data["cfg"], msg, falso)
+    assert not await handlers.revisar_bot_desde_mtproto(
+        ctx, chat_id=CHAT, message_id=7, bot_id=uid, username="x", first_name="x",
+        llamado_por=None, texto="hola")
+    aplicar.assert_not_awaited()
