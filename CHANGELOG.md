@@ -16,7 +16,7 @@ en cuanto escribe. Si la cuenta secundaria está conectada, también vigila lo q
 escriben los bots, por si al bot no le llegan esos mensajes. Los bans de bots son solo
 del grupo donde pasó, y un bot que añadiste tú no se toca.
 
-## 2026-11 · Los «Posts» del perfil
+## v1.1.0 · 2026-11-05 · Los «Posts» del perfil
 
 Con la cuenta secundaria, el bot mira también los «Posts» del perfil (las historias
 que se dejan fijadas), con su pie y el texto que va dentro de cada foto. Si son un
