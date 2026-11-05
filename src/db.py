@@ -456,6 +456,9 @@ class DB:
         ar_cols = {r[1] for r in self._conn.execute("PRAGMA table_info(admin_reports)").fetchall()}
         if ar_cols and "action_taken" not in ar_cols:
             self._conn.execute("ALTER TABLE admin_reports ADD COLUMN action_taken TEXT")
+        if "thread_id" not in ar_cols:
+            # El tema donde se escribió el @admin (grupos con temas, `temas`).
+            self._conn.execute("ALTER TABLE admin_reports ADD COLUMN thread_id INTEGER")
         su_cols = {r[1] for r in self._conn.execute("PRAGMA table_info(seen_users)").fetchall()}
         if "last_msg_id" not in su_cols:
             self._conn.execute("ALTER TABLE seen_users ADD COLUMN last_msg_id INTEGER")
@@ -1816,18 +1819,27 @@ class DB:
         reported_msg_id: int | None,
         reported_user_id: int | None,
         bot_confirm_msg_id: int | None,
+        thread_id: int | None = None,
     ) -> None:
         with self._cur() as c:
             c.execute(
                 """
                 INSERT OR REPLACE INTO admin_reports
                   (chat_id, reporter_msg_id, reporter_user_id, reporter_username,
-                   reported_msg_id, reported_user_id, bot_confirm_msg_id, ts)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                   reported_msg_id, reported_user_id, bot_confirm_msg_id, ts, thread_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (chat_id, reporter_msg_id, reporter_user_id, reporter_username,
-                 reported_msg_id, reported_user_id, bot_confirm_msg_id, time.time()),
+                 reported_msg_id, reported_user_id, bot_confirm_msg_id, time.time(), thread_id),
             )
+
+    def admin_report_existe(self, chat_id: int, reporter_msg_id: int) -> bool:
+        """¿Ya se registró este @admin? (una edición no es un aviso nuevo)."""
+        with self._cur() as c:
+            return c.execute(
+                "SELECT 1 FROM admin_reports WHERE chat_id=? AND reporter_msg_id=?",
+                (chat_id, reporter_msg_id),
+            ).fetchone() is not None
 
     def find_admin_report_by_reported(self, chat_id: int, reported_msg_id: int) -> sqlite3.Row | None:
         with self._cur() as c:

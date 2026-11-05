@@ -5,6 +5,15 @@ cada commit: para el detalle está el historial de git. Desde la v1.0.0 cada ver
 publicada lleva su número (`stable` apunta a la última); los hitos de antes, solo
 la fecha.
 
+## 2026-11 · Grupos con temas
+
+En los grupos con temas, un @admin escrito sin responder a nada enlazaba a veces un
+mensaje de otro tema: ahora el aviso busca el mensaje anterior en el mismo tema, y si
+no puede saber cuál es, te lleva al propio @admin. Editar un @admin ya no te manda el
+aviso otra vez. Los comandos sin responder (/warn, /ban, /spam, /scan) ya no apuntan a
+quien abrió el tema, y lo que el bot contesta sale en el tema donde se le pidió, no en
+General.
+
 ## 2026-11 · Solo escriben los bots que mete un admin
 
 Telegram permite ahora mencionar un bot en un grupo donde no está y que conteste allí

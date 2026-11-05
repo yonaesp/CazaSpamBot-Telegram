@@ -26,6 +26,7 @@ Cuatro decisiones de diseño:
 from __future__ import annotations
 
 from . import fechas
+from . import temas
 import datetime as _dt
 import html as _h
 import time
@@ -254,6 +255,7 @@ async def _entregar(context, update, texto: str, cfg: Config) -> None:
         # Si el privado no está disponible (nunca escribió al bot), mejor en el
         # grupo que perderlo: un informe que no llega no sirve de nada.
         await context.bot.send_message(chat_id=msg.chat_id, text=texto,
+                                       message_thread_id=temas.hilo(msg),
                                        parse_mode="HTML", disable_web_page_preview=True)
 
 

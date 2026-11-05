@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 
 from . import fechas
+from . import temas
 import html
 import logging
 
@@ -109,7 +110,7 @@ async def _add_sample_with_ux(
     db: DB = context.bot_data["db"]
 
     cmd = "legal" if label == "ham" else "spam"
-    if not msg.reply_to_message:
+    if temas.respuesta(msg) is None:
         usage = t(
             "admin.sample_usage",
             cmd=cmd,
@@ -118,7 +119,7 @@ async def _add_sample_with_ux(
         await msg.reply_text(usage, parse_mode="HTML")
         return
 
-    target = msg.reply_to_message
+    target = temas.respuesta(msg)
     text = target.text or target.caption or ""
     if not text or len(text) < 5:
         if is_group:
@@ -176,11 +177,11 @@ async def _spam_combo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     db: DB = context.bot_data["db"]
     cfg: Config = context.bot_data["cfg"]
 
-    if not msg.reply_to_message:
+    if temas.respuesta(msg) is None:
         await msg.reply_text(t("spam.usage"), parse_mode="HTML")
         return
 
-    target = msg.reply_to_message
+    target = temas.respuesta(msg)
     text = target.text or target.caption or ""
     author = target.from_user
 
@@ -531,8 +532,8 @@ async def _resolve_target_user(
     args = list(context.args or [])
 
     # 1) Reply
-    if msg and msg.reply_to_message and msg.reply_to_message.from_user:
-        target = msg.reply_to_message.from_user
+    if msg and temas.respuesta(msg) and temas.respuesta(msg).from_user:
+        target = temas.respuesta(msg).from_user
         # Cachear username si vino con uno
         if target.username:
             db.remember_username(target.username, target.id)
@@ -734,7 +735,7 @@ async def cmd_ban(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     # Borrar el comando del admin (en grupo) ANTES de ejecutar el ban para
     # que el grupo no vea el "/ban @x razón" mientras se procesa
-    objetivo_msg = update.effective_message.reply_to_message if update.effective_message else None
+    objetivo_msg = temas.respuesta(update.effective_message) if update.effective_message else None
     if is_group:
         await _delete_command_safely(update)
         # Borrar TAMBIÉN el mensaje al que se respondió: banear al spammer y dejar

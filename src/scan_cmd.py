@@ -24,6 +24,7 @@ from telegram import Update
 from telegram.ext import ContextTypes
 
 from . import user_signals
+from . import temas
 from . import verification
 from .config import Config
 from .db import DB
@@ -147,7 +148,7 @@ async def cmd_scan(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not user or user.id != cfg.admin_user_id:
         return
     msg = update.effective_message
-    target = msg.reply_to_message if msg else None
+    target = temas.respuesta(msg) if msg else None
     if target is None:
         # En el DM el mensaje no tiene por qué existir todavía: el bot se queda
         # esperando el reenvío, que es el orden natural (primero el comando, luego
@@ -215,6 +216,7 @@ async def _entregar(context, msg, texto: str, cfg) -> None:
     except TelegramError:
         # Un informe que no llega no sirve de nada: mejor en el grupo que perderlo.
         await context.bot.send_message(chat_id=msg.chat_id, text=texto,
+                                       message_thread_id=temas.hilo(msg),
                                        parse_mode="HTML", disable_web_page_preview=True)
 
 

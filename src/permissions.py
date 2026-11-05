@@ -13,6 +13,8 @@ import time
 
 from telegram.constants import ChatMemberStatus
 from telegram.error import TelegramError
+
+from . import temas
 from telegram.ext import ContextTypes
 
 log = logging.getLogger(__name__)
@@ -91,7 +93,8 @@ async def _avisar_sin_permiso(update, context) -> None:
     from .i18n import t
     try:
         aviso = await context.bot.send_message(
-            chat_id=msg.chat_id, text=t("perm.solo_admin_del_bot"), parse_mode="HTML")
+            chat_id=msg.chat_id, text=t("perm.solo_admin_del_bot"), parse_mode="HTML",
+            message_thread_id=temas.hilo(msg))
     except TelegramError as exc:
         log.debug("aviso de permisos chat=%s: %s", msg.chat_id, exc)
         return

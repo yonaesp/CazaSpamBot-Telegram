@@ -59,6 +59,7 @@ Una lección nueva va al final, con el número siguiente y su línea en el índi
 - [L51](#l51) · Versiones, `update.sh` y la imagen para ARM: que otros la monten y la mantengan al día
 - [L52](#l52) · ZERO: los «Posts» del perfil, un escaparate con OCR que el bot no miraba
 - [L53](#l53) · Bots invitados: un spam que publica un bot que ni siquiera está en el grupo
+- [L54](#l54) · Grupos con temas: un @admin que enlazaba otro tema y llegaba dos veces
 
 ---
 
@@ -1241,4 +1242,36 @@ esas cuentas (y 777000) no se tocan nunca.
 
 Lo que sigue sin hacerse: banear por el texto en otro alfabeto de un mensaje (los alfabetos solo deciden en el nombre,
 la bio y el canal).
+
+---
+
+<a id="l54"></a>
+## L54 · Grupos con temas: un @admin que enlazaba otro tema y llegaba dos veces
+
+5-nov-2026, Domótica/Alexa, un grupo con temas («categorías»). A las 18:50:28 un miembro escribe «@admin» en General, sin
+responder a nada; justo encima estaba el anuncio de un bot invitado (L53). El admin dijo que el aviso le llegó «muy tarde» y
+que «Ir al mensaje» le llevaba a un mensaje de otra categoría: «quizás este bug es por que no estaba previsto para esto,
+debemos estar al día en estas cosas siempre».
+
+Lo que pasó, comprobado con el log y leyendo los mensajes con la cuenta secundaria:
+- Sin respuesta, `admin_report` suponía que lo reportado era `id - 1` (451505). En un grupo con temas los ids son del grupo
+  entero: el 451505 era un mensaje del propio avisador de las 18:11, en otro tema. El spam era el 451503.
+- El privado salió a las 18:50:28, en el mismo segundo. A las 21:47:29 el miembro EDITÓ su «@admin» (sin cambiar el texto),
+  `on_edited_message` lo pasa por `on_message` como si fuera nuevo y el bot repitió la confirmación en el grupo y el
+  privado. Ese segundo aviso es el que llegó «tarde».
+- Nada en `src/` sabía de temas. En un tema la Bot API pone en `reply_to_message` el mensaje que creó el tema
+  (`forum_topic_created`) aunque no se responda a nada, así que `/warn`, `/ban`, `/spam`, `/legal` y `/scan` sin responder
+  iban contra quien abrió el tema, y `dormant_bot_mention` no saltaba nunca dentro de uno. Y lo que el bot publicaba a
+  raíz de un mensaje (el resultado de `/scan`, el warn, el antiflood, el aviso de permisos) caía en General.
+
+Lo que se hizo (`temas.py`): `respuesta()` (y un test con `ast` que prohíbe leer `.reply_to_message` fuera de ahí), `hilo()`
+para publicar en el tema del mensaje, y `tema_mtproto()` para saber de qué tema es un mensaje leído con la cuenta
+secundaria. El @admin sin respuesta busca el anterior DEL MISMO tema que no sea del avisador ni del bot; sin cuenta
+secundaria, `id - 1` solo en un grupo sin temas. El privado sale siempre (antes, si la copia fallaba, se perdía también el
+aviso), y si no se sabe qué se reporta enlaza al propio @admin, que está en su tema con lo reportado encima. Una edición de
+un @admin ya registrado no repite nada. El agradecimiento sale en el tema del @admin (`admin_reports.thread_id`).
+
+Trampa al probarlo: los tests viejos usan `MagicMock` como mensaje, que contesta a cualquier atributo; con `bool()` y
+`is not None`, todo parecía un tema y 11 tests cayeron. `es_tema()` compara `is True` y el inicio de tema se reconoce por
+el tipo de PTB (`ForumTopicCreated`): es lo correcto también con un mensaje real.
 

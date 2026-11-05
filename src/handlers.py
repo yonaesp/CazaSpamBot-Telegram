@@ -21,6 +21,7 @@ from telegram.ext import ContextTypes
 
 from . import borrado_diferido
 from . import bots_invitados
+from . import temas
 from . import antiraid
 from . import channel_reader
 from . import desofuscar
@@ -1753,7 +1754,7 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     # humano confirmado por admin = 12, veterano = 10, resto = 6.
     if not is_edit and _antiflood_check(context, db, chat_id, user.id):
         log.info("antiflood user=%s chat=%s msg=%s → mute 6h", user.id, chat_id, msg.message_id)
-        await _antiflood_apply(context, chat_id, user.id, user, msg.message_id)
+        await _antiflood_apply(context, chat_id, user.id, user, msg.message_id, temas.hilo(msg))
         return
 
     # Reacción amigable a saludos de usuarios marcados como greeters
@@ -3323,7 +3324,7 @@ def _antiflood_check(
 
 async def _antiflood_apply(
     context: ContextTypes.DEFAULT_TYPE,
-    chat_id: int, user_id: int, user, msg_id: int,
+    chat_id: int, user_id: int, user, msg_id: int, thread_id: int | None = None,
 ) -> None:
     """Mute 6h por flood + aviso público con motivo + (1ª vez) botón es/no-bot al admin."""
     db: DB = context.bot_data["db"]
@@ -3357,6 +3358,7 @@ async def _antiflood_apply(
         sent = await context.bot.send_message(
             chat_id=chat_id,
             text=t("hdl.flood_muted_public", name=name, hours=mute_hours),
+            message_thread_id=thread_id,
             parse_mode="HTML", disable_notification=True,
         )
         jq = context.application.job_queue

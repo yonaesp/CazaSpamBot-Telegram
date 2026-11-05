@@ -11,6 +11,7 @@ Comandos:
 from __future__ import annotations
 
 from . import fechas
+from . import temas
 import asyncio
 import html
 import logging
@@ -80,8 +81,8 @@ async def _get_target(update: Update, context, db) -> tuple[int | None, str | No
     resolución que /ban: respuesta, @usuario, id o mención de alguien sin username.
     """
     msg = update.effective_message
-    if msg and msg.reply_to_message and msg.reply_to_message.from_user:
-        u = msg.reply_to_message.from_user
+    if msg and temas.respuesta(msg) and temas.respuesta(msg).from_user:
+        u = temas.respuesta(msg).from_user
         return u.id, u.username or u.first_name
     from .admin import _resolve_target_user
     uid, _resto, _err = await _resolve_target_user(update, context, db)
@@ -110,7 +111,7 @@ async def cmd_warn(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     # Resolver target: reply || arg @username || arg user_id
     target_id: int | None = None
     target_user = None
-    target_msg = msg.reply_to_message
+    target_msg = temas.respuesta(msg)
     reason_parts = list(context.args) if context.args else []
 
     if target_msg and target_msg.from_user:
@@ -169,6 +170,7 @@ async def cmd_warn(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         context, chat_id=msg.chat_id, target_id=target_id, target_user=target_user,
         by_admin=update.effective_user.id, reason=reason,
         target_msg_id=(target_msg.message_id if target_msg else None),
+        thread_id=temas.hilo(msg),
     )
 
 
@@ -180,6 +182,7 @@ async def aplicar_warn(
     by_admin: int,
     reason: str | None,
     target_msg_id: int | None = None,
+    thread_id: int | None = None,
 ) -> int:
     """Pone un warn y hace TODO lo que conlleva: contar, borrar el mensaje
     infractor, publicarlo en el grupo y ejecutar la acción configurada al llegar
@@ -303,6 +306,7 @@ async def aplicar_warn(
     try:
         sent = await context.bot.send_message(
             chat_id=chat_id, text=text, parse_mode="HTML", disable_notification=False,
+            message_thread_id=thread_id,
         )
     except TelegramError as exc:
         log.warning("warn publish fallo: %s", exc)

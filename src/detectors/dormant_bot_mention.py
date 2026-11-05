@@ -21,6 +21,7 @@ from telegram import Message, MessageEntity
 
 from ..i18n import t
 from . import Hit, trozo_entidad
+from .. import temas
 
 DORMANT_DAYS = 365
 
@@ -72,8 +73,9 @@ def check(
     dormant_days = (now - last_msg_ts) / 86400
     if dormant_days < DORMANT_DAYS:
         return Hit.none()
-    # No aplica si es respuesta a alguien (conversación legítima)
-    if msg.reply_to_message is not None:
+    # No aplica si es respuesta a alguien (conversación legítima). Con `temas`: en
+    # un tema, la Bot API hace pasar todo mensaje por respuesta y nunca saltaba.
+    if temas.respuesta(msg) is not None:
         return Hit.none()
     bot_uname = _mentions_a_bot(msg)
     if not bot_uname:

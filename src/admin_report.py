@@ -19,6 +19,7 @@ El thanks se auto-borra a los 5 min para no ensuciar el grupo.
 """
 from __future__ import annotations
 
+import asyncio
 import html
 import logging
 import random
@@ -28,7 +29,7 @@ from telegram import Message
 from telegram.error import TelegramError
 from telegram.ext import ContextTypes
 
-from . import borrado_diferido, enlaces, notify_prefs
+from . import borrado_diferido, enlaces, notify_prefs, temas
 from .db import DB
 from .i18n import t, variant_keys
 
@@ -39,6 +40,8 @@ _ADMIN_MENTIONS = ("@admin", "@admins", "@administrador", "@administradores")
 _ADMIN_RE = re.compile(r"(?<![A-Za-z0-9_])@(?:admin|admins|administrador|administradores)(?![A-Za-z0-9_])", re.IGNORECASE)
 
 CONFIRM_TTL_S = 60          # Auto-borra confirm tras 1 min
+_PREVIOS = 30               # mensajes del grupo que se miran hacia atrás (todos los temas)
+_PREVIOS_TIMEOUT_S = 4.0
 THANKS_TTL_S = 5 * 60       # Auto-borra thanks tras 5 min
 
 # Frases alternativas (el bot elige una al azar para no sonar a robot). Viven en los
@@ -72,20 +75,26 @@ async def handle_admin_mention(
     if reporter.id == cfg.admin_user_id:
         return
 
-    reported = msg.reply_to_message
+    # Una edición del @admin no es otro aviso. Caso real (5-nov-2026): el miembro
+    # editó su «@admin» tres horas después y el bot volvió a confirmar en el grupo y
+    # a mandar el privado, que llegó como si el aviso fuera de ese momento.
+    if getattr(msg, "edit_date", None) and db.admin_report_existe(msg.chat_id, msg.message_id):
+        log.info("admin_report: edición de un @admin ya registrado (msg=%s), no se repite", msg.message_id)
+        return
+
+    reported = temas.respuesta(msg)
     if reported:
         reported_msg_id = reported.message_id
         reported_user_id = reported.from_user.id if reported.from_user else None
     else:
-        # Heurística: si no hay reply explícito, asumir el mensaje INMEDIATAMENTE ANTERIOR
-        # (msg_id - 1). En supergrupos los message_id son secuenciales por chat.
-        # No siempre es exacto (puede ser de otro user), pero como tracking funciona:
-        # si NADIE borra ese msg_id-1, el cascade no dispara, sin efectos secundarios.
-        reported_msg_id = msg.message_id - 1 if msg.message_id > 1 else None
-        reported_user_id = None
+        reported_msg_id, reported_user_id = await _anterior_del_tema(context, msg)
+        if reported_msg_id is None and not getattr(msg.chat, "is_forum", False):
+            # Sin cuenta secundaria y en un grupo sin temas: el id anterior, que puede
+            # no ser el que se reporta (es solo para el seguimiento del borrado).
+            reported_msg_id = msg.message_id - 1 if msg.message_id > 1 else None
         log.info(
-            "admin_report sin reply explícito, asumiendo msg_id %s como reportado (chat=%s)",
-            reported_msg_id, msg.chat_id,
+            "admin_report sin reply explícito: reportado msg=%s de user=%s (chat=%s, tema=%s)",
+            reported_msg_id, reported_user_id, msg.chat_id, temas.tema_bot_api(msg),
         )
 
     # Reacción ✍️ al mensaje del reporter (feedback visual rápido sin ensuciar)
@@ -105,6 +114,7 @@ async def handle_admin_mention(
         sent = await context.bot.send_message(
             chat_id=msg.chat_id,
             text=confirm_text,
+            message_thread_id=temas.hilo(msg),
             reply_to_message_id=msg.message_id,
             disable_notification=True,
             allow_sending_without_reply=True,
@@ -122,6 +132,7 @@ async def handle_admin_mention(
         reported_msg_id=reported_msg_id,
         reported_user_id=reported_user_id,
         bot_confirm_msg_id=bot_msg_id,
+        thread_id=temas.hilo(msg),
     )
 
     # Auto-delete confirm a 1 min
@@ -138,8 +149,11 @@ async def handle_admin_mention(
         reporter.id, msg.message_id, reported_msg_id,
     )
 
-    # Reenviar al admin DM (ADMIN_USER_ID) el mensaje reportado para revisión
-    if cfg.admin_notify_chat_id and reported_msg_id:
+    # El privado sale SIEMPRE. Antes, sin mensaje reportado no salía, y si la copia
+    # fallaba (un mensaje de servicio, uno ya borrado) se perdía también el aviso.
+    if not cfg.admin_notify_chat_id:
+        return
+    if reported_msg_id:
         try:
             await context.bot.copy_message(
                 chat_id=cfg.admin_notify_chat_id,
@@ -147,30 +161,65 @@ async def handle_admin_mention(
                 message_id=reported_msg_id,
                 disable_notification=notify_prefs.sin_sonido(db, importante=True),
             )
-            chat_title = msg.chat.title or str(msg.chat_id)
-            reporter_disp = (
-                f"@{reporter.username}" if reporter.username
-                else (reporter.first_name or f"id {reporter.id}")
-            )
-            via = t("report.via_reply") if reported else t("report.via_previous")
-            # Enlace al mensaje REPORTADO, no al del reportante: la copia que se
-            # manda arriba llega sin el hilo alrededor, y lo que hace falta mirar
-            # es el contexto en el que se escribió.
-            _url_rep = enlaces.al_mensaje(msg.chat, reported_msg_id)
-            ctx_text = t(
-                "report.admin_dm",
-                enlace=t("hdl.enlace_al_msg", url=_url_rep) if _url_rep else "",
-                chat=html.escape(chat_title),
-                reporter=html.escape(reporter_disp), reporter_id=reporter.id,
-                msg_id=reported_msg_id, via=via,
-                author_id=reported_user_id or "?",
-            )
-            await context.bot.send_message(
-                chat_id=cfg.admin_notify_chat_id, text=ctx_text, parse_mode="HTML",
-                disable_notification=notify_prefs.sin_sonido(db, importante=True),
-            )
         except TelegramError as exc:
-            log.debug("admin_report copy to admin DM fallo: %s", exc)
+            log.info("admin_report: no se pudo copiar msg=%s al privado: %s", reported_msg_id, exc)
+    chat_title = msg.chat.title or str(msg.chat_id)
+    reporter_disp = (
+        f"@{reporter.username}" if reporter.username
+        else (reporter.first_name or f"id {reporter.id}")
+    )
+    via = t("report.via_reply") if reported else t("report.via_previous")
+    # Enlace al mensaje REPORTADO, no al del reportante: la copia que se manda
+    # arriba llega sin el hilo alrededor, y lo que hace falta mirar es el contexto
+    # en el que se escribió. Si no se sabe cuál es, al propio @admin, que está en
+    # su tema y con lo reportado justo encima.
+    _url_rep = (enlaces.al_mensaje(msg.chat, reported_msg_id) if reported_msg_id
+                else enlaces.al_mensaje(msg.chat, msg.message_id))
+    ctx_text = t(
+        "report.admin_dm" if reported_msg_id else "report.admin_dm_sin_mensaje",
+        enlace=t("hdl.enlace_al_msg", url=_url_rep) if _url_rep else "",
+        chat=html.escape(chat_title),
+        reporter=html.escape(reporter_disp), reporter_id=reporter.id,
+        msg_id=reported_msg_id or "?", via=via,
+        author_id=reported_user_id or "?",
+    )
+    try:
+        await context.bot.send_message(
+            chat_id=cfg.admin_notify_chat_id, text=ctx_text, parse_mode="HTML",
+            disable_notification=notify_prefs.sin_sonido(db, importante=True),
+        )
+    except TelegramError as exc:
+        log.warning("admin_report: el aviso al privado falló: %s", exc)
+
+
+async def _anterior_del_tema(context: ContextTypes.DEFAULT_TYPE, msg: Message) -> tuple[int | None, int | None]:
+    """El mensaje anterior al @admin en SU tema, de otra persona: (id, autor) o (None, None).
+
+    Con la cuenta secundaria, porque la Bot API no da el historial. En un grupo con
+    temas los ids son del grupo entero y el `id - 1` puede ser de otro tema (caso del
+    5-nov-2026, `temas`). Se saltan los mensajes de servicio, los del que avisa y los
+    del bot. Ante cualquier fallo, (None, None): mejor sin mensaje que uno equivocado.
+    """
+    reporter = context.bot_data.get("reporter")
+    client = reporter.get_client() if reporter is not None else None
+    if client is None:
+        return None, None
+    tema = temas.tema_bot_api(msg)
+    quien = msg.from_user.id if msg.from_user else None
+    try:
+        previos = await asyncio.wait_for(
+            client.get_messages(msg.chat_id, limit=_PREVIOS, max_id=msg.message_id), _PREVIOS_TIMEOUT_S)
+    except Exception as exc:  # noqa: BLE001 — sin esto el aviso sale igual
+        log.info("admin_report: no se pudo leer lo anterior al @admin: %s", exc)
+        return None, None
+    for m in previos or []:
+        if getattr(m, "action", None) is not None or temas.tema_mtproto(m) != tema:
+            continue
+        autor = getattr(m, "sender_id", None)
+        if autor in (quien, context.bot.id):
+            continue
+        return m.id, autor
+    return None, None
 
 
 async def on_reported_message_deleted(
@@ -225,7 +274,7 @@ async def on_reported_message_deleted(
     thanks_msg_id = None
     try:
         sent = await bot.send_message(
-            chat_id=chat_id, text=thanks_text,
+            chat_id=chat_id, text=thanks_text, message_thread_id=_hilo_guardado(report),
             parse_mode="HTML", disable_notification=True,
         )
         thanks_msg_id = sent.message_id
@@ -254,6 +303,14 @@ async def on_reported_message_deleted(
 
 # Referencias vivas a tareas en segundo plano (ver comentario en el create_task).
 _BG_TASKS: set = set()
+
+
+def _hilo_guardado(report) -> int | None:
+    """El tema donde se escribió el @admin, si se guardó (los reportes viejos no lo tienen)."""
+    try:
+        return report["thread_id"]
+    except (KeyError, IndexError):
+        return None
 
 
 async def _delayed_delete(bot, chat_id: int, msg_id: int, delay: int) -> None:
