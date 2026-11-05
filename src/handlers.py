@@ -20,6 +20,7 @@ from telegram.error import TelegramError
 from telegram.ext import ContextTypes
 
 from . import borrado_diferido
+from . import bots_invitados
 from . import antiraid
 from . import channel_reader
 from . import desofuscar
@@ -3044,6 +3045,20 @@ async def _moderate_bot_message(context, db, cfg, msg, user) -> None:
     """Modera un mensaje de un BOT externo miembro del grupo. Si tiene botones
     inline (spam típico) o URL en blocklist → ban federado del bot + delete.
     Silencioso (auto-ban). Los bots legítimos sin spam no disparan nada."""
+    # Bot INVITADO: no es miembro, contesta porque alguien lo mencionó. Se deja traza
+    # siempre (no está comprobado que la Bot API los entregue: la primera línea de
+    # este log lo dirá) y, si quien lo llamó ya está baneado, fuera (bots_invitados).
+    llamado_por = bots_invitados.llamante(msg)
+    if llamado_por is not None:
+        log.info("bot invitado @%s (id=%s) llamado por user=%s chat=%s msg=%s",
+                 user.username, user.id, llamado_por, msg.chat_id, msg.message_id)
+        if db.is_banned(llamado_por):
+            await _banear_bot_invitado(
+                context, db, cfg, chat_id=msg.chat_id, chat_title=msg.chat.title,
+                message_id=msg.message_id, bot_user=user, llamado_por=llamado_por,
+                texto=msg.text or msg.caption, via="mensaje",
+            )
+            return
     hits = []
     # OJO: NO se usa buttons_det aquí. Los botones inline son señal de spam cuando
     # los manda un HUMANO (no puede crearlos: implica forward de canal promocional),
@@ -3411,14 +3426,37 @@ async def on_flood_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         await query.answer()
 
 
+async def _banear_bot_invitado(
+    context: ContextTypes.DEFAULT_TYPE, db: DB, cfg: Config, *, chat_id: int,
+    chat_title: str | None, message_id: int, bot_user, llamado_por: int,
+    texto: str | None, via: str,
+) -> None:
+    """Ban (sin frase pública) del bot invitado que llamó un baneado, y su mensaje fuera."""
+    await _apply_action(
+        context, db, cfg, chat_id=chat_id, chat_title=chat_title,
+        user_id=bot_user.id, username=getattr(bot_user, "username", None),
+        message_id=message_id,
+        decision=Decision(
+            action="ban", score=100, rule="bot_invitado",
+            reason=t("reason.bot_invitado", caller=llamado_por),
+            payload={"is_bot": True, "llamado_por": llamado_por, "via": via},
+        ),
+        original_text=texto, first_name=getattr(bot_user, "first_name", None),
+    )
+
+
 async def _safe_cleanup_consecutive(
     context: ContextTypes.DEFAULT_TYPE, chat_id: int, banned_user_id: int,
     banned_msg_id: int | None, banned_msg_ts: float | None = None,
+    banned_text: str | None = None,
 ) -> None:
     """Wrapper que captura excepciones del cleanup en background.
 
     Sin esto, una excepción dentro del task lanzado con `create_task` se traga
     silenciosamente (no hay await) y queda como Future con exception unhandled.
+
+    Si el mensaje baneado mencionaba bots, la sonda vuelve a pasar más tarde por si
+    contestan como bots invitados (`bots_invitados`, caso del 5-nov-2026).
     """
     try:
         await _cleanup_consecutive_after_ban(
@@ -3430,6 +3468,26 @@ async def _safe_cleanup_consecutive(
             "cleanup_consecutive task falló user=%s chat=%s: %s",
             banned_user_id, chat_id, exc,
         )
+    bots = bots_invitados.mencionados(banned_text)
+    if not bots or banned_msg_id is None:
+        return
+    db: DB = context.bot_data["db"]
+    cfg: Config = context.bot_data["cfg"]
+
+    async def _actuar(msg_id: int, autor, texto: str) -> None:
+        await _banear_bot_invitado(
+            context, db, cfg, chat_id=chat_id, chat_title=None, message_id=msg_id,
+            bot_user=autor, llamado_por=banned_user_id, texto=texto, via="sonda",
+        )
+
+    try:
+        await bots_invitados.barrer(
+            context.bot, chat_id, cfg.admin_notify_chat_id, banned_msg_id, bots,
+            _actuar, propio_id=context.bot.id,
+        )
+    except Exception as exc:  # noqa: BLE001
+        log.warning("bots_invitados: pasada tardía falló user=%s chat=%s: %s",
+                    banned_user_id, chat_id, exc)
 
 
 async def _cleanup_consecutive_after_ban(
@@ -3770,6 +3828,7 @@ async def _apply_action(
                         _safe_cleanup_consecutive(
                             context, chat_id=chat_id, banned_user_id=user_id,
                             banned_msg_id=message_id, banned_msg_ts=banned_msg_ts,
+                            banned_text=original_text,
                         ),
                         update=None,
                     )

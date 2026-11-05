@@ -5,6 +5,15 @@ cada commit: para el detalle está el historial de git. Desde la v1.0.0 cada ver
 publicada lleva su número (`stable` apunta a la última); los hitos de antes, solo
 la fecha.
 
+## 2026-11 · Bots que contestan sin estar en el grupo
+
+Telegram permite ahora mencionar un bot en un grupo donde no está y que conteste allí
+mismo, sin entrar. Un spammer lo usa así: escribe los @ de varios bots suyos y, aunque
+el bot lo banee al momento, los bots ya han recibido la llamada y publican su anuncio
+segundos después. Ahora, cuando el bot banea a alguien que mencionó bots, vuelve a
+mirar durante medio minuto y banea lo que hayan publicado esos bots, siempre que no
+sean miembros del grupo: un bot tuyo que el spammer mencione no se toca.
+
 ## 2026-11 · Los «Posts» del perfil
 
 Con la cuenta secundaria, el bot mira también los «Posts» del perfil (las historias

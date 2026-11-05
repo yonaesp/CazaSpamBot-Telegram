@@ -1,6 +1,6 @@
 # CazaSpamBot — Bot Antispam Telegram
 
-Bot de moderación antispam **en producción 24/7**, multi-grupo, federado y **bilingüe** (es/en). ~25.500 LOC en `src/`, Podman, **1942 tests**, 28 detectores (un módulo cada uno en `src/detectors/`).
+Bot de moderación antispam **en producción 24/7**, multi-grupo, federado y **bilingüe** (es/en). ~25.500 LOC en `src/`, Podman, **1963 tests**, 28 detectores (un módulo cada uno en `src/detectors/`).
 
 > **Estado: PRODUCCIÓN.** No es un esqueleto. Cualquier cambio afecta grupos reales con miles de usuarios. **Investiga > Confirma > Actúa.**
 
@@ -35,7 +35,7 @@ Todos los identificadores reales viven en `.env` (gitignored), no en el repo. Co
 
 ## Idiomas (i18n)
 
-Todo el texto que ve el usuario vive en `src/locales/<código>.json` (`es.json` / `en.json`, **1.252 claves** cada uno), nunca en el código. Idioma global de la instancia: `/idioma` (persiste) o `BOT_LANG`/`LC_ALL`/`LANG` al arrancar. Soltar un `fr.json` basta para que `/idioma fr` funcione; fallback por clave al español (un idioma al 40 % ya es usable); un JSON roto se ignora con un log (por eso JSON y no `.py`: un `.py` con una comilla mal puesta tumbaba el arranque). Guía para traductores: `src/locales/README.md`.
+Todo el texto que ve el usuario vive en `src/locales/<código>.json` (`es.json` / `en.json`, **1.254 claves** cada uno), nunca en el código. Idioma global de la instancia: `/idioma` (persiste) o `BOT_LANG`/`LC_ALL`/`LANG` al arrancar. Soltar un `fr.json` basta para que `/idioma fr` funcione; fallback por clave al español (un idioma al 40 % ya es usable); un JSON roto se ignora con un log (por eso JSON y no `.py`: un `.py` con una comilla mal puesta tumbaba el arranque). Guía para traductores: `src/locales/README.md`.
 
 1. **Toda clave nueva va a `es.json` y `en.json`** (test de paridad lo exige).
 2. `t(key, _lang=None, **fmt)`. El selector se llama **`_lang` con guion bajo a propósito**: con el nombre `lang` colisionaba con un placeholder llamado igual y el usuario veía `{lang}` literal (bug real).
@@ -108,6 +108,7 @@ Todo el texto que ve el usuario vive en `src/locales/<código>.json` (`es.json` 
 - `adult_link` (`link_target.check_anuncio`, dura y reportable): enlace + dos señales explícitas distintas, o una + dominio de `adult_domains.txt`; la URL se quita antes de contar. Fuera de `adult_explicit.txt` lo que se dice hablando de control parental («porno», «xxx», «+18», «contenido filtrado»…) (L24).
 - **Destinos fichados** (`destinos.py`): los enlaces de un ban con evidencia de spam (`REGLAS_QUE_FICHAN`; un ban manual a secas no, puede ser por insultar) se fichan por dominio, canal o invitación, nunca una plataforma (`NUNCA`): +45 en `bio_spam` y `url_blocklist` en mensajes; al desbanear se olvidan. «Cualquier t.me» no: 9 veteranos legítimos lo llevan (L50).
 - **Cuenta robada** (`cuenta_robada.py`): veterano (≥`MIN_MSGS_DE_CASA`, sin warns) callado ≥90 días según Telegram (si no se sabe, no se banea) con la bio de spam → ban federado, aviso en el grupo 24 h (nombre e id, sin enlace) mencionando a quien diga `robada_mencion` y privado con «Bien baneada / Desbanear» (dueño o admin de ese grupo). Panel ▸ Cuentas robadas y `/robadas` (L50).
+- **Bots invitados** (`bots_invitados.py`): un @bot mencionado en un grupo donde NO está contesta allí mismo (Bot API 10.0: `Message.guest_bot_caller_user`; MTProto: `guestchat_via_from`), sin entrar ni dejar rastro en el registro de administración. Tras banear a quien mencionó bots, la sonda vuelve a pasar (~8 y ~33 s) y banea (`bot_invitado`, sin frase ni reporte) lo que publicaron ESOS bots si no son miembros: uno de la casa mencionado por el spammer no se toca, y si no se sabe, tampoco. Si la respuesta llega por la Bot API y quien llamó está baneado, igual. No está comprobado que la Bot API las entregue: la traza `bot invitado @… llamado por` lo dirá (L53).
 - `via_bot_referral` (`inline_buttons.enlaces_de_referido`): botón a bot o mini-app cuyo `start`/`startapp` lleva el id de quien publica o empieza por `ref`/`r_`/`invite`/`aff` = ban por `_apply_action` (copia antes de borrar). El resto de botones vía bot no banea (encuestas, juegos, cheques `t.me/send?start=CQ…`) (L25).
 
 **Menciones**: un @ que el bot no conoce y está a una tecla del de un miembro (`external_mention.posible_errata`: una edición o dos vecinas cruzadas; dos si pasa de 9 letras; empate = nada) no puntúa, y en las salidas sin acción `errata_mencion` responde citando ese @ (`ReplyParameters.quote`, posición UTF-16; si se rechaza, sin cita). **Nunca en los primeros mensajes** (sería suplantar a un admin); los @ van en `<code>` para no mencionar a nadie; se borra al corregirlo editando (`on_edited_message`, aunque el re-escaneo esté apagado) o a los 10 min (`gentle_warnings.errata`; `barrido_job` cubre los reinicios) (L26). Si el aviso suave ya salió y una edición deja el mensaje sin hits, `_aviso_resuelto_al_editar` edita el privado a «✅ Corregido por su autor» con «Antes decía:» y borra el aviso del grupo; solo el camino del aviso suave guarda en `avisos_admin` (hay test) y una decisión ya tomada con los botones no se reescribe (L27).
@@ -258,4 +259,4 @@ GitHub guarda solo 14 días: `scripts/traffic_log.py` los acumula en `traffic/hi
 
 Lo nuevo va en su apartado temático de este fichero como invariante de 1-3 líneas (qué no hacer, el número medido, el test que lo fija), nunca al final por fecha. El relato (el caso, la medida, lo que se probó) va a `docs/lecciones.md` como lección nueva, con su línea en el índice, y aquí se cita con `(Ln)`. Un procedimiento de varios pasos que se usa a veces, a una skill en `.claude/skills/`. Las preferencias del admin y el estado del trabajo, a la memoria.
 
-*Actualizado: 2026-11-02 — 28 detectores, 1942 tests, 1.252 claves por idioma.*
+*Actualizado: 2026-11-05 — 28 detectores, 1963 tests, 1.254 claves por idioma.*

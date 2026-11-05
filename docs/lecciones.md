@@ -58,6 +58,7 @@ Una lección nueva va al final, con el número siguiente y su línea en el índi
 - [L50](#l50) · Dos veteranos con la bio de spam tras años callados: cuentas robadas y destinos que se aprenden
 - [L51](#l51) · Versiones, `update.sh` y la imagen para ARM: que otros la monten y la mantengan al día
 - [L52](#l52) · ZERO: los «Posts» del perfil, un escaparate con OCR que el bot no miraba
+- [L53](#l53) · Bots invitados: un spam que publica un bot que ni siquiera está en el grupo
 
 ---
 
@@ -1180,3 +1181,43 @@ y 22 no baneadas (7,9 %), una de ellas ZERO (al medir, su ban manual aún no est
   baneadas tenían fotos normales o un anuncio de otra cosa (un taxi): eso no es de este detector.
 - De las 21 legítimas con posts, ninguna da ni una señal suelta (0 puntos todas).
 - Las tres están en los tests con su texto (sin identificadores) y ZERO, en la escena de `scripts/simular.py`.
+
+---
+
+<a id="l53"></a>
+## L53 · Bots invitados: un spam que publica un bot que ni siquiera está en el grupo
+
+5-nov-2026, Domótica/Alexa. A las 16:10:58 una cuenta nueva escribe solo «@xcb1cv5fdbot @dsfsfds56bot @cxvxcrfdsfbot».
+El bot la banea a las 16:10:59 por mencionar cuentas de fuera (130). Ella misma borra su mensaje ese segundo. A las
+16:11:01 aparece el mensaje de @dsfsfds56bot y a las 16:11:07 el de @cxvxcrfdsfbot: el mismo anuncio en chino (billetes
+falsos «que pasan la máquina», prostitución, blanqueo) con diez botones a un mismo `t.me/…`. La sonda que limpia tras un
+ban se llevó el primero a las 16:11:02 (por los botones) y paró tras tres ids vacíos; el segundo llegó cinco segundos
+después y se quedó en el grupo hasta que un miembro avisó con @admin a las 21:47.
+
+Lo que se comprobó con la cuenta secundaria, solo leyendo:
+- Ninguno de los tres bots es miembro del grupo y el registro de administración no tiene ni una entrada suya (ni entrada
+  ni invitación). Los mensajes llevan `guestchat_via_from` = la cuenta baneada: son **bots invitados**, una función de la
+  Bot API 10.0 (PTB 22.8 ya trae `Message.guest_bot_caller_user`, `Update.guest_message` y `answer_guest_query`). Se
+  menciona el bot en un grupo cualquiera, Telegram le pasa la llamada y el bot contesta allí mismo. No hay ningún permiso
+  de grupo para apagarlo (ni en los `ChatBannedRights` de MTProto ni en los `ChatPermissions` de la Bot API).
+- Es el único caso en 30 días en los cuatro grupos.
+- No se sabe si la Bot API entrega a los demás bots del grupo el mensaje de un bot invitado: la ruta de bots
+  (`_moderate_bot_message`) no dejaba traza cuando no encontraba nada y solo mira URL fichadas y anuncios (L40), así que
+  «no lo vio» y «lo vio y lo dio por limpio» no se distinguían.
+
+Por qué la cuenta secundaria no lo pilló: no lee los mensajes de los grupos, a propósito (Telethon solo para lo que la
+Bot API no puede). Y no era un reenvío: es el mensaje propio del bot.
+
+Lo que se hizo (`bots_invitados.py`), sin depender de esa duda:
+- Si el mensaje baneado mencionaba bots, la sonda vuelve a pasar a los ~8 y ~33 s, sin repetir lo ya visto, y banea con
+  `bot_invitado` (sin frase pública ni reporte) lo que publicaron ESOS bots. Solo si el bot no es miembro del grupo: un
+  bot de la casa que el spammer mencione (el de warns) no se toca, y si no se puede saber, tampoco.
+- Si la respuesta llega por la Bot API y quien la llamó ya está baneado, lo mismo, y queda la traza
+  `bot invitado @… llamado por …` en cualquier caso: la primera vez que salga dirá si la Bot API los entrega.
+- Llamar a un bot no es spam por sí solo: si quien lo llama no está baneado, el mensaje del bot sigue la ruta de bots de
+  siempre.
+
+Lo que no se hizo: ni vigilar los mensajes con la cuenta secundaria (sería el primer uso de Telethon para leer el grupo
+en directo; decide el admin) ni banear por el texto en otro alfabeto de un mensaje (los alfabetos solo deciden en el
+nombre, la bio y el canal).
+
