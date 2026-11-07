@@ -3690,6 +3690,46 @@ async def _cleanup_consecutive_after_ban(
     return deleted
 
 
+def _se_federa(cfg, decision: Decision) -> bool:
+    """¿Este ban va a todos los grupos? El aviso tiene que decir lo que se hizo."""
+    return bool(getattr(cfg, "federation_enabled", False)) and not (decision.payload or {}).get("solo_aqui")
+
+
+def _chat_del_aviso(db: DB, chat_id: int, chat_title: str | None) -> str:
+    """El grupo del aviso, por su nombre y enlazado; el id solo si no se sabe el nombre.
+
+    Lo que llega por la cuenta secundaria no trae título (7-nov-2026: el aviso de
+    tres bots invitados decía «Chat: -1001190184646»).
+    """
+    try:
+        titulo = chat_title or db.titulo_chat(chat_id)
+        if not titulo:
+            return f"<code>{chat_id}</code>"
+        return enlaces.al_grupo(chat_id, _h.escape(titulo), db.chat_username(chat_id))
+    except Exception:  # noqa: BLE001 — el aviso sale aunque la BD no conteste
+        return _h.escape(str(chat_title or chat_id))
+
+
+def _linea_llamante(db: DB, chat_id: int, payload: dict | None) -> str:
+    """«Lo llamó: …» en el aviso de un bot invitado; vacío si no aplica.
+
+    Lo pidió el admin (7-nov-2026): el aviso decía que alguien había mencionado
+    al bot, pero no quién, aunque el dato estaba en el payload.
+    """
+    uid = (payload or {}).get("llamado_por")
+    if not uid:
+        return ""
+    nombre, usuario = str(uid), None
+    try:
+        seen = db.get_seen(chat_id, int(uid))
+        if seen is not None:
+            nombre = seen["first_name"] or seen["username"] or nombre
+            usuario = seen["username"]
+    except Exception:  # noqa: BLE001
+        pass
+    return t("hdl.llamante_line", quien=enlaces.al_perfil(uid, _h.escape(nombre), usuario), uid=uid)
+
+
 async def _apply_action(
     context: ContextTypes.DEFAULT_TYPE,
     db: DB,
@@ -3757,7 +3797,7 @@ async def _apply_action(
                         if username:
                             name_link += f" (@{username})"
                         habria = {
-                            "ban": t("hdl.would.ban"),
+                            "ban": t("hdl.would.ban") if _se_federa(cfg, decision) else t("hdl.would.ban_aqui"),
                             "kick": t("hdl.would.kick"),
                             "mute": t("hdl.would.mute"),
                             "delete": t("hdl.would.delete"),
@@ -3771,7 +3811,7 @@ async def _apply_action(
                             chat_id=cfg.admin_notify_chat_id,
                             text=t(
                                 "hdl.shadow_notice",
-                                chat=chat_title or chat_id,
+                                chat=_chat_del_aviso(db, chat_id, chat_title),
                                 user_link=name_link,
                                 uid=user_id,
                                 would=habria,
@@ -3811,11 +3851,13 @@ async def _apply_action(
                     # el grupo donde escribieron. Federado, un bot legítimo que un
                     # miembro llamó como invitado quedaría fuera también del grupo
                     # donde lo metió un admin, y lo rebanearía cada entrada.
-                    if cfg.federation_enabled and not (decision.payload or {}).get("solo_aqui"):
+                    if _se_federa(cfg, decision):
+                        # El mensaje se queda para copiarlo al aviso; se borra abajo.
                         fed_results = await federate_ban(
                             context.bot, db, user_id=user_id,
                             reason=decision.reason, rule=decision.rule,
                             triggered_in_chat=chat_id, shadow=False,
+                            conservar=(chat_id, message_id) if message_id else None,
                         )
                     else:
                         await context.bot.ban_chat_member(chat_id=chat_id, user_id=user_id)
@@ -3834,6 +3876,8 @@ async def _apply_action(
                     action_label = "ban" if decision.action in ("ban", "kick") else "delete"
                     db.mark_admin_report_action(chat_id, message_id, action_label)
                     if cfg.admin_notify_chat_id:
+                        # La copia y el aviso, cada uno por su lado: con los dos en el
+                        # mismo `try`, una copia fallida se llevaba el aviso entero.
                         try:
                             await context.bot.copy_message(
                                 chat_id=cfg.admin_notify_chat_id,
@@ -3841,13 +3885,17 @@ async def _apply_action(
                                 message_id=message_id,
                                 disable_notification=notify_prefs.sin_sonido(db, importante=False),
                             )
+                        except TelegramError as exc:
+                            log.warning("copia del mensaje al aviso fallo chat=%s msg=%s: %s",
+                                        chat_id, message_id, exc)
+                        try:
                             # Perfil clicable (es DM privado al admin, sin riesgo de visibilidad)
                             display = (first_name or username or str(user_id))
                             name_link = f'<a href="tg://user?id={user_id}">{_h.escape(display)}</a>'
                             if username:
                                 name_link += f" (@{username})"
                             accion = {
-                                "ban": t("hdl.act.ban"),
+                                "ban": t("hdl.act.ban") if _se_federa(cfg, decision) else t("hdl.act.ban_aqui"),
                                 "kick": t("hdl.act.kick"),
                                 "mute": t("hdl.act.mute"),
                                 "delete": t("hdl.act.delete"),
@@ -3860,12 +3908,13 @@ async def _apply_action(
                                 or (decision.reason or "").strip()
                                 or t("hdl.reason_generic")
                             )
-                            motivo_line = t("hdl.reason_line", reason=_h.escape(motivo))
+                            motivo_line = (t("hdl.reason_line", reason=_h.escape(motivo))
+                                           + _linea_llamante(db, chat_id, decision.payload))
                             await context.bot.send_message(
                                 chat_id=cfg.admin_notify_chat_id,
                                 text=t(
                                     "hdl.action_notice",
-                                    chat=chat_title or chat_id,
+                                    chat=_chat_del_aviso(db, chat_id, chat_title),
                                     user_link=name_link,
                                     uid=user_id,
                                     action=accion,
@@ -3878,7 +3927,8 @@ async def _apply_action(
                                 disable_notification=notify_prefs.sin_sonido(db, importante=False),
                             )
                         except TelegramError as exc:
-                            log.debug("copy_message a admin DM fallo: %s", exc)
+                            log.warning("aviso de acción al admin fallo chat=%s msg=%s: %s",
+                                        chat_id, message_id, exc)
                     try:
                         await context.bot.delete_message(chat_id=chat_id, message_id=message_id)
                     except TelegramError as exc:

@@ -21,10 +21,16 @@ async def federate_ban(
     rule: str,
     triggered_in_chat: int,
     shadow: bool,
+    conservar: tuple[int, int] | None = None,
 ) -> dict[int, str]:
     """Bania al usuario en todos los chats donde el bot es admin.
 
     Devuelve {chat_id: "ok" | "shadow" | "error: ..."}.
+
+    `conservar` = (chat_id, message_id) del mensaje que quien llama aún tiene que
+    copiar al aviso del admin y borrar él mismo: la limpieza no lo toca. Sin esto,
+    `_apply_action` iba a copiar un mensaje ya borrado, la copia fallaba y el aviso
+    entero se perdía (del 26-sep al 7-nov-2026, todo ban decidido sobre un mensaje).
 
     Nota: la persistencia en `banned_users` se hace al FINAL del loop, solo si
     al menos un chat se baneó correctamente. Evita registros huérfanos cuando
@@ -60,7 +66,8 @@ async def federate_ban(
     # Solo Bot API y solo en los chats donde el ban se aplicó de verdad.
     if not shadow:
         await _retirar_mensajes(bot, db, user_id,
-                                [cid for cid, v in results.items() if v == "ok"])
+                                [cid for cid, v in results.items() if v == "ok"],
+                                conservar=conservar)
 
     # Registrar el ban solo si al menos un chat lo aplicó (o si es shadow)
     any_applied = any(v in ("ok", "shadow") for v in results.values())
@@ -84,8 +91,9 @@ async def federate_ban(
 LIMPIEZA_VENTANA_S = 7 * 86400
 
 
-async def _retirar_mensajes(bot: Bot, db: DB, user_id: int, chats: list[int]) -> int:
-    """Borra lo que el baneado escribió en esos chats. Nunca lanza."""
+async def _retirar_mensajes(bot: Bot, db: DB, user_id: int, chats: list[int],
+                            conservar: tuple[int, int] | None = None) -> int:
+    """Borra lo que el baneado escribió en esos chats, salvo `conservar`. Nunca lanza."""
     try:
         por_chat = db.mensajes_para_limpiar(user_id, time.time() - LIMPIEZA_VENTANA_S)
     except Exception as exc:  # noqa: BLE001
@@ -93,7 +101,7 @@ async def _retirar_mensajes(bot: Bot, db: DB, user_id: int, chats: list[int]) ->
         return 0
     total = 0
     for cid in chats:
-        ids = list(por_chat.get(cid) or [])
+        ids = [i for i in (por_chat.get(cid) or []) if conservar != (cid, i)]
         # Y los avisos del bot ligados a esa persona («un admin lo revisará»,
         # avisos suaves): con sus mensajes fuera quedarían respondiendo a nada.
         try:

@@ -553,6 +553,12 @@ class DB:
                 (chat_id, title, username, chat_type, int(am_admin), int(can_restrict), int(can_delete), now, now),
             )
 
+    def titulo_chat(self, chat_id: int) -> str | None:
+        """Título del grupo según `bot_chats`, o None."""
+        with self._cur() as c:
+            row = c.execute("SELECT title FROM bot_chats WHERE chat_id=?", (chat_id,)).fetchone()
+        return row["title"] if row else None
+
     def chat_username(self, chat_id: int) -> str | None:
         with self._cur() as c:
             row = c.execute("SELECT username FROM bot_chats WHERE chat_id=?", (chat_id,)).fetchone()

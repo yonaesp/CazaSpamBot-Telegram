@@ -5,6 +5,13 @@ cada commit: para el detalle está el historial de git. Desde la v1.0.0 cada ver
 publicada lleva su número (`stable` apunta a la última); los hitos de antes, solo
 la fecha.
 
+## 2026-11 · El aviso de los bans que se deciden sobre un mensaje vuelve a llegar
+
+- Desde el 26-sep, el aviso privado de un ban decidido sobre un mensaje se perdía: la limpieza que sigue al ban borraba
+  el mensaje antes de copiarlo al aviso, y la copia fallida se llevaba el aviso. Ahora la limpieza lo deja y el aviso
+  sale aunque la copia falle.
+- El aviso de un bot invitado dice quién lo llamó, que el ban fue solo de ese grupo y el nombre del grupo.
+
 ## 2026-11 · Grupos con temas
 
 En los grupos con temas, un @admin escrito sin responder a nada enlazaba a veces un

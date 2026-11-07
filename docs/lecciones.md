@@ -60,6 +60,7 @@ Una lección nueva va al final, con el número siguiente y su línea en el índi
 - [L52](#l52) · ZERO: los «Posts» del perfil, un escaparate con OCR que el bot no miraba
 - [L53](#l53) · Bots invitados: un spam que publica un bot que ni siquiera está en el grupo
 - [L54](#l54) · Grupos con temas: un @admin que enlazaba otro tema y llegaba dos veces
+- [L55](#l55) · El aviso de ban que no llegaba: la limpieza borraba el mensaje antes de copiarlo
 
 ---
 
@@ -1274,4 +1275,31 @@ un @admin ya registrado no repite nada. El agradecimiento sale en el tema del @a
 Trampa al probarlo: los tests viejos usan `MagicMock` como mensaje, que contesta a cualquier atributo; con `bool()` y
 `is not None`, todo parecía un tema y 11 tests cayeron. `es_tema()` compara `is True` y el inicio de tema se reconoce por
 el tipo de PTB (`ForumTopicCreated`): es lo correcto también con un mensaje real.
+
+## L55 · El aviso de ban que no llegaba: la limpieza borraba el mensaje antes de copiarlo
+
+Caso (7-nov-2026, 04:45, Windows 11): «Chelsea» (8686388890), que había entrado el día antes, escribió su primer
+mensaje (61715) mencionando a @amsoslbot, @ybjsibot y @tbjsibot. Los tres contestaron como bots invitados (61716-61718).
+El bot la baneó por `external_mention_or_link` (130) y baneó a los tres bots por `bot_invitado`. Al admin le llegaron los
+tres avisos de los bots y no el de ella, y preguntó: «¿no podemos ver quién los mencionó?».
+
+Lo que pasaba, desde el 26-sep (L12): `_apply_action` audita en `moderation_log`, banea con `federate_ban`, y después
+copia el mensaje al privado, manda el aviso y borra el mensaje. Pero `federate_ban` acaba retirando los mensajes del
+baneado (`mensajes_recientes` ∪ `moderation_log`), y el que se estaba juzgando ya estaba en `moderation_log`: se borraba
+antes de copiarlo. La copia fallaba («Message to copy not found») y, como la copia y el aviso iban en el mismo `try` con
+un `log.debug`, el aviso se perdía sin rastro. Solo quedaba un `delete_message fallo: Message to delete not found`. En la
+última semana, 6 de 6 bans decididos sobre un mensaje; los de perfil (sin mensaje) y los `solo_aqui` sí avisaban. Los
+tests no lo veían: sus dobles copiaban cualquier cosa.
+
+Lo que se hizo:
+- `federate_ban(..., conservar=(chat_id, message_id))`: la limpieza deja ese mensaje, que `_apply_action` copia y borra.
+- La copia y el aviso, en `try` separados y con `log.warning`: si la copia falla, el aviso sale igual.
+- Aviso de bot invitado: «🗣 Lo llamó: <nombre enlazado> (id)» (`_linea_llamante`, del payload `llamado_por` y
+  `seen_users`), «Baneado (solo en este grupo)» cuando el ban no se federa (también con la federación apagada) y el
+  nombre del grupo enlazado cuando llega por la cuenta secundaria sin título (`_chat_del_aviso`, de `bot_chats`).
+- `tests/test_aviso_accion.py`, con un doble de Telegram en el que lo borrado ya no se puede copiar ni borrar; con el
+  arreglo quitado, el test del caso real falla.
+
+De paso quedó resuelto lo que L53 dejaba abierto: la Bot API SÍ entrega los mensajes de un bot invitado (las dos trazas,
+`(cuenta secundaria)` a las 04:45:03,9 y `(Bot API)` a las 04:45:04,3; `marcar` evitó actuar dos veces).
 
