@@ -25,10 +25,10 @@ _SPANISH_STOPWORDS = frozenset({
     # Verbos comunes
     "es", "son", "está", "están", "estaba", "fue", "será", "ha", "han",
     "hay", "haber", "tiene", "tengo", "tenía", "tener", "puede", "pueden",
-    "podría", "ser", "estar", "fue", "hizo", "hacer",
+    "podría", "ser", "estar", "hizo", "hacer",
     # Pronombres
     "yo", "tú", "él", "ella", "nosotros", "vosotros", "ellos", "ellas",
-    "me", "te", "le", "lo", "la", "se", "su", "mi", "tu", "nos", "os", "les",
+    "me", "te", "le", "lo", "se", "su", "mi", "tu", "nos", "os", "les",
     # Negación / afirmación
     "no", "sí", "tampoco", "también", "ya", "aún", "todavía",
     # Conectores y adverbios
@@ -45,7 +45,7 @@ _SPANISH_STOPWORDS = frozenset({
     "podemos", "debemos", "vamos", "vais", "van",
     # Muletillas y comunes en charla
     "vale", "venga", "pues", "tal", "qué", "cuál", "quién",
-    "alguien", "ayuda", "sabe", "sabéis", "veo", "creo", "pienso",
+    "ayuda", "sabe", "sabéis", "veo", "creo", "pienso",
 })
 
 # Inglés: sin marcas ortográficas propias, así que solo cuentan las stopwords.

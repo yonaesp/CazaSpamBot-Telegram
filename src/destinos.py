@@ -120,6 +120,60 @@ def aprender_de_ban(db, user_id: int, texto: str | None, reglas: str) -> int:
         return 0
 
 
+# Bots: un bot de spam se ficha como `t.me/<bot>`, que es lo mismo que enlazarlo, y
+# así una mención y un enlace al mismo bot cuentan igual (L55). Fichan los bots
+# mencionados en un ban con contenido de spam (las reglas de contenido de
+# `autoaprendizaje` más las que ya fichan destinos; hay test que las mantiene a la
+# par) y los bots invitados con señales de spam (`handlers._bot_de_spam`).
+REGLAS_QUE_FICHAN_BOTS = REGLAS_QUE_FICHAN | frozenset({
+    "commercial_ad", "investment_scam", "url_blocklist", "contact_spam",
+    "offplatform_contact", "tg_deeplink", "inline_buttons_from_user",
+    "external_mention_or_link", "dormant_bot_mention", "bot_fichado", "llama_bot_de_spam",
+})
+_BOT_RE = re.compile(r"[a-z][a-z0-9_]{1,28}bot")
+
+
+def clave_bot(username: str | None) -> str | None:
+    """`t.me/<bot>` de un usuario de bot, o None si no es un bot o es uno conocido."""
+    from .bots_invitados import BOTS_CONOCIDOS
+    u = (username or "").lstrip("@").lower()
+    if not _BOT_RE.fullmatch(u) or u in BOTS_CONOCIDOS:
+        return None
+    return f"t.me/{u}"
+
+
+def fichar_bot(db, username: str | None, user_id: int, regla: str) -> bool:
+    """Ficha un bot de spam. `user_id`: la cuenta cuyo desbaneo lo olvida. Nunca lanza."""
+    k = clave_bot(username)
+    if not k:
+        return False
+    try:
+        db.fichar_destino(k, user_id, regla)
+        return True
+    except Exception as exc:  # noqa: BLE001
+        log.debug("destinos: no se pudo fichar el bot %s: %s", k, exc)
+        return False
+
+
+def aprender_bots_de_ban(db, user_id: int, texto: str | None, reglas: str) -> list[str]:
+    """Ficha los bots que mencionaba un mensaje baneado por contenido de spam."""
+    from .bots_invitados import mencionados
+    if not set((reglas or "").split("+")) & REGLAS_QUE_FICHAN_BOTS:
+        return []
+    hechos = [u for u in sorted(mencionados(texto)) if fichar_bot(db, u, user_id, reglas)]
+    if hechos:
+        log.info("destinos: fichados los bots %s mencionados por user=%s (%s)", hechos, user_id, reglas)
+    return hechos
+
+
+def bots_fichados_en(texto: str | None, fichados_: frozenset[str]) -> list[str]:
+    """Los @bots del texto que ya están fichados, como `@usuario`."""
+    from .bots_invitados import mencionados
+    if not fichados_:
+        return []
+    return sorted("@" + u for u in mencionados(texto) if clave_bot(u) in fichados_)
+
+
 def olvidar(db, user_id: int) -> None:
     """Al desbanear, lo que se fichó solo por esa cuenta sobra."""
     try:

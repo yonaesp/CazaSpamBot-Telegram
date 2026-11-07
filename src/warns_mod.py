@@ -217,8 +217,15 @@ async def aplicar_warn(
     else:
         mention = f'<a href="tg://user?id={target_id}">user</a>'
 
-    # Borrar el mensaje infractor, si se sabe cuál es
+    # Borrar el mensaje infractor, si se sabe cuál es, después de guardarlo
+    # (antispam-conventions: nunca borrar sin haberlo guardado; auditoría, L57).
     if target_msg_id:
+        guardado = db.mensaje_reciente(chat_id, target_msg_id)
+        db.log_action(chat_id=chat_id, user_id=target_id, username=getattr(target_user, "username", None),
+                      message_id=target_msg_id, rule="manual_warn", action="delete", score=0,
+                      mode="shadow" if cfg.shadow else "active",
+                      payload={"motivo": reason, "warns": n,
+                               "texto": guardado[1] if guardado and guardado[0] == target_id else None})
         try:
             await context.bot.delete_message(chat_id=chat_id, message_id=target_msg_id)
         except TelegramError:
@@ -235,6 +242,11 @@ async def aplicar_warn(
         # una conjetura que despistaba cuando el motivo era otro (usuario ya fuera,
         # admin intocable, límite de la API…). Revisión del 21-sep-2026, clase 3.
         motivo_fallo = ""
+        # La sanción por límite de warns, auditada como toda acción (auditoría, L57).
+        db.log_action(chat_id=chat_id, user_id=target_id, username=None, message_id=None,
+                      rule="warns_limit", action=action, score=0,
+                      mode="shadow" if cfg.shadow else "active",
+                      payload={"warns": n, "limite": limit, "motivo": reason})
         if action == "ban":
             motivo_ban = t("reason.warns_limit", n=n, limit=limit,
                            last_reason=reason or t("reason.no_reason"))

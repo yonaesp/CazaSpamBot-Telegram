@@ -1,0 +1,6 @@
+# Además de lo de serie (E, F), las reglas que cazan fallos de verdad y no estilo
+# (7-nov-2026, L56): bugbear (B: `strip("www.")` que quita letras sueltas, sets con
+# repetidos), asyncio (ASYNC: bloquear el bucle; RUF006: tareas sin guardar que el
+# recolector puede matar) y errores de pylint (PLE: caracteres invisibles sin escapar).
+[lint]
+extend-select = ["B", "ASYNC", "RUF006", "PLE"]

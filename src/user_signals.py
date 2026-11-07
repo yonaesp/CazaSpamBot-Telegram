@@ -244,7 +244,11 @@ def render_markup(sig: Optional[UserSignals]) -> str:
         parts.append(t("signals.newest_photo", date=fechas.dia(sig.newest_photo, "%Y-%m-%d")))
     if sig.is_premium:
         parts.append(t("signals.premium"))
+    bio = ""
     if sig.bio:
         import html as _html
-        parts.append(t("signals.bio", bio=_html.escape(sig.bio)))
-    return " · ".join(parts[:4]) + ("\n" + parts[4] if len(parts) > 4 else "")
+        bio = (t("signals.bio", bio=_html.escape(sig.bio)))
+    # La bio, siempre en su línea: con premium y dos fotos de fechas distintas era el
+    # sexto elemento y `parts[:4]` + `parts[4]` la tiraba (auditoría, L57).
+    linea = " · ".join(parts)
+    return linea + ("\n" + bio if bio else "")

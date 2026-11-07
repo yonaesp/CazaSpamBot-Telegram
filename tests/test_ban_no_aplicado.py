@@ -97,5 +97,5 @@ def test_el_aviso_deja_aceptar_la_decision_del_otro_admin():
     fuente = Path("src/handlers.py").read_text()
     i = fuente.index("async def on_readmision_callback")
     bloque = fuente[i:i + 1200]
-    assert "revoke_ban" in bloque, "no permite levantar el ban de la lista"
-    assert "unban_chat_member" in bloque, "lo quita de la lista pero lo deja expulsado"
+    # `unfederate_ban` quita de la lista, desbanea en todos y olvida lo aprendido (L57).
+    assert "await unfederate_ban(" in bloque, "no levanta el ban por unfederate_ban"

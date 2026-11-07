@@ -234,8 +234,9 @@ async def _reconcile_banned_users(context, db) -> None:
     cutoff = _t.time() - 30 * 86400
     with db._cur() as c:
         rows = c.execute(
+            # Solo los federados: un ban de un solo grupo (warns) no es «a medias».
             "SELECT user_id FROM banned_users "
-            "WHERE revoked_at IS NULL AND banned_at > ?",
+            "WHERE revoked_at IS NULL AND banned_at > ? AND COALESCE(federated, 1)=1",
             (cutoff,),
         ).fetchall()
     pending = [r["user_id"] for r in rows]

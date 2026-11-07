@@ -916,6 +916,14 @@ class DB:
                 fuera.setdefault(r["chat_id"], set()).add(int(r["mid"]))
         return {cid: sorted(ids) for cid, ids in fuera.items()}
 
+    def ultimo_mensaje_de(self, chat_id: int, user_id: int) -> int | None:
+        """Id del último mensaje guardado de esa persona en ese chat, o None."""
+        with self._cur() as c:
+            fila = c.execute(
+                "SELECT msg_id FROM mensajes_recientes WHERE chat_id=? AND user_id=? "
+                "ORDER BY ts DESC, msg_id DESC LIMIT 1", (chat_id, user_id)).fetchone()
+        return int(fila["msg_id"]) if fila else None
+
     def mensaje_reciente(self, chat_id: int, msg_id: int):
         """(user_id, texto) de un mensaje guardado, o None si ya no se tiene."""
         with self._cur() as c:
@@ -1156,9 +1164,13 @@ class DB:
             )
 
     def is_banned(self, user_id: int) -> bool:
+        """¿Ban FEDERADO vigente? El ban de un solo grupo (warns con
+        `warn_ban_federado=0`) no cuenta: si contara, al escribir o entrar en otro grupo
+        se le federaba igual (auditoría, L57)."""
         with self._cur() as c:
             row = c.execute(
-                "SELECT 1 FROM banned_users WHERE user_id=? AND revoked_at IS NULL",
+                "SELECT 1 FROM banned_users WHERE user_id=? AND revoked_at IS NULL "
+                "AND COALESCE(federated, 1)=1",
                 (user_id,),
             ).fetchone()
         return bool(row)

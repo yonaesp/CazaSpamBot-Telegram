@@ -5,6 +5,16 @@ cada commit: para el detalle está el historial de git. Desde la v1.0.0 cada ver
 publicada lleva su número (`stable` apunta a la última); los hitos de antes, solo
 la fecha.
 
+## 2026-11 · Bots de spam que se banean de antemano, y una auditoría completa
+
+- Un bot invitado con señales de spam (ya fichado, nombre o texto en otro alfabeto, llamado junto a otros, o lo llamó
+  alguien ya baneado) se banea también en los demás grupos antes de que nadie lo llame allí, y quien lo llamó, si es
+  nuevo, también. Mencionar un bot de spam fichado es ban (salvo a quien tiene confianza).
+- Auditoría del código: un «@admin» con spam ya no se salta los detectores; el ban por reacciones ya no borra el
+  mensaje de otra persona; vuelven a funcionar el destino de los enlaces a canales y las citas de canales ajenos; la
+  revisión «Legítimo/Spam» aprende del mensaje revisado; varios bans que no quedaban registrados ahora sí.
+- Comprobaciones automáticas: `scripts/verificar.sh` (ruff con más reglas, suite y simulador) antes de cada commit.
+
 ## 2026-11 · El aviso de los bans que se deciden sobre un mensaje vuelve a llegar
 
 - Desde el 26-sep, el aviso privado de un ban decidido sobre un mensaje se perdía: la limpieza que sigue al ban borraba

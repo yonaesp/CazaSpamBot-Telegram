@@ -154,7 +154,9 @@ async def _leer(context, urls, es_moderado) -> Destino | None:
     for clave, url in claves:
         guardado = _cache.get(clave)
         if guardado is not None and (time.time() - guardado[0]) < _TTL_S:
-            if guardado[1] is not None:
+            # Lo cacheado pasa el mismo filtro que lo recién leído: antes la primera
+            # lectura de un enlace se descartaba y la segunda, desde la caché, no.
+            if guardado[1] is not None and not _es_propio(guardado[1], es_moderado):
                 return guardado[1]
             continue
         pendientes.append((clave, url))
@@ -169,16 +171,35 @@ async def _leer(context, urls, es_moderado) -> Destino | None:
     for clave, url in pendientes:
         destino = await _resolver(client, clave, url)
         _guardar(clave, destino)
-        if destino is None:
-            continue
-        if es_moderado is not None and destino.chat_id is not None:
-            try:
-                if es_moderado(destino.chat_id):
-                    continue             # enlace a uno de nuestros grupos
-            except Exception:  # noqa: BLE001
-                pass
+        if destino is None or _es_propio(destino, es_moderado):
+            continue                     # enlace a uno de nuestros grupos
         return destino
     return None
+
+
+def _es_propio(destino: "Destino", es_moderado) -> bool:
+    """¿Es uno de nuestros grupos? Sin forma de saberlo, no."""
+    if es_moderado is None or destino.chat_id is None:
+        return False
+    try:
+        return bool(es_moderado(destino.chat_id))
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def _id_bot_api(entidad) -> int | None:
+    """El id como lo da la Bot API (`-100…` en canales y supergrupos).
+
+    Telethon da el id crudo (positivo) y nuestros grupos se guardan con el de la Bot
+    API: sin convertirlo, ningún destino coincidía nunca con un grupo propio (L57).
+    """
+    if entidad is None or getattr(entidad, "id", None) is None:
+        return None
+    try:
+        from telethon.utils import get_peer_id
+        return int(get_peer_id(entidad))
+    except Exception:  # noqa: BLE001
+        return getattr(entidad, "id", None)
 
 
 def _guardar(clave: str, destino: "Destino | None") -> None:
@@ -216,7 +237,7 @@ async def _por_invitacion(client, hash_: str, url: str) -> Destino | None:
     if not titulo and not about:
         return None
     return Destino(titulo=titulo[:300], descripcion=str(about)[:600], url=url,
-                   chat_id=getattr(chat, "id", None))
+                   chat_id=_id_bot_api(chat))
 
 
 async def _por_username(client, username: str, url: str) -> Destino | None:
@@ -245,4 +266,4 @@ async def _por_username(client, username: str, url: str) -> Destino | None:
     if not titulo and not about:
         return None
     return Destino(titulo=str(titulo)[:300], descripcion=str(about)[:600], url=url,
-                   chat_id=getattr(entidad, "id", None))
+                   chat_id=_id_bot_api(entidad))

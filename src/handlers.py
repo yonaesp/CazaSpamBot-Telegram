@@ -13,6 +13,7 @@ from collections import deque
 import aiohttp
 from telegram import (
     ChatMemberUpdated,
+    MessageEntity,
     Update,
 )
 from telegram.constants import ChatMemberStatus
@@ -31,7 +32,7 @@ from . import llm_veto
 from . import admin_report, autoaprendizaje, enlaces, errata_mencion, gentle_warning, greetings, learning, notify_prefs, quips, rule_explain, story_reader, trust as _trust, user_signals, verification
 from .config import Config
 from .db import DB
-from .detectors import Hit
+from .detectors import Hit, trozo_entidad
 from .i18n import t
 from .detectors import cas as cas_det
 from .detectors import external_mention as ext_det
@@ -60,7 +61,7 @@ from .detectors import reaction_farming as react_det
 from .detectors import tg_deeplink as tgdeep_det
 from .detectors import unicode_script as script_det
 from .detectors import url_blocklist as url_det
-from .federation import federate_ban
+from .federation import federate_ban, unfederate_ban
 from .notifier import Notifier
 from .scoring import Decision, decide
 
@@ -976,7 +977,7 @@ async def _bot_añadido(context: ContextTypes.DEFAULT_TYPE, db: DB, cfg: Config,
                 chat_id=cfg.admin_notify_chat_id,
                 text=t(
                     "hdl.bot_added_kicked",
-                    chat=cmu.chat.title or cmu.chat.id,
+                    chat=_h.escape(str(cmu.chat.title or cmu.chat.id)),
                     bot_username=user.username or "?",
                     bot_id=user.id,
                     adder=_h.escape(who),
@@ -1769,7 +1770,12 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     # OJO: el caption de una historia lo escribe el spammer en SU canal, así que
     # podría poner "@admins" ahí para saltarse todos los detectores de golpe. La vía
     # de aviso a admins es para humanos pidiendo ayuda, no para texto importado.
-    if getattr(msg, "story", None) is None and admin_report.contains_admin_mention(msg):
+    # Y solo si es un aviso LIMPIO (auditoría del 7-nov-2026, L57): antes cualquier
+    # «@admin» saltaba todos los detectores, así que «@admin 🔥 packs t.me/+XXXX» de una
+    # cuenta nueva no se juzgaba. Con enlaces, otras menciones, reenvío, botones, otro
+    # alfabeto o un texto largo, pasa por el pipeline entero como cualquier mensaje.
+    if (getattr(msg, "story", None) is None and admin_report.contains_admin_mention(msg)
+            and _aviso_admin_limpio(db, cfg, msg)):
         await admin_report.handle_admin_mention(context, db, msg)
         return
 
@@ -1859,7 +1865,7 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     ), "contact"))
     # 3d-ter2) Promoción de canal externo mediante cita a otro chat (external_reply):
     # el reclamo va en la cita y el texto visible es un CTA mínimo ("Please Join").
-    hits.append(_sin_tumbar(lambda: extreply_det.check(msg, is_first_msg=is_first, is_moderated_chat=cfg.is_moderated), "extreply"))
+    hits.append(_sin_tumbar(lambda: extreply_det.check(msg, is_first_msg=is_first, is_moderated_chat=lambda c: _se_modera(db, cfg, c)), "extreply"))
     # 3d-quat) Detectores de dinero/trabajo (anuncio comercial + testimonio de
     # estafa de inversión). Su agresividad la modula el ajuste money_guard del chat:
     # 'normal' (defecto), 'soft' (solo casos muy claros) u 'off'. Es lo que pediste
@@ -2165,7 +2171,9 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     # cuando ya hay un hit de enlace, así que son unas pocas consultas al día.
     enlaces_tg = _enlaces_tg_de(real)
     if enlaces_tg:
-        destino = await link_reader.leer(context, enlaces_tg, es_moderado=cfg.is_moderated)
+        # `_se_modera`, no `cfg.is_moderated`: sin lista explícita, este dice que sí a
+        # CUALQUIER chat y todo destino se daba por grupo propio (auditoría, L57).
+        destino = await link_reader.leer(context, enlaces_tg, es_moderado=lambda c: _se_modera(db, cfg, c))
         destino_hit = link_target_det.check(destino)
         # Traza de lo que se vio del destino. El 1-oct-2026 no quedó ninguna, y para
         # saber por qué no saltó hubo que volver a pedir la ficha a mano.
@@ -2484,7 +2492,9 @@ async def on_message_reaction(update: Update, context: ContextTypes.DEFAULT_TYPE
         context, db, cfg,
         chat_id=mru.chat.id, chat_title=mru.chat.title,
         user_id=user.id, username=user.username,
-        message_id=mru.message_id, decision=decision,
+        # None: mru.message_id es el mensaje AL QUE se reaccionó, de otra persona; se
+        # copiaba al aviso como si fuera suyo y se borraba del grupo (auditoría, L57).
+        message_id=None, decision=decision,
         original_text=t("hdl.reaction_farming_text", count=count,
                         seconds=cfg.reaction_threshold_seconds),
         first_name=user.first_name,
@@ -2981,12 +2991,16 @@ async def on_pending_review_callback(update: Update, context: ContextTypes.DEFAU
         await q.answer(t("hdl.callback_invalid", error=exc))
         return
 
-    # Recuperar texto del msg vía seen_users.last_msg_text (lo guardamos al recibirlo)
+    # El texto del mensaje REVISADO, no el último de la persona (auditoría, L57):
+    # `last_msg_text` era el último que escribió, y en 4 de 5 revisiones ya era otro;
+    # «Legítimo» podía guardar como bueno el spam que vino después. Si no se tiene
+    # el revisado (o es de otra persona), no se aprende nada.
     seen = db.get_seen(chat_id, user_id)
-    text = (seen["last_msg_text"] if seen else "") or ""
+    guardado = db.mensaje_reciente(chat_id, msg_id)
+    text = guardado[1] if guardado and guardado[0] == user_id else ""
 
     if verdict == "legit":
-        # Añadir a samples ham + borrar aviso público + suprimir reglas para ese user
+        # Añadir a samples ham + borrar aviso público (no suprime reglas: eso lo da la confianza)
         if text and len(text) >= 5:
             norm = learning.normalize(text)
             db.add_sample(
@@ -3090,7 +3104,8 @@ async def _moderate_bot_message(context, db, cfg, msg, user) -> None:
     # bots de moderación legítimos: caso real, @MissRose_bot expulsada de 4 grupos
     # por publicar su aviso de warn, que lleva un botón, tras 685 mensajes buenos.
     # Para un bot solo cuentan señales de spam REAL:
-    hits.append(url_det.check(msg, cfg.url_blocklist, is_first_msg=True, fichados=destinos.fichados(db)))
+    hits.append(url_det.check(msg, cfg.url_blocklist, is_first_msg=True, fichados=destinos.fichados(db),
+                              menciones=False))
     hits.append(comad_det.check(msg, is_first_msg=True))
     real = [h for h in hits if h]
     if not real:
@@ -3150,6 +3165,13 @@ async def _moderate_channel_message(context, db, cfg, msg) -> None:
     mode = "shadow" if cfg.shadow else "active"
     log.info("CHANNEL spam sender_chat=%s (%s) chat=%s reglas=%s → ban canal (%s)",
              sc.id, sc_name, msg.chat_id, rule, mode)
+    # Auditado ANTES de borrar (antispam-conventions; auditoría, L57).
+    db.log_action(
+        chat_id=msg.chat_id, user_id=sc.id, username=(sc.username or None),
+        message_id=msg.message_id, rule=rule, action="ban", score=score, mode=mode,
+        payload={"sender_chat": True, "title": sc.title, "rules": [h.rule for h in real],
+                 "texto": (msg.text or msg.caption or "")[:1000]},
+    )
     if not cfg.shadow:
         try:
             await context.bot.ban_chat_sender_chat(chat_id=msg.chat_id, sender_chat_id=sc.id)
@@ -3159,11 +3181,6 @@ async def _moderate_channel_message(context, db, cfg, msg) -> None:
             await context.bot.delete_message(chat_id=msg.chat_id, message_id=msg.message_id)
         except TelegramError as exc:
             log.debug("delete channel-sender msg fallo: %s", exc)
-    db.log_action(
-        chat_id=msg.chat_id, user_id=sc.id, username=(sc.username or None),
-        message_id=msg.message_id, rule=rule, action="ban", score=score, mode=mode,
-        payload={"sender_chat": True, "title": sc.title, "rules": [h.rule for h in real]},
-    )
     if cfg.admin_notify_chat_id:
         prefix = t("hdl.shadow_prefix") if cfg.shadow else ""
         try:
@@ -3260,7 +3277,7 @@ async def _moderate_via_bot_message(context, db, cfg, msg, user) -> bool:
                 chat_id=cfg.admin_notify_chat_id,
                 text=t(
                     "hdl.via_bot_deleted",
-                    chat=msg.chat.title or msg.chat_id,
+                    chat=_h.escape(str(msg.chat.title or msg.chat_id)),
                     uid=user.id,
                     name=display,
                     via_bot=via_uname or "?",
@@ -3473,6 +3490,123 @@ async def _banear_bot_invitado(
         original_text=texto, first_name=getattr(bot_user, "first_name", None),
     )
     bots_invitados.olvidar(chat_id, bot_user.id)
+    username = getattr(bot_user, "username", None)
+    llamados = (bots_invitados.anotar_llamada(chat_id, llamado_por, bot_user.id, username)
+                if llamado_por else [(bot_user.id, username)])
+    señales = _señales_bot_de_spam(
+        db, cfg, chat_id, username=username, nombre=getattr(bot_user, "first_name", None),
+        texto=texto, llamante=llamado_por, n_llamados=len(llamados))
+    if señales:
+        try:
+            await _bot_de_spam(context, db, cfg, chat_id=chat_id, bots=llamados,
+                               llamante=llamado_por, señales=señales)
+        except Exception as exc:  # noqa: BLE001 — el ban del bot ya está hecho
+            log.warning("bot de spam: fallo al extender el ban chat=%s bot=%s: %s",
+                        chat_id, bot_user.id, exc, exc_info=True)
+
+
+# Quien llama a un bot de spam se banea si su confianza no llega a esto: la misma
+# frontera que en `on_message` separa «se actúa» de «revisión humana».
+LLAMANTE_TRUST_MAX = 40
+
+
+def _señales_bot_de_spam(db: DB, cfg: Config, chat_id: int, *, username: str | None,
+                         nombre: str | None, texto: str | None, llamante: int | None,
+                         n_llamados: int) -> list[str]:
+    """Por qué un bot invitado es de spam; vacío si no hay nada más que haber escrito.
+
+    Ninguna mira el tema del mensaje: son las del caso real (7-nov-2026, tres bots con
+    el nombre en chino que una cuenta nueva llamó a la vez).
+    """
+    señales: list[str] = []
+    k = destinos.clave_bot(username)
+    if k and k in destinos.fichados(db):
+        señales.append("fichado")
+    if n_llamados >= 2:
+        señales.append(f"llamado junto a otros {n_llamados - 1}")
+    try:
+        permitidos = verification.allowed_scripts_de(db, chat_id, cfg)
+        if any(verification._texto_en_otro_alfabeto(x, permitidos) for x in (nombre, texto)):
+            señales.append("otro alfabeto")
+    except Exception as exc:  # noqa: BLE001
+        log.debug("bot de spam: alfabetos ilegibles chat=%s: %s", chat_id, exc)
+    if llamante and db.is_banned(llamante):
+        señales.append("quien lo llamó está baneado")
+    return señales
+
+
+async def _bot_de_spam(context: ContextTypes.DEFAULT_TYPE, db: DB, cfg: Config, *,
+                       chat_id: int, bots: list[tuple[int, str | None]],
+                       llamante: int | None, señales: list[str]) -> None:
+    """Un bot invitado de spam: ficharlo, banearlo en los demás grupos y a quien lo llamó.
+
+    Pedido del admin (7-nov-2026): adelantarse a que escriba en otro grupo. Se ficha
+    como `t.me/<bot>` (mencionarlo en adelante es `bot_fichado`) y se banea en cada grupo
+    moderado donde no es miembro; donde lo metió un admin, se queda.
+    """
+    for bot_id, username in bots:
+        destinos.fichar_bot(db, username, bot_id, "bot_invitado")
+        if bots_invitados.marcar("preventivo", bot_id):
+            await _banear_bot_en_los_demas(context, db, cfg, origen=chat_id, bot_id=bot_id,
+                                           username=username, señales=señales)
+    if llamante and bots_invitados.marcar("llamante", chat_id, llamante):
+        await _banear_llamante(context, db, cfg, chat_id=chat_id, llamante=llamante,
+                               bots=bots, señales=señales)
+
+
+async def _banear_bot_en_los_demas(context: ContextTypes.DEFAULT_TYPE, db: DB, cfg: Config, *,
+                                   origen: int, bot_id: int, username: str | None,
+                                   señales: list[str]) -> int:
+    """Banea un bot de spam en los grupos donde aún no ha escrito. Devuelve cuántos."""
+    n = 0
+    for cid in db.admin_chats():
+        if cid == origen or not _se_modera(db, cfg, cid):
+            continue
+        if await bots_invitados.es_miembro(context.bot, cid, bot_id):
+            continue                      # lo metió un admin (o no se pudo saber): se queda
+        modo = "shadow" if cfg.shadow else "active"
+        if not cfg.shadow:
+            try:
+                await context.bot.ban_chat_member(chat_id=cid, user_id=bot_id)
+            except TelegramError as exc:
+                log.warning("bot de spam: no se pudo banear @%s en chat=%s: %s", username, cid, exc)
+                continue
+        db.log_action(chat_id=cid, user_id=bot_id, username=username, message_id=None,
+                      rule="bot_de_spam_preventivo", action="ban", score=100, mode=modo,
+                      payload={"origen": origen, "señales": señales, "is_bot": True})
+        n += 1
+    log.info("bot de spam @%s (id=%s): baneado de antemano en %d grupos más (%s)%s",
+             username, bot_id, n, ", ".join(señales), " [shadow]" if cfg.shadow else "")
+    return n
+
+
+async def _banear_llamante(context: ContextTypes.DEFAULT_TYPE, db: DB, cfg: Config, *,
+                           chat_id: int, llamante: int, bots: list[tuple[int, str | None]],
+                           señales: list[str]) -> bool:
+    """Ban de quien llamó a un bot de spam, si no tiene confianza. True si se actuó."""
+    if db.is_banned(llamante):
+        return False                      # ya lo cazó su propio mensaje (caso del 7-nov)
+    confianza = _trust_score_cached(context, db, chat_id, llamante)
+    if confianza >= LLAMANTE_TRUST_MAX:
+        log.info("llamó a un bot de spam user=%s chat=%s, pero su confianza es %d: no se banea",
+                 llamante, chat_id, confianza)
+        return False
+    msg_id = db.ultimo_mensaje_de(chat_id, llamante)
+    guardado = db.mensaje_reciente(chat_id, msg_id) if msg_id else None
+    seen = db.get_seen(chat_id, llamante)
+    nombres = ", ".join("@" + u if u else str(b) for b, u in bots)
+    await _apply_action(
+        context, db, cfg, chat_id=chat_id, chat_title=None, user_id=llamante,
+        username=seen["username"] if seen is not None else None, message_id=msg_id,
+        decision=Decision(
+            action="ban", score=100, rule="llama_bot_de_spam",
+            reason=t("reason.llama_bot_de_spam", bots=nombres),
+            payload={"bots": [b for b, _u in bots], "señales": señales, "confianza": confianza},
+        ),
+        original_text=guardado[1] if guardado else None,
+        first_name=seen["first_name"] if seen is not None else None,
+    )
+    return True
 
 
 async def revisar_bot_desde_mtproto(
@@ -3690,6 +3824,43 @@ async def _cleanup_consecutive_after_ban(
     return deleted
 
 
+AVISO_ADMIN_MAX_CAR = 400
+
+
+def _aviso_admin_limpio(db: DB, cfg: Config, msg) -> bool:
+    """¿Es un «@admin» que solo pide ayuda? Si no, se juzga como cualquier mensaje.
+
+    Fuera: enlaces, menciones a alguien que no sea @admin, reenvíos, botones, vía bot,
+    un texto largo o escrito en un alfabeto que el chat no permite (L57).
+    """
+    texto = msg.text or msg.caption or ""
+    if len(texto) > AVISO_ADMIN_MAX_CAR:
+        return False
+    if (getattr(msg, "forward_origin", None) or getattr(msg, "reply_markup", None)
+            or getattr(msg, "via_bot", None)):
+        return False
+    for ent in list(getattr(msg, "entities", None) or []) + list(getattr(msg, "caption_entities", None) or []):
+        tipo = getattr(ent, "type", None)
+        if tipo in (MessageEntity.URL, MessageEntity.TEXT_LINK, MessageEntity.TEXT_MENTION):
+            return False
+        if tipo == MessageEntity.MENTION:
+            trozo = trozo_entidad(texto, ent.offset, ent.length)
+            if not admin_report._ADMIN_RE.fullmatch(trozo or ""):
+                return False
+    if "t.me/" in texto.lower() or "http" in texto.lower():
+        return False
+    try:
+        # Sin el propio «@admin»: sus letras latinas rebajaban la proporción y un texto
+        # entero en chino detrás de «@admins» pasaba por limpio.
+        resto = admin_report._ADMIN_RE.sub(" ", texto)
+        if verification._texto_en_otro_alfabeto(resto, verification.allowed_scripts_de(db, msg.chat_id, cfg)):
+            return False
+    except Exception as exc:  # noqa: BLE001 — sin saber el alfabeto, se juzga entero
+        log.debug("aviso @admin: alfabetos ilegibles: %s", exc)
+        return False
+    return True
+
+
 def _se_federa(cfg, decision: Decision) -> bool:
     """¿Este ban va a todos los grupos? El aviso tiene que decir lo que se hizo."""
     return bool(getattr(cfg, "federation_enabled", False)) and not (decision.payload or {}).get("solo_aqui")
@@ -3785,13 +3956,18 @@ async def _apply_action(
                 # EVALUAR lo que haría (marcado [SHADOW]). Es lo más útil al probar:
                 # ver los "habría baneado" en Telegram en vez de en docker logs.
                 if cfg.admin_notify_chat_id:
-                    try:
-                        if message_id:
+                    # Copia y aviso por separado, como en el modo real (L55).
+                    if message_id:
+                        try:
                             await context.bot.copy_message(
                                 chat_id=cfg.admin_notify_chat_id,
                                 from_chat_id=chat_id, message_id=message_id,
                                 disable_notification=notify_prefs.sin_sonido(db, importante=False),
                             )
+                        except TelegramError as exc:
+                            log.warning("shadow: copia del mensaje al aviso fallo chat=%s msg=%s: %s",
+                                        chat_id, message_id, exc)
+                    try:
                         display = (first_name or username or str(user_id))
                         name_link = f'<a href="tg://user?id={user_id}">{_h.escape(display)}</a>'
                         if username:
@@ -3823,7 +3999,7 @@ async def _apply_action(
                             disable_notification=notify_prefs.sin_sonido(db, importante=False),
                         )
                     except TelegramError as exc:
-                        log.debug("shadow notify fallo: %s", exc)
+                        log.warning("shadow: aviso al admin fallo chat=%s: %s", chat_id, exc)
             else:
                 # Reportar oficialmente a Telegram ANTES del ban — SOLO si:
                 #   - decision.action == "ban" (kick es recuperable, no merece reporte permanente)
@@ -3866,6 +4042,7 @@ async def _apply_action(
                     destinos.aprender_de_ban(
                         db, user_id, original_text or (decision.payload or {}).get("bio_preview"),
                         decision.rule)
+                    destinos.aprender_bots_de_ban(db, user_id, original_text, decision.rule)
                 elif decision.action == "kick":
                     await context.bot.ban_chat_member(chat_id=chat_id, user_id=user_id)
                     await asyncio.sleep(0.5)
@@ -4073,15 +4250,10 @@ async def on_readmision_callback(update: Update, context: ContextTypes.DEFAULT_T
     if accion == "lift":
         # Aceptar la decisión del otro admin: fuera de la lista federada y
         # desbaneado en todos los grupos, para que deje de rebotar.
-        db.revoke_ban(user_id, revoked_by=cfg.admin_user_id)
-        for fila in db.all_chats():
-            if not fila["am_admin"]:
-                continue
-            try:
-                await context.bot.unban_chat_member(
-                    chat_id=fila["chat_id"], user_id=user_id, only_if_banned=True)
-            except TelegramError:
-                pass
+        # Por `unfederate_ban`, que además olvida lo aprendido de esa cuenta (muestras
+        # y destinos fichados); a mano no se olvidaba (auditoría, L57).
+        await unfederate_ban(context.bot, db, user_id=user_id, revoked_by=cfg.admin_user_id,
+                             shadow=cfg.shadow)
         await q.answer(t("hdl.readm_lifted"))
     else:
         await q.answer(t("hdl.readm_kept"))

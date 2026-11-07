@@ -21,6 +21,9 @@ KNOWN_RULES: frozenset[str] = frozenset({
     "posts_spam",
     "bot_invitado",
     "bot_no_autorizado",
+    "bot_fichado",
+    "llama_bot_de_spam",
+    "bot_de_spam_preventivo",
     "premium_new_link",
     "story_share",
     "han_pending_review",
@@ -67,6 +70,7 @@ KNOWN_RULES: frozenset[str] = frozenset({
     "verification_suspicious_timeout",
     "verification_reminder_timeout",
     "warns_limit",
+    "manual_warn",
     "manual_admin_ban",
     "manual_review_ban",
 })

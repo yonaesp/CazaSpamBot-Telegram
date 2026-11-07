@@ -93,7 +93,7 @@ def test_cambiar_mayusculas_o_invisibles_no_sirve(tmp_path):
     db = _db(tmp_path)
     _escribe(db, -100, 7, TEXTO)
     _escribe(db, -200, 7, TEXTO.upper())
-    _escribe(db, -300, 7, TEXTO.replace(" ", " ​"))
+    _escribe(db, -300, 7, TEXTO.replace(" ", " \u200b"))
     assert det.check(db, -300, 7, TEXTO)
 
 

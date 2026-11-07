@@ -46,7 +46,7 @@ async def test_un_ocr_colgado_no_congela_el_bot(monkeypatch):
     import time as _t
     monkeypatch.setattr(ocr, "_disponible", True)
     monkeypatch.setattr(ocr, "TIMEOUT_S", 0.05)
-    monkeypatch.setattr(ocr, "_leer_sincrono", lambda d: (_t.sleep(30), "x")[1])
+    monkeypatch.setattr(ocr, "_leer_sincrono", lambda d: (_t.sleep(30), "x")[1])  # noqa: ASYNC251 — corre en el hilo del OCR, es lo que se prueba
     t0 = _t.perf_counter()
     assert await ocr.leer(b"datos") == ""
     assert _t.perf_counter() - t0 < 3

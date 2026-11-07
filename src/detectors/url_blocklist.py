@@ -21,11 +21,29 @@ def _iter_urls(msg: Message) -> list[str]:
     return urls
 
 
+# Mencionar un bot de spam fichado (L55): 100, lo que pide un ban. No es regla dura:
+# un veterano que avisa «cuidado con @x_bot, es estafa» no cae (trust ≥ 70).
+BOT_FICHADO_SCORE = 100
+
+
 def check(msg: Message, blocklist: list[str], is_first_msg: bool,
-          fichados: frozenset[str] = frozenset()) -> Hit:
+          fichados: frozenset[str] = frozenset(), menciones: bool = True) -> Hit:
     """`fichados`: destinos aprendidos de bans de spam (`destinos`), dominio o
-    `t.me/canal`. Cuentan igual que la lista fija."""
+    `t.me/canal`. Cuentan igual que la lista fija.
+
+    Con `menciones`, un @bot fichado da `bot_fichado` (L55). La ruta de bots miembro
+    lo apaga: un bot de moderación que cita a un spammer no es spam.
+    """
     from .. import destinos
+    if menciones and fichados:
+        bots = destinos.bots_fichados_en((msg.text or "") + "\n" + (msg.caption or ""), fichados)
+        if bots:
+            return Hit(
+                rule="bot_fichado",
+                score=BOT_FICHADO_SCORE,
+                reason=t("reason.bot_fichado", bots=", ".join(bots)),
+                payload={"bots": bots},
+            )
     bad: list[str] = []
     for raw in _iter_urls(msg):
         url = raw if "://" in raw else "https://" + raw

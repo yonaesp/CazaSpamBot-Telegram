@@ -21,14 +21,25 @@ con el mismo anuncio en chino (billetes falsos, prostitución) y diez botones. L
 que limpia tras un ban borró el primero y ya había parado cuando llegó el segundo, que
 se quedó seis horas en el grupo.
 
-Tres vías, porque no está comprobado que la Bot API le entregue a un bot los mensajes
-de un bot invitado:
-1. **Bot API** (ruta de bots de `handlers`), si los entrega.
+Tres vías (la Bot API sí los entrega: comprobado el 7-nov-2026, L55; las otras dos
+quedan de respaldo y `marcar` evita actuar dos veces):
+1. **Bot API** (ruta de bots de `handlers`).
 2. **La cuenta secundaria** (`telethon_bridge`): mira los mensajes nuevos de bots en
    los grupos moderados, por si la Bot API no los entrega (decisión del admin).
 3. **Pasada tardía de la sonda**: tras banear a alguien cuyo mensaje mencionaba bots,
    vuelve a mirar y retira lo que hayan publicado esos bots.
 `marcar` evita que dos vías actúen sobre el mismo mensaje.
+
+**Bot de spam** (pedido del admin, 7-nov-2026: «si alguien mencionó a esos bots, que
+se banee a esa persona y a los bots mencionados antes de que lleguen a escribir»).
+Un bot invitado con señales de spam (`handlers._señales_bot_de_spam`: ya fichado, su
+nombre o su texto en un alfabeto que el chat no permite, la misma persona llamó a
+varios bots a la vez, o quien lo llamó ya está baneado) se ficha (`destinos`, como
+`t.me/<bot>`) y se banea en TODOS los grupos donde no es miembro, antes de que nadie lo
+llame allí; y quien lo llamó, si no tiene confianza, también. Desde entonces, mencionar
+a un bot fichado es `bot_fichado` (100) en cualquier grupo. La primera vez no se puede
+adelantar: el bot contesta en el mismo segundo de la mención (caso del 7-nov: tres
+respuestas en 61716-61718, justo detrás de la llamada 61715).
 """
 from __future__ import annotations
 
@@ -57,6 +68,36 @@ _MENCION_BOT_RE = re.compile(r"(?<![\w@])@([a-z][a-z0-9_]{1,28}bot)(?!\w)", re.I
 
 Actuar = Callable[[int, object, str], Awaitable[None]]
 
+# Bots de ayuda conocidos: ni se fichan ni cuentan como «bot de spam» por mencionarlos.
+# Los comparte `dormant_bot_mention` (una cuenta dormida que vuelve pidiendo ayuda).
+BOTS_CONOCIDOS = frozenset({
+    "grouphelpbot", "userinfobot", "combot", "combot_anti_spam_bot",
+    "gif", "sticker", "vote", "like", "pollbot", "directlinkbot",
+    "rosebot", "missrose_bot", "shieldy_bot", "safeguard", "spambot",
+    "botfather", "cazaspambot", "getidsbot", "username_to_id_bot",
+})
+
+# Llamadas a bots invitados por persona y chat, para ver a quien llama a varios a la
+# vez (el 5 y el 7-nov, tres bots en un solo mensaje). Ventana corta y tope de memoria.
+VENTANA_LLAMADAS_S = 120.0
+_LLAMADAS_MAX = 500
+_llamadas: "OrderedDict[tuple[int, int], list[tuple[float, int, str | None]]]" = OrderedDict()
+
+
+def anotar_llamada(chat_id: int, llamante: int, bot_id: int, username: str | None,
+                   ahora: float | None = None) -> list[tuple[int, str | None]]:
+    """Apunta que `llamante` llamó a ese bot y devuelve los bots distintos que ha llamado
+    en ese chat dentro de la ventana, este incluido: [(bot_id, username), …]."""
+    ahora = time.time() if ahora is None else ahora
+    k = (chat_id, llamante)
+    previas = [x for x in _llamadas.pop(k, []) if ahora - x[0] <= VENTANA_LLAMADAS_S]
+    if all(b != bot_id for _, b, _u in previas):
+        previas.append((ahora, bot_id, username))
+    _llamadas[k] = previas
+    while len(_llamadas) > _LLAMADAS_MAX:
+        _llamadas.popitem(last=False)
+    return [(b, u) for _, b, u in previas]
+
 # Remitentes que pone Telegram y no son bots de nadie: @GroupAnonymousBot (admin
 # anónimo), @Channel_Bot (mensaje en nombre de un canal) y 777000 (Telegram, el
 # reenvío automático del canal vinculado). No son miembros y nunca se tocan.
@@ -75,14 +116,15 @@ def llamante(msg) -> int | None:
     return uid if isinstance(uid, int) else None
 
 
-async def _es_miembro(bot, chat_id: int, user_id: int) -> bool:
-    """True si el bot está en el grupo (o no se puede saber: lado seguro, no se toca)."""
+async def _es_miembro(bot, chat_id: int, user_id: int) -> bool | None:
+    """True si el bot está en el grupo, False si no, None si no se pudo saber."""
     try:
         m = await bot.get_chat_member(chat_id=chat_id, user_id=user_id)
     except TelegramError as exc:
         texto = str(exc).lower()
-        return not ("not found" in texto or "participant_id_invalid" in texto
-                    or "user not participant" in texto)
+        if "not found" in texto or "participant_id_invalid" in texto or "user not participant" in texto:
+            return False
+        return None
     return m.status not in (ChatMemberStatus.LEFT, ChatMemberStatus.BANNED)
 
 
@@ -100,6 +142,8 @@ async def es_miembro(bot, chat_id: int, bot_id: int) -> bool:
     if dato and time.time() - dato[0] < _MIEMBRO_TTL_S:
         return dato[1]
     res = await _es_miembro(bot, chat_id, bot_id)
+    if res is None:
+        return True        # no se pudo saber: lado seguro (no se toca) y sin guardarlo (L57)
     if len(_miembro_cache) >= _MIEMBRO_MAX:
         _miembro_cache.pop(next(iter(_miembro_cache)))
     _miembro_cache[clave] = (time.time(), res)
@@ -116,9 +160,12 @@ _ACTUADOS_MAX = 500
 _actuados: OrderedDict[tuple[int, int], None] = OrderedDict()
 
 
-def marcar(chat_id: int, message_id: int) -> bool:
-    """True la primera vez que se pide actuar sobre ese mensaje; False las demás."""
-    clave = (chat_id, message_id)
+def marcar(*clave: object) -> bool:
+    """True la primera vez que se pide actuar sobre esa clave; False las demás.
+
+    Lo normal es `(chat_id, message_id)`; con otra forma (`"preventivo", bot_id`) evita
+    repetir una acción que varias vías o varios bots disparan a la vez.
+    """
     if clave in _actuados:
         return False
     _actuados[clave] = None

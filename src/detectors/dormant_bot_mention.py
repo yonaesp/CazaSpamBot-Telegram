@@ -29,13 +29,8 @@ DORMANT_DAYS = 365
 _BOT_MENTION_RE = re.compile(r"@([A-Za-z0-9_]{3,32})", re.IGNORECASE)
 
 # Bots LEGÍTIMOS conocidos: si un user dormido vuelve y menciona uno de estos
-# (p.ej. para pedir ayuda), NO es spam. Whitelist anti-falso-positivo.
-_LEGIT_BOTS = frozenset({
-    "grouphelpbot", "userinfobot", "combot", "combot_anti_spam_bot",
-    "gif", "sticker", "vote", "like", "pollbot", "directlinkbot",
-    "rosebot", "missrose_bot", "shieldy_bot", "safeguard", "spambot",
-    "botfather", "cazaspambot", "getidsbot", "username_to_id_bot",
-})
+# (p.ej. para pedir ayuda), NO es spam. La lista es la de `bots_invitados`.
+from ..bots_invitados import BOTS_CONOCIDOS as _LEGIT_BOTS  # noqa: E402
 
 
 def _mentions_a_bot(msg: Message) -> str | None:

@@ -1,0 +1,7 @@
+#!/bin/bash
+# Nada se commitea con algo en rojo (L56). Solo si el commit toca código, tests, listas o el simulador.
+# Saltárselo a sabiendas: git commit --no-verify (y decir por qué).
+cambios=$(git diff --cached --name-only -- src tests config scripts/simular.py ruff.toml)
+[ -z "$cambios" ] && exit 0
+echo "pre-commit: comprobando antes de commitear…"
+exec "$(git rev-parse --show-toplevel)/scripts/verificar.sh"

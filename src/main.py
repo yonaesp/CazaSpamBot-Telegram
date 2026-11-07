@@ -210,10 +210,13 @@ async def _on_error(update: object, context) -> None:
     - Error inesperado: traceback completo + aviso al admin con cooldown de 10 min
       (para no spamear si algo entra en bucle). El bot sigue vivo.
     """
-    from telegram.error import NetworkError, RetryAfter, TimedOut
+    from telegram.error import BadRequest, NetworkError, RetryAfter, TimedOut
     elog = logging.getLogger("antispam")
     err = context.error
-    if isinstance(err, (NetworkError, TimedOut, RetryAfter)):
+    # `BadRequest` hereda de `NetworkError` en PTB, pero no es la red: es un mensaje mal
+    # hecho («Can't parse entities», «chat not found»). Se trataba como red transitoria,
+    # sin traceback ni aviso: el fallo mudo de L55 (auditoría, L57).
+    if isinstance(err, (NetworkError, TimedOut, RetryAfter)) and not isinstance(err, BadRequest):
         elog.warning("Red transitoria (%s): %s", type(err).__name__, err)
         return
     elog.error("Excepción no capturada en handler/job", exc_info=err)

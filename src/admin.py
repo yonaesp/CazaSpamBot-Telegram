@@ -154,7 +154,8 @@ async def _add_sample_with_ux(
         ack = t(
             "sample.ack_group",
             emoji=emoji, label=label_txt, status=status,
-            chat=msg.chat.title or msg.chat_id, text=text[:200],
+            # Escapados: un texto con «<» o «&» hacía que Telegram rechazara el acuse (L57).
+            chat=html.escape(str(msg.chat.title or msg.chat_id)), text=html.escape(text[:200]),
         )
         await _notify_admin_ack(context, ack)
     else:
@@ -162,6 +163,14 @@ async def _add_sample_with_ux(
             t("sample.ack_dm", emoji=emoji, label=label_txt, status=status),
             parse_mode="HTML",
         )
+
+
+def _texto_auditable(m) -> str | None:
+    """El texto (o pie) de un mensaje para guardarlo al auditar, o None."""
+    if m is None:
+        return None
+    x = getattr(m, "text", None) or getattr(m, "caption", None)
+    return x[:1000] if isinstance(x, str) else None
 
 
 async def _spam_combo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -246,7 +255,12 @@ async def _spam_combo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                 detail="[manual_admin_spam] " + t("reason.manual_admin_spam_report"),
             )
 
-    # 3) Ban federado
+    # 3) Ban federado, auditado ANTES de borrar nada (antispam-conventions): /spam no
+    # dejaba fila y no salía en /recent ni en /stats (auditoría, L57).
+    db.log_action(chat_id=msg.chat_id, user_id=author.id, username=author.username,
+                  message_id=target.message_id, rule="manual_admin_ban", action="ban", score=0,
+                  mode="shadow" if cfg.shadow else "active",
+                  payload={"via": "/spam", "texto": _texto_auditable(target)})
     results = await federate_ban(
         context.bot, db, user_id=author.id,
         reason=t("reason.manual_admin_spam"),
@@ -736,6 +750,19 @@ async def cmd_ban(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     # Borrar el comando del admin (en grupo) ANTES de ejecutar el ban para
     # que el grupo no vea el "/ban @x razón" mientras se procesa
     objetivo_msg = temas.respuesta(update.effective_message) if update.effective_message else None
+    # Auditoría obligatoria: sin esto un ban manual quedaba en `banned_users` pero
+    # NO en `moderation_log`, así que no salía en /recent ni contaba en /stats.
+    # La regla del proyecto pide persistir TODA acción de moderación, shadow o real,
+    # y ANTES de borrar el mensaje (se guarda su texto; auditoría, L57).
+    db.log_action(
+        chat_id=(update.effective_chat.id if update.effective_chat else 0),
+        user_id=user_id, username=username,
+        message_id=(objetivo_msg.message_id if objetivo_msg is not None
+                    else (update.effective_message.message_id if update.effective_message else 0)),
+        rule="manual_admin_ban", action="ban", score=0,
+        mode=("shadow" if cfg.shadow else "active"),
+        payload={"reason": reason, "texto": _texto_auditable(objetivo_msg)},
+    )
     if is_group:
         await _delete_command_safely(update)
         # Borrar TAMBIÉN el mensaje al que se respondió: banear al spammer y dejar
@@ -757,17 +784,6 @@ async def cmd_ban(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     shadow = sum(1 for v in results.values() if v == "shadow")
     err = sum(1 for v in results.values() if v.startswith("error"))
     ack = t("admin.ban.ack", uid=user_id, ok=ok, shadow=shadow, err=err)
-    # Auditoría obligatoria: sin esto un ban manual quedaba en `banned_users` pero
-    # NO en `moderation_log`, así que no salía en /recent ni contaba en /stats.
-    # La regla del proyecto pide persistir TODA acción de moderación, shadow o real.
-    db.log_action(
-        chat_id=(update.effective_chat.id if update.effective_chat else 0),
-        user_id=user_id, username=username,
-        message_id=(update.effective_message.message_id if update.effective_message else 0),
-        rule="manual_admin_ban", action="ban", score=0,
-        mode=("shadow" if cfg.shadow else "active"),
-        payload={"reason": reason, "chats_ok": ok, "chats_error": err},
-    )
     # Borrar welcome huérfano del baneado si seguía pendiente
     if not cfg.shadow:
         await _cleanup_welcome_on_ban(context, db, user_id)
@@ -1316,6 +1332,12 @@ async def on_suspicious_review_callback(update: Update, context: ContextTypes.DE
             triggered_in_chat=chat_id, shadow=cfg.shadow,
         )
         ok = sum(1 for v in (res or {}).values() if v == "ok")
+        # Auditado como toda acción (antispam-conventions): no salía en /recent ni en
+        # /stats (auditoría, L57).
+        db.log_action(chat_id=chat_id, user_id=user_id, username=None, message_id=None,
+                      rule="manual_review_ban", action="ban", score=0,
+                      mode="shadow" if cfg.shadow else "active",
+                      payload={"via": "revision_sospechoso", "resultados": res})
         if ok and not cfg.shadow:
             # Lo confirmas tú: los enlaces de su bio quedan fichados (`destinos`).
             from . import destinos

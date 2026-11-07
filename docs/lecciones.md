@@ -61,6 +61,8 @@ Una lección nueva va al final, con el número siguiente y su línea en el índi
 - [L53](#l53) · Bots invitados: un spam que publica un bot que ni siquiera está en el grupo
 - [L54](#l54) · Grupos con temas: un @admin que enlazaba otro tema y llegaba dos veces
 - [L55](#l55) · El aviso de ban que no llegaba: la limpieza borraba el mensaje antes de copiarlo
+- [L56](#l56) · Adelantarse a los bots de spam, y comprobaciones que se ejecutan solas
+- [L57](#l57) · Auditoría del 7-nov: lo que no funcionaba como decía el CLAUDE.md
 
 ---
 
@@ -1302,4 +1304,83 @@ Lo que se hizo:
 
 De paso quedó resuelto lo que L53 dejaba abierto: la Bot API SÍ entrega los mensajes de un bot invitado (las dos trazas,
 `(cuenta secundaria)` a las 04:45:03,9 y `(Bot API)` a las 04:45:04,3; `marcar` evitó actuar dos veces).
+
+## L56 · Adelantarse a los bots de spam, y comprobaciones que se ejecutan solas
+
+Pedido del admin (7-nov-2026), tras L55: «si alguien mencionó a esos bots directamente se banee a esa persona y a los
+bots mencionados antes de que lleguen incluso a escribir […] y usa hooks y scripts que revisen que el código está
+perfectamente programado».
+
+**Lo que no se puede**: adelantarse a la PRIMERA llamada. El bot invitado contesta en cuanto Telegram le entrega la
+mención, a la vez que nos llega a nosotros (7-nov: llamada 61715 y respuestas 61716-61718 en el mismo segundo), y para
+banear a un bot hace falta su id, que una mención no trae (resolverlo es `contacts.ResolveUsername`, el que da FloodWait).
+
+**Lo que sí** (reutilizando `destinos`, la confianza y la ruta de bots invitados):
+- Un bot invitado con señales de spam (`handlers._señales_bot_de_spam`): ya fichado; nombre o texto en un alfabeto que el
+  chat no permite; la misma persona llamó a ≥2 bots en 2 min (`bots_invitados.anotar_llamada`); o quien lo llamó ya está
+  baneado. Ninguna mira el tema: son las del caso real. Entonces (`_bot_de_spam`): se ficha como `t.me/<bot>` (una
+  mención y un enlace al bot cuentan igual), se banea en todos los grupos moderados donde no es miembro
+  (`bot_de_spam_preventivo`, auditado por grupo, en shadow solo se apunta; donde lo metió un admin se queda) y quien lo
+  llamó se banea si su confianza es < 40 (`llama_bot_de_spam`, una vez aunque conteste más de un bot).
+- Mencionar un bot fichado es `bot_fichado` (100) en `url_blocklist`. No es regla dura: un veterano que avisa «cuidado
+  con @x_bot» no cae. La ruta de bots miembro no lo mira (un bot de moderación que cita al spammer no es spam).
+- Un ban por contenido ficha los @bots que mencionaba (`destinos.aprender_bots_de_ban`, `REGLAS_QUE_FICHAN_BOTS`).
+- `BOTS_CONOCIDOS` (los de `dormant_bot_mention`, ahora compartidos) nunca se fichan. Desbanear el bot lo olvida.
+- Medido antes de activarlo: en 7 días, las únicas menciones de `@…bot` en `mensajes_recientes` eran los seis bots de
+  spam (5 y 7-nov); ninguna persona legítima mencionó un bot.
+
+**Comprobaciones que se ejecutan solas**:
+- `ruff.toml` añade `B`, `ASYNC`, `RUF006` y `PLE`. Cazó un `lstrip("www.")` en `external_mention` (la misma trampa que ya
+  documentaba `url_blocklist`: quita letras sueltas, no el prefijo), sets con repetidos y un espacio de ancho cero sin
+  escapar.
+- `tests/test_meta_avisos.py` (ast): ningún `try` con copia y aviso juntos (encontró otro: el aviso de modo shadow),
+  `federate_ban` antes de copiar lleva `conservar=`, y «sincronizado en todos los grupos» solo con `_se_federa`. Pasados
+  sobre el código de antes de L55, cazan sus dos fallos.
+- `scripts/verificar.sh` lo junta todo. Lo lanzan el pre-commit (`.githooks/pre-commit`, con `core.hooksPath`) y el hook
+  Stop de Claude Code (`.claude/settings.json`), que no deja dar un turno por acabado con la suite en rojo si el código
+  cambió desde la última pasada en verde; el PostToolUse pasa ruff a cada fichero editado. En su primera pasada, el Stop
+  ya cazó las cifras de tests desfasadas en los README.
+
+## L57 · Auditoría del 7-nov: lo que no funcionaba como decía el CLAUDE.md
+
+Pedido del admin (7-nov-2026): «haz un audit completo de todo el código para revisar que todo funciona como debe […] que no
+se nos pase nada como lo de antes». Lo hizo un agente Opus (solo lectura, ~1 h, con reproducciones contra un doble fiel
+de Telegram y medidas en la base viva). Lo confirmado y arreglado, cada uno con su test en `tests/test_auditoria_l57.py`:
+
+1. **Cualquier «@admin» saltaba todos los detectores**: `on_message` atendía el reporte y hacía `return` antes de juzgar
+   nada, así que «@admin 🔥 packs t.me/+XXXX» de una cuenta nueva pasaba entero. Ahora solo un aviso limpio
+   (`_aviso_admin_limpio`: sin enlaces, sin otras menciones, sin reenvío, botones ni vía bot, ≤400 caracteres y, quitado
+   el propio @admin, en un alfabeto permitido) toma el atajo; lo demás se juzga como cualquier mensaje. Sin explotar aún.
+2. **`reaction_farming` copiaba y borraba el mensaje de OTRA persona**: le pasaba a `_apply_action` el mensaje al que se
+   reaccionó. Ahora actúa sin mensaje. Activo pero sin saltar nunca (155 reacciones en 30 días).
+3. **`link_target_spam` y `external_quote_channel` muertos en producción**: con `MODERATED_CHAT_IDS` vacío,
+   `cfg.is_moderated` dice que sí a cualquier chat, y se pasaba como filtro de «grupo propio»: todo destino se descartaba.
+   Además Telethon da el id crudo (positivo) y los grupos se guardan con el de la Bot API (`-100…`), y lo cacheado no pasaba
+   el filtro (la primera lectura se descartaba y la segunda no). Arreglado con `_se_modera`, `link_reader._id_bot_api` y
+   `_es_propio` también para la caché. 0 disparos desde que existen: conviene mirar las trazas «destino de enlace» unos días
+   (`link_target_spam` es regla dura).
+4. **Los botones «Legítimo/Spam» aprendían del último mensaje de la persona** (`last_msg_text`), no del revisado: en 4 de
+   5 revisiones de la base ya era otro. Ahora `mensaje_reciente(chat, msg_id)` del mismo autor, o nada.
+5. **El ban local por warns acababa federado**: `is_banned` no miraba `federated`. Latente (los 957 bans vigentes son
+   federados). `is_banned` y la reconciliación nocturna, solo federados.
+6. **`BadRequest` se trataba como «red transitoria»** en `_on_error` (en PTB hereda de `NetworkError`): un «Can't parse
+   entities» no dejaba traceback ni aviso. El mismo fallo mudo de L55.
+7. **«Levantar» en el aviso de readmisión** desbaneaba a mano y no olvidaba lo aprendido; ahora `unfederate_ban`.
+8. **Bans sin auditar o auditados después de borrar**: /spam, el botón «Banear» de sospechosos, el límite de warns, la ruta
+   de canales y /ban. Además `/warn` borraba el mensaje advertido sin guardarlo. Todos guardan antes.
+9. Menores: la bio se perdía en `render_markup` con premium y dos fotos; títulos de grupo y texto sin escapar en tres
+   avisos HTML; `es_miembro` guardaba en caché el «no se pudo saber»; el aviso de modo shadow tenía copia y aviso en el
+   mismo `try`; `lstrip("www.")` en `external_mention` (L56).
+
+Meta-tests nuevos (ast): `cfg.is_moderated` no se pasa sin llamar; `_apply_action` de `on_message_reaction` sin
+mensaje; los botones de revisión no leen `last_msg_text`; quien banea audita, y antes de borrar; `revoke_ban` solo en
+`federation`/`maintenance`; el atajo del @admin exige `_aviso_admin_limpio`.
+
+**Pendiente de decisión del admin** (no se tocó):
+- Las revisiones humanas de CAS (1 infracción) y lols/CAS con confianza ≥ 90 solo dejan una fila `noop`: 49 en silencio
+  (el último el 9-oct; 6 de esas personas acabaron baneadas). Mandarlas al privado con los botones de sospechosos.
+- Con modo suave (`soft_ban`, hoy apagado), el ban pasa a mute antes del bloque de confianza y desaparecen el aviso de
+  «¿cuenta robada?» y la revisión.
+- En modo shadow (hoy `active`) aún salen en público el aviso suave, la revisión y el antiflood, y `_moderate_via_bot_message`
+  borra de verdad.
 

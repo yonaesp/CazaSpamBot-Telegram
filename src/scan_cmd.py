@@ -372,7 +372,8 @@ async def _responder_scan(context, msg, target, cfg: Config, db: DB) -> None:
             resolve_username=db.resolve_username,
             own_chat_username=None,
         ),
-        extreply_det.check(target, is_first_msg=True, is_moderated_chat=cfg.is_moderated),
+        extreply_det.check(target, is_first_msg=True, is_moderated_chat=lambda c: cfg.is_moderated(c) and (
+            bool(cfg.moderated_chat_ids_set) or db.puede_moderar(c))),  # como handlers._se_modera
         comad_det.check(_limpio, is_first_msg=True),
         # Faltaba: el /scan no corría investment_scam, así que un testimonio de
         # estafa salía como «no se detectaría» aunque el bot sí lo cazara.

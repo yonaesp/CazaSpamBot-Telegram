@@ -20,7 +20,7 @@ from .wordlists import active_langs, load_terms
 
 log = logging.getLogger(__name__)
 
-_ZW = re.compile(r"[​-‍⁠﻿᠎]")
+_ZW = re.compile(r"[\u200b-‍⁠﻿᠎]")
 
 
 def normalize(text: str | None) -> str:

@@ -162,7 +162,8 @@ def find_external_telegram_links(msg: Message, own_chat_username: str | None = N
             parsed = urlparse(url)
         except ValueError:
             continue
-        host = (parsed.netloc or "").lower().lstrip("www.")
+        # removeprefix, no lstrip: lstrip quita LETRAS sueltas (ver url_blocklist).
+        host = (parsed.netloc or "").lower().removeprefix("www.")
         path = parsed.path.strip("/")
         if host not in _TG_HOSTS or not path:
             continue
