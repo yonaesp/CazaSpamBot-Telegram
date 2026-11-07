@@ -22,16 +22,7 @@ la fecha.
   sale aunque la copia falle.
 - El aviso de un bot invitado dice quién lo llamó, que el ban fue solo de ese grupo y el nombre del grupo.
 
-## 2026-11 · Grupos con temas
-
-En los grupos con temas, un @admin escrito sin responder a nada enlazaba a veces un
-mensaje de otro tema: ahora el aviso busca el mensaje anterior en el mismo tema, y si
-no puede saber cuál es, te lleva al propio @admin. Editar un @admin ya no te manda el
-aviso otra vez. Los comandos sin responder (/warn, /ban, /spam, /scan) ya no apuntan a
-quien abrió el tema, y lo que el bot contesta sale en el tema donde se le pidió, no en
-General.
-
-## 2026-11 · Solo escriben los bots que mete un admin
+## v1.2.0 · 2026-11-08 · Solo escriben los bots que mete un admin
 
 Telegram permite ahora mencionar un bot en un grupo donde no está y que conteste allí
 mismo, sin entrar. Un spammer lo usa así: escribe los @ de varios bots suyos y, aunque
@@ -41,6 +32,13 @@ admin: el que añade otra persona se banea al entrar, y el que escribe sin ser m
 en cuanto escribe. Si la cuenta secundaria está conectada, también vigila lo que
 escriben los bots, por si al bot no le llegan esos mensajes. Los bans de bots son solo
 del grupo donde pasó, y un bot que añadiste tú no se toca.
+
+En los grupos con temas, un @admin escrito sin responder a nada enlazaba a veces un
+mensaje de otro tema: ahora el aviso busca el mensaje anterior en el mismo tema, y si
+no puede saber cuál es, te lleva al propio @admin. Editar un @admin ya no te manda el
+aviso otra vez. Los comandos sin responder (/warn, /ban, /spam, /scan) ya no apuntan a
+quien abrió el tema, y lo que el bot contesta sale en el tema donde se le pidió, no en
+General.
 
 ## v1.1.0 · 2026-11-05 · Los «Posts» del perfil
 
