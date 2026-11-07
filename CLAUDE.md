@@ -1,6 +1,6 @@
 # CazaSpamBot — Bot Antispam Telegram
 
-Bot de moderación antispam **en producción 24/7**, multi-grupo, federado y **bilingüe** (es/en). ~25.500 LOC en `src/`, Podman, **2031 tests**, 28 detectores (un módulo cada uno en `src/detectors/`).
+Bot de moderación antispam **en producción 24/7**, multi-grupo, federado y **bilingüe** (es/en). ~25.500 LOC en `src/`, Podman, **2033 tests**, 28 detectores (un módulo cada uno en `src/detectors/`).
 
 > **Estado: PRODUCCIÓN.** No es un esqueleto. Cualquier cambio afecta grupos reales con miles de usuarios. **Investiga > Confirma > Actúa.**
 
@@ -35,7 +35,7 @@ Todos los identificadores reales viven en `.env` (gitignored), no en el repo. Co
 
 ## Idiomas (i18n)
 
-Todo el texto que ve el usuario vive en `src/locales/<código>.json` (`es.json` / `en.json`, **1.266 claves** cada uno), nunca en el código. Idioma global de la instancia: `/idioma` (persiste) o `BOT_LANG`/`LC_ALL`/`LANG` al arrancar. Soltar un `fr.json` basta para que `/idioma fr` funcione; fallback por clave al español (un idioma al 40 % ya es usable); un JSON roto se ignora con un log (por eso JSON y no `.py`: un `.py` con una comilla mal puesta tumbaba el arranque). Guía para traductores: `src/locales/README.md`.
+Todo el texto que ve el usuario vive en `src/locales/<código>.json` (`es.json` / `en.json`, **1.267 claves** cada uno), nunca en el código. Idioma global de la instancia: `/idioma` (persiste) o `BOT_LANG`/`LC_ALL`/`LANG` al arrancar. Soltar un `fr.json` basta para que `/idioma fr` funcione; fallback por clave al español (un idioma al 40 % ya es usable); un JSON roto se ignora con un log (por eso JSON y no `.py`: un `.py` con una comilla mal puesta tumbaba el arranque). Guía para traductores: `src/locales/README.md`.
 
 1. **Toda clave nueva va a `es.json` y `en.json`** (test de paridad lo exige).
 2. `t(key, _lang=None, **fmt)`. El selector se llama **`_lang` con guion bajo a propósito**: con el nombre `lang` colisionaba con un placeholder llamado igual y el usuario veía `{lang}` literal (bug real).
@@ -53,8 +53,8 @@ Todo el texto que ve el usuario vive en `src/locales/<código>.json` (`es.json` 
 3. `obvious_spam_profile` (≥2 campos no-latín; NFKC + confusable_homoglyphs anti-FP)
 4. `bio_spam` (bio con invite link + emojis sexuales/comerciales + keywords)
 5. `photos_batch_upload` (≥3 fotos en ≤2min = identidad robada; bypass si cuenta >1 año)
-6. `lols.bot` lookup → ban (con trust≥90, solo una fila `noop`: no avisa a nadie, L57)
-7. `cas` lookup → ban si offenses≥2 (con =1 o trust≥90, solo una fila `noop`, sin aviso: L57)
+6. `lols.bot` lookup → ban (con trust≥90, revisión humana al privado con los botones de sospechosos, `_revision_humana`, L57)
+7. `cas` lookup → ban si offenses≥2 (con =1 o trust≥90, revisión humana igual; hay test que exige el aviso en cada rama, también en `recien_llegados`)
 8. `verification.on_join` — por defecto verificación, bienvenida y avisos de sospechosos, **los tres OFF** (los avisos por «sin foto» llenaban el privado). Encendidos, tres niveles por chat (`chat_settings.review_level`, NULL = el más callado): `alto` (defecto: otro alfabeto, homoglifos, cuenta nueva sin fotos), `medio` (una señal fuerte o dos cualesquiera) y `bajo` (cualquier indicio, también no tener @usuario). Todo por chat vía `/config` (L6).
 
 **`on_message`** — recolecta hits, `decide()`, luego trust score:
@@ -264,4 +264,4 @@ GitHub guarda solo 14 días: `scripts/traffic_log.py` los acumula en `traffic/hi
 
 Lo nuevo va en su apartado temático de este fichero como invariante de 1-3 líneas (qué no hacer, el número medido, el test que lo fija), nunca al final por fecha. El relato (el caso, la medida, lo que se probó) va a `docs/lecciones.md` como lección nueva, con su línea en el índice, y aquí se cita con `(Ln)`. Un procedimiento de varios pasos que se usa a veces, a una skill en `.claude/skills/`. Las preferencias del admin y el estado del trabajo, a la memoria.
 
-*Actualizado: 2026-11-07 — 28 detectores, 2031 tests, 1.266 claves por idioma.*
+*Actualizado: 2026-11-07 — 28 detectores, 2033 tests, 1.267 claves por idioma.*

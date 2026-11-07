@@ -1377,8 +1377,9 @@ mensaje; los botones de revisión no leen `last_msg_text`; quien banea audita, y
 `federation`/`maintenance`; el atajo del @admin exige `_aviso_admin_limpio`.
 
 **Pendiente de decisión del admin** (no se tocó):
-- Las revisiones humanas de CAS (1 infracción) y lols/CAS con confianza ≥ 90 solo dejan una fila `noop`: 49 en silencio
-  (el último el 9-oct; 6 de esas personas acabaron baneadas). Mandarlas al privado con los botones de sospechosos.
+- ~~Las revisiones humanas de CAS y lols~~: HECHO el mismo día con el OK del admin. Las de CAS (1 infracción) y las de
+  lols/CAS con confianza ≥ 90 solo dejaban una fila `noop` (49 en silencio; 6 de esas personas acabaron baneadas); ahora
+  van al privado con los botones de sospechosos (`_revision_humana`).
 - Con modo suave (`soft_ban`, hoy apagado), el ban pasa a mute antes del bloque de confianza y desaparecen el aviso de
   «¿cuenta robada?» y la revisión.
 - En modo shadow (hoy `active`) aún salen en público el aviso suave, la revisión y el antiflood, y `_moderate_via_bot_message`

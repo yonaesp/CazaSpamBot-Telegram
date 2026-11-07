@@ -228,6 +228,13 @@ async def _actuar(context, db: DB, cfg: Config, fila, hit, espera: int, origen: 
             rule=f"{hit.rule}_trusted_review", action="noop", score=hit.score, mode=cfg.mode,
             payload={"trust": trust, "would_be": "ban", "via": "recien_llegados"},
         )
+        from types import SimpleNamespace
+        from .handlers import _revision_humana
+        lista = "lols.bot" if hit.rule.startswith("lols") else "CAS"
+        await _revision_humana(
+            context, db, cfg, SimpleNamespace(id=chat_id, title=db.titulo_chat(chat_id)),
+            SimpleNamespace(id=user_id, username=fila["username"], first_name=fila["first_name"]),
+            [("lista_externa_veterano", {"lista": lista, "trust": trust})])
         return True
     log.info(
         "recien_llegados: %s fichó a user=%s %ds después de entrar (aún sin escribir) → ban",

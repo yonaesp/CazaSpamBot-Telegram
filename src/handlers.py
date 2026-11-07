@@ -1283,6 +1283,8 @@ async def on_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                     score=lols_hit.score, mode=cfg.mode,
                     payload={"trust": rejoin_trust, "would_be": "ban", "lols": lols_hit.payload},
                 )
+                await _revision_humana(context, db, cfg, cmu.chat, user,
+                                       [("lista_externa_veterano", {"lista": "lols.bot", "trust": rejoin_trust})])
             else:
                 decision = decide(
                     [lols_hit], cfg.ban_score, cfg.kick_score, cfg.mute_score,
@@ -1310,6 +1312,8 @@ async def on_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                     score=hit.score, mode=cfg.mode,
                     payload={"trust": rejoin_trust, "offenses": offenses, "would_be": "ban"},
                 )
+                await _revision_humana(context, db, cfg, cmu.chat, user,
+                                       [("lista_externa_veterano", {"lista": "CAS", "trust": rejoin_trust})])
             elif offenses >= cfg.cas_autoban_min:
                 decision = decide(
                     [hit], cfg.ban_score, cfg.kick_score, cfg.mute_score,
@@ -1333,6 +1337,7 @@ async def on_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                     "CAS match user=%s offenses=%d < autoban_min=%d → revisión manual",
                     user.id, offenses, cfg.cas_autoban_min,
                 )
+                await _revision_humana(context, db, cfg, cmu.chat, user, [("cas_low_offense", {})])
 
     # Verification AL FINAL: si lols/cas no bannearon, ahora publicamos welcome
     # (con botón o amistoso según trust + perfil legítimo).
@@ -3859,6 +3864,17 @@ def _aviso_admin_limpio(db: DB, cfg: Config, msg) -> bool:
         log.debug("aviso @admin: alfabetos ilegibles: %s", exc)
         return False
     return True
+
+
+async def _revision_humana(context, db: DB, cfg: Config, chat, user, motivos) -> None:
+    """Revisión humana de una lista externa (CAS con 1 infracción, o lols/CAS sobre un
+    veterano): al privado con los botones de sospechosos. Antes solo quedaba una fila
+    `noop` y nadie la veía: 49 así, y 6 acabaron baneados después (decisión del admin
+    tras la auditoría del 7-nov-2026, L57). Nunca lanza."""
+    try:
+        await verification._send_suspicious_review(context, db, cfg, chat, user, motivos, None)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("revisión humana: no se pudo avisar de user=%s: %s", getattr(user, "id", "?"), exc)
 
 
 def _se_federa(cfg, decision: Decision) -> bool:

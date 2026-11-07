@@ -192,3 +192,32 @@ def test_la_bio_sale_siempre_aunque_haya_premium_y_fotos():
     sig = user_signals.UserSignals(user_id=1, photo_count=3, oldest_photo=d,
                                    newest_photo=d + dt.timedelta(days=400), bio="canal t.me/x", is_premium=True)
     assert "canal t.me/x" in user_signals.render_markup(sig)
+
+
+# ----------------------------------------- 6. revisiones de CAS/lols que no llegaban
+
+@pytest.mark.asyncio
+async def test_la_revision_de_cas_llega_al_privado_con_botones(db, monkeypatch):
+    from src import notify_prefs
+    monkeypatch.setattr(notify_prefs, "sin_sonido", lambda db, importante: False)
+    ctx = MagicMock()
+    ctx.bot.send_message = AsyncMock(return_value=NS(message_id=1))
+    cfg = NS(admin_notify_chat_id=345)
+    await handlers._revision_humana(ctx, db, cfg, NS(id=CHAT, title="Windows 11"),
+                                    NS(id=7, username=None, first_name="Ana"), [("cas_low_offense", {})])
+    kw = ctx.bot.send_message.await_args.kwargs
+    assert kw["chat_id"] == 345 and kw["reply_markup"] is not None
+    assert "CAS" in kw["text"]
+
+
+def test_toda_revision_de_lista_externa_avisa():
+    """Cada rama que deja una revisión de CAS/lols manda también el aviso."""
+    def cuenta(f, fn_name):
+        fn = next(n for n in ast.walk(_arbol(Path(f)))
+                  if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.name == fn_name)
+        src = ast.unparse(fn)
+        return src.count("_trusted_review") + src.count("rule='cas_low_offense'"), src.count("_revision_humana(")
+    revisiones, avisos = cuenta("src/handlers.py", "on_chat_member")
+    assert revisiones == avisos == 3
+    revisiones, avisos = cuenta("src/recien_llegados.py", "_actuar")
+    assert revisiones == avisos == 1
