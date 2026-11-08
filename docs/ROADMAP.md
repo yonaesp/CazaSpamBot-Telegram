@@ -155,4 +155,4 @@ es un cambio pequeño.
 - **Soporte Postgres**: SQLite WAL sobra de largo para este volumen.
 - **Filtro de palabrotas**: antispam no es moderación de lenguaje.
 
-*Actualizado: 2026-11-08. 2054 tests en verde, 28 detectores.*
+*Actualizado: 2026-11-08. 2060 tests en verde, 28 detectores.*

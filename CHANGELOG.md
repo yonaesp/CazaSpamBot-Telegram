@@ -11,7 +11,7 @@ la fecha.
   lleva el enlace (sin entrar ni dejar rastro) y, si es un canal de spam, lo banea antes de que escriba. Si el destino
   parece limpio o el enlace ha caducado, te llega al privado para que decidas, una sola vez por persona.
 - Un enlace a un canal que promete rentabilidades («90% de precisión», «100% de rentabilidad», «ganancias garantizadas»)
-  cuenta ya como enlace a un canal de spam, también en los mensajes.
+  cuenta ya como enlace a un canal de spam, también en los mensajes, igual que uno que se anuncia solo con emojis sexuales («💦 🍑»).
 
 ## 2026-11 · Bots de spam que se banean de antemano, y una auditoría completa
 

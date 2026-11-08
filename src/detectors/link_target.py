@@ -191,6 +191,19 @@ def promesa_de_rentabilidad(texto: str | None) -> str | None:
     return None
 
 
+# --- Emojis sexuales en la ficha (8-nov-2026, L58) --------------------------------
+# Los destinos de las bios baneadas: «Baby blog España 💦 🍑» (143 miembros, sin
+# descripción) salía limpio porque el reclamo va en emojis, no en palabras. Dos
+# DISTINTOS de esta lista estricta: sin 🔥 ni 😈, que llevan medio Telegram («Ofertas
+# 🔥»), y uno solo no basta («Private 💋.» va a revisión, no a ban).
+_EMOJIS_SEXUALES = frozenset("\U0001F4A6\U0001F351\U0001F346\U0001F975\U0001F445\U0001F48B\U0001F51E\U0001FAE6")
+
+
+def emojis_sexuales(texto: str | None) -> int:
+    """Cuántos emojis sexuales DISTINTOS lleva el texto (💦 🍑 🍆 🥵 👅 💋 🔞 🫦)."""
+    return len(_EMOJIS_SEXUALES & set(texto or ""))
+
+
 def _keywords_re():
     terms = load_terms("link_target_keywords.txt", _DEFAULT_LINK_TARGET_KEYWORDS)
     terms += load_terms("personal_channel_keywords.txt", _DEFAULT_CHANNEL_KEYWORDS)
@@ -204,7 +217,8 @@ def check(destino) -> Hit:
     texto = getattr(destino, "texto", "") or ""
     if not texto.strip():
         return Hit.none()
-    if not _keywords_re().search(texto) and not promesa_de_rentabilidad(texto):
+    if (not _keywords_re().search(texto) and not promesa_de_rentabilidad(texto)
+            and emojis_sexuales(texto) < 2):
         return Hit.none()
     titulo = (getattr(destino, "titulo", "") or texto)[:80]
     return Hit(

@@ -64,6 +64,22 @@ def test_lo_que_no_es_una_promesa(texto):
     assert not link_target.check(_destino(titulo="Canal", descripcion=texto))
 
 
+@pytest.mark.parametrize("titulo", ["Baby blog España 💦 🍑", "Chicas 🥵👅 solo hoy"])
+def test_dos_emojis_sexuales_distintos_confiesan(titulo):
+    """Destinos reales de las bios baneadas: el reclamo va en emojis, no en palabras."""
+    assert link_target.check(_destino(titulo=titulo, descripcion=""))
+
+
+@pytest.mark.parametrize("titulo", [
+    "Private 💋.",                 # uno solo: a revisión, no a ban
+    "Ofertas 🔥🔥😈 Amazon",        # 🔥 y 😈 no cuentan
+    "Frutería 🍑🍑",                # el mismo dos veces no son dos
+    "Cursway ✈️ AI travel planner",
+])
+def test_lo_que_no_confiesa_por_emojis(titulo):
+    assert not link_target.check(_destino(titulo=titulo, descripcion=""))
+
+
 # ------------------------------------------------- leer el destino de la bio
 
 @pytest.fixture

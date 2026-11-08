@@ -1426,6 +1426,16 @@ el primer barrido, ninguno lleva un enlace privado en la bio.
   en estos grupos es de casa: «broker» (MQTT), «señales» (wifi), «invest…» suelto (investigación), «cripto…» suelto
   (criptografía), «binary». Probado con frases de OCR, domótica e inversión honesta (`tests/test_bio_destino.py`).
 
+**Los 20 enlaces, uno a uno (pregunta del admin: «¿ya los detectaría?»).** Eran 6 enlaces distintos: uno lo llevaban
+11 cuentas («Cursway», un falso planificador de viajes con 2 miembros), otro 5 («Baby blog España 💦 🍑», 143), y cuatro
+una cuenta cada uno («Private 💋.», 23.283; un grupo chino de blanqueo, 22.746; otro chino del que la cuenta secundaria
+ya es miembro; y el de Rosario, caducado). Cinco estaban fichados en `destinos_spam` desde sus bans de `bio_spam`: una
+cuenta nueva con cualquiera de ellos suma 40 + 45 y cae al entrar. El de Rosario no, porque su ban fue por
+`external_mention_or_link`, que no ficha. Con el juez de entonces solo el chino de blanqueo se confesaba; el de los
+emojis salía limpio, así que `link_target` cuenta ya dos emojis sexuales DISTINTOS de una lista estricta (💦 🍑 🍆 🥵 👅
+💋 🔞 🫦, sin 🔥 ni 😈, que llevan medio Telegram). «Private 💋.», con uno solo, va a revisión. «Cursway» no se puede
+generalizar: lo para la ficha del enlace y la red (11 cuentas con el mismo enlace).
+
 **Lo que no se tocó.** `investment_scam` no cazó el testimonio («inversión de 150 €… ganancia de 1750 $» no casa con
 `_GIVE_BACK_RE`), pero el mensaje ya puntuaba para ban (210) y la regla de la casa es no tocar un detector cuando el caso
 ya se resolvió. Queda anotado por si vuelve con una cuenta de confianza media.
