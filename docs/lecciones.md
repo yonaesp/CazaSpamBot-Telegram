@@ -63,6 +63,7 @@ Una lección nueva va al final, con el número siguiente y su línea en el índi
 - [L55](#l55) · El aviso de ban que no llegaba: la limpieza borraba el mensaje antes de copiarlo
 - [L56](#l56) · Adelantarse a los bots de spam, y comprobaciones que se ejecutan solas
 - [L57](#l57) · Auditoría del 7-nov: lo que no funcionaba como decía el CLAUDE.md
+- [L58](#l58) · Rosario: un enlace privado en la bio que nadie fue a mirar
 
 ---
 
@@ -1385,3 +1386,46 @@ mensaje; los botones de revisión no leen `last_msg_text`; quien banea audita, y
 - En modo shadow (hoy `active`) aún salen en público el aviso suave, la revisión y el antiflood, y `_moderate_via_bot_message`
   borra de verdad.
 
+<a id="l58"></a>
+## L58 · Rosario: un enlace privado en la bio que nadie fue a mirar
+
+**El caso (8-nov-2026, Alexa).** «Rosario Vargas» (foto de una madre con su hijo, sin @usuario) entró el 28-oct a las
+15:32 y pulsó «Soy humano» a los 47 s. Su bio era solo `https://t.me/+WcrsCd2W0ZZkYjM0`. Once días después, a las 09:01
+del 8-nov, publicó un testimonio de inversión («Empecé con una pequeña inversión de 150 €… En 72 horas, recibí mi ganancia
+de 1750 $…», @Trader_Alice00 y `t.me/+ALBlhFVEFx5kNGU0`) y cayó en 2 s por `external_mention_or_link` +
+`learned_similarity` (210). El admin preguntó si no se podía haber evitado.
+
+**Por qué entró.** `bio_spam` da 40 puntos a un enlace privado y el ban empieza en 60: sin emojis, llamada a la acción, red
+ni palabras clave, la bio pasaba como inocente, a propósito (un enlace solo no prueba nada). Lo que habría decidido es
+adónde lleva, y eso solo lo leía el barrido de los sábados (`barrido_bios._positivo`), que va de 600 en 600 y empieza por
+quien no está en `seen_users`: a ella no había llegado. El join y el repaso de 7 días leían la bio, pero no el destino.
+El enlace de la bio ya había caducado el 8-nov (`InviteHashExpiredError`): no se sabe adónde llevaba.
+
+**El juez de destinos tampoco lo habría visto.** El enlace del mensaje llevaba a «Trade Republic investment Fx📊» (6.720
+miembros): «La mejor compañía de inversión… 90% de precisión · 100% de rentabilidad · @Trader_Alice00». La traza dijo
+`→ limpio`: `link_target` solo conocía sexo, blanqueo, documentos falsos y apuestas. Con una cuenta robada de un veterano
+(confianza ≥70) no habría saltado nada: `link_target_spam` es la regla dura que debe pararlo.
+
+**Medido antes de decidir.** De las 20 cuentas con un enlace privado en la bio que ha visto el bot (`bio_enlaces`, desde
+el 31-oct), las 20 acabaron baneadas por spam (19 por `bio_spam` con más señales y esta). En los 600 veteranos que repasó
+el primer barrido, ninguno lleva un enlace privado en la bio.
+
+**Lo que se hizo (opción elegida por el admin: «leer el destino; ban o revisión»).**
+- `recien_llegados.revisar_destino_bio`: si la bio lleva un enlace privado y `bio_spam` no basta, se lee el destino con
+  `link_reader` (sin unirse ni contar como visita, el mismo camino que el barrido) y se juzga con `link_target`. Si se
+  confiesa spam, ban con regla `bio_spam` y la bio en el payload (así `destinos` ficha el enlace). Si sale limpio, no se
+  puede leer (caducado, sin cuenta secundaria) o lleva a uno de nuestros grupos (este último, nada), revisión al privado
+  con los botones de sospechosos, una sola vez por persona: la fila `noop` `bio_enlace_privado` es la traza y el «ya
+  avisado», y lleva `bio_preview` para que «Banear» fiche el enlace (`ultima_bio_vista`).
+- En el join va en una tarea aparte (`revisar_destino_bio_aparte`, tras los mismos 5 s que los posts), porque es una
+  llamada por la cuenta secundaria y PTB procesa los updates de uno en uno. En el repaso, justo después de `bio_spam`.
+- `link_target.promesa_de_rentabilidad`, estructural y no en la lista: una garantía de beneficio («rentabilidad
+  garantizada», «guaranteed profits») basta; un porcentaje de acierto o de rentabilidad («90% de precisión», «100% de
+  rentabilidad», «95% accuracy») solo con vocabulario financiero en la ficha. Una negación delante lo anula («no existe la
+  rentabilidad garantizada» es lo que escribe un canal que avisa de estafas). El vocabulario financiero deja fuera lo que
+  en estos grupos es de casa: «broker» (MQTT), «señales» (wifi), «invest…» suelto (investigación), «cripto…» suelto
+  (criptografía), «binary». Probado con frases de OCR, domótica e inversión honesta (`tests/test_bio_destino.py`).
+
+**Lo que no se tocó.** `investment_scam` no cazó el testimonio («inversión de 150 €… ganancia de 1750 $» no casa con
+`_GIVE_BACK_RE`), pero el mensaje ya puntuaba para ban (210) y la regla de la casa es no tocar un detector cuando el caso
+ya se resolvió. Queda anotado por si vuelve con una cuenta de confianza media.

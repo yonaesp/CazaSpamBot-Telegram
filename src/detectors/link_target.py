@@ -145,6 +145,52 @@ def check_anuncio(msg, texto: str | None = None) -> Hit:
     )
 
 
+# --- Promesas de rentabilidad (8-nov-2026, L58) ----------------------------------
+# Caso real: «Trade Republic investment Fx📊», 6.720 miembros, «90% de precisión ·
+# 100% de rentabilidad», enlazado desde un testimonio de inversión en Alexa. Salió
+# «limpio» porque la lista solo conocía sexo, blanqueo y documentos falsos.
+#
+# Estructural, no en la lista: la señal no es el tema (hablar de inversión es normal)
+# sino la PROMESA, que ningún canal honesto se atreve a escribir de sí mismo. Una
+# garantía de beneficio basta sola; un porcentaje de acierto o de rentabilidad, solo
+# con vocabulario financiero en la misma ficha («99% de precisión» es también lo que
+# dice de sí misma una herramienta de OCR). Una negación delante («no existe la
+# rentabilidad garantizada») lo anula: es lo que escribe un canal que avisa de estafas.
+_PROMESA_GARANTIA_RE = re.compile(
+    r"\b(?:rentabilidad(?:es)?|ganancias?|beneficios?|retornos?|ingresos)\s+garantizad[oa]s?\b"
+    r"|\bguaranteed\s+(?:profits?|returns?|income|gains|earnings)\b",
+    re.IGNORECASE,
+)
+_PROMESA_PORCENTAJE_RE = re.compile(
+    r"\b\d{2,3}(?:[.,]\d+)?\s?%\s*(?:de\s+)?(?:rentabilidad|ganancias?|beneficios?|retornos?"
+    r"|precisi[oó]n|aciertos?|efectividad|exactitud|profits?|returns?|roi|accuracy|win\s?rate)\b",
+    re.IGNORECASE,
+)
+# Sin palabras que en estos grupos son de casa: «broker» (MQTT), «señales» (wifi),
+# «invest…» suelto (investigación), «cripto…» suelto (criptografía), «binary».
+_FINANZAS_RE = re.compile(
+    r"\b(?:inversi[oó]n(?:es)?|invertir|invest(?:ing|ments?|ors?)?|trading|traders?|forex"
+    r"|criptomonedas?|criptodivisas?|criptoactivos?|crypto(?:currenc(?:y|ies))?|bitcoin|btc|usdt"
+    r"|opciones\s+binarias|binary\s+options)\b",
+    re.IGNORECASE,
+)
+_NEGACION_RE = re.compile(r"\b(?:no|sin|nunca|ning[uú]n[oa]?|never|no\s+such)\b[^.!?\n]{0,25}$", re.IGNORECASE)
+
+
+def promesa_de_rentabilidad(texto: str | None) -> str | None:
+    """El trozo que promete beneficios, o None. Lo que nadie honesto escribe de sí mismo."""
+    texto = texto or ""
+    for m in _PROMESA_GARANTIA_RE.finditer(texto):
+        if not _NEGACION_RE.search(texto[max(0, m.start() - 40):m.start()]):
+            return m.group(0)
+    if not _FINANZAS_RE.search(texto):
+        return None
+    for m in _PROMESA_PORCENTAJE_RE.finditer(texto):
+        if not _NEGACION_RE.search(texto[max(0, m.start() - 40):m.start()]):
+            return m.group(0)
+    return None
+
+
 def _keywords_re():
     terms = load_terms("link_target_keywords.txt", _DEFAULT_LINK_TARGET_KEYWORDS)
     terms += load_terms("personal_channel_keywords.txt", _DEFAULT_CHANNEL_KEYWORDS)
@@ -158,7 +204,7 @@ def check(destino) -> Hit:
     texto = getattr(destino, "texto", "") or ""
     if not texto.strip():
         return Hit.none()
-    if not _keywords_re().search(texto):
+    if not _keywords_re().search(texto) and not promesa_de_rentabilidad(texto):
         return Hit.none()
     titulo = (getattr(destino, "titulo", "") or texto)[:80]
     return Hit(

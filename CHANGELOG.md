@@ -5,6 +5,14 @@ cada commit: para el detalle está el historial de git. Desde la v1.0.0 cada ver
 publicada lleva su número (`stable` apunta a la última); los hitos de antes, solo
 la fecha.
 
+## 2026-11 · Bios con un enlace privado: el bot mira adónde llevan
+
+- Quien entra con un enlace privado de Telegram en la bio y nada más ya no pasa sin que nadie lo mire: el bot lee adónde
+  lleva el enlace (sin entrar ni dejar rastro) y, si es un canal de spam, lo banea antes de que escriba. Si el destino
+  parece limpio o el enlace ha caducado, te llega al privado para que decidas, una sola vez por persona.
+- Un enlace a un canal que promete rentabilidades («90% de precisión», «100% de rentabilidad», «ganancias garantizadas»)
+  cuenta ya como enlace a un canal de spam, también en los mensajes.
+
 ## 2026-11 · Bots de spam que se banean de antemano, y una auditoría completa
 
 - Un bot invitado con señales de spam (ya fichado, nombre o texto en otro alfabeto, llamado junto a otros, o lo llamó

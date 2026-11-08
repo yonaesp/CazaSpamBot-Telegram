@@ -886,6 +886,12 @@ class DB:
                 "ORDER BY ts DESC LIMIT 1", (user_id,)).fetchone()
         return fila[0] if fila else None
 
+    def tiene_accion(self, user_id: int, rule: str) -> bool:
+        """¿Hay ya una fila de `moderation_log` con esta regla para esta persona?"""
+        with self._cur() as c:
+            return c.execute("SELECT 1 FROM moderation_log WHERE user_id=? AND rule=? LIMIT 1",
+                             (user_id, rule)).fetchone() is not None
+
     def textos_previos(self, chat_id: int, user_id: int, msg_id: int,
                        desde_ts: float) -> list[str]:
         """Lo que esta persona escribió en este chat antes de `msg_id`, desde

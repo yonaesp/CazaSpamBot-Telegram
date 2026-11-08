@@ -71,6 +71,7 @@ KNOWN_RULES: frozenset[str] = frozenset({
     "verification_reminder_timeout",
     "warns_limit",
     "manual_warn",
+    "bio_enlace_privado",
     "manual_admin_ban",
     "manual_review_ban",
 })

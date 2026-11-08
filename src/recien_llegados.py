@@ -369,6 +369,9 @@ async def _revisar_perfil(context, db: DB, cfg: Config, fila, espera: int) -> bo
                 original_text=None, first_name=usuario.first_name,
             )
             return True
+        if await revisar_destino_bio(context, db, cfg, chat_id, fila["chat_title"], usuario,
+                                     sig.bio, "recien_llegados"):
+            return True
 
     # Los «Posts» del perfil, el escaparate que más cabe (pie + OCR de la foto).
     if await _revisar_posts(context, db, cfg, fila, usuario, sig, client, espera):
@@ -533,6 +536,92 @@ async def revisar_posts_aparte(context, chat, user, sig, client, via: str = "joi
         return await _revisar_posts(context, db, cfg, fila, user, sig, client, 0, via)
     except Exception as exc:  # noqa: BLE001 — una tarea suelta nunca tumba el bot
         log.warning("revisar_posts_aparte: fallo con user=%s: %s", user.id, exc)
+        return False
+
+
+# ---------------------------------------------------------------------------
+# La bio con un enlace privado que no llega a `bio_spam` (L58)
+# ---------------------------------------------------------------------------
+
+# Regla de la fila `noop` que deja la revisión: sirve de traza y de «ya avisado».
+REGLA_REVISION_BIO = "bio_enlace_privado"
+
+
+async def revisar_destino_bio(context, db: DB, cfg: Config, chat_id: int, chat_title: str | None,
+                              user, bio: str | None, via: str) -> bool:
+    """Bio con un enlace privado (t.me/+…) que `bio_spam` no basta para banear: se lee
+    adónde lleva, sin entrar ni contar como visita, y se juzga con `link_target`. Si el
+    destino se confiesa spam, ban; si sale limpio o no se puede leer, revisión humana al
+    privado, una sola vez por persona. True si se baneó. Nunca lanza.
+
+    Caso que lo motivó (8-nov-2026, Alexa): entró el 28-oct con solo un enlace privado
+    en la bio (40 puntos, el umbral es 60), pasó el botón en 47 s y once días después
+    publicó un testimonio de inversión. Las 20 cuentas vistas con un enlace privado en
+    la bio eran spam; de 600 veteranos repasados, ninguno lo lleva.
+    """
+    from .detectors import bio_spam, link_target
+    try:
+        codigos = bio_spam.enlaces_privados(bio)
+        if not codigos:
+            return False
+        from . import link_reader
+        from .handlers import _apply_action, _revision_humana, _se_modera
+        destino = await link_reader.leer(context, [f"https://t.me/+{c}" for c in codigos])
+        if destino is not None and destino.chat_id is not None and _se_modera(db, cfg, destino.chat_id):
+            return False                 # lleva a uno de nuestros grupos
+        hit = link_target.check(destino)
+        titulo = (destino.titulo if destino else "") or ""
+        if hit:
+            from .scoring import Decision
+            log.info("bio con enlace privado user=%s chat=%s destino=%r → SPAM, ban (%s)",
+                     user.id, chat_id, titulo[:80], via)
+            await _apply_action(
+                context, db, cfg, chat_id=chat_id, chat_title=chat_title,
+                user_id=user.id, username=user.username, message_id=None,
+                decision=Decision(
+                    action="ban", score=min(200, 40 + hit.score), rule="bio_spam",
+                    reason=t("reason.bio_spam", details=t("reason.bio_invite_link") + " + " + hit.reason),
+                    payload={"bio_preview": bio[:200], "destino": titulo[:200],
+                             "url": getattr(destino, "url", None), "via": via},
+                ),
+                original_text=None, first_name=user.first_name,
+            )
+            return True
+        if db.tiene_accion(user.id, REGLA_REVISION_BIO):
+            return False
+        log.info("bio con enlace privado user=%s chat=%s destino=%r → revisión humana (%s)",
+                 user.id, chat_id, titulo[:80] or None, via)
+        db.log_action(
+            chat_id=chat_id, user_id=user.id, username=user.username, message_id=None,
+            rule=REGLA_REVISION_BIO, action="noop", score=40, mode=cfg.mode,
+            payload={"bio_preview": bio[:200], "destino": titulo[:200] or None,
+                     "via": via, "would_be": "review"},
+        )
+        motivo = (("bio_enlace_privado", {"destino": titulo[:80]}) if titulo
+                  else ("bio_enlace_privado_ilegible", {}))
+        from types import SimpleNamespace
+        await _revision_humana(
+            context, db, cfg, SimpleNamespace(id=chat_id, title=chat_title or db.titulo_chat(chat_id)),
+            user, [motivo])
+        return False
+    except Exception as exc:  # noqa: BLE001 — nunca frena la entrada ni el repaso
+        log.warning("revisar_destino_bio: fallo con user=%s: %s", getattr(user, "id", "?"), exc)
+        return False
+
+
+async def revisar_destino_bio_aparte(context, chat, user, bio: str) -> bool:
+    """La de arriba en una tarea aparte para el join: leer el destino es una llamada
+    por la cuenta secundaria y PTB procesa los updates de uno en uno."""
+    import asyncio
+    try:
+        await asyncio.sleep(_ESPERA_JOIN_S)
+        db: DB = context.bot_data["db"]
+        if db.is_banned(user.id):
+            return False
+        return await revisar_destino_bio(context, db, context.bot_data["cfg"], chat.id,
+                                         getattr(chat, "title", None), user, bio, "join")
+    except Exception as exc:  # noqa: BLE001
+        log.warning("revisar_destino_bio_aparte: fallo con user=%s: %s", user.id, exc)
         return False
 
 

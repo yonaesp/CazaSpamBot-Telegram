@@ -1226,6 +1226,14 @@ async def on_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                     rule=bio_hit.rule, reason=bio_hit.reason, payload=bio_hit.payload,
                 )
                 return
+            # Un enlace privado que no llega a ban: adónde lleva, en una tarea aparte
+            # (ban si se confiesa spam; si no, revisión al privado). Caso Rosario (L58).
+            if bio_spam_det.enlaces_privados(sig_pre.bio):
+                from . import recien_llegados
+                context.application.create_task(
+                    recien_llegados.revisar_destino_bio_aparte(context, cmu.chat, user, sig_pre.bio),
+                    update=None,
+                )
 
         # NUEVO: fotos de perfil en ráfaga (≤2 min) → cuenta construida con
         # identidad robada. Caso real Javier (5 fotos en 18s). Ban directo.
