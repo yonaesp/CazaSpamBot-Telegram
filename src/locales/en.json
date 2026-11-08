@@ -1268,5 +1268,8 @@
   "act.auto": "If you turned on automatic updates, it will install itself tonight.",
   "act.mayor": "⚠️ This is a major version: read what's new before installing it, as it may ask you to change something. Automatic updates won't install it.",
   "act.hecha": "✅ CazaSpamBot updated to <b>{nueva}</b> (was {antes}). Running normally.",
-  "act.fallida": "⚠️ The update to <b>{nueva}</b> didn't start properly, so it went back to {actual}, which keeps protecting your groups. Automatic updates won't try that version again. The details are in the <code>update.sh</code> log."
+  "act.fallida": "⚠️ The update to <b>{nueva}</b> didn't start properly, so it went back to {actual}, which keeps protecting your groups. Automatic updates won't try that version again. The details are in the <code>update.sh</code> log.",
+  "cuenta2.privacidad_cerrada": "🔒 <b>Nobody can add the secondary account to groups anymore</b>\nIt had «Everybody» in «Who can add me to groups?». Now only you and its contacts can; Telegram only lets everyone else send it a link, and the account never opens links.\nYou can change it in that account: Settings ▸ Privacy ▸ Groups.",
+  "cuenta2.salida": "🚪 <b>The secondary account left a group that isn't yours</b>\n{grupo}{miembros}\nIt was added by {quien}, who is neither you nor one of its contacts. A group that isn't yours would show it off as a shop window and wear down the reputation it uses to report spam.",
+  "cuenta2.miembros": " ({n} members)"
 }

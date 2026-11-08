@@ -5,6 +5,13 @@ cada commit: para el detalle está el historial de git. Desde la v1.0.0 cada ver
 publicada lleva su número (`stable` apunta a la última); los hitos de antes, solo
 la fecha.
 
+## 2026-11 · Nadie mete a la cuenta secundaria en grupos ajenos
+
+- Telegram deja de serie que cualquiera añada una cuenta a un grupo. Si la de Telethon está en «Todos», el bot lo cierra
+  a sus contactos y al admin, y te avisa. Si otra elección ya está puesta, la respeta.
+- Si alguien la mete en un grupo donde no está el bot, sale de él y te dice quién fue. No toca los grupos que creó
+  ella, ni a los que entró por su cuenta, ni a los que la añadiste tú o un contacto suyo.
+
 ## 2026-11 · Bios con un enlace privado: el bot mira adónde llevan
 
 - Quien entra con un enlace privado de Telegram en la bio y nada más ya no pasa sin que nadie lo mire: el bot lee adónde

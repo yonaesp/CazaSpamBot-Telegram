@@ -57,6 +57,7 @@ def attach(client, bot: Bot, db: DB, context=None) -> None:
     if context is not None:
         _attach_cambio_de_nombre(client, events, context)
         _attach_bots_ajenos(client, events, context)
+        _attach_cuenta_en_grupo(client, events, context)
 
     @client.on(events.MessageDeleted)
     async def _on_deleted(event: Any) -> None:
@@ -359,6 +360,26 @@ def _attach_bots_ajenos(client, events, context) -> None:
             log.warning("bots ajenos (cuenta secundaria) exc: %s", exc)
 
     log.info("Telethon: vigilando los mensajes de bots en los grupos (bots_invitados)")
+
+
+def _attach_cuenta_en_grupo(client, events, context) -> None:
+    """Si alguien mete a la cuenta secundaria en un grupo, se mira en ese momento (L59).
+
+    No está garantizado que llegue (Telegram no siempre le manda el aviso de servicio
+    al recién añadido a un supergrupo): por eso `cuenta_secundaria.vigilar_job` corre
+    además cada 24 h. Barato: solo las altas, y se descarta lo que no es ella.
+    """
+    @client.on(events.ChatAction(func=lambda e: e.user_added))
+    async def _on_alta(event: Any) -> None:  # noqa: ANN401
+        try:
+            yo = await client.get_me(input_peer=True)  # en caché: sin red
+            if getattr(yo, "user_id", None) not in (event.user_ids or []):
+                return
+            from . import cuenta_secundaria
+            log.info("cuenta secundaria: la han metido en %s; se revisa ya", event.chat_id)
+            await cuenta_secundaria.vigilar_job(context)
+        except Exception as exc:  # noqa: BLE001 — un handler suelto jamás tumba el bot
+            log.warning("alta de la cuenta secundaria exc: %s", exc)
 
 
 def _attach_cambio_de_nombre(client, events, context) -> None:

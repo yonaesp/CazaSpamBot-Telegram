@@ -64,6 +64,7 @@ Una lección nueva va al final, con el número siguiente y su línea en el índi
 - [L56](#l56) · Adelantarse a los bots de spam, y comprobaciones que se ejecutan solas
 - [L57](#l57) · Auditoría del 7-nov: lo que no funcionaba como decía el CLAUDE.md
 - [L58](#l58) · Rosario: un enlace privado en la bio que nadie fue a mirar
+- [L59](#l59) · La cuenta secundaria: cualquiera podía meterla en un grupo
 
 ---
 
@@ -1428,8 +1429,8 @@ el primer barrido, ninguno lleva un enlace privado en la bio.
 
 **Los 20 enlaces, uno a uno (pregunta del admin: «¿ya los detectaría?»).** Eran 6 enlaces distintos: uno lo llevaban
 11 cuentas («Cursway», un falso planificador de viajes con 2 miembros), otro 5 («Baby blog España 💦 🍑», 143), y cuatro
-una cuenta cada uno («Private 💋.», 23.283; un grupo chino de blanqueo, 22.746; otro chino del que la cuenta secundaria
-ya es miembro; y el de Rosario, caducado). Cinco estaban fichados en `destinos_spam` desde sus bans de `bio_spam`: una
+una cuenta cada uno («Private 💋.», 23.283; un grupo chino de blanqueo, 22.746; otro chino, «公群 2714», que Telegram
+devolvió como `ChatInviteAlready` aunque la cuenta secundaria no es miembro (L59); y el de Rosario, caducado). Cinco estaban fichados en `destinos_spam` desde sus bans de `bio_spam`: una
 cuenta nueva con cualquiera de ellos suma 40 + 45 y cae al entrar. El de Rosario no, porque su ban fue por
 `external_mention_or_link`, que no ficha. Con el juez de entonces solo el chino de blanqueo se confesaba; el de los
 emojis salía limpio, así que `link_target` cuenta ya dos emojis sexuales DISTINTOS de una lista estricta (💦 🍑 🍆 🥵 👅
@@ -1439,3 +1440,31 @@ generalizar: lo para la ficha del enlace y la red (11 cuentas con el mismo enlac
 **Lo que no se tocó.** `investment_scam` no cazó el testimonio («inversión de 150 €… ganancia de 1750 $» no casa con
 `_GIVE_BACK_RE`), pero el mensaje ya puntuaba para ban (210) y la regla de la casa es no tocar un detector cuando el caso
 ya se resolvió. Queda anotado por si vuelve con una cuenta de confianza media.
+
+## L59 · La cuenta secundaria: cualquiera podía meterla en un grupo
+
+**El caso (8-nov-2026).** Al leer los destinos de L58, una invitación a un grupo chino de blanqueo («公群 2714
+-墨颜集团色料代收») contestó `ChatInviteAlready`, y se dio por hecho que la cuenta secundaria ya era miembro. No lo era:
+el propio objeto traía `left=True` y `channels.getParticipant` dio `UserNotParticipantError`. Telegram devuelve
+`ChatInviteAlready` también para un grupo que la cuenta puede ver sin estar dentro. **Antes de afirmar que la cuenta
+está en un chat, `getParticipant` o la lista de diálogos; `ChatInviteAlready` no lo prueba.**
+
+**Lo que sí estaba mal.** «¿Quién puede añadirme a grupos?» seguía en «Todos», lo que trae Telegram de serie: cualquiera
+podía meter la cuenta en un grupo de spam, que la luciría de escaparate. Además, estar dentro de grupos así le resta
+reputación, y es la que respalda los reportes a Telegram. El admin pidió «evita que otros puedan añadir esa cuenta a
+otros grupos».
+
+**Lo que se hizo (`src/cuenta_secundaria.py`).** Al arrancar (a los 5 min) y cada 24 h:
+1. Si la privacidad de grupos está en «Todos» (cualquier regla `PrivacyValueAllowAll`, también «Todos menos…»), se
+   cierra a los contactos y al admin del bot. Cualquier otra elección se respeta: la tomó alguien a propósito.
+   Aplicada a mano el 8-nov con la misma función: quedó `AllowUsers(admin) + AllowContacts`, y la cuenta tiene 0
+   contactos, así que solo puede añadirla el admin.
+2. Un grupo o canal donde no está el bot (`bot_chats` o `_se_modera`) y al que la metió otra persona (ni el admin, ni un
+   contacto, ni ella misma con un enlace o una solicitud, ni creado por ella) se abandona y se avisa al admin, en
+   silencio porque ya está resuelto. Si no se sabe quién la metió, o no se pueden leer los contactos, no se sale de
+   nada: un grupo legítimo perdido es peor que uno de spam un día más.
+
+El alta en un grupo (`events.ChatAction` con `user_added`, en `telethon_bridge`) lanza la misma revisión en el momento,
+pero no está garantizado que Telegram le mande ese aviso al recién añadido a un supergrupo: el job diario es la red. En
+`MODE=shadow` no toca nada. Medido el 8-nov: la cuenta está en sus 5 grupos (los 4 moderados, más «Informática (PC)
+en Español», que creó ella) y en ninguno ajeno. Tests: `tests/test_cuenta_secundaria.py`.

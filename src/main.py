@@ -17,7 +17,7 @@ from telegram.ext import (
     filters,
 )
 
-from . import actualizaciones, admin, barrido_bios, chat_picker, cuenta_robada, chat_settings_cmd, config_panel, errata_mencion, group_clean, lang_cmd, maintenance, notify_prefs, quienfue_cmd, recien_llegados, scan_cmd, scanuser_cmd, telethon_bridge, topweekly, verification, warns_mod
+from . import actualizaciones, admin, barrido_bios, chat_picker, cuenta_robada, cuenta_secundaria, chat_settings_cmd, config_panel, errata_mencion, group_clean, lang_cmd, maintenance, notify_prefs, quienfue_cmd, recien_llegados, scan_cmd, scanuser_cmd, telethon_bridge, topweekly, verification, warns_mod
 from .config import load_config
 from .db import DB
 from .handlers import (
@@ -160,6 +160,10 @@ async def _post_init(app: Application) -> None:
         # Cada 24h: cleanup nightly de tablas viejas (reaction_events, gentle_warnings,
         # pending_verifications, cas_cache, suppressions)
         app.job_queue.run_repeating(maintenance.cleanup_nightly_job, interval=86400, first=3600)
+        # Cada 24 h (y a los 5 min): nadie mete a la cuenta secundaria en grupos ajenos (L59).
+        if reporter.get_client() is not None:
+            app.job_queue.run_repeating(cuenta_secundaria.vigilar_job, interval=86400, first=300,
+                                        name="cuenta_secundaria")
         # Top semanal: domingo 20:00 Europe/Madrid (weekday 6)
         from datetime import time as _dt_time
         app.job_queue.run_daily(

@@ -1,6 +1,6 @@
 # CazaSpamBot — Bot Antispam Telegram
 
-Bot de moderación antispam **en producción 24/7**, multi-grupo, federado y **bilingüe** (es/en). ~25.500 LOC en `src/`, Podman, **2060 tests**, 28 detectores (un módulo cada uno en `src/detectors/`).
+Bot de moderación antispam **en producción 24/7**, multi-grupo, federado y **bilingüe** (es/en). ~25.500 LOC en `src/`, Podman, **2074 tests**, 28 detectores (un módulo cada uno en `src/detectors/`).
 
 > **Estado: PRODUCCIÓN.** No es un esqueleto. Cualquier cambio afecta grupos reales con miles de usuarios. **Investiga > Confirma > Actúa.**
 
@@ -19,6 +19,8 @@ Todos los identificadores reales viven en `.env` (gitignored), no en el repo. Co
 
 ⚠️ `.env` y `data/telethon.session` van en **600**: en 644 los leía cualquier usuario del N100 y de la réplica del N6005, y la sesión da la cuenta secundaria entera. Nada de `.env.bak*` con secretos al lado (L1).
 
+La cuenta secundaria no entra en grupos ajenos (`cuenta_secundaria.py`, al arrancar y cada 24 h): «añadirme a grupos» en «Todos» se cierra a contactos + admin (otra elección se respeta), y de un grupo donde no está el bot y al que la metió un extraño sale y avisa; si no se sabe quién la metió, no toca nada. `ChatInviteAlready` no prueba que sea miembro: antes de decirlo, `getParticipant` (L59).
+
 ## Grupos federados
 
 - `MODERATED_CHAT_IDS` (CSV de chat_ids) o, vacío, autodescubrimiento. Las cuatro puertas (join, mensaje, reacción, canal) pasan por `_se_modera`: la lista explícita si la hay; si no, ser **admin con permiso de restringir** (`db.puede_moderar`). Un test impide usar `cfg.is_moderated` a pelo en una puerta: daba True en cualquier chat, y un grupo ajeno metía bans en la federación (L2); tampoco se pasa como filtro de «grupo propio» (`link_reader`, `external_reply`): sin lista explícita descartaba todo destino y `link_target_spam` y `external_quote_channel` no saltaron nunca hasta el 7-nov (hay test con `ast`) (L57).
@@ -35,7 +37,7 @@ Todos los identificadores reales viven en `.env` (gitignored), no en el repo. Co
 
 ## Idiomas (i18n)
 
-Todo el texto que ve el usuario vive en `src/locales/<código>.json` (`es.json` / `en.json`, **1.270 claves** cada uno), nunca en el código. Idioma global de la instancia: `/idioma` (persiste) o `BOT_LANG`/`LC_ALL`/`LANG` al arrancar. Soltar un `fr.json` basta para que `/idioma fr` funcione; fallback por clave al español (un idioma al 40 % ya es usable); un JSON roto se ignora con un log (por eso JSON y no `.py`: un `.py` con una comilla mal puesta tumbaba el arranque). Guía para traductores: `src/locales/README.md`.
+Todo el texto que ve el usuario vive en `src/locales/<código>.json` (`es.json` / `en.json`, **1.273 claves** cada uno), nunca en el código. Idioma global de la instancia: `/idioma` (persiste) o `BOT_LANG`/`LC_ALL`/`LANG` al arrancar. Soltar un `fr.json` basta para que `/idioma fr` funcione; fallback por clave al español (un idioma al 40 % ya es usable); un JSON roto se ignora con un log (por eso JSON y no `.py`: un `.py` con una comilla mal puesta tumbaba el arranque). Guía para traductores: `src/locales/README.md`.
 
 1. **Toda clave nueva va a `es.json` y `en.json`** (test de paridad lo exige).
 2. `t(key, _lang=None, **fmt)`. El selector se llama **`_lang` con guion bajo a propósito**: con el nombre `lang` colisionaba con un placeholder llamado igual y el usuario veía `{lang}` literal (bug real).
@@ -264,4 +266,4 @@ GitHub guarda solo 14 días: `scripts/traffic_log.py` los acumula en `traffic/hi
 
 Lo nuevo va en su apartado temático de este fichero como invariante de 1-3 líneas (qué no hacer, el número medido, el test que lo fija), nunca al final por fecha. El relato (el caso, la medida, lo que se probó) va a `docs/lecciones.md` como lección nueva, con su línea en el índice, y aquí se cita con `(Ln)`. Un procedimiento de varios pasos que se usa a veces, a una skill en `.claude/skills/`. Las preferencias del admin y el estado del trabajo, a la memoria.
 
-*Actualizado: 2026-11-08 — 28 detectores, 2060 tests, 1.270 claves por idioma.*
+*Actualizado: 2026-11-08 — 28 detectores, 2074 tests, 1.273 claves por idioma.*
