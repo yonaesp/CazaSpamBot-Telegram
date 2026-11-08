@@ -1455,10 +1455,11 @@ reputación, y es la que respalda los reportes a Telegram. El admin pidió «evi
 otros grupos».
 
 **Lo que se hizo (`src/cuenta_secundaria.py`).** Al arrancar (a los 5 min) y cada 24 h:
-1. Si la privacidad de grupos está en «Todos» (cualquier regla `PrivacyValueAllowAll`, también «Todos menos…»), se
-   cierra a los contactos y al admin del bot. Cualquier otra elección se respeta: la tomó alguien a propósito.
-   Aplicada a mano el 8-nov con la misma función: quedó `AllowUsers(admin) + AllowContacts`, y la cuenta tiene 0
-   contactos, así que solo puede añadirla el admin.
+1. Si la privacidad de grupos está en «Todos» (cualquier regla `PrivacyValueAllowAll`, también «Todos menos…»), pasa
+   a «Mis contactos», sin excepciones. Cualquier otra elección se respeta: la tomó alguien a propósito. Primero se
+   cerró a contactos + el admin; el admin pidió dejarla en «Mis contactos» a secas («para facilitarlo»): es la opción
+   que enseña la app, sin excepciones que explicar. La cuenta tiene 0 contactos, así que hoy nadie puede añadirla;
+   para meterla en un grupo nuevo, se guarda la cuenta del admin en sus contactos.
 2. Un grupo o canal donde no está el bot (`bot_chats` o `_se_modera`) y al que la metió otra persona (ni el admin, ni un
    contacto, ni ella misma con un enlace o una solicitud, ni creado por ella) se abandona y se avisa al admin, en
    silencio porque ya está resuelto. Si no se sabe quién la metió, o no se pueden leer los contactos, no se sale de
@@ -1467,4 +1468,14 @@ otros grupos».
 El alta en un grupo (`events.ChatAction` con `user_added`, en `telethon_bridge`) lanza la misma revisión en el momento,
 pero no está garantizado que Telegram le mande ese aviso al recién añadido a un supergrupo: el job diario es la red. En
 `MODE=shadow` no toca nada. Medido el 8-nov: la cuenta está en sus 5 grupos (los 4 moderados, más «Informática (PC)
-en Español», que creó ella) y en ninguno ajeno. Tests: `tests/test_cuenta_secundaria.py`.
+en Español», que creó ella) y en ninguno ajeno. La primera pasada (22:05) no dejó ni una línea en el log, así que no
+se podía saber si había corrido: ahora deja `cuenta secundaria: pasada hecha; …` cada vez.
+
+**Para quien instala (petición del admin: «que el instalador le informe de dichos permisos y sugiera correcciones
+automáticas»).** `scripts/telethon_login confirm`, recién hecho el login, enseña tres ajustes de privacidad que importan
+a una cuenta de moderación (`cuenta_secundaria.AJUSTES`): grupos («Mis contactos»), quién ve el número («Nadie»: es
+admin en los grupos) y llamadas («Mis contactos»). Solo marca lo que está en «Todos», y con terminal pregunta
+«¿Lo corrijo ahora? (S/n)»; sin terminal, da el comando. `privacidad [--corregir]` hace lo mismo después, sobre una
+copia de la sesión, porque el bot puede estar usando la buena. `setup.py` pide meter la cuenta en los grupos ANTES del
+login: después solo podrán sus contactos. En la cuenta de aquí: grupos y número en «Mis contactos», llamadas en «Todos».
+Tests: `tests/test_cuenta_secundaria.py`.

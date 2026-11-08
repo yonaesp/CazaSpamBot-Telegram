@@ -7,8 +7,11 @@ la fecha.
 
 ## 2026-11 · Nadie mete a la cuenta secundaria en grupos ajenos
 
-- Telegram deja de serie que cualquiera añada una cuenta a un grupo. Si la de Telethon está en «Todos», el bot lo cierra
-  a sus contactos y al admin, y te avisa. Si otra elección ya está puesta, la respeta.
+- Telegram deja de serie que cualquiera añada una cuenta a un grupo. Si la de Telethon está en «Todos», el bot la deja
+  en «Mis contactos» y te avisa. Si otra elección ya está puesta, la respeta.
+- Al iniciar sesión con la cuenta secundaria, el instalador enseña su privacidad (quién puede meterla en grupos, ver su
+  número y llamarla) y ofrece corregir de una vez lo que esté abierto a todos. Después, cuando quieras:
+  `python -m scripts.telethon_login privacidad`.
 - Si alguien la mete en un grupo donde no está el bot, sale de él y te dice quién fue. No toca los grupos que creó
   ella, ni a los que entró por su cuenta, ni a los que la añadiste tú o un contacto suyo.
 

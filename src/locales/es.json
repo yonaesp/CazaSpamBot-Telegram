@@ -1269,7 +1269,7 @@
   "act.mayor": "⚠️ Es una versión mayor: lee las novedades antes de instalarla, porque puede pedirte algún cambio. Las actualizaciones automáticas no la instalan.",
   "act.hecha": "✅ CazaSpamBot actualizado a la <b>{nueva}</b> (antes, {antes}). Funciona con normalidad.",
   "act.fallida": "⚠️ La actualización a la <b>{nueva}</b> no arrancó bien y se ha vuelto a la {actual}, que sigue protegiendo tus grupos. Las actualizaciones automáticas no volverán a intentar esa versión. Lo que pasó está en el log de <code>update.sh</code>.",
-  "cuenta2.privacidad_cerrada": "🔒 <b>Ya nadie puede meter a la cuenta secundaria en grupos</b>\nTenía «Todos» en «¿Quién puede añadirme a grupos?». Ahora solo pueden tú y sus contactos; a los demás Telegram solo les deja mandarle un enlace, y la cuenta nunca abre enlaces.\nSe cambia en esa cuenta: Ajustes ▸ Privacidad ▸ Grupos.",
+  "cuenta2.privacidad_cerrada": "🔒 <b>Ya nadie puede meter a la cuenta secundaria en grupos</b>\nTenía «Todos» en «¿Quién puede añadirme a grupos?» y ahora tiene «Mis contactos». A los demás Telegram solo les deja mandarle un enlace, y la cuenta nunca abre enlaces.\nPara meterla tú en un grupo nuevo, guarda tu cuenta en sus contactos. Se cambia en esa cuenta: Ajustes ▸ Privacidad y seguridad ▸ Grupos.",
   "cuenta2.salida": "🚪 <b>La cuenta secundaria ha salido de un grupo ajeno</b>\n{grupo}{miembros}\nLa metió {quien}, que no eres tú ni un contacto suyo. Un grupo ajeno la luciría de escaparate y le restaría reputación para reportar spam.",
   "cuenta2.miembros": " ({n} miembros)"
 }

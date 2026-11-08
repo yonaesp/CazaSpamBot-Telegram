@@ -287,6 +287,10 @@ def main() -> int:
         print("     Telegram no le deja mandarte los avisos por DM (no puede escribirte primero).")
         paso += 1
     if telethon_nuevo:
+        print(f"  {paso}. Mete la cuenta secundaria como {BOLD}administradora{RESET} en tus grupos, con los")
+        print("     mismos permisos que el bot. Hazlo antes de iniciar sesión: al confirmar te")
+        print("     ofrecerá cerrar quién puede meterla en grupos, y después solo podrán sus contactos.")
+        paso += 1
         print(f"  {paso}. Inicia sesión con la cuenta secundaria (Telegram le manda un código):")
         print(f"       {CYAN}sudo docker compose exec antispam-bot python -m scripts.telethon_login request{RESET}")
         print(f"       {CYAN}sudo docker compose exec antispam-bot python -m scripts.telethon_login confirm 12345{RESET}")

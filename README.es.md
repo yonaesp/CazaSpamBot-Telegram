@@ -9,7 +9,7 @@
 [![python-telegram-bot](https://img.shields.io/badge/PTB-22.8-26A5E4?logo=telegram&logoColor=white)](https://python-telegram-bot.org/)
 [![Telethon](https://img.shields.io/badge/Telethon-1.44-blueviolet)](https://docs.telethon.dev/)
 [![Idiomas](https://img.shields.io/badge/idiomas-es%20%7C%20en%20%7C%20a%C3%B1ade%20el%20tuyo-orange)](src/locales/README.md)
-[![Tests](https://img.shields.io/badge/tests-2074%20passing-success)](#tests)
+[![Tests](https://img.shields.io/badge/tests-2087%20passing-success)](#tests)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 
 🌍 [**English**](README.md) · **Español**
@@ -173,7 +173,7 @@ Cuando veas `Bot @TuBot … listo`, ya está vivo (Ctrl+C sale del log; el bot s
 
 ### Paso 5 · Conecta la cuenta secundaria *(si la configuraste)*
 
-Añádela también como administradora de tus grupos, con los mismos permisos. Luego:
+Añádela también como administradora de tus grupos, con los mismos permisos, antes de iniciar sesión: al confirmar te enseña su privacidad y te ofrece corregir lo que esté abierto a todos, y desde entonces solo sus contactos pueden meterla en grupos. Luego:
 
 ```bash
 sudo docker compose exec antispam-bot python -m scripts.telethon_login request
@@ -386,7 +386,7 @@ Con **`/ban` y un motivo**, el bot publica el motivo en el grupo y ese aviso se 
 No: esa copia es privada y solo modera los grupos de su dueño. El código es gratis, así que montas tu propio bot con tu propio token y es enteramente tuyo. Son [5 minutos](#instalacion).
 
 **¿Qué es eso de la cuenta secundaria? ¿Es seguro?**
-Es una cuenta normal de Telegram, con otro número, que el bot usa como lo harías tú desde otro dispositivo. **No uses tu cuenta personal**: si Telegram limitara la secundaria por actividad automática, la tuya no se vería afectada. La sesión queda en `data/telethon.session` y hay que tratarla como una contraseña. Es opcional. Si la cuenta deja que cualquiera la añada a grupos (lo que trae Telegram de serie), el bot lo limita a sus contactos y a ti, y si alguien la mete en un grupo donde no está el bot, sale de él y te avisa.
+Es una cuenta normal de Telegram, con otro número, que el bot usa como lo harías tú desde otro dispositivo. **No uses tu cuenta personal**: si Telegram limitara la secundaria por actividad automática, la tuya no se vería afectada. La sesión queda en `data/telethon.session` y hay que tratarla como una contraseña. Es opcional. Si la cuenta deja que cualquiera la añada a grupos (lo que trae Telegram de serie), el bot lo deja en «Mis contactos», y si alguien la mete en un grupo donde no está el bot, sale de él y te avisa.
 
 **¿Baneará a miembros legítimos?**
 Es lo que más se esfuerza en evitar. Quien tiene historial en el grupo está protegido por su confianza, lo dudoso te llega con botones en vez de acabar en ban, y puedes arrancar en modo prueba para ver qué haría antes de dejarle actuar.
@@ -420,7 +420,7 @@ Contarnos que baneó a alguien legítimo vale tanto como el código: [CONTRIBUTI
 ## 🧪 Tests
 
 ```bash
-.venv/bin/python -m pytest tests/ -q     # 2074 tests
+.venv/bin/python -m pytest tests/ -q     # 2087 tests
 ```
 
 Cada detector tiene tests de lo que debe cazar **y de lo que no**, con casos reales. Un falso positivo es peor que un falso negativo.

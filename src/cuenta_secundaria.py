@@ -7,12 +7,17 @@ estar dentro le resta reputación, que es la que respalda los reportes a Telegra
 Medido el 8-nov-2026: la de este bot estaba en «Todos».
 
 Dos guardas, al arrancar y cada 24 h (`vigilar_job`):
-1. Privacidad: si está en «Todos», se cierra a sus contactos y al admin del bot.
+1. Privacidad: si está en «Todos», se deja en «Mis contactos» (decisión del admin,
+   8-nov: la opción de serie de Telegram, sin excepciones que haya que explicar).
    Cualquier otra elección la tomó alguien a propósito y se respeta.
 2. Grupos: un grupo o canal donde no está el bot y al que la metió otra persona
    (ni el admin, ni un contacto, ni ella misma con un enlace o una solicitud, ni
    creado por ella) se abandona y se avisa al admin. Si no se sabe quién la metió,
    no se toca: un grupo legítimo perdido es peor que un grupo de spam un día más.
+
+Al iniciar sesión (`scripts/telethon_login confirm`, o `privacidad`), quien instala
+ve además la privacidad que importa a una cuenta de moderación (`AJUSTES`) y se le
+ofrece corregirla de una vez (`revisar_e_informar`).
 
 Nunca se une a nada ni lee mensajes: tres o cuatro llamadas al día.
 """
@@ -36,39 +41,130 @@ CERRADA, YA_CERRADA, ERROR = "cerrada", "ya_cerrada", "error"
 # El job diario y el alta en un grupo pueden coincidir: una pasada a la vez.
 _UNA_A_LA_VEZ = asyncio.Lock()
 
+ETIQUETA = {"todos": "Todos", "contactos": "Mis contactos", "nadie": "Nadie"}
 
-async def cerrar_privacidad(client: Any, admin_id: int | None) -> str:
-    """Si cualquiera puede meterla en grupos, lo cierra a sus contactos y al admin."""
-    from telethon import utils
-    from telethon.tl.functions.account import GetPrivacyRequest, SetPrivacyRequest
-    from telethon.tl.types import (
-        InputPrivacyKeyChatInvite,
-        InputPrivacyValueAllowContacts,
-        InputPrivacyValueAllowUsers,
-        PrivacyValueAllowAll,
-    )
+
+@dataclass(frozen=True)
+class Ajuste:
+    clave: str        # nombre del InputPrivacyKey de Telethon
+    nombre: str       # como lo llama la app en Ajustes ▸ Privacidad y seguridad
+    recomendado: str  # 'contactos' | 'nadie'
+    porque: str
+
+
+# Lo único que se corrige solo es el primero; los demás, solo si quien instala dice que sí.
+AJUSTES: tuple[Ajuste, ...] = (
+    Ajuste("InputPrivacyKeyChatInvite", "Grupos (quién puede añadirme)", "contactos",
+           "un grupo de spam la luciría de escaparate y le restaría reputación para reportar"),
+    Ajuste("InputPrivacyKeyPhoneNumber", "Número de teléfono (quién lo ve)", "nadie",
+           "es admin en tus grupos y cualquiera de sus miembros vería su número"),
+    Ajuste("InputPrivacyKeyPhoneCall", "Llamadas", "contactos",
+           "las redes de spam también llaman"),
+)
+GRUPOS = AJUSTES[0]
+
+
+def _abierta(reglas: list[Any]) -> bool:
+    """«Todos», también «Todos menos…»: lo único que se corrige."""
+    from telethon.tl.types import PrivacyValueAllowAll
+    return any(isinstance(r, PrivacyValueAllowAll) for r in reglas)
+
+
+def describir(reglas: list[Any]) -> str:
+    """Como lo enseña la app: Todos, Mis contactos o Nadie, y si lleva excepciones."""
+    nombres = {type(r).__name__ for r in reglas}
+    base = ("Todos" if "PrivacyValueAllowAll" in nombres
+            else "Mis contactos" if "PrivacyValueAllowContacts" in nombres else "Nadie")
+    sueltas = nombres - {"PrivacyValueAllowAll", "PrivacyValueAllowContacts",
+                         "PrivacyValueDisallowAll"}
+    return base + (" (con excepciones)" if sueltas else "")
+
+
+async def _reglas(client: Any, aj: Ajuste) -> list[Any] | None:
+    """Las reglas actuales de un ajuste; None si no se pudieron leer."""
+    from telethon.tl import types
+    from telethon.tl.functions.account import GetPrivacyRequest
     try:
-        actual = await client(GetPrivacyRequest(InputPrivacyKeyChatInvite()))
+        return list((await client(GetPrivacyRequest(getattr(types, aj.clave)()))).rules)
     except Exception as exc:  # noqa: BLE001 - FloodWait, red...
-        log.warning("cuenta secundaria: no se pudo leer quién puede meterla en grupos: %s", exc)
-        return ERROR
-    if not any(isinstance(r, PrivacyValueAllowAll) for r in actual.rules):
-        return YA_CERRADA
-    reglas: list[Any] = [InputPrivacyValueAllowContacts()]
-    if admin_id:
-        try:
-            reglas.append(InputPrivacyValueAllowUsers(
-                [utils.get_input_user(await client.get_input_entity(admin_id))]))
-        except Exception as exc:  # noqa: BLE001 - el admin no está en su caché
-            log.info("cuenta secundaria: el admin %s no se pudo resolver (%s); solo contactos",
-                     admin_id, exc)
+        log.warning("cuenta secundaria: no se pudo leer «%s»: %s", aj.nombre, exc)
+        return None
+
+
+async def leer_privacidad(client: Any) -> list[tuple[Ajuste, list[Any] | None]]:
+    """Las reglas actuales de cada ajuste de `AJUSTES`."""
+    return [(aj, await _reglas(client, aj)) for aj in AJUSTES]
+
+
+async def poner(client: Any, aj: Ajuste) -> bool:
+    """Deja el ajuste en su valor recomendado, sin excepciones."""
+    from telethon.tl import types
+    from telethon.tl.functions.account import SetPrivacyRequest
+    valor = (types.InputPrivacyValueAllowContacts() if aj.recomendado == "contactos"
+             else types.InputPrivacyValueDisallowAll())
     try:
-        await client(SetPrivacyRequest(InputPrivacyKeyChatInvite(), reglas))
+        await client(SetPrivacyRequest(getattr(types, aj.clave)(), [valor]))
     except Exception as exc:  # noqa: BLE001
-        log.warning("cuenta secundaria: no se pudo cerrar quién puede meterla en grupos: %s", exc)
+        log.warning("cuenta secundaria: no se pudo cambiar «%s»: %s", aj.nombre, exc)
+        return False
+    log.info("cuenta secundaria: «%s» pasa a %s", aj.nombre, ETIQUETA[aj.recomendado])
+    return True
+
+
+async def cerrar_privacidad(client: Any) -> str:
+    """Si cualquiera puede meterla en grupos, lo deja en «Mis contactos»."""
+    reglas = await _reglas(client, GRUPOS)
+    if reglas is None:
         return ERROR
-    log.info("cuenta secundaria: «añadirme a grupos» pasa de Todos a contactos + admin")
-    return CERRADA
+    if not _abierta(reglas):
+        return YA_CERRADA
+    return CERRADA if await poner(client, GRUPOS) else ERROR
+
+
+async def revisar_e_informar(client: Any, corregir: bool | None,
+                             escribir: Callable[[str], Any] = print,
+                             preguntar: Callable[[str], str] | None = None) -> int:
+    """Para quien instala: enseña la privacidad y ofrece corregir lo abierto a todos.
+
+    `corregir`: True corrige sin preguntar, False solo informa y None pregunta con
+    `preguntar` (sin él, informa y dice el comando). Devuelve 1 si algo falló.
+    """
+    estado = await leer_privacidad(client)
+    escribir("\nPrivacidad de la cuenta secundaria:")
+    abiertos, fallos = [], 0
+    for aj, reglas in estado:
+        if reglas is None:
+            escribir(f"  ❓ {aj.nombre}: no se pudo leer")
+            fallos += 1
+        elif _abierta(reglas):
+            escribir(f"  ⚠️  {aj.nombre}: {describir(reglas)} → recomendado "
+                     f"«{ETIQUETA[aj.recomendado]}»: {aj.porque}")
+            abiertos.append(aj)
+        else:
+            escribir(f"  ✅ {aj.nombre}: {describir(reglas)}")
+    if not abiertos:
+        return 1 if fallos else 0
+    comando = "python -m scripts.telethon_login privacidad --corregir"
+    if corregir is None:
+        if preguntar is None:
+            escribir(f"Para corregirlo: {comando}")
+            return 1 if fallos else 0
+        try:
+            resp = preguntar("¿Lo corrijo ahora? (S/n): ").strip().lower()
+        except EOFError:
+            resp = "n"
+        corregir = resp in ("", "s", "si", "sí", "y", "yes")
+    if not corregir:
+        escribir(f"Sin cambios. Cuando quieras: {comando}")
+        return 1 if fallos else 0
+    for aj in abiertos:
+        ok = await poner(client, aj)
+        fallos += not ok
+        escribir(f"  {'✅' if ok else '❌'} {aj.nombre} → {ETIQUETA[aj.recomendado]}")
+    if GRUPOS in abiertos:
+        escribir("Para meterla tú en un grupo nuevo: en esa cuenta, guarda la tuya en sus "
+                 "contactos. Se cambia en la app: Ajustes ▸ Privacidad y seguridad.")
+    return 1 if fallos else 0
 
 
 @dataclass
@@ -155,7 +251,8 @@ async def _vigilar(context: Any) -> None:
         log.info("cuenta secundaria: modo shadow, no se toca su privacidad ni sus grupos")
         return
     avisos: list[str] = []
-    if await cerrar_privacidad(client, cfg.admin_user_id) == CERRADA:
+    privacidad = await cerrar_privacidad(client)
+    if privacidad == CERRADA:
         avisos.append(t("cuenta2.privacidad_cerrada"))
 
     from .handlers import _se_modera
@@ -166,7 +263,9 @@ async def _vigilar(context: Any) -> None:
     except Exception as exc:  # noqa: BLE001
         log.warning("cuenta secundaria: get_me falló: %s", exc)
         yo = None
+    salidas: int | str = "sin mirar (faltan contactos o get_me)"
     if contactos is not None and yo is not None:
+        salidas = 0
         confianza = contactos | ({cfg.admin_user_id} if cfg.admin_user_id else set())
         ajenos = await grupos_ajenos(
             client, yo, confianza, lambda cid: cid in del_bot or _se_modera(db, cfg, cid))
@@ -178,10 +277,14 @@ async def _vigilar(context: Any) -> None:
                 continue
             log.info("cuenta secundaria: sale de %s (%r), la metió %s", g.chat_id,
                      g.titulo[:40], g.invito)
+            salidas += 1
             miembros = t("cuenta2.miembros", n=g.miembros) if g.miembros else ""
             avisos.append(t("cuenta2.salida", grupo=html.escape(g.titulo[:80]),
                             miembros=miembros, quien=await _nombre_de(client, g.invito)))
 
+    # Una línea por pasada: un vigilante que no deja rastro no se sabe si corrió.
+    log.info("cuenta secundaria: pasada hecha; privacidad de grupos %s; grupos ajenos dejados: %s",
+             privacidad, salidas)
     if not avisos or not cfg.admin_notify_chat_id:
         return
     try:

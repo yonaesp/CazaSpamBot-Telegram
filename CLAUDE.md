@@ -1,6 +1,6 @@
 # CazaSpamBot — Bot Antispam Telegram
 
-Bot de moderación antispam **en producción 24/7**, multi-grupo, federado y **bilingüe** (es/en). ~25.500 LOC en `src/`, Podman, **2074 tests**, 28 detectores (un módulo cada uno en `src/detectors/`).
+Bot de moderación antispam **en producción 24/7**, multi-grupo, federado y **bilingüe** (es/en). ~25.500 LOC en `src/`, Podman, **2087 tests**, 28 detectores (un módulo cada uno en `src/detectors/`).
 
 > **Estado: PRODUCCIÓN.** No es un esqueleto. Cualquier cambio afecta grupos reales con miles de usuarios. **Investiga > Confirma > Actúa.**
 
@@ -19,7 +19,7 @@ Todos los identificadores reales viven en `.env` (gitignored), no en el repo. Co
 
 ⚠️ `.env` y `data/telethon.session` van en **600**: en 644 los leía cualquier usuario del N100 y de la réplica del N6005, y la sesión da la cuenta secundaria entera. Nada de `.env.bak*` con secretos al lado (L1).
 
-La cuenta secundaria no entra en grupos ajenos (`cuenta_secundaria.py`, al arrancar y cada 24 h): «añadirme a grupos» en «Todos» se cierra a contactos + admin (otra elección se respeta), y de un grupo donde no está el bot y al que la metió un extraño sale y avisa; si no se sabe quién la metió, no toca nada. `ChatInviteAlready` no prueba que sea miembro: antes de decirlo, `getParticipant` (L59).
+La cuenta secundaria no entra en grupos ajenos (`cuenta_secundaria.py`, al arrancar y cada 24 h): «añadirme a grupos» en «Todos» pasa a «Mis contactos», sin excepciones (decisión del admin; otra elección se respeta), y de un grupo donde no está el bot y al que la metió un extraño sale y avisa; si no se sabe quién la metió, no toca nada. `ChatInviteAlready` no prueba que sea miembro: antes de decirlo, `getParticipant`. Quien instala ve al confirmar el login su privacidad (grupos, número, llamadas; `AJUSTES`) y se le ofrece corregir lo que esté en «Todos»: `scripts.telethon_login privacidad [--corregir]`, sobre una copia de la sesión (L59).
 
 ## Grupos federados
 
@@ -266,4 +266,4 @@ GitHub guarda solo 14 días: `scripts/traffic_log.py` los acumula en `traffic/hi
 
 Lo nuevo va en su apartado temático de este fichero como invariante de 1-3 líneas (qué no hacer, el número medido, el test que lo fija), nunca al final por fecha. El relato (el caso, la medida, lo que se probó) va a `docs/lecciones.md` como lección nueva, con su línea en el índice, y aquí se cita con `(Ln)`. Un procedimiento de varios pasos que se usa a veces, a una skill en `.claude/skills/`. Las preferencias del admin y el estado del trabajo, a la memoria.
 
-*Actualizado: 2026-11-08 — 28 detectores, 2074 tests, 1.273 claves por idioma.*
+*Actualizado: 2026-11-08 — 28 detectores, 2087 tests, 1.273 claves por idioma.*

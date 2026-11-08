@@ -5,6 +5,8 @@ Uso:
     python -m scripts.telethon_login confirm 12345   # Completa login con el código recibido
     python -m scripts.telethon_login confirm 12345 mi2faPassword   # Si hay 2FA
     python -m scripts.telethon_login status          # Comprueba si la session ya existe y es válida
+    python -m scripts.telethon_login privacidad      # Revisa su privacidad y ofrece corregirla
+    python -m scripts.telethon_login privacidad --corregir   # La corrige sin preguntar
     python -m scripts.telethon_login logout          # Cierra sesión Telethon y borra .session
 """
 from __future__ import annotations
@@ -88,8 +90,44 @@ async def cmd_confirm(code: str, password: str | None) -> int:
     print(f"✅ Login OK como {me.first_name} (@{me.username}) id={me.id}")
     print(f"Session persistida en {SESSION}")
     PENDING.unlink(missing_ok=True)
+    # Recién entrada, se le enseña su privacidad y se ofrece corregirla (L59): con la
+    # de serie, cualquiera puede meterla en un grupo de spam.
+    try:
+        await _privacidad(client, corregir=None)
+    except Exception as exc:  # noqa: BLE001 - el login ya está hecho: que no lo parezca fallido
+        print(f"(No se pudo revisar su privacidad: {exc}. Más tarde: privacidad)")
     await client.disconnect()
     return 0
+
+
+async def _privacidad(client: TelegramClient, corregir: bool | None) -> int:
+    from src import cuenta_secundaria
+    preguntar = input if corregir is None and sys.stdin.isatty() else None
+    return await cuenta_secundaria.revisar_e_informar(client, corregir, preguntar=preguntar)
+
+
+async def cmd_privacidad(corregir: bool | None) -> int:
+    """Sobre una copia de la sesión: el bot puede estar usando la buena."""
+    import shutil
+    import tempfile
+    if not Path(SESSION).exists():
+        print("❌ No hay sesión. Ejecuta 'request' y 'confirm'.")
+        return 1
+    tmp = tempfile.mkdtemp(prefix="privacidad-")
+    copia = Path(tmp) / "copia.session"
+    shutil.copy(SESSION, copia)
+    try:
+        client = TelegramClient(str(copia), int(os.environ["TG_API_ID"]), os.environ["TG_API_HASH"])
+        await client.connect()
+        try:
+            if not await client.is_user_authorized():
+                print("❌ No autenticado. Ejecuta 'request'.")
+                return 1
+            return await _privacidad(client, corregir)
+        finally:
+            await client.disconnect()
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
 
 
 async def cmd_status() -> int:
@@ -141,6 +179,8 @@ async def main() -> int:
         return await cmd_confirm(code, password)
     if cmd == "status":
         return await cmd_status()
+    if cmd == "privacidad":
+        return await cmd_privacidad(True if "--corregir" in sys.argv[2:] else None)
     if cmd == "logout":
         return await cmd_logout()
     print(f"Comando desconocido: {cmd}\n{__doc__}", file=sys.stderr)

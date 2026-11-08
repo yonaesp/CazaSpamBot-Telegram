@@ -9,7 +9,7 @@
 [![python-telegram-bot](https://img.shields.io/badge/PTB-22.8-26A5E4?logo=telegram&logoColor=white)](https://python-telegram-bot.org/)
 [![Telethon](https://img.shields.io/badge/Telethon-1.44-blueviolet)](https://docs.telethon.dev/)
 [![Languages](https://img.shields.io/badge/languages-es%20%7C%20en%20%7C%20add%20yours-orange)](src/locales/README.md)
-[![Tests](https://img.shields.io/badge/tests-2074%20passing-success)](#tests)
+[![Tests](https://img.shields.io/badge/tests-2087%20passing-success)](#tests)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 
 🌍 **English** · [**Español**](README.es.md)
@@ -174,7 +174,7 @@ Once you see `Bot @YourBot … listo`, it's alive (Ctrl+C leaves the log; the bo
 
 ### Step 5 · Connect the secondary account *(if you set one up)*
 
-Make it an administrator of your groups too, with the same permissions. Then:
+Make it an administrator of your groups too, with the same permissions, before logging in: when you confirm, it shows the account's privacy and offers to fix whatever is open to everybody, and from then on only its contacts can add it to groups. Then:
 
 ```bash
 sudo docker compose exec antispam-bot python -m scripts.telethon_login request
@@ -387,7 +387,7 @@ With **`/ban` and a reason**, the bot posts the reason in the group and that not
 No: that copy is private and only moderates its owner's groups. The code is free, so you run your own bot with your own token, and it's fully yours. It takes [5 minutes](#install).
 
 **What's this secondary account? Is it safe?**
-It's a regular Telegram account, with another number, that the bot uses the way you would from another device. **Don't use your personal account**: if Telegram ever limited the secondary one for automated activity, yours would be unaffected. The session lives in `data/telethon.session` and must be treated like a password. It's optional. If the account lets everybody add it to groups (Telegram's default), the bot narrows that to its contacts and you, and if someone else adds it to a group the bot isn't in, it leaves and tells you.
+It's a regular Telegram account, with another number, that the bot uses the way you would from another device. **Don't use your personal account**: if Telegram ever limited the secondary one for automated activity, yours would be unaffected. The session lives in `data/telethon.session` and must be treated like a password. It's optional. If the account lets everybody add it to groups (Telegram's default), the bot switches that to «My contacts», and if someone else adds it to a group the bot isn't in, it leaves and tells you.
 
 **Will it ban legitimate members?**
 That's what it tries hardest to avoid. Members with history in the group are protected by their trust level, doubtful cases reach you with buttons instead of ending in a ban, and you can start in test mode to see what it would do before letting it act.
@@ -421,7 +421,7 @@ Telling us about a legitimate member it banned is as useful as code: [CONTRIBUTI
 ## 🧪 Tests
 
 ```bash
-.venv/bin/python -m pytest tests/ -q     # 2074 tests
+.venv/bin/python -m pytest tests/ -q     # 2087 tests
 ```
 
 Every detector has tests for what it must catch **and what it must not**, built from real cases. A false positive is worse than a false negative.

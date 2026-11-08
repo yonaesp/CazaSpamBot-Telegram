@@ -12,12 +12,15 @@ import pytest
 from telethon.tl.types import (
     InputPeerUser,
     InputPrivacyValueAllowContacts,
-    InputPrivacyValueAllowUsers,
+    InputPrivacyValueDisallowAll,
     PrivacyValueAllowAll,
     PrivacyValueAllowContacts,
     PrivacyValueDisallowAll,
     PrivacyValueDisallowUsers,
 )
+
+import ast
+from pathlib import Path
 
 from src import cuenta_secundaria as cs
 from src import handlers, telethon_bridge
@@ -31,7 +34,8 @@ class Cliente:
 
     def __init__(self, reglas=(), dialogos=(), participantes=None, contactos=(CONTACTO,),
                  falla=()):
-        self.reglas, self.dialogos = list(reglas), list(dialogos)
+        self.reglas = reglas if isinstance(reglas, dict) else list(reglas)
+        self.dialogos = list(dialogos)
         self.part, self.contactos, self.falla = participantes or {}, list(contactos), set(falla)
         self.puestas, self.salidas = [], []
 
@@ -40,9 +44,13 @@ class Cliente:
         if nombre in self.falla:
             raise RuntimeError(nombre)
         if nombre == "GetPrivacyRequest":
-            return NS(rules=self.reglas)
+            clave = type(req.key).__name__
+            if clave in self.falla:
+                raise RuntimeError(clave)
+            r = self.reglas
+            return NS(rules=r.get(clave, []) if isinstance(r, dict) else r)
         if nombre == "SetPrivacyRequest":
-            self.puestas.append(req.rules)
+            self.puestas.append((type(req.key).__name__, req.rules))
             return NS(rules=[])
         if nombre == "GetContactIDsRequest":
             return self.contactos
@@ -82,17 +90,17 @@ def _grupo(cid, titulo="Grupo", canal=True, **flags):
 @pytest.mark.asyncio
 async def test_si_cualquiera_puede_meterla_se_cierra():
     cli = Cliente(reglas=[PrivacyValueAllowAll()])
-    assert await cs.cerrar_privacidad(cli, ADMIN) == cs.CERRADA
-    (reglas,) = cli.puestas
-    assert isinstance(reglas[0], InputPrivacyValueAllowContacts)
-    assert isinstance(reglas[1], InputPrivacyValueAllowUsers)
-    assert reglas[1].users[0].user_id == ADMIN
+    assert await cs.cerrar_privacidad(cli) == cs.CERRADA
+    ((clave, reglas),) = cli.puestas
+    # «Mis contactos» a secas, como la opción de la app (decisión del admin, 8-nov)
+    assert clave == "InputPrivacyKeyChatInvite"
+    assert [type(r) for r in reglas] == [InputPrivacyValueAllowContacts]
 
 
 @pytest.mark.asyncio
 async def test_todos_menos_alguien_sigue_abierto():
     cli = Cliente(reglas=[PrivacyValueDisallowUsers(users=[5]), PrivacyValueAllowAll()])
-    assert await cs.cerrar_privacidad(cli, ADMIN) == cs.CERRADA
+    assert await cs.cerrar_privacidad(cli) == cs.CERRADA
 
 
 @pytest.mark.parametrize("reglas", [
@@ -103,15 +111,85 @@ async def test_todos_menos_alguien_sigue_abierto():
 @pytest.mark.asyncio
 async def test_lo_que_eligio_alguien_se_respeta(reglas):
     cli = Cliente(reglas=reglas)
-    assert await cs.cerrar_privacidad(cli, ADMIN) == cs.YA_CERRADA
+    assert await cs.cerrar_privacidad(cli) == cs.YA_CERRADA
     assert not cli.puestas
 
 
 @pytest.mark.asyncio
 async def test_si_no_puede_leerla_lo_dice():
     cli = Cliente(reglas=[PrivacyValueAllowAll()], falla={"GetPrivacyRequest"})
-    assert await cs.cerrar_privacidad(cli, ADMIN) == cs.ERROR
+    assert await cs.cerrar_privacidad(cli) == cs.ERROR
     assert not cli.puestas
+
+
+@pytest.mark.parametrize("reglas,dice", [
+    ([PrivacyValueAllowAll()], "Todos"),
+    ([PrivacyValueDisallowUsers(users=[5]), PrivacyValueAllowAll()], "Todos (con excepciones)"),
+    ([PrivacyValueAllowContacts(), PrivacyValueDisallowAll()], "Mis contactos"),
+    ([PrivacyValueDisallowAll()], "Nadie"),
+    ([], "Nadie"),
+])
+def test_se_describe_como_en_la_app(reglas, dice):
+    assert cs.describir(reglas) == dice
+
+
+# ------------------------------------------------- lo que ve quien instala
+
+ABIERTA = {"InputPrivacyKeyChatInvite": [PrivacyValueAllowAll()],
+           "InputPrivacyKeyPhoneNumber": [PrivacyValueAllowContacts(), PrivacyValueDisallowAll()],
+           "InputPrivacyKeyPhoneCall": [PrivacyValueAllowAll()]}
+
+
+@pytest.mark.asyncio
+async def test_al_instalar_se_corrige_solo_lo_abierto_a_todos():
+    cli, salida = Cliente(reglas=ABIERTA), []
+    assert await cs.revisar_e_informar(cli, corregir=True, escribir=salida.append) == 0
+    assert [(c, [type(r) for r in rr]) for c, rr in cli.puestas] == [
+        ("InputPrivacyKeyChatInvite", [InputPrivacyValueAllowContacts]),
+        ("InputPrivacyKeyPhoneCall", [InputPrivacyValueAllowContacts]),
+    ]
+    texto = "\n".join(salida)
+    assert "✅ Número de teléfono (quién lo ve): Mis contactos" in texto
+    assert "guarda la tuya en sus contactos" in texto   # cómo meterla tú después
+
+
+@pytest.mark.parametrize("respuesta,cambia", [("", True), ("s", True), ("n", False)])
+@pytest.mark.asyncio
+async def test_al_instalar_se_pregunta(respuesta, cambia):
+    cli = Cliente(reglas=ABIERTA)
+    await cs.revisar_e_informar(cli, corregir=None, escribir=lambda _: None,
+                                preguntar=lambda _: respuesta)
+    assert bool(cli.puestas) is cambia
+
+
+@pytest.mark.asyncio
+async def test_sin_terminal_solo_informa_y_da_el_comando():
+    cli, salida = Cliente(reglas=ABIERTA), []
+    await cs.revisar_e_informar(cli, corregir=None, escribir=salida.append)
+    assert not cli.puestas
+    assert any("privacidad --corregir" in x for x in salida)
+
+
+@pytest.mark.asyncio
+async def test_lo_que_no_se_puede_leer_se_dice_y_no_se_toca():
+    cli, salida = Cliente(reglas=ABIERTA, falla={"InputPrivacyKeyPhoneCall"}), []
+    assert await cs.revisar_e_informar(cli, corregir=True, escribir=salida.append) == 1
+    assert [c for c, _ in cli.puestas] == ["InputPrivacyKeyChatInvite"]
+    assert any("❓ Llamadas" in x for x in salida)
+
+
+@pytest.mark.asyncio
+async def test_poner_nadie():
+    cli = Cliente()
+    assert await cs.poner(cli, cs.AJUSTES[1])
+    assert [type(r) for r in cli.puestas[0][1]] == [InputPrivacyValueDisallowAll]
+
+
+def test_el_login_revisa_la_privacidad_al_confirmar():
+    arbol = ast.parse(Path("scripts/telethon_login.py").read_text(encoding="utf-8"))
+    confirm = next(n for n in ast.walk(arbol)
+                   if isinstance(n, ast.AsyncFunctionDef) and n.name == "cmd_confirm")
+    assert "await _privacidad(client" in ast.unparse(confirm)
 
 
 # ------------------------------------------------------------------ grupos
