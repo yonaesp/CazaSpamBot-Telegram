@@ -23,22 +23,29 @@ la fecha.
 - Un enlace a un canal que promete rentabilidades («90% de precisión», «100% de rentabilidad», «ganancias garantizadas»)
   cuenta ya como enlace a un canal de spam, también en los mensajes, igual que uno que se anuncia solo con emojis sexuales («💦 🍑»).
 
-## 2026-11 · Bots de spam que se banean de antemano, y una auditoría completa
+## v1.3.0 · 2026-11-09 · Bots de spam que se banean de antemano
 
-- Un bot invitado con señales de spam (ya fichado, nombre o texto en otro alfabeto, llamado junto a otros, o lo llamó
-  alguien ya baneado) se banea también en los demás grupos antes de que nadie lo llame allí, y quien lo llamó, si es
-  nuevo, también. Mencionar un bot de spam fichado es ban (salvo a quien tiene confianza).
-- Auditoría del código: un «@admin» con spam ya no se salta los detectores; el ban por reacciones ya no borra el
-  mensaje de otra persona; vuelven a funcionar el destino de los enlaces a canales y las citas de canales ajenos; la
-  revisión «Legítimo/Spam» aprende del mensaje revisado; varios bans que no quedaban registrados ahora sí.
-- Comprobaciones automáticas: `scripts/verificar.sh` (ruff con más reglas, suite y simulador) antes de cada commit.
+Un bot invitado con señales de spam (ya fichado, nombre o texto en otro alfabeto,
+llamado junto a otros bots, o lo llamó alguien ya baneado) se banea también en los
+demás grupos antes de que nadie lo llame allí, y quien lo llamó, si es nuevo, también.
+Mencionar un bot de spam fichado es ban, salvo a quien tiene confianza. El aviso de un
+bot invitado dice quién lo llamó, que el ban fue solo de ese grupo y el nombre del grupo.
 
-## 2026-11 · El aviso de los bans que se deciden sobre un mensaje vuelve a llegar
+Las coincidencias dudosas con las listas (CAS con una sola infracción, o una lista que
+marca a un miembro veterano) llegan al privado con los botones Permitir y Banear; antes
+se quedaban apuntadas donde nadie las veía.
 
-- Desde el 26-sep, el aviso privado de un ban decidido sobre un mensaje se perdía: la limpieza que sigue al ban borraba
-  el mensaje antes de copiarlo al aviso, y la copia fallida se llevaba el aviso. Ahora la limpieza lo deja y el aviso
-  sale aunque la copia falle.
-- El aviso de un bot invitado dice quién lo llamó, que el ban fue solo de ese grupo y el nombre del grupo.
+Desde el 26-sep se perdía el aviso privado de un ban decidido sobre un mensaje: la
+limpieza que sigue al ban borraba el mensaje antes de copiarlo al aviso, y la copia
+fallida se llevaba el aviso. Ahora la limpieza lo deja y el aviso sale aunque la copia
+falle.
+
+Auditoría del código: un «@admin» con spam ya no se salta los detectores; el ban por
+reacciones ya no borra el mensaje de otra persona; vuelven a funcionar el destino de
+los enlaces a canales y las citas de canales ajenos cuando el bot descubre sus grupos
+solo; la revisión «Legítimo/Spam» aprende del mensaje revisado; varios bans que no
+quedaban registrados ahora sí. Y comprobaciones automáticas: `scripts/verificar.sh`
+(ruff con más reglas, suite y simulador) antes de cada commit.
 
 ## v1.2.0 · 2026-11-08 · Solo escriben los bots que mete un admin
 
