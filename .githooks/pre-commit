@@ -4,4 +4,8 @@
 cambios=$(git diff --cached --name-only -- src tests config scripts/simular.py ruff.toml)
 [ -z "$cambios" ] && exit 0
 echo "pre-commit: comprobando antes de commitear…"
-exec "$(git rev-parse --show-toplevel)/scripts/verificar.sh"
+raiz=$(git rev-parse --show-toplevel)
+# Sin las variables que fijan el repo: en un worktree van con ruta absoluta y un `git` lanzado
+# por los tests escribiría en este repositorio (L60).
+unset $(git rev-parse --local-env-vars)
+cd "$raiz" && exec "$raiz/scripts/verificar.sh"
