@@ -65,6 +65,7 @@ Una lección nueva va al final, con el número siguiente y su línea en el índi
 - [L57](#l57) · Auditoría del 7-nov: lo que no funcionaba como decía el CLAUDE.md
 - [L58](#l58) · Rosario: un enlace privado en la bio que nadie fue a mirar
 - [L59](#l59) · La cuenta secundaria: cualquiera podía meterla en un grupo
+- [L60](#l60) · Un test que escribió en el repositorio de verdad
 
 ---
 
@@ -1441,6 +1442,7 @@ generalizar: lo para la ficha del enlace y la red (11 cuentas con el mismo enlac
 `_GIVE_BACK_RE`), pero el mensaje ya puntuaba para ban (210) y la regla de la casa es no tocar un detector cuando el caso
 ya se resolvió. Queda anotado por si vuelve con una cuenta de confianza media.
 
+<a id="l59"></a>
 ## L59 · La cuenta secundaria: cualquiera podía meterla en un grupo
 
 **El caso (8-nov-2026).** Al leer los destinos de L58, una invitación a un grupo chino de blanqueo («公群 2714
@@ -1477,5 +1479,31 @@ a una cuenta de moderación (`cuenta_secundaria.AJUSTES`): grupos («Mis contact
 admin en los grupos) y llamadas («Mis contactos»). Solo marca lo que está en «Todos», y con terminal pregunta
 «¿Lo corrijo ahora? (S/n)»; sin terminal, da el comando. `privacidad [--corregir]` hace lo mismo después, sobre una
 copia de la sesión, porque el bot puede estar usando la buena. `setup.py` pide meter la cuenta en los grupos ANTES del
-login: después solo podrán sus contactos. En la cuenta de aquí: grupos y número en «Mis contactos», llamadas en «Todos».
+login: después solo podrán sus contactos. En la cuenta de aquí: grupos y número estaban en «Mis contactos» y llamadas en «Todos», que pasó a «Mis
+contactos» el 8-nov con el OK del admin.
 Tests: `tests/test_cuenta_secundaria.py`.
+
+<a id="l60"></a>
+## L60 · Un test que escribió en el repositorio de verdad
+
+**El caso (9-nov-2026, al sacar la v1.3.0).** La versión se prepara en un worktree aparte (`git worktree add --detach`,
+skill `publicar`). Su `git commit` lanzó el pre-commit (`scripts/verificar.sh`, L56), y `tests/test_update_sh.py`, que
+monta un repo de juguete con `git init --bare`, `git config user.name t` y un commit, escribió en el repositorio del bot:
+`core.bare = true` en `.git/config` (`git status` en la carpeta del bot: «esta operación debe ser realizada en un árbol
+de trabajo»), la identidad de commit pasó a «t <t@t>» y la rama de la versión avanzó a un commit «v1.0.0» con solo los
+ficheros del juguete. El `git remote add origin` chocó con el `origin` real y el test se paró ahí, antes de cualquier
+`push`. Nada salió del servidor.
+
+**Por qué.** Git pasa a sus hooks `GIT_DIR` y `GIT_INDEX_FILE`. En la carpeta principal van relativos (`.git`), y un
+`git` lanzado desde otra carpeta los resuelve contra la suya: inofensivo, y por eso los commits en `main` nunca lo
+mostraron. En un worktree van con ruta absoluta, y todo `git` que lance un test actúa sobre el repo real. La v1.2.0 no
+lo vio porque salió de un commit anterior al pre-commit.
+
+**Lo que se hizo.** Se restauró `.git/config` (`core.bare false`, la identidad de siempre), la rama volvió a e852d40 y
+`git fsck` salió limpio. El pre-commit hace `unset $(git rev-parse --local-env-vars)` antes de `verificar.sh`, y
+`tests/conftest.py` quita esas mismas variables al cargar, para cualquier otra vía. Comprobado: con `GIT_DIR` apuntando a
+un repo cebo, los 12 tests de `update.sh` pasan y el `.git/config` del cebo no cambia.
+
+**La regla.** Un test que lanza `git` (o cualquier herramienta que lea `GIT_*`) no hereda las variables que fijan el
+repositorio. Al hacer commit en un worktree, comprobar después que `.git/config` sigue igual.
+
