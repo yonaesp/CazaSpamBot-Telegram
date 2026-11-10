@@ -16,7 +16,17 @@ la fecha.
 - Al parar, el bot termina lo que tenía entre manos (`stop_grace_period: 45s` en el compose), y una segunda señal de
   parada ya no corta el apagado a medias.
 
-## 2026-11 · Nadie mete a la cuenta secundaria en grupos ajenos
+## v1.4.0 · 2026-11-10 · El enlace privado de la bio se mira, y nadie mete a la cuenta secundaria en grupos ajenos
+
+**Bios con un enlace privado: el bot mira adónde llevan**
+
+- Quien entra con un enlace privado de Telegram en la bio y nada más ya no pasa sin que nadie lo mire: el bot lee adónde
+  lleva el enlace (sin entrar ni dejar rastro) y, si es un canal de spam, lo banea antes de que escriba. Si el destino
+  parece limpio o el enlace ha caducado, te llega al privado para que decidas, una sola vez por persona.
+- Un enlace a un canal que promete rentabilidades («90% de precisión», «100% de rentabilidad», «ganancias garantizadas»)
+  cuenta ya como enlace a un canal de spam, también en los mensajes, igual que uno que se anuncia solo con emojis sexuales («💦 🍑»).
+
+**Nadie mete a la cuenta secundaria en grupos ajenos**
 
 - Telegram deja de serie que cualquiera añada una cuenta a un grupo. Si la de Telethon está en «Todos», el bot la deja
   en «Mis contactos» y te avisa. Si otra elección ya está puesta, la respeta.
@@ -25,14 +35,6 @@ la fecha.
   `python -m scripts.telethon_login privacidad`.
 - Si alguien la mete en un grupo donde no está el bot, sale de él y te dice quién fue. No toca los grupos que creó
   ella, ni a los que entró por su cuenta, ni a los que la añadiste tú o un contacto suyo.
-
-## 2026-11 · Bios con un enlace privado: el bot mira adónde llevan
-
-- Quien entra con un enlace privado de Telegram en la bio y nada más ya no pasa sin que nadie lo mire: el bot lee adónde
-  lleva el enlace (sin entrar ni dejar rastro) y, si es un canal de spam, lo banea antes de que escriba. Si el destino
-  parece limpio o el enlace ha caducado, te llega al privado para que decidas, una sola vez por persona.
-- Un enlace a un canal que promete rentabilidades («90% de precisión», «100% de rentabilidad», «ganancias garantizadas»)
-  cuenta ya como enlace a un canal de spam, también en los mensajes, igual que uno que se anuncia solo con emojis sexuales («💦 🍑»).
 
 ## v1.3.0 · 2026-11-09 · Bots de spam que se banean de antemano
 
