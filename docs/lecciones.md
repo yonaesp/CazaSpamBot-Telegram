@@ -1559,8 +1559,12 @@ de Telethon en trabajos de fondo no tenían tope: una que no volviera dejaba par
 activado para que una caída en código nativo deje traza.
 
 **Lo que no se tocó.** PTB procesa los updates de uno en uno y `AIORateLimiter` duerme lo que pida Telegram (hasta 3
-reintentos): en una avalancha con la verificación encendida, un 429 al publicar pararía la moderación ese tiempo. Aquí
-verificación y bienvenida están apagadas; queda anotado. Tampoco se puso `mem_limit` al contenedor.
+reintentos): en una avalancha con la verificación encendida, un 429 al publicar pararía la moderación ese tiempo (el
+limitador para todas las peticiones, no solo las de ese grupo). Aquí la verificación está encendida en tres grupos (la
+primera redacción decía «apagada»: se miró el valor por defecto y no `chat_settings`). Medido el 10-nov: en 90 días, el
+minuto con más entradas en un grupo con verificación tuvo 4 (Telegram admite 20 mensajes por minuto y grupo) y en los
+logs guardados no hay ningún «Rate limit hit». Solo lo alcanzaría una avalancha de verdad; queda anotado y sin tocar.
+Tampoco se puso `mem_limit` al contenedor.
 
 **La regla.** Una auditoría de estabilidad empieza por los eventos y el log del contenedor, no por el código: los
 códigos de salida, lo que quedó en los grupos y lo que el log no dice. Tests: `tests/test_estabilidad_l61.py`.
