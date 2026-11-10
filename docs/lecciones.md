@@ -66,6 +66,7 @@ Una lección nueva va al final, con el número siguiente y su línea en el índi
 - [L58](#l58) · Rosario: un enlace privado en la bio que nadie fue a mirar
 - [L59](#l59) · La cuenta secundaria: cualquiera podía meterla en un grupo
 - [L60](#l60) · Un test que escribió en el repositorio de verdad
+- [L61](#l61) · Auditoría de estabilidad: lo que solo se ve mirando producción
 
 ---
 
@@ -1506,4 +1507,58 @@ un repo cebo, los 12 tests de `update.sh` pasan y el `.git/config` del cebo no c
 
 **La regla.** Un test que lanza `git` (o cualquier herramienta que lea `GIT_*`) no hereda las variables que fijan el
 repositorio. Al hacer commit en un worktree, comprobar después que `.git/config` sigue igual.
+
+<a id="l61"></a>
+## L61 · Auditoría de estabilidad: lo que solo se ve mirando producción
+
+**El encargo (10-nov-2026).** «Haz un audit de estabilidad al bot.» Se empezó por producción (eventos del contenedor,
+el log entero, la base, los mensajes del bot que siguen en los grupos) y después el código. Lo que estaba bien: 0
+`Traceback` y 0 `ERROR` en el log, base íntegra (3,5 MB, 20.293 filas la mayor tabla), 94 MB de memoria, todas las
+esperas de la ruta de un update con tope, todos los cachés con límite salvo uno. Lo que no:
+
+**1. Cada reinicio era un SIGKILL.** `sudo podman events --filter container=cazaspam-bot --since 72h`: los 6
+`docker compose restart` acabaron en «died 137», y en el mismo segundo. Reproducido con un contenedor que atrapa
+SIGTERM: `docker compose restart` (compose v5.6.1 sobre la API de Podman 5.4.2) tarda 0,18 s y el trap no corre; con
+`-t 20` llega el SIGTERM y sale con 0. `stop`, `up -d --force-recreate` y `podman restart` sí son limpios. Lo que
+cuesta: PTB confirma a Telegram los updates al pedir los siguientes, así que lo que estaba en cola sin procesar se
+pierde, y un ban federado se queda a medias (lo repara la reconciliación nocturna). `sesiones` arregló el envoltorio
+(añade `-t` con el mayor `StopTimeout` del proyecto) y el compose lleva `stop_grace_period: 45s`: al parar, PTB espera
+a las tareas de `create_task`, y la pasada tardía de los bots invitados duerme hasta 33 s.
+
+**2. Dos señales de parada abortaban el apagado.** Al reiniciar la máquina el log dejó «coroutine 'Updater.stop' was
+never awaited»: llegan dos SIGTERM (Podman y systemd), y el manejador de PTB relanza `SystemExit` en medio del apagado.
+Salía con código 0 sin procesar la cola ni cerrar nada. `main._parada_unica` atiende la primera e ignora las demás; se
+instala en `_post_init`, sobre los manejadores de `run_polling`.
+
+**3. Un bucle colgado no lo reiniciaba nadie.** El healthcheck (latido de menos de 300 s) solo pone el contenedor en
+`unhealthy`; `HealthcheckOnFailureAction` es `none` y ni Docker ni Podman reinician por eso. Con texto de terceros
+pasando por decenas de expresiones regulares, un bucle bloqueado es posible. `vigia_cuelgue`: un hilo que mira si el
+latido avanza y, tras 20 comprobaciones de 15 s sin latido, vuelca los hilos (`faulthandler`), deja una marca en
+`data/cuelgue.txt` y sale con 70. Comprobado que Podman relanza un contenedor `unless-stopped` que sale solo (3
+reinicios en 16 s en la prueba). Cuenta comprobaciones y no segundos porque un cgroup con `MemoryHigh` congela el
+proceso entero (pasó el 9-nov en otro servicio): al descongelarse, por reloj habría matado a un bucle sano.
+
+**4. Los borrados programados vivían en memoria.** Listando con la cuenta secundaria los mensajes del bot en los grupos
+salieron 8 que debieron borrarse: avisos de ban de mayo y junio, un warn, un recordatorio, una «Verificación correcta»
+de septiembre y un «ha sido baneado» del 16-oct. Cada uno se publicó poco antes de un reinicio. `borrado_diferido`
+apunta ahora cada borrado en `borrados_pendientes`, el job que borra a su hora olvida la fila y `barrido_job` (cada
+5 min, con 90 s de margen para no adelantarse al job) borra lo vencido; un fallo de red se reintenta hasta un día. Los
+ocho sitios que llamaban a `jq.run_once(borrar_mensaje_job…)` pasan por `programar`, y los tres con job propio
+(bienvenidas y aviso suave) llaman a `apuntar`.
+
+**5. Telethon caído hasta el siguiente reinicio.** Telethon reintenta la conexión 5 veces y, si no puede, se queda
+desconectado: bio, fotos, Posts y reportes apagados sin una línea (en dos días, 12 «Server closed the connection», cada
+una con su reconexión). `_telethon_vivo_job` reconecta cada 5 min y avisa a la tercera pasada caído. Además, 28 llamadas
+de Telethon en trabajos de fondo no tenían tope: una que no volviera dejaba parada la cola de reportes, o el cerrojo de
+`cuenta_secundaria` cogido, o el barrido semanal sin acabar (y el planificador se salta las pasadas siguientes).
+
+**Menores.** `_admin_any_cache` no tenía límite (una entrada por cada desconocido que escribe al bot); `faulthandler`
+activado para que una caída en código nativo deje traza.
+
+**Lo que no se tocó.** PTB procesa los updates de uno en uno y `AIORateLimiter` duerme lo que pida Telegram (hasta 3
+reintentos): en una avalancha con la verificación encendida, un 429 al publicar pararía la moderación ese tiempo. Aquí
+verificación y bienvenida están apagadas; queda anotado. Tampoco se puso `mem_limit` al contenedor.
+
+**La regla.** Una auditoría de estabilidad empieza por los eventos y el log del contenedor, no por el código: los
+códigos de salida, lo que quedó en los grupos y lo que el log no dice. Tests: `tests/test_estabilidad_l61.py`.
 

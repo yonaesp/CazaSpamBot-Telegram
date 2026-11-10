@@ -325,13 +325,8 @@ async def aplicar_warn(
         return n
     # Auto-borrado, para no ensuciar el chat con el histórico de warns.
     delete_after = getattr(cfg, "public_quip_delete_after_s", 10800) if cfg else 10800
-    jq = context.application.job_queue
-    if jq is not None and delete_after > 0:
-        jq.run_once(
-            borrado_diferido.borrar_mensaje_job, when=delete_after,
-            data={"chat_id": chat_id, "message_id": sent.message_id},
-            name=f"del_warn_{chat_id}_{sent.message_id}",
-        )
+    borrado_diferido.programar(context, chat_id, sent.message_id, delete_after,
+                               nombre=f"del_warn_{chat_id}_{sent.message_id}")
     return n
 
 

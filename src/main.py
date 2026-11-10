@@ -1,8 +1,10 @@
 """Bot Antispam Telegram (CazaSpamBot) — entry point."""
 from __future__ import annotations
 
+import faulthandler
 import logging
 import os
+import signal
 from pathlib import Path
 
 import aiohttp
@@ -17,7 +19,7 @@ from telegram.ext import (
     filters,
 )
 
-from . import actualizaciones, admin, barrido_bios, chat_picker, cuenta_robada, cuenta_secundaria, chat_settings_cmd, config_panel, errata_mencion, group_clean, lang_cmd, maintenance, notify_prefs, quienfue_cmd, recien_llegados, scan_cmd, scanuser_cmd, telethon_bridge, topweekly, verification, warns_mod
+from . import actualizaciones, admin, barrido_bios, borrado_diferido, chat_picker, cuenta_robada, cuenta_secundaria, chat_settings_cmd, config_panel, errata_mencion, group_clean, lang_cmd, maintenance, notify_prefs, quienfue_cmd, recien_llegados, scan_cmd, scanuser_cmd, telethon_bridge, topweekly, verification, vigia_cuelgue, warns_mod
 from .config import load_config
 from .db import DB
 from .handlers import (
@@ -75,8 +77,42 @@ async def _register_bot_commands(app: Application, cfg) -> None:
     await group_clean.apply_command_menu(app.bot, cfg, app.bot_data["db"])
 
 
+def _parada_unica():
+    """Manejador de las señales de parada: la primera apaga, las demás se ignoran.
+
+    Con el de PTB, una segunda señal a mitad del apagado lo abortaba: al reiniciar la
+    máquina llegan dos SIGTERM casi a la vez (el de Podman y el de systemd) y el bot
+    salía sin procesar lo que tenía en cola ni cerrar nada («coroutine 'Updater.stop'
+    was never awaited», 9-nov-2026, L61).
+    """
+    visto = {"n": 0}
+
+    def _parar() -> None:
+        visto["n"] += 1
+        if visto["n"] > 1:
+            logging.getLogger("antispam").warning(
+                "señal de parada repetida (%d): ya me estoy apagando, se ignora", visto["n"])
+            return
+        raise SystemExit
+
+    return _parar
+
+
+def _una_sola_parada() -> None:
+    """Sustituye en el bucle en marcha los manejadores que puso `run_polling`."""
+    import asyncio
+    parar = _parada_unica()
+    try:
+        bucle = asyncio.get_running_loop()
+        for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGABRT):
+            bucle.add_signal_handler(sig, parar)
+    except (NotImplementedError, RuntimeError, ValueError) as exc:  # Windows, hilo que no es el principal
+        logging.getLogger("antispam").debug("señales de parada sin cambiar: %s", exc)
+
+
 async def _post_init(app: Application) -> None:
     cfg = app.bot_data["cfg"]
+    _una_sola_parada()
     # Idioma global: pref guardada > env BOT_LANG / locale del sistema > 'es'.
     lang = lang_cmd.resolve_and_apply(app.bot_data["db"])
     logging.getLogger("antispam").info("Idioma del bot: %s", lang)
@@ -141,6 +177,12 @@ async def _post_init(app: Application) -> None:
     await publico.poner_descripcion(app.bot)
     if app.job_queue:
         app.job_queue.run_repeating(_heartbeat_job, interval=30, first=1)
+        # Si el bucle se cuelga, el proceso sale y el contenedor se relanza (L61). Se
+        # arranca aquí, con el latido ya programado: sin cola de trabajos no hay latido.
+        vigia_cuelgue.arrancar()
+        app.job_queue.run_once(_informar_cuelgue_job, when=45)
+        # Cada 5 min: borrados programados que un reinicio dejó sin su job (L61).
+        app.job_queue.run_repeating(borrado_diferido.barrido_job, interval=300, first=50)
         # Cada 15 min: cleanup verificaciones (3 tiers: kick suspicious 30min +
         # reminder normal 3h + kick post-reminder +6h). 15min basta: el plazo mínimo es 30min.
         app.job_queue.run_repeating(verification.cleanup_job, interval=900, first=60)
@@ -164,6 +206,9 @@ async def _post_init(app: Application) -> None:
         if reporter.get_client() is not None:
             app.job_queue.run_repeating(cuenta_secundaria.vigilar_job, interval=86400, first=300,
                                         name="cuenta_secundaria")
+            # Cada 5 min: si Telethon se rindió reconectando, se vuelve a conectar (L61).
+            app.job_queue.run_repeating(_telethon_vivo_job, interval=300, first=240,
+                                        name="telethon_vivo")
         # Top semanal: domingo 20:00 Europe/Madrid (weekday 6)
         from datetime import time as _dt_time
         app.job_queue.run_daily(
@@ -199,11 +244,94 @@ _HEARTBEAT_PATH = Path("/app/data/heartbeat")
 
 async def _heartbeat_job(context) -> None:
     """Toca un fichero cada 30s para el healthcheck del docker-compose."""
+    vigia_cuelgue.latido()
     try:
         _HEARTBEAT_PATH.parent.mkdir(parents=True, exist_ok=True)
         _HEARTBEAT_PATH.touch()
     except OSError:
         pass
+
+
+async def _informar_cuelgue_job(context) -> None:
+    """Al arrancar: si el vigía mató al proceso por un cuelgue, se le cuenta al admin."""
+    cuando = vigia_cuelgue.cuelgue_anterior()
+    if cuando is None:
+        return
+    from . import fechas
+    log = logging.getLogger("antispam")
+    log.warning("arranque tras un cuelgue del bucle de eventos (%s)", fechas.cuando(cuando))
+    cfg = context.bot_data.get("cfg")
+    admin_id = getattr(cfg, "admin_notify_chat_id", 0) if cfg else 0
+    if not admin_id:
+        return
+    try:
+        await context.bot.send_message(
+            chat_id=admin_id, text=t("main.cuelgue", cuando=fechas.cuando(cuando)),
+            parse_mode="HTML",
+            disable_notification=notify_prefs.sin_sonido(context.bot_data.get("db"), importante=True),
+        )
+    except Exception as exc:  # noqa: BLE001
+        log.warning("no se pudo avisar del cuelgue: %s", exc)
+
+
+# Comprobaciones seguidas con Telethon caído antes de avisar (3 × 5 min).
+_TELETHON_AVISAR_A = 3
+
+
+async def _telethon_vivo_job(context) -> None:
+    """Reconecta la cuenta secundaria si se cayó, y avisa si no vuelve (L61).
+
+    Telethon reintenta la conexión unas pocas veces y, si no lo consigue, se queda
+    desconectado hasta el siguiente reinicio: la bio, las fotos y los reportes se
+    apagaban sin decir nada.
+    """
+    rep = context.bot_data.get("reporter")
+    if rep is None or rep.get_client() is None:
+        return
+    log = logging.getLogger("antispam")
+    viva = await rep.asegurar_conexion()
+    caidas = context.bot_data.get("_telethon_caidas", 0)
+    if viva:
+        if caidas >= _TELETHON_AVISAR_A:
+            await _avisar_telethon_vuelve(context)
+        if caidas:
+            log.info("Telethon: la cuenta secundaria vuelve a estar conectada")
+        context.bot_data["_telethon_caidas"] = 0
+        return
+    caidas += 1
+    context.bot_data["_telethon_caidas"] = caidas
+    log.warning("Telethon: la cuenta secundaria sigue desconectada (%d comprobaciones)", caidas)
+    if caidas == _TELETHON_AVISAR_A:
+        await _avisar_telethon_caida(context)
+
+
+async def _avisar_telethon_caida(context) -> None:
+    """Suena: sin la cuenta secundaria no se leen bios ni fotos ni se reporta."""
+    cfg = context.bot_data.get("cfg")
+    admin_id = getattr(cfg, "admin_notify_chat_id", 0) if cfg else 0
+    if not admin_id:
+        return
+    try:
+        await context.bot.send_message(
+            chat_id=admin_id, text=t("main.telethon_caida"), parse_mode="HTML",
+            disable_notification=notify_prefs.sin_sonido(context.bot_data.get("db"), importante=True),
+        )
+    except Exception as exc:  # noqa: BLE001
+        logging.getLogger("antispam").warning("no se pudo avisar de la caída de Telethon: %s", exc)
+
+
+async def _avisar_telethon_vuelve(context) -> None:
+    cfg = context.bot_data.get("cfg")
+    admin_id = getattr(cfg, "admin_notify_chat_id", 0) if cfg else 0
+    if not admin_id:
+        return
+    try:
+        await context.bot.send_message(
+            chat_id=admin_id, text=t("main.telethon_vuelve"), parse_mode="HTML",
+            disable_notification=notify_prefs.sin_sonido(context.bot_data.get("db"), importante=False),
+        )
+    except Exception as exc:  # noqa: BLE001
+        logging.getLogger("antispam").warning("no se pudo avisar de la vuelta de Telethon: %s", exc)
 
 
 async def _on_error(update: object, context) -> None:
@@ -250,6 +378,8 @@ async def _on_error(update: object, context) -> None:
 
 
 def main() -> int:
+    # Una caída en código nativo (sqlite, la librería de cifrado) deja al menos la traza.
+    faulthandler.enable()
     cfg = load_config()
     logging.basicConfig(
         level=getattr(logging, cfg.log_level, logging.INFO),

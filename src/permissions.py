@@ -20,6 +20,7 @@ from telegram.ext import ContextTypes
 log = logging.getLogger(__name__)
 
 _CACHE_TTL = 300  # 5 min cache de admin status
+_CACHE_MAX = 5000
 
 
 async def is_chat_admin_any(context: ContextTypes.DEFAULT_TYPE, user_id: int) -> bool:
@@ -33,6 +34,12 @@ async def is_chat_admin_any(context: ContextTypes.DEFAULT_TYPE, user_id: int) ->
     cached = cache.get(user_id)
     if cached and cached[1] > now:
         return cached[0]
+    # Con tope: una entrada por cada desconocido que escribe al bot no caduca sola.
+    if len(cache) >= _CACHE_MAX:
+        for uid in [u for u, (_, hasta) in cache.items() if hasta <= now]:
+            cache.pop(uid, None)
+        if len(cache) >= _CACHE_MAX:
+            cache.clear()
     for row in db.all_chats():
         if not row["am_admin"]:
             continue

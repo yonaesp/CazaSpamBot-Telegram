@@ -30,6 +30,10 @@ SESSION_PATH = "/app/data/telethon.session"
 # de la cuenta en su Native Antispam.
 DEFAULT_RATE_LIMIT_PER_HOUR = 20
 DEFAULT_RATE_LIMIT_PER_DAY = 100
+# Topes de tiempo (L61). Un reporte son hasta cinco llamadas encadenadas, y ante un
+# FloodWait Telethon duerme sola hasta 60 s sin lanzar nada.
+_TOPE_REPORTE_S = 90.0
+_TOPE_CONEXION_S = 30.0
 
 
 @dataclass
@@ -172,8 +176,58 @@ class SpamReporter:
             reason=reason, detail=detail,
         ))
 
+    async def asegurar_conexion(self) -> bool:
+        """True si el cliente está conectado; si se cayó, intenta reconectar (L61).
+
+        Telethon reintenta unas pocas veces y, si no lo consigue, se queda desconectado
+        para siempre. Lo llama un job cada 5 min. Nunca lanza.
+        """
+        if self._client is None:
+            return False
+        try:
+            if self._client.is_connected():
+                return True
+            log.warning("Telethon desconectado: intento reconectar")
+            await asyncio.wait_for(self._client.connect(), _TOPE_CONEXION_S)
+            if not self._client.is_connected():
+                return False
+            if not await asyncio.wait_for(self._client.is_user_authorized(), _TOPE_CONEXION_S):
+                log.warning("Telethon reconectó, pero la sesión ya no está autorizada")
+                return False
+            log.info("Telethon reconectado")
+            return True
+        except Exception as exc:  # noqa: BLE001 — incluye asyncio.TimeoutError
+            log.warning("Telethon: no se pudo reconectar: %s", exc or type(exc).__name__)
+            return False
+
     async def _worker(self) -> None:
-        """Procesa la cola.
+        """Procesa la cola, cada reporte con tope de tiempo.
+
+        Sin tope, una llamada de Telethon que no volviera dejaba la cola parada hasta
+        el siguiente reinicio, sin una línea en el log (L61).
+        """
+        while True:
+            task: ReportTask = await self._queue.get()
+            ok_rate, rate_reason = self._within_rate_limit()
+            if not ok_rate:
+                log.warning(
+                    "SpamReporter rate-limit alcanzado (%s) — descarto reporte user=%s",
+                    rate_reason, task.user_id,
+                )
+                self._queue.task_done()
+                continue
+            try:
+                await asyncio.wait_for(self._enviar(task), _TOPE_REPORTE_S)
+            except asyncio.TimeoutError:
+                log.warning("Worker reporte: %.0f s sin respuesta con user=%s; sigo con el siguiente",
+                            _TOPE_REPORTE_S, task.user_id)
+            except Exception as exc:
+                log.warning("Worker reporte exc: %s", exc)
+            finally:
+                self._queue.task_done()
+
+    async def _enviar(self, task: ReportTask) -> None:
+        """Un reporte.
 
         Estrategia (en este orden, fallback al siguiente si falla):
           1. channels.reportSpam — mejor cuando somos admin del supergrupo y hay msg_id
@@ -188,69 +242,55 @@ class SpamReporter:
             InputReportReasonSpam,
         )
 
-        while True:
-            task: ReportTask = await self._queue.get()
-            ok_rate, rate_reason = self._within_rate_limit()
-            if not ok_rate:
-                log.warning(
-                    "SpamReporter rate-limit alcanzado (%s) — descarto reporte user=%s",
-                    rate_reason, task.user_id,
-                )
-                continue
+        reason_obj = InputReportReasonFake() if task.reason == "fake" else InputReportReasonSpam()
+        detail = task.detail[:200]
+        done = False
+
+        # 1) channels.reportSpam (preferido cuando es admin y hay mensaje)
+        if task.message_id and task.chat_id:
             try:
-                reason_obj = InputReportReasonFake() if task.reason == "fake" else InputReportReasonSpam()
-                detail = task.detail[:200]
-                done = False
-
-                # 1) channels.reportSpam (preferido cuando es admin y hay mensaje)
-                if task.message_id and task.chat_id:
-                    try:
-                        chat_entity = await self._client.get_entity(task.chat_id)
-                        user_entity = await self._client.get_entity(task.user_id)
-                        await self._client(ReportSpamRequest(
-                            channel=chat_entity,
-                            participant=user_entity,
-                            id=[task.message_id],
-                        ))
-                        log.info(
-                            "channels.reportSpam OK: chat=%s msg=%s user=%s",
-                            task.chat_id, task.message_id, task.user_id,
-                        )
-                        done = True
-                    except RPCError as exc:
-                        log.debug("channels.reportSpam fallo (%s), intento messages.Report", exc)
-                    except Exception as exc:
-                        log.debug("channels.reportSpam exc (%s), intento messages.Report", exc)
-
-                # 2) messages.Report (mensaje específico)
-                if not done and task.message_id and task.chat_id:
-                    try:
-                        chat_entity = await self._client.get_entity(task.chat_id)
-                        await self._client(ReportRequest(
-                            peer=chat_entity,
-                            id=[task.message_id],
-                            option=b"",
-                            message=detail,
-                        ))
-                        log.info(
-                            "messages.Report OK: chat=%s msg=%s user=%s",
-                            task.chat_id, task.message_id, task.user_id,
-                        )
-                        done = True
-                    except RPCError as exc:
-                        log.debug("messages.Report fallo (%s), intento ReportPeer", exc)
-                    except Exception as exc:
-                        log.debug("messages.Report exc (%s), intento ReportPeer", exc)
-
-                # 3) account.ReportPeer (usuario sin mensaje)
-                if not done:
-                    done = await self._report_peer(task, reason_obj, detail)
-                if done:
-                    self._sent_timestamps.append(time.time())
+                chat_entity = await self._client.get_entity(task.chat_id)
+                user_entity = await self._client.get_entity(task.user_id)
+                await self._client(ReportSpamRequest(
+                    channel=chat_entity,
+                    participant=user_entity,
+                    id=[task.message_id],
+                ))
+                log.info(
+                    "channels.reportSpam OK: chat=%s msg=%s user=%s",
+                    task.chat_id, task.message_id, task.user_id,
+                )
+                done = True
+            except RPCError as exc:
+                log.debug("channels.reportSpam fallo (%s), intento messages.Report", exc)
             except Exception as exc:
-                log.warning("Worker reporte exc: %s", exc)
-            finally:
-                self._queue.task_done()
+                log.debug("channels.reportSpam exc (%s), intento messages.Report", exc)
+
+        # 2) messages.Report (mensaje específico)
+        if not done and task.message_id and task.chat_id:
+            try:
+                chat_entity = await self._client.get_entity(task.chat_id)
+                await self._client(ReportRequest(
+                    peer=chat_entity,
+                    id=[task.message_id],
+                    option=b"",
+                    message=detail,
+                ))
+                log.info(
+                    "messages.Report OK: chat=%s msg=%s user=%s",
+                    task.chat_id, task.message_id, task.user_id,
+                )
+                done = True
+            except RPCError as exc:
+                log.debug("messages.Report fallo (%s), intento ReportPeer", exc)
+            except Exception as exc:
+                log.debug("messages.Report exc (%s), intento ReportPeer", exc)
+
+        # 3) account.ReportPeer (usuario sin mensaje)
+        if not done:
+            done = await self._report_peer(task, reason_obj, detail)
+        if done:
+            self._sent_timestamps.append(time.time())
 
     async def _report_peer(self, task: ReportTask, reason_obj, detail: str) -> bool:
         from telethon.errors import RPCError

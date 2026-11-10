@@ -17,6 +17,7 @@ from telegram import Message
 from telegram.error import TelegramError
 from telegram.ext import ContextTypes
 
+from . import borrado_diferido
 from .db import DB
 from .i18n import t, variant_keys
 
@@ -98,6 +99,7 @@ async def send(
             data={"chat_id": msg.chat_id, "user_msg_id": msg.message_id, "bot_msg_id": sent.message_id},
             name=f"del_gentle_{msg.chat_id}_{sent.message_id}",
         )
+        borrado_diferido.apuntar(context, msg.chat_id, sent.message_id, GENTLE_DELETE_AFTER_S)
     return sent.message_id
 
 

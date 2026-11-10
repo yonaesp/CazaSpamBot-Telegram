@@ -28,6 +28,8 @@ IMPORTANTES = {
     ("handlers.py", "_send_review_request"),         # ¿es spam? (yo no he actuado)
     ("handlers.py", "_avisar_readmision"),           # readmiten a un baneado
     ("main.py", "_on_error"),                        # error interno
+    ("main.py", "_informar_cuelgue_job"),            # me quedé colgado y me reinicié
+    ("main.py", "_avisar_telethon_caida"),           # la cuenta secundaria no vuelve
     ("verification.py", "avisar_han_mudo"),          # alguien espera mudo tu decisión
 }
 # Lo que contesta a una orden tuya: lo estás esperando, no es un aviso.

@@ -105,6 +105,16 @@ CREATE TABLE IF NOT EXISTS mensajes_recientes (
 CREATE INDEX IF NOT EXISTS idx_msgrec_user ON mensajes_recientes(chat_id, user_id, ts DESC);
 CREATE INDEX IF NOT EXISTS idx_msgrec_ts   ON mensajes_recientes(ts);
 
+-- Mensajes del bot que hay que borrar a una hora (L61). El job que lo hace vive en
+-- memoria y un reinicio se lo lleva: `borrado_diferido.barrido_job` borra desde aquí.
+CREATE TABLE IF NOT EXISTS borrados_pendientes (
+    chat_id     INTEGER NOT NULL,
+    message_id  INTEGER NOT NULL,
+    vence       REAL NOT NULL,
+    PRIMARY KEY (chat_id, message_id)
+);
+CREATE INDEX IF NOT EXISTS idx_borrados_vence ON borrados_pendientes(vence);
+
 CREATE TABLE IF NOT EXISTS username_map (
     username_lower TEXT PRIMARY KEY,
     user_id        INTEGER NOT NULL,
@@ -1693,6 +1703,24 @@ class DB:
         with self._cur() as c:
             c.execute("DELETE FROM gentle_warnings WHERE chat_id=? AND user_msg_id=? AND bot_msg_id=?",
                       (chat_id, user_msg_id, bot_msg_id))
+
+    # ------------- borrados_pendientes -------------
+
+    def apuntar_borrado(self, chat_id: int, message_id: int, vence: float) -> None:
+        with self._cur() as c:
+            c.execute("INSERT OR REPLACE INTO borrados_pendientes (chat_id, message_id, vence) "
+                      "VALUES (?, ?, ?)", (chat_id, message_id, vence))
+
+    def olvidar_borrado(self, chat_id: int, message_id: int) -> None:
+        with self._cur() as c:
+            c.execute("DELETE FROM borrados_pendientes WHERE chat_id=? AND message_id=?",
+                      (chat_id, message_id))
+
+    def borrados_vencidos(self, antes_de: float, limite: int = 50) -> list[sqlite3.Row]:
+        with self._cur() as c:
+            return c.execute(
+                "SELECT chat_id, message_id, vence FROM borrados_pendientes "
+                "WHERE vence <= ? ORDER BY vence LIMIT ?", (antes_de, limite)).fetchall()
 
     # ------------- avisos_admin -------------
 

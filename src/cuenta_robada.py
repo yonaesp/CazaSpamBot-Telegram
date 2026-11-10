@@ -178,11 +178,8 @@ async def _aviso_grupo(context, chat_id: int, nombre: str, uid: int, admins: str
     except TelegramError as exc:
         log.warning("cuenta_robada: no se pudo avisar en %s: %s", chat_id, exc)
         return False
-    jq = getattr(getattr(context, "application", None), "job_queue", None)
-    if jq is not None:
-        jq.run_once(borrado_diferido.borrar_mensaje_job, when=AVISO_TTL_S,
-                    data={"chat_id": chat_id, "message_id": m.message_id},
-                    name=f"del_robada_{chat_id}_{m.message_id}")
+    borrado_diferido.programar(context, chat_id, m.message_id, AVISO_TTL_S,
+                               nombre=f"del_robada_{chat_id}_{m.message_id}")
     return True
 
 

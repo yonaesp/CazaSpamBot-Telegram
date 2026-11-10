@@ -56,12 +56,8 @@ def _schedule_delete(context, chat_id: int, message_id: int, delete_after: int,
     if old_job_name:
         for job in jq.get_jobs_by_name(old_job_name):
             job.schedule_removal()
-    name = f"del_banannounce_{chat_id}_{message_id}"
-    jq.run_once(
-        borrado_diferido.borrar_mensaje_job, when=delete_after,
-        data={"chat_id": chat_id, "message_id": message_id}, name=name,
-    )
-    return name
+    return borrado_diferido.programar(context, chat_id, message_id, delete_after,
+                                      nombre=f"del_banannounce_{chat_id}_{message_id}")
 
 
 async def announce_ban(

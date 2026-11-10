@@ -48,6 +48,10 @@ log = logging.getLogger(__name__)
 # cuatro grupos se leen en unas 11 semanas, por debajo de la relectura de 90 días.
 MAX_POR_PASADA = 600
 PAUSA_S = 2.0
+# Topes (L61): una llamada que no vuelve dejaba el barrido parado para siempre, y el
+# planificador se salta las pasadas siguientes mientras la anterior no acabe.
+_TOPE_LLAMADA_S = 15.0
+_TOPE_PASADA_S = 90 * 60.0
 RELECTURA_S = 90 * 86400
 # Enlaces a Telegram de la bio, tal cual (las invitaciones distinguen mayúsculas) y sin
 # lo que venga pegado detrás, como un emoji.
@@ -65,7 +69,11 @@ async def barrido_job(context) -> None:
         log.warning("barrido_bios: sin Telethon no se puede leer ninguna bio")
         return
     try:
-        r = await barrer(context, db, cfg, client)
+        r = await asyncio.wait_for(barrer(context, db, cfg, client), _TOPE_PASADA_S)
+    except asyncio.TimeoutError:
+        log.warning("barrido_bios: la pasada no acabó en %.0f min; sigue la semana que viene",
+                    _TOPE_PASADA_S / 60)
+        return
     except Exception as exc:  # noqa: BLE001 — un trabajo de fondo nunca tumba el bot
         log.warning("barrido_bios: la pasada falló: %s", exc)
         return
@@ -104,7 +112,7 @@ async def barrer(context, db: DB, cfg: Config, client) -> dict[str, int]:
     r = {"leidas": 0, "avisos": 0, "robadas": 0}
     for uid, cids, u in pendientes[:MAX_POR_PASADA]:
         try:
-            full = await client(GetFullUserRequest(u))
+            full = await asyncio.wait_for(client(GetFullUserRequest(u)), _TOPE_LLAMADA_S)
         except FloodWaitError as exc:
             log.warning("barrido_bios: FloodWait de %d s tras %d bios; sigue la semana que viene",
                         exc.seconds, r["leidas"])

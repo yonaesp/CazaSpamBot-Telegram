@@ -7,6 +7,7 @@ cascada los avisos del bot que respondieron a esos mensajes.
 """
 from __future__ import annotations
 
+import asyncio
 import html as _h
 import logging
 import os
@@ -128,7 +129,19 @@ def _borrados_por_el_bot(db: DB, chat_id: int, msg_ids: list[int]) -> set:
     return {r["message_id"] for r in filas}
 
 
+_TOPE_REGISTRO_S = 15.0
+
+
 async def _quien_borro(client, chat_id: int, msg_ids: set):
+    """`_leer_quien_borro` con tope: sin él, una llamada que no vuelve dejaba la tarea viva (L61)."""
+    try:
+        return await asyncio.wait_for(_leer_quien_borro(client, chat_id, msg_ids), _TOPE_REGISTRO_S)
+    except asyncio.TimeoutError:
+        log.debug("manual_delete: el registro de administración tardó demasiado chat=%s", chat_id)
+        return t("tb.actor_desconocido"), None
+
+
+async def _leer_quien_borro(client, chat_id: int, msg_ids: set):
     """(actor_info, actor_id) según el registro de administración del chat.
 
     Una SOLA pasada para todo el lote. Antes se recorría el admin_log una vez por

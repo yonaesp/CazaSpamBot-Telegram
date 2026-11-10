@@ -1,6 +1,6 @@
 # CazaSpamBot — Bot Antispam Telegram
 
-Bot de moderación antispam **en producción 24/7**, multi-grupo, federado y **bilingüe** (es/en). ~25.500 LOC en `src/`, Podman, **2087 tests**, 28 detectores (un módulo cada uno en `src/detectors/`).
+Bot de moderación antispam **en producción 24/7**, multi-grupo, federado y **bilingüe** (es/en). ~25.500 LOC en `src/`, Podman, **2116 tests**, 28 detectores (un módulo cada uno en `src/detectors/`).
 
 > **Estado: PRODUCCIÓN.** No es un esqueleto. Cualquier cambio afecta grupos reales con miles de usuarios. **Investiga > Confirma > Actúa.**
 
@@ -37,7 +37,7 @@ La cuenta secundaria no entra en grupos ajenos (`cuenta_secundaria.py`, al arran
 
 ## Idiomas (i18n)
 
-Todo el texto que ve el usuario vive en `src/locales/<código>.json` (`es.json` / `en.json`, **1.273 claves** cada uno), nunca en el código. Idioma global de la instancia: `/idioma` (persiste) o `BOT_LANG`/`LC_ALL`/`LANG` al arrancar. Soltar un `fr.json` basta para que `/idioma fr` funcione; fallback por clave al español (un idioma al 40 % ya es usable); un JSON roto se ignora con un log (por eso JSON y no `.py`: un `.py` con una comilla mal puesta tumbaba el arranque). Guía para traductores: `src/locales/README.md`.
+Todo el texto que ve el usuario vive en `src/locales/<código>.json` (`es.json` / `en.json`, **1.276 claves** cada uno), nunca en el código. Idioma global de la instancia: `/idioma` (persiste) o `BOT_LANG`/`LC_ALL`/`LANG` al arrancar. Soltar un `fr.json` basta para que `/idioma fr` funcione; fallback por clave al español (un idioma al 40 % ya es usable); un JSON roto se ignora con un log (por eso JSON y no `.py`: un `.py` con una comilla mal puesta tumbaba el arranque). Guía para traductores: `src/locales/README.md`.
 
 1. **Toda clave nueva va a `es.json` y `en.json`** (test de paridad lo exige).
 2. `t(key, _lang=None, **fmt)`. El selector se llama **`_lang` con guion bajo a propósito**: con el nombre `lang` colisionaba con un placeholder llamado igual y el usuario veía `{lang}` literal (bug real).
@@ -165,7 +165,9 @@ Bienvenidas (L39): `config/welcomes/<chat_id>.txt` → `generic.<lang>.txt` → 
 
 ## Jobs programados (`main.py`)
 
-- `_heartbeat_job` (30s) — healthcheck del contenedor
+- `_heartbeat_job` (30s) — healthcheck del contenedor y latido de `vigia_cuelgue`: si el bucle lleva 5 min sin latir, el proceso vuelca los hilos, sale con código 70 y el contenedor se relanza (el healthcheck solo marca `unhealthy`, nadie reinicia por eso); al arrancar lo cuenta por privado. Cuenta comprobaciones propias, no reloj: un proceso congelado por el sistema no se mata al volver (L61)
+- `borrado_diferido.barrido_job` (5min) — borra los mensajes del bot vencidos que un reinicio dejó sin job. **Todo borrado programado pasa por `borrado_diferido.programar`** (o `apuntar`, si el job es propio): queda en `borrados_pendientes`; un `run_once(borrar_mensaje_job…)` a pelo no sobrevive al reinicio (hay test con `ast`; el 10-nov había 8 avisos de hasta seis meses en los grupos) (L61)
+- `_telethon_vivo_job` (5min) — Telethon se rinde tras unos reintentos y se queda desconectado hasta el siguiente reinicio: `reporter.asegurar_conexion()` reconecta, y a la tercera pasada caído avisa (suena) y otra vez al volver. Los trabajos de fondo con Telethon llevan tope (`wait_for`: reporter 90 s por reporte, `cuenta_secundaria` 10 min, `barrido_bios` 90 min, `_quien_borro` 15 s; hay test) (L61)
 - `verification.cleanup_job` (15min) — 3 tiers: kick suspicious 30min, reminder normal 3h, kick post-reminder +6h
 - `recien_llegados.revisar_job` (15min) — repaso de recién llegados que aún no han escrito (L16)
 - `barrido_bios.barrido_job` (sábado 11:00 Madrid) — relee la bio de cada miembro cada 90 días, primero a quien no está en `seen_users`, 600 por pasada; positivo (`bio_spam`, otro alfabeto con enlace o grupo enlazado que `link_target` da por spam, leído con `link_reader`) de un veterano callado → `cuenta_robada`, de los demás → privado con los botones de sospechosos. Una bio con enlace privado bajo el umbral se relee cada semana (L49, L50)
@@ -246,6 +248,8 @@ sudo -n docker logs --tail 5 cazaspam-bot     # verificar "Bot ... listo"; las o
 git add -A && git commit -m "..." && git push   # nunca tras `pytest | tail`: el tail se traga el rc y el commit sale con la suite en rojo (1-nov)
 ```
 
+**Parar sin matar (L61)**: `docker compose restart` sin `-t`, con el cliente compose sobre la API de Podman, mandaba SIGKILL al instante (6 de 6 reinicios con «died 137»: se pierden los updates ya confirmados que estaban en cola). El envoltorio del N100 añade el `-t` desde el 10-nov y el compose lleva `stop_grace_period: 45s`; tras reiniciar, `sudo podman events --filter container=cazaspam-bot --since 5m` tiene que decir `died 0`. Una segunda señal de parada se ignora (`_parada_unica`: al reiniciar la máquina llegan dos y la segunda abortaba el apagado).
+
 **`restart` recarga el código (src/ montado por volumen) pero no el `.env`**: para eso hace falta `up -d`, y para las dependencias, recompilar (se instalan al construir la imagen). ⚠️ **Compilar a mano, siempre `podman pull` de la base + `build --no-cache`, dentro del `flock`**: con caché, el `apt-get upgrade` salió de una capa vieja y el parche de pyasn1 del 31-oct devolvió libbrotli1 sin su arreglo (CVE crítica); `parcheo-auto` ya compila así.
 
 ## Docs detalladas
@@ -266,4 +270,4 @@ GitHub guarda solo 14 días: `scripts/traffic_log.py` los acumula en `traffic/hi
 
 Lo nuevo va en su apartado temático de este fichero como invariante de 1-3 líneas (qué no hacer, el número medido, el test que lo fija), nunca al final por fecha. El relato (el caso, la medida, lo que se probó) va a `docs/lecciones.md` como lección nueva, con su línea en el índice, y aquí se cita con `(Ln)`. Un procedimiento de varios pasos que se usa a veces, a una skill en `.claude/skills/`. Las preferencias del admin y el estado del trabajo, a la memoria.
 
-*Actualizado: 2026-11-08 — 28 detectores, 2087 tests, 1.273 claves por idioma.*
+*Actualizado: 2026-11-10 — 28 detectores, 2116 tests, 1.276 claves por idioma.*

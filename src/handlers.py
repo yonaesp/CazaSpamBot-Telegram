@@ -2926,13 +2926,10 @@ async def _send_review_request(
             chat_id=chat_id, text=aviso_txt, parse_mode="HTML",
             reply_to_message_id=msg_id, disable_notification=True,
         )
-        jq = context.application.job_queue
-        if jq is not None and public is not None:
-            jq.run_once(
-                borrado_diferido.borrar_mensaje_job, when=6 * 3600,
-                data={"chat_id": chat_id, "message_id": public.message_id},
-                name=f"del_review_aviso_{chat_id}_{public.message_id}",
-            )
+        if public is not None:
+            borrado_diferido.programar(
+                context, chat_id, public.message_id, 6 * 3600,
+                nombre=f"del_review_aviso_{chat_id}_{public.message_id}")
     except TelegramError as exc:
         log.warning("review aviso send fallo: %s", exc)
         public = None
@@ -3391,13 +3388,10 @@ async def _antiflood_apply(
             message_thread_id=thread_id,
             parse_mode="HTML", disable_notification=True,
         )
-        jq = context.application.job_queue
-        if jq is not None and sent is not None:
-            jq.run_once(
-                borrado_diferido.borrar_mensaje_job, when=3600,
-                data={"chat_id": chat_id, "message_id": sent.message_id},
-                name=f"del_antiflood_{chat_id}_{sent.message_id}",
-            )
+        if sent is not None:
+            borrado_diferido.programar(
+                context, chat_id, sent.message_id, 3600,
+                nombre=f"del_antiflood_{chat_id}_{sent.message_id}")
     except TelegramError:
         pass
     # Botón al admin SOLO la 1ª vez (reincidencia → re-mute sin preguntar).

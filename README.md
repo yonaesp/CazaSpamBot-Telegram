@@ -9,7 +9,7 @@
 [![python-telegram-bot](https://img.shields.io/badge/PTB-22.8-26A5E4?logo=telegram&logoColor=white)](https://python-telegram-bot.org/)
 [![Telethon](https://img.shields.io/badge/Telethon-1.44-blueviolet)](https://docs.telethon.dev/)
 [![Languages](https://img.shields.io/badge/languages-es%20%7C%20en%20%7C%20add%20yours-orange)](src/locales/README.md)
-[![Tests](https://img.shields.io/badge/tests-2087%20passing-success)](#tests)
+[![Tests](https://img.shields.io/badge/tests-2116%20passing-success)](#tests)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 
 🌍 **English** · [**Español**](README.es.md)
@@ -421,7 +421,7 @@ Telling us about a legitimate member it banned is as useful as code: [CONTRIBUTI
 ## 🧪 Tests
 
 ```bash
-.venv/bin/python -m pytest tests/ -q     # 2087 tests
+.venv/bin/python -m pytest tests/ -q     # 2116 tests
 ```
 
 Every detector has tests for what it must catch **and what it must not**, built from real cases. A false positive is worse than a false negative.

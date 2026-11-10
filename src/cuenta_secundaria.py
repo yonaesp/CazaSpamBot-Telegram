@@ -40,6 +40,7 @@ log = logging.getLogger(__name__)
 CERRADA, YA_CERRADA, ERROR = "cerrada", "ya_cerrada", "error"
 # El job diario y el alta en un grupo pueden coincidir: una pasada a la vez.
 _UNA_A_LA_VEZ = asyncio.Lock()
+_TOPE_PASADA_S = 10 * 60.0
 
 ETIQUETA = {"todos": "Todos", "contactos": "Mis contactos", "nadie": "Nadie"}
 
@@ -238,7 +239,12 @@ async def _nombre_de(client: Any, user_id: int) -> str:
 async def vigilar_job(context: Any) -> None:
     """Cierra la privacidad de grupos y saca a la cuenta de los grupos ajenos."""
     async with _UNA_A_LA_VEZ:
-        await _vigilar(context)
+        try:
+            await asyncio.wait_for(_vigilar(context), _TOPE_PASADA_S)
+        except asyncio.TimeoutError:
+            # Sin tope, una llamada que no volviera se quedaba con el cerrojo para siempre (L61).
+            log.warning("cuenta secundaria: la pasada no acabó en %.0f min; se deja para la siguiente",
+                        _TOPE_PASADA_S / 60)
 
 
 async def _vigilar(context: Any) -> None:

@@ -137,13 +137,8 @@ async def handle_admin_mention(
 
     # Auto-delete confirm a 1 min
     if bot_msg_id:
-        jq = context.application.job_queue
-        if jq:
-            jq.run_once(
-                borrado_diferido.borrar_mensaje_job, when=CONFIRM_TTL_S,
-                data={"chat_id": msg.chat_id, "msg_id": bot_msg_id},
-                name=f"del_admin_confirm_{msg.chat_id}_{bot_msg_id}",
-            )
+        borrado_diferido.programar(context, msg.chat_id, bot_msg_id, CONFIRM_TTL_S,
+                                   nombre=f"del_admin_confirm_{msg.chat_id}_{bot_msg_id}")
     log.info(
         "admin_report registered: reporter=%s msg=%s reported_msg=%s",
         reporter.id, msg.message_id, reported_msg_id,

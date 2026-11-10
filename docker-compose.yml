@@ -5,6 +5,11 @@ services:
       dockerfile: Dockerfile
     container_name: cazaspam-bot
     restart: unless-stopped
+    # Al parar, el bot termina lo que tiene en cola y las tareas en curso (hasta ~35 s
+    # si acaba de banear a alguien que llamó a bots). Con los 10 s por defecto se le
+    # mataba a medias. En Podman, `docker compose restart` necesita además `-t 45`:
+    # sin `-t` manda SIGKILL directamente (L61).
+    stop_grace_period: 45s
     # Sin root y con un uid que no es de nadie en el host: si alguien escapara del
     # contenedor, no sería ningún usuario real. Ese uid tiene que poder escribir en
     # ./data y en ./config/blacklist/custom (ver README, «Instalación»).

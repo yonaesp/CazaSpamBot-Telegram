@@ -5,6 +5,17 @@ cada commit: para el detalle está el historial de git. Desde la v1.0.0 cada ver
 publicada lleva su número (`stable` apunta a la última); los hitos de antes, solo
 la fecha.
 
+## 2026-11 · Más difícil de tumbar
+
+- Si el bot se queda colgado, sale solo y el contenedor lo vuelve a levantar; al arrancar te lo cuenta por privado.
+  Antes el contenedor quedaba marcado como «unhealthy» y nadie lo reiniciaba.
+- Los mensajes que el bot borra pasado un tiempo (avisos de ban, warns, bienvenidas) ya no se quedan para siempre si
+  hay un reinicio por medio: quedan apuntados y se borran al volver.
+- Si la cuenta secundaria pierde la conexión y no la recupera sola, el bot la reconecta cada 5 minutos y te avisa si
+  lleva 15 minutos caída. Antes se quedaba sin leer perfiles hasta el siguiente reinicio, sin decir nada.
+- Al parar, el bot termina lo que tenía entre manos (`stop_grace_period: 45s` en el compose), y una segunda señal de
+  parada ya no corta el apagado a medias.
+
 ## 2026-11 · Nadie mete a la cuenta secundaria en grupos ajenos
 
 - Telegram deja de serie que cualquiera añada una cuenta a un grupo. Si la de Telethon está en «Todos», el bot la deja

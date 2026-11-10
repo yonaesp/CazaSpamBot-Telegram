@@ -749,6 +749,7 @@ async def _send_friendly_welcome(context, db, chat, user, settings) -> None:
             data={"chat_id": chat.id, "message_id": sent.message_id, "user_id": user.id},
             name=f"del_friendly_welcome_{chat.id}_{sent.message_id}",
         )
+        borrado_diferido.apuntar(context, chat.id, sent.message_id, FRIENDLY_WELCOME_DELETE_AFTER_S)
 
 
 async def _delete_friendly_welcome_job(context) -> None:
@@ -938,13 +939,8 @@ async def _send_clean_welcome(context, db, chat, user, settings) -> None:
             log.debug("no se pudo recordar el welcome chat=%s user=%s: %s", chat.id, user.id, exc)
     delete_after = (settings["welcome_delete_after_s"] if settings else 0) or 0
     if sent and delete_after > 0:
-        jq = context.application.job_queue
-        if jq:
-            jq.run_once(
-                borrado_diferido.borrar_mensaje_job, when=delete_after,
-                data={"chat_id": chat.id, "message_id": sent.message_id},
-                name=f"del_clean_welcome_{chat.id}_{sent.message_id}",
-            )
+        borrado_diferido.programar(context, chat.id, sent.message_id, delete_after,
+                                   nombre=f"del_clean_welcome_{chat.id}_{sent.message_id}")
 
 
 # Mensajes previos que bastan para considerar que alguien «ya es de casa».
@@ -1192,13 +1188,8 @@ async def on_join(
     # Auto-delete del welcome tras N segundos (default 600 = 10 min)
     delete_after = settings["welcome_delete_after_s"] or 0
     if sent and delete_after > 0:
-        jq = context.application.job_queue
-        if jq:
-            jq.run_once(
-                borrado_diferido.borrar_mensaje_job, when=delete_after,
-                data={"chat_id": chat.id, "message_id": sent.message_id},
-                name=f"del_welcome_{chat.id}_{sent.message_id}",
-            )
+        borrado_diferido.programar(context, chat.id, sent.message_id, delete_after,
+                                   nombre=f"del_welcome_{chat.id}_{sent.message_id}")
 
 
 async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1269,6 +1260,7 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                     data={"chat_id": chat_id, "message_id": welcome_msg_id, "user_id": target_user_id},
                     name=f"del_verified_welcome_{chat_id}_{welcome_msg_id}",
                 )
+                borrado_diferido.apuntar(context, chat_id, welcome_msg_id, ttl)
         except TelegramError as exc:
             # "message is not modified" = doble callback con el mismo quip: el
             # mensaje YA muestra un welcome (lo editó el otro click), NO lo borramos.
