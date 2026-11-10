@@ -1545,6 +1545,9 @@ apunta ahora cada borrado en `borrados_pendientes`, el job que borra a su hora o
 5 min, con 90 s de margen para no adelantarse al job) borra lo vencido; un fallo de red se reintenta hasta un día. Los
 ocho sitios que llamaban a `jq.run_once(borrar_mensaje_job…)` pasan por `programar`, y los tres con job propio
 (bienvenidas y aviso suave) llaman a `apuntar`.
+Los 8 viejos se borraron a mano con el OK del admin, y ahí salió otro límite: **la Bot API no deja al bot borrar un
+mensaje de más de 48 h, ni siendo admin** («Message can't be deleted», 8 de 8); la cuenta secundaria, admin del grupo,
+sí pudo. Por eso el barrido no insiste con lo que lleva más de un día vencido.
 
 **5. Telethon caído hasta el siguiente reinicio.** Telethon reintenta la conexión 5 veces y, si no puede, se queda
 desconectado: bio, fotos, Posts y reportes apagados sin una línea (en dos días, 12 «Server closed the connection», cada
