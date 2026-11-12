@@ -551,8 +551,9 @@ async def revisar_destino_bio(context, db: DB, cfg: Config, chat_id: int, chat_t
                               user, bio: str | None, via: str) -> bool:
     """Bio con un enlace privado (t.me/+…) que `bio_spam` no basta para banear: se lee
     adónde lleva, sin entrar ni contar como visita, y se juzga con `link_target`. Si el
-    destino se confiesa spam, ban; si sale limpio o no se puede leer, revisión humana al
-    privado, una sola vez por persona. True si se baneó. Nunca lanza.
+    destino se confiesa spam o su título está en un alfabeto que el grupo no permite,
+    ban; si sale limpio o no se puede leer, revisión humana al privado, una sola vez
+    por persona. True si se baneó. Nunca lanza.
 
     Caso que lo motivó (8-nov-2026, Alexa): entró el 28-oct con solo un enlace privado
     en la bio (40 puntos, el umbral es 60), pasó el botón en 47 s y once días después
@@ -571,18 +572,34 @@ async def revisar_destino_bio(context, db: DB, cfg: Config, chat_id: int, chat_t
             return False                 # lleva a uno de nuestros grupos
         hit = link_target.check(destino)
         titulo = (destino.titulo if destino else "") or ""
-        if hit:
+        puntos, motivo, alfabeto = (hit.score, hit.reason, None) if hit else (0, None, None)
+        if not hit and titulo:
+            # El destino no se confiesa, pero su título está escrito en un alfabeto que
+            # este grupo no permite: el mismo criterio que el nombre, la bio y el canal
+            # personal, y aquí con un enlace privado delante (decisión del admin,
+            # 12-nov-2026, L62: «公群 2714 -墨颜集团色料代收 押金28888U» fue a revisión).
+            from . import verification
+            otro = verification._texto_en_otro_alfabeto(
+                titulo, verification.allowed_scripts_de(db, chat_id, cfg))
+            if otro:
+                alfabeto = otro[0]
+                puntos, motivo = 60, t("reason.destino_otro_alfabeto", alfabeto=alfabeto)
+        if motivo:
             from .scoring import Decision
-            log.info("bio con enlace privado user=%s chat=%s destino=%r → SPAM, ban (%s)",
-                     user.id, chat_id, titulo[:80], via)
+            log.info("bio con enlace privado user=%s chat=%s destino=%r → %s, ban (%s)",
+                     user.id, chat_id, titulo[:80],
+                     f"en otro alfabeto ({alfabeto})" if alfabeto else "SPAM", via)
+            payload = {"bio_preview": bio[:200], "destino": titulo[:200],
+                       "url": getattr(destino, "url", None), "via": via}
+            if alfabeto:
+                payload["destino_alfabeto"] = alfabeto
             await _apply_action(
                 context, db, cfg, chat_id=chat_id, chat_title=chat_title,
                 user_id=user.id, username=user.username, message_id=None,
                 decision=Decision(
-                    action="ban", score=min(200, 40 + hit.score), rule="bio_spam",
-                    reason=t("reason.bio_spam", details=t("reason.bio_invite_link") + " + " + hit.reason),
-                    payload={"bio_preview": bio[:200], "destino": titulo[:200],
-                             "url": getattr(destino, "url", None), "via": via},
+                    action="ban", score=min(200, 40 + puntos), rule="bio_spam",
+                    reason=t("reason.bio_spam", details=t("reason.bio_invite_link") + " + " + motivo),
+                    payload=payload,
                 ),
                 original_text=None, first_name=user.first_name,
             )

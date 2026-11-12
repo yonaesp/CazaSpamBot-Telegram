@@ -129,6 +129,12 @@ async def cleanup_nightly_job(context: ContextTypes.DEFAULT_TYPE) -> None:
         ).rowcount
         stats["avisos_admin"] = n
 
+        # revisiones_pendientes > 7 días: nadie va a decidir ya sobre ese aviso.
+        n = c.execute(
+            "DELETE FROM revisiones_pendientes WHERE ts < ?", (now - 7 * 86400,),
+        ).rowcount
+        stats["revisiones_pendientes"] = n
+
         # pending_verifications verificadas hace >7 días
         n = c.execute(
             "DELETE FROM pending_verifications WHERE verified_at IS NOT NULL AND verified_at < ?",

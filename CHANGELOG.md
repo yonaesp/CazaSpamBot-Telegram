@@ -5,6 +5,15 @@ cada commit: para el detalle está el historial de git. Desde la v1.0.0 cada ver
 publicada lleva su número (`stable` apunta a la última); los hitos de antes, solo
 la fecha.
 
+## 2026-11 · Un enlace privado a un grupo en otro alfabeto es ban
+
+- Quien entra con un enlace privado en la bio que lleva a un grupo escrito en un alfabeto que tu grupo no permite (un
+  grupo en chino, si solo permites el latino) queda baneado en cuanto el bot lee el destino. Antes iba a revisión.
+- Una bio en otro alfabeto ya no se libra por llevar un enlace, un @usuario o cifras: la regla del alfabeto mide solo
+  lo escrito.
+- Si el bot banea a alguien de quien tenías un aviso de revisión pendiente, ese aviso se actualiza solo («Ya está
+  baneado», con el motivo) y pierde los botones.
+
 ## v1.4.1 · 2026-11-12 · Más difícil de tumbar
 
 - Si el bot se queda colgado, sale solo y el contenedor lo vuelve a levantar; al arrancar te lo cuenta por privado.

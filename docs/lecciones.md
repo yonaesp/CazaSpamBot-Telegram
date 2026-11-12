@@ -67,6 +67,7 @@ Una lección nueva va al final, con el número siguiente y su línea en el índi
 - [L59](#l59) · La cuenta secundaria: cualquiera podía meterla en un grupo
 - [L60](#l60) · Un test que escribió en el repositorio de verdad
 - [L61](#l61) · Auditoría de estabilidad: lo que solo se ve mirando producción
+- [L62](#l62) · El enlace privado de la bio que lleva a un grupo en un alfabeto prohibido
 
 ---
 
@@ -1569,3 +1570,42 @@ Tampoco se puso `mem_limit` al contenedor.
 **La regla.** Una auditoría de estabilidad empieza por los eventos y el log del contenedor, no por el código: los
 códigos de salida, lo que quedó en los grupos y lo que el log no dice. Tests: `tests/test_estabilidad_l61.py`.
 
+<a id="l62"></a>
+## L62 · El enlace privado de la bio que lleva a un grupo en un alfabeto prohibido
+
+**El caso (12-nov-2026, Windows 10).** Entró a las 04:38 con la bio «赚钱进群了解https://t.me/+… 业务员@MY1588888», pasó el
+botón en 4 s, y a las 04:53 el repaso leyó el destino del enlace, «公群 2714 -墨颜集团色料代收 押金28888U», y lo mandó a
+revisión humana. A las 04:57 escribió, ya con el nombre en chino, y cayó por `non_allowed_script+obvious_spam_profile`.
+El aviso de revisión siguió en el privado diciendo «ya está DENTRO del grupo», y a las 06:32 el admin baneó a mano a
+quien llevaba 95 minutos fuera. Su encargo: «Si el chino está prohibido y el grupo de spam que tiene en la descripción
+lleva a un grupo chino, el ban debería estar asegurado».
+
+**Tres causas.**
+1. *Las cifras hacían «decorativo» cualquier texto.* `_is_decorative_mix` usa `confusable_homoglyphs.is_dangerous`, y para
+   UTS#39 las cifras son confundibles con letras latinas: un texto con dos alfabetos (chino y una sola letra latina) y una
+   cifra salía «decorativo», y `_texto_en_otro_alfabeto` devolvía None. El título tenía un 92 % de letras chinas. Ahora
+   la guarda mira solo las letras.
+2. *La bio se medía con el enlace dentro.* Las letras de `https://t.me/+0bXkM6iJhUQ1ZWEx` y de `@MY1588888` son latinas:
+   la bio daba un 28 % de chino (el umbral es 70 %). `barrido_bios` ya quitaba los enlaces por su cuenta; el join, el
+   primer mensaje y el repaso, no. Ahora los quita `_texto_en_otro_alfabeto` para todos, y los @ también. Con esto la
+   cuenta habría caído al entrar.
+3. *El destino solo se juzgaba por lo que confiesa.* `revisar_destino_bio` pasaba el destino por `link_target` y, si no
+   saltaba, revisión. Ahora un título en un alfabeto que el chat no permite es ban `bio_spam` (100 puntos, sin reporte:
+   el alfabeto no prueba nada ante Telegram). En el barrido semanal vale solo para enlaces privados: un veterano puede
+   llevar en la bio su canal público en otro idioma.
+
+**Medido antes de tocar** (base viva, en seco): de 19.514 nombres, 6 dejan de ser «decorativos» y 2 pasarían a ban, los
+dos ya baneados por spam; de las 31 bios guardadas cambian 4, las cuatro de cuentas baneadas. Ninguna deja de
+detectarse y ningún miembro actual cambia.
+
+**El aviso que pedía decidir lo ya decidido.** Los avisos con Permitir/Banear no se apuntaban en ningún sitio, así que
+nadie podía cerrarlos. `revisiones.py`: cada aviso se apunta al mandarlo (`revisiones_pendientes`), y `federate_ban` lo
+edita («Ya está baneado» y el motivo) y le quita los botones; quien decide con el botón lo olvida él. Un test con `ast`
+exige que todo aviso con esos botones se apunte. Los avisos anteriores al despliegue no están apuntados.
+
+**Lo que no se tocó.** Los enlaces de los mensajes: `link_target_spam` es regla dura y banea también a veteranos, y un
+veterano puede enlazar un canal en otro idioma. Tampoco el cirílico mezclado con alguna palabra latina, que sigue
+saliendo «decorativo» (las letras cirílicas sí son confundibles con las latinas): es otra decisión, con su propia medida.
+
+**La regla.** Una guarda contra falsos positivos también se prueba con los positivos reales: esta anulaba la regla del
+alfabeto ante cualquier texto con una cifra y una letra latina. Tests: `tests/test_destino_alfabeto_l62.py`.

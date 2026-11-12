@@ -85,7 +85,7 @@ def test_lo_que_no_confiesa_por_emojis(titulo):
 @pytest.fixture
 def entorno(tmp_path, monkeypatch):
     db = DB(str(tmp_path / "t.db"))
-    cfg = NS(mode="active", shadow=False)
+    cfg = NS(mode="active", shadow=False, allowed_scripts=["latin"])
     aplicar, revisar = AsyncMock(), AsyncMock()
     monkeypatch.setattr(handlers, "_apply_action", aplicar)
     monkeypatch.setattr(handlers, "_revision_humana", revisar)

@@ -27,7 +27,7 @@ from telegram.error import TelegramError
 from telegram.ext import ContextTypes
 
 from . import borrado_diferido
-from . import notify_prefs, user_signals
+from . import notify_prefs, revisiones, user_signals
 from .db import DB
 from .detectors.unicode_script import non_allowed_ratio
 from .i18n import current_lang, t
@@ -134,6 +134,13 @@ def _is_decorative_mix(s: str) -> bool:
     """
     if not s:
         return False
+    # Solo las letras. Para UTS#39 las cifras también son «confundibles con el latín»
+    # (2, 1, 8…), y bastaba que un texto chino llevara una cifra y una letra latina
+    # («…押金28888U», «业务员@MY1588888») para darlo por decorativo y saltarse la regla
+    # del alfabeto (12-nov-2026, L62). Medido: de 19.514 nombres cambian 2, ya baneados.
+    s = "".join(ch for ch in s if ch.isalpha() or ch.isspace())
+    if not s.strip():
+        return False
     if _HAVE_CONFUSABLES:
         try:
             # is_dangerous=True cuando el texto contiene caracteres confundibles
@@ -202,6 +209,9 @@ def _letras_no_permitidas(texto: str, permitidos: list[str]) -> int:
     return n
 
 
+_MENCION_RE = _re_bio.compile(r"@[A-Za-z0-9_]{4,32}")
+
+
 def _texto_en_otro_alfabeto(texto: Optional[str], permitidos: list[str]):
     """(alfabeto, ratio) si el texto está ESCRITO en un alfabeto no permitido.
 
@@ -212,6 +222,11 @@ def _texto_en_otro_alfabeto(texto: Optional[str], permitidos: list[str]):
     import unicodedata
     if not texto:
         return None
+    # Sin los enlaces ni los @: son latinos por fuerza y no dicen en qué alfabeto
+    # escribe nadie. «赚钱进群了解https://t.me/+… 业务员@MY1588888» daba un 28 % de chino
+    # y la cuenta entró (12-nov-2026, L62); `barrido_bios` ya los quitaba por su lado.
+    from . import destinos
+    texto = _MENCION_RE.sub(" ", destinos.sin_enlaces(texto))
     norm = unicodedata.normalize("NFKC", texto)
     if _is_decorative_mix(norm):
         return None
@@ -879,13 +894,15 @@ async def _send_suspicious_review(context, db, cfg, chat, user, reasons, sig) ->
         + t("review.footer")
     )
     try:
-        await context.bot.send_message(
+        enviado = await context.bot.send_message(
             chat_id=cfg.admin_notify_chat_id, text=text, parse_mode="HTML",
             reply_markup=kb, disable_web_page_preview=True,
             disable_notification=notify_prefs.sin_sonido(db, importante=False),
         )
     except TelegramError as exc:
         log.debug("suspicious review send fallo user=%s: %s", user.id, exc)
+        return
+    revisiones.apuntar(db, enviado, user.id, text)
 
 
 # Default del welcome en modo limpio (sin instrucción de "pulsa el botón").
@@ -1590,7 +1607,7 @@ async def avisar_han_mudo(context, db, cfg, chat, user, sig) -> None:
     texto = t("han.muted_review", name=_html.escape(etiqueta), uid=user.id,
               chat=_html.escape(str(chat.title or chat.id))) + extra
     try:
-        await context.bot.send_message(
+        enviado = await context.bot.send_message(
             chat_id=cfg.admin_notify_chat_id, text=texto, parse_mode="HTML",
             reply_markup=build_muted_review_keyboard(chat.id, user.id),
             disable_web_page_preview=True,
@@ -1598,6 +1615,8 @@ async def avisar_han_mudo(context, db, cfg, chat, user, sig) -> None:
         )
     except TelegramError as exc:
         log.warning("aviso han mudo falló: %s", exc)
+        return
+    revisiones.apuntar(db, enviado, user.id, texto)
 
 
 async def restringir_seguro(bot, db, chat_id: int, user_id: int, permissions,

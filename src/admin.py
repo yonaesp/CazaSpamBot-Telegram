@@ -1225,6 +1225,9 @@ async def on_suspicious_review_callback(update: Update, context: ContextTypes.DE
         await q.answer(t("review.invalid_callback"))
         return
     base = q.message.text_html if q.message else ""
+    if action in ("allow", "allowu", "ban") and q.message:
+        # Decidido aquí: este aviso lo cierra el propio botón, no el ban (L62).
+        db.olvidar_revision(q.message.chat_id, q.message.message_id)
 
     # ⚙️ Tuerca: abre el panel de ajustes; "collapse" vuelve a la vista de decisión.
     if action == "gear":

@@ -36,7 +36,7 @@ import time
 from telegram import InlineKeyboardMarkup
 from telegram.error import TelegramError
 
-from . import cuenta_robada, destinos, enlaces, fechas, link_reader, notify_prefs, verification
+from . import cuenta_robada, destinos, enlaces, fechas, link_reader, notify_prefs, revisiones, verification
 from .config import Config
 from .db import DB
 from .detectors import bio_spam, link_target
@@ -176,7 +176,20 @@ async def _positivo(context, db: DB, cfg: Config, chat_id: int, uid: int,
         hit = link_target.check(destino)
         if hit:
             return hit.score, hit.reason
+        # Un enlace PRIVADO a un grupo cuyo título está en un alfabeto que este no
+        # permite (L62). Solo el privado: un veterano puede llevar en la bio su canal
+        # público en otro idioma, y de 600 repasados ninguno lleva un enlace privado.
+        if destino is not None and _es_privado(destino.url):
+            otro = verification._texto_en_otro_alfabeto(
+                destino.titulo, verification.allowed_scripts_de(db, chat_id, cfg))
+            if otro:
+                return 60, t("reason.destino_otro_alfabeto", alfabeto=otro[0])
     return None
+
+
+def _es_privado(url: str | None) -> bool:
+    """¿Es una invitación privada (`t.me/+…` o `t.me/joinchat/…`)?"""
+    return bool(url) and bool(re.search(r"(?:t\.me|telegram\.(?:me|dog))/(?:\+|joinchat/)", url, re.IGNORECASE))
 
 
 async def _ultimo_mensaje(client, db: DB, cids: list[int], u) -> float | None:
@@ -214,7 +227,7 @@ async def _avisar(bot, db: DB, cfg: Config, chat, u, bio: str, score: int, motiv
         motivo=html.escape(motivo),
     )
     try:
-        await bot.send_message(
+        enviado = await bot.send_message(
             chat_id=cfg.admin_notify_chat_id, text=texto, parse_mode="HTML",
             reply_markup=InlineKeyboardMarkup([verification._rv_decide_row(chat_id, u.id)]),
             disable_web_page_preview=True,
@@ -222,3 +235,5 @@ async def _avisar(bot, db: DB, cfg: Config, chat, u, bio: str, score: int, motiv
         )
     except TelegramError as exc:
         log.warning("barrido_bios: no se pudo avisar de %s: %s", u.id, exc)
+        return
+    revisiones.apuntar(db, enviado, u.id, texto)

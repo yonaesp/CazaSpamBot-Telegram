@@ -84,6 +84,10 @@ async def federate_ban(
             "federate_ban: ningún chat aplicó ban user=%s (todos fallaron); NO se registra",
             user_id,
         )
+    # Un aviso de revisión que seguía abierto en el privado ya no pide nada (L62).
+    if not shadow and any(v == "ok" for v in results.values()):
+        from . import revisiones
+        await revisiones.cerrar_por_ban(bot, db, user_id, rule)
     return results
 
 

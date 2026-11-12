@@ -115,6 +115,19 @@ CREATE TABLE IF NOT EXISTS borrados_pendientes (
 );
 CREATE INDEX IF NOT EXISTS idx_borrados_vence ON borrados_pendientes(vence);
 
+-- Avisos de revisión («decide tú») que siguen abiertos en el privado del admin (L62).
+-- Si el bot banea después a esa persona por otra regla, el aviso se edita y se cierra:
+-- el 12-nov-2026 uno seguía pidiendo una decisión 95 minutos después del ban.
+CREATE TABLE IF NOT EXISTS revisiones_pendientes (
+    admin_chat_id  INTEGER NOT NULL,
+    aviso_msg_id   INTEGER NOT NULL,
+    user_id        INTEGER NOT NULL,
+    texto          TEXT NOT NULL,
+    ts             REAL NOT NULL,
+    PRIMARY KEY (admin_chat_id, aviso_msg_id)
+);
+CREATE INDEX IF NOT EXISTS idx_revisiones_user ON revisiones_pendientes(user_id);
+
 CREATE TABLE IF NOT EXISTS username_map (
     username_lower TEXT PRIMARY KEY,
     user_id        INTEGER NOT NULL,
@@ -1721,6 +1734,28 @@ class DB:
             return c.execute(
                 "SELECT chat_id, message_id, vence FROM borrados_pendientes "
                 "WHERE vence <= ? ORDER BY vence LIMIT ?", (antes_de, limite)).fetchall()
+
+    # ------------- revisiones_pendientes -------------
+
+    def apuntar_revision(self, admin_chat_id: int, aviso_msg_id: int, user_id: int, texto: str) -> None:
+        with self._cur() as c:
+            c.execute("INSERT OR REPLACE INTO revisiones_pendientes "
+                      "(admin_chat_id, aviso_msg_id, user_id, texto, ts) VALUES (?, ?, ?, ?, ?)",
+                      (admin_chat_id, aviso_msg_id, user_id, texto, time.time()))
+
+    def olvidar_revision(self, admin_chat_id: int, aviso_msg_id: int) -> None:
+        with self._cur() as c:
+            c.execute("DELETE FROM revisiones_pendientes WHERE admin_chat_id=? AND aviso_msg_id=?",
+                      (admin_chat_id, aviso_msg_id))
+
+    def pop_revisiones(self, user_id: int) -> list[sqlite3.Row]:
+        """Los avisos de revisión abiertos de esa persona; se olvidan al devolverlos."""
+        with self._cur() as c:
+            filas = c.execute("SELECT admin_chat_id, aviso_msg_id, texto FROM revisiones_pendientes "
+                              "WHERE user_id=? ORDER BY ts", (user_id,)).fetchall()
+            if filas:
+                c.execute("DELETE FROM revisiones_pendientes WHERE user_id=?", (user_id,))
+        return filas
 
     # ------------- avisos_admin -------------
 
