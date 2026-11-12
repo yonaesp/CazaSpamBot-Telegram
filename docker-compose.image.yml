@@ -9,6 +9,9 @@ services:
     image: ghcr.io/yonaesp/cazaspambot:1
     container_name: cazaspam-bot
     restart: unless-stopped
+    # On stop, the bot finishes what it has queued. With the default 10 s it could be
+    # killed halfway.
+    stop_grace_period: 45s
     # Runs without root, as a uid nobody owns on your machine. Create the folders
     # with: sudo install -d -o 10112 -g 10112 data custom
     user: "${APP_UID:-10112}:${APP_GID:-10112}"

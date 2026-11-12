@@ -97,6 +97,8 @@ def test_la_segunda_señal_de_parada_se_ignora():
 
 def test_el_compose_da_tiempo_a_apagar():
     assert "stop_grace_period: 45s" in Path("docker-compose.yml").read_text(encoding="utf-8")
+    # Quien instala por imagen usa este otro fichero: sin la línea, se quedaba en los 10 s.
+    assert "stop_grace_period: 45s" in Path("docker-compose.image.yml").read_text(encoding="utf-8")
 
 
 # ---------------------------------------------- borrados que sobreviven a un reinicio

@@ -1,2 +1,2 @@
 """Versión del bot (SemVer). Se sube al publicar una versión: skill `publicar` (L51)."""
-__version__ = "1.4.0"
+__version__ = "1.4.1"
