@@ -67,5 +67,8 @@ def check(
             "caption_len": len(caption),
             "is_suspicious": is_suspicious,
             "suspicious_reasons": suspicious_reasons or [],
+            # Qué sticker era: el 13-nov-2026 no se pudo saber de qué paquete salió.
+            **({"sticker_set": getattr(msg.sticker, "set_name", None),
+                "sticker_emoji": getattr(msg.sticker, "emoji", None)} if msg.sticker else {}),
         },
     )

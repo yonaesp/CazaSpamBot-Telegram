@@ -216,10 +216,13 @@ class Sim:
     async def escribe(self, cid, u, texto):
         from src import handlers
         _mid[0] += 1
-        m = {"message_id": _mid[0], "date": int(RELOJ[0]), "chat": self._chat(cid),
-             "from": _usuario(u), "text": texto}
-        if ents := _entidades(texto):
-            m["entities"] = ents
+        m = {"message_id": _mid[0], "date": int(RELOJ[0]), "chat": self._chat(cid), "from": _usuario(u)}
+        if isinstance(texto, dict):      # un adjunto: los campos del mensaje, tal cual los da la Bot API
+            m.update(texto)
+        else:
+            m["text"] = texto
+            if ents := _entidades(texto):
+                m["entities"] = ents
         return await self._despacha(handlers.on_message, {"message": m})
 
     def accion(self, cid, uid, desde):
@@ -227,8 +230,8 @@ class Sim:
         with self.db._cur() as c:
             f = c.execute("SELECT rule, action, score FROM moderation_log WHERE user_id=? AND chat_id=? "
                           "AND ts>=? ORDER BY id DESC LIMIT 1", (uid, cid, desde)).fetchone()
-        if not f or f["action"] == "noop":
-            return None, (f"{f['rule']} {f['score']:.0f} (noop)" if f else "")
+        if not f or f["action"].startswith("noop"):     # noop_solo_forma, noop_prisa_legitimo…
+            return None, (f"{f['rule']} {f['score']:.0f} ({f['action']})" if f else "")
         return f["action"], f"{f['rule']} {f['score']:.0f}"
 
     async def escena(self, nombre, cid, u, pasos, espera):
@@ -243,6 +246,8 @@ class Sim:
             accion, detalle = self.accion(cid, u["id"], RELOJ[0])
             esperada = espera if i == len(pasos) - 1 else None
             ok = accion == esperada
+            if isinstance(texto, dict):
+                texto = "[" + ", ".join(texto) + "]"
             corto = texto if len(texto) < 70 else texto[:67] + "..."
             print(f"  {'✓' if ok else '✗'} +{(RELOJ[0] - t0) / 60:3.0f} min «{corto}» → "
                   f"{accion or 'nada'}{f' [{detalle}]' if detalle else ''}"
@@ -317,6 +322,14 @@ async def escenas(s: Sim) -> None:
              "alguien sabe cómo arreglarlo?")
     await s.escena("Dos personas pegan el mismo error (1/2)", c1, _nuevo(30, "Jorge Peña", "jorgep"), [(15, error)], None)
     await s.escena("Dos personas pegan el mismo error (2/2)", c4, _nuevo(31, "Elena Sanz", "elenasanz"), [(20, error)], None)
+
+    # Un adjunto como primer mensaje (L64): solo, y con un perfil que no es sospechoso, no castiga.
+    sticker = {"sticker": {"file_id": "s1", "file_unique_id": "u1", "type": "regular", "width": 512, "height": 512,
+                           "is_animated": True, "is_video": False, "emoji": "😍", "set_name": "Minions"}}
+    await s.escena("Persona normal: su primer mensaje es un sticker", c4, _nuevo(32, "Javier", "pavonj"),
+                   [(45, sticker)], None)
+    await s.escena("El mismo sticker a los 6 segundos de entrar (prisa + adjunto)", c1, _nuevo(33, "Joka", "huibb"),
+                   [(0.1, sticker)], "ban")
 
     await escenas_posts(s, c3)
 

@@ -556,6 +556,37 @@ def _solo_prisa_sin_contenido(msg, real: list[Hit]) -> bool:
     return not adjunto
 
 
+def _solo_adjunto_de_perfil_normal(msg, msg_txt, real: list[Hit]) -> bool:
+    """¿Lo único que hay es un adjunto en el primer mensaje, de un perfil que NO es sospechoso?
+
+    `first_msg_media` nació para «adjunto + cuenta sospechosa» (120-140, ban), pero
+    sin la sospecha ya suma 70-90 y eso pasa del umbral de expulsión. Medido el
+    13-nov-2026 sobre todo `moderation_log`: como regla única y con el perfil normal
+    expulsó 3 veces y **las 3 eran gente legítima** (una foto, un vídeo y un sticker;
+    el último, una cuenta de 2013 con foto y @ que llevaba 44 días en el grupo). Con
+    el perfil sospechoso, 4 de sus 5 bans siguen en pie.
+
+    Sigue cayendo como siempre: el adjunto con enlace, mención, botones, reenvío o
+    mandado vía bot, y toda combinación con otra regla (la prisa incluida: el caso
+    Joka, foto a los 6 s de entrar). `is_suspicious` tiene que ser False de verdad:
+    un hit sin ese dato no se perdona.
+    """
+    if len(real) != 1 or real[0].rule != "first_msg_media":
+        return False
+    if (real[0].payload or {}).get("is_suspicious") is not False:
+        return False
+    if any(getattr(msg, a, None) for a in ("forward_origin", "reply_markup", "via_bot")):
+        return False
+    txt = (getattr(msg_txt, "text", None) or getattr(msg_txt, "caption", None) or "")
+    if _ENLACE_O_MENCION.search(txt):
+        return False
+    # tuple() a los dos lados: un `tuple + list` ya tumbó un detector aquí.
+    for e in tuple(getattr(msg, "entities", None) or ()) + tuple(getattr(msg, "caption_entities", None) or ()):
+        if getattr(e, "type", None) in ("url", "text_link", "mention", "text_mention"):
+            return False
+    return True
+
+
 async def _perdon_por_contenido_limpio(
     context, db: DB, cfg: Config, msg, msg_txt, user, real: list[Hit],
 ) -> str:
@@ -584,13 +615,17 @@ async def _perdon_por_contenido_limpio(
       - si además hay imagen, lo que el OCR saca de ella tampoco dispara nada. Esto
         último es lo que cierra el hueco de «caption inocente + cartel de spam»: se
         paga la lectura solo aquí, que es donde puede cambiar el veredicto.
+
+    Segunda puerta, sin exigir texto propio: `_solo_adjunto_de_perfil_normal`. Lo de
+    la imagen vale igual para las dos.
     """
     if any(h.rule not in _REGLAS_DE_FORMA for h in real):
         return ""
     if _forward_de_fuera(real):
         return ""
     texto = _texto_propio_sustantivo(msg_txt)
-    if not texto:
+    solo_adjunto = not texto and _solo_adjunto_de_perfil_normal(msg, msg_txt, real)
+    if not texto and not solo_adjunto:
         return ""
     if _ENLACE_O_MENCION.search(texto):
         return ""
@@ -607,6 +642,8 @@ async def _perdon_por_contenido_limpio(
             return ""
         if any(de_la_imagen):
             return ""
+    if solo_adjunto:
+        return t("reason.solo_adjunto")
     return t("reason.solo_forma", reglas=", ".join(h.rule for h in real))
 
 

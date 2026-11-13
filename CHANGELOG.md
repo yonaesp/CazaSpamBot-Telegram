@@ -5,6 +5,13 @@ cada commit: para el detalle está el historial de git. Desde la v1.0.0 cada ver
 publicada lleva su número (`stable` apunta a la última); los hitos de antes, solo
 la fecha.
 
+## 2026-11 · Un sticker como primer mensaje ya no expulsa
+
+- Quien estrena el grupo con un sticker, una foto o un vídeo sin texto ya no queda expulsado si su perfil no tiene
+  nada de sospechoso: el mensaje se queda y te llega un aviso con botones por si quieres banearlo. Con un perfil
+  sospechoso, un enlace, una mención, botones o un reenvío, y cuando salta además otra regla, todo sigue igual.
+- El aviso de esa regla dice «un adjunto (foto, vídeo, sticker…)» y el registro guarda de qué paquete era el sticker.
+
 ## 2026-11 · La cuenta que entra vacía y se arma antes de escribir
 
 - Una cuenta que entra con el perfil vacío y, ya dentro, se pone la foto, el @ o la bio de spam cae en cuanto lo hace,

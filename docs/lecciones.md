@@ -69,6 +69,7 @@ Una lección nueva va al final, con el número siguiente y su línea en el índi
 - [L61](#l61) · Auditoría de estabilidad: lo que solo se ve mirando producción
 - [L62](#l62) · El enlace privado de la bio que lleva a un grupo en un alfabeto prohibido
 - [L63](#l63) · La cuenta que entra vacía y se arma minutos antes de escribir
+- [L64](#l64) · Un sticker como primer mensaje: la regla de forma que expulsaba sola
 
 ---
 
@@ -1658,3 +1659,37 @@ nada. Caen al armarse. Tampoco se cambia la lectura por Telethon del join por `g
 
 **La regla.** Antes de espaciar una comprobación porque es cara, mirar si hay una forma gratis de saber cuándo toca
 hacerla. Tests: `tests/test_armado_l63.py`.
+
+## L64 · Un sticker como primer mensaje: la regla de forma que expulsaba sola
+
+**El caso (13-nov-2026, Windows 11).** «Javier» (784909, una cuenta de 2013 con foto y @) entró el 30-sep, no escribió
+en 44 días y su primer mensaje fue un sticker animado. `first_msg_media` dio 70 + 20 (sin pie) = 90 y lo expulsó; el
+aviso decía «una foto o vídeo, con un perfil sospechoso», con `is_suspicious: false` en su propio payload. La pregunta
+del admin: «ha sido baneado por pasar un sticker animado que creo que es de los oficiales y no uno personalizado de
+spam, puede ser?».
+
+**La causa.** El detector se pensó para «adjunto + cuenta sospechosa» (+50: 120-140, ban) y su docstring dice que sin
+la sospecha da un «score medio para combinar con otros». Pero 70 ya es el umbral de expulsión (`KICK_SCORE`), así que
+sola expulsaba siempre. El perdón por contenido limpio (L21) no llegaba: pide 40 caracteres de texto propio y un
+sticker no lleva ninguno. La regla no mira qué adjunto es: un sticker de un paquete oficial y uno hecho para anunciar
+puntúan igual.
+
+**Medido** (todo `moderation_log`, 16 acciones de la regla): sola y con el perfil no sospechoso, 3 expulsiones (una
+foto, un vídeo y este sticker) y ninguna era spam: nadie los ha vuelto a tocar y uno lleva 357 mensajes. Sola y con el
+perfil sospechoso, 5 bans, 4 en pie. Combinada con otras, 8 bans, 7 en pie (el revocado es Kleo, L21); de ellos, el
+único con el perfil normal y sin regla de contenido es Joka: una foto a los 6 s de entrar (`jfm_fast`).
+
+**El arreglo.** `_solo_adjunto_de_perfil_normal`, una segunda puerta de `_perdon_por_contenido_limpio`: si lo único que
+ha saltado es `first_msg_media` con `is_suspicious` a False (de verdad: un hit sin ese dato no entra), sin enlace ni
+mención (en el texto o en las entidades), sin botones, sin reenvío y sin `via_bot`, y lo que el OCR lee de la imagen
+tampoco dispara nada, no se castiga: `noop_solo_forma` en la auditoría y el aviso con botones al privado, callado. Las
+puntuaciones no cambian, así que toda combinación sigue como estaba (dos escenas en el simulador: el sticker de una
+persona normal, nada; el mismo sticker a los 6 s de entrar, ban). El payload guarda `sticker_set` y `sticker_emoji`:
+esta vez no se pudo saber de qué paquete era. La explicación de la regla dice «un adjunto (foto, vídeo, sticker…)».
+
+**Lo que se pierde.** Un adjunto sin texto (una foto sin letras, un vídeo, un sticker) mandado desde una cuenta con
+nombre, @, foto y más de 90 días, robada por ejemplo, ya no se expulsa solo: llega el aviso con «Banear». Con Telethon
+caído no se sabe si el perfil es sospechoso y cuenta como normal; ya era así (90, expulsión) y ahora es aviso.
+
+**La regla.** Una señal que «solo suma» tiene que quedar por debajo del umbral más bajo o tener su perdón: se comprueba
+contra los umbrales, no contra el docstring. Tests: `tests/test_adjunto_solo_l64.py`.
