@@ -39,7 +39,7 @@ from __future__ import annotations
 import logging
 import time
 
-from telegram.error import TelegramError
+from telegram.error import RetryAfter, TelegramError
 
 from .config import Config
 from .db import DB
@@ -151,6 +151,13 @@ async def revisar_job(context) -> None:
         log.warning("recien_llegados: no se pudo consultar la lista: %s", exc)
         return
 
+    # El armado, para la ventana entera: el primer día lo mira cada minuto
+    # `vigilar_armado_job`; del segundo al séptimo basta con esta vuelta (L63).
+    try:
+        await _vigilar_armado(context, VENTANA_S, MAX_NOMBRES_POR_CICLO)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("armado: fallo en la pasada del repaso: %s", exc)
+
     mirados = 0
     nombres = 0
     saltados = 0
@@ -194,8 +201,10 @@ async def revisar_job(context) -> None:
     # «lleva días sin correr». Sale como mucho una línea por vuelta, y solo cuando
     # de verdad ha consultado a alguien.
     if nombres or mirados:
-        log.info("recien_llegados: %d nombres, %d consultados en listas, %d en espera, %d en la ventana",
-                 nombres, mirados, saltados, len(candidatos))
+        leidos = MAX_PERFILES_POR_CICLO - context.bot_data.get(_CLAVE_PRESUPUESTO, 0)
+        log.info("recien_llegados: %d nombres, %d perfiles leídos, %d consultados en listas, "
+                 "%d en espera, %d en la ventana",
+                 nombres, leidos, mirados, saltados, len(candidatos))
 
 
 async def _revisar_listas(context, db: DB, cfg: Config, session, fila, espera: int) -> bool:
@@ -377,7 +386,12 @@ async def _revisar_perfil(context, db: DB, cfg: Config, fila, espera: int) -> bo
     if await _revisar_posts(context, db, cfg, fila, usuario, sig, client, espera):
         return True
 
-    if not obvio:
+    # El criterio del join ENTERO en cuanto hay perfil leído, no solo cuando el
+    # nombre ya disparaba: la bio o el título del canal en un alfabeto que el chat
+    # no permite cuentan igual con el nombre limpio (L63). Sin perfil leído, el
+    # nombre solo ya dijo que no.
+    por_nombre = obvio
+    if not por_nombre and sig is None:
         return False
 
     obvio, razones = verification._is_obvious_spam_profile(
@@ -402,6 +416,12 @@ async def _revisar_perfil(context, db: DB, cfg: Config, fila, espera: int) -> bo
             original_text=None, first_name=usuario.first_name,
         )
         return True
+
+    # Lo de abajo (dejar mudo un nombre Han con salvoconducto) sigue siendo solo
+    # para un nombre que dispara: con el nombre limpio no hay nada que decidir, y
+    # a quien el admin ya dejó pasar no se le vuelve a silenciar en cada lectura.
+    if not por_nombre:
+        return False
 
     if not cfg.shadow and verification.han_requiere_decision(
             sig, usuario.username, usuario.first_name, usuario.last_name):
@@ -667,11 +687,16 @@ _CLAVE_DISPARO = "_recien_llegados_disparo"
 DISPARO_CADA_S = 120
 
 
-async def revisar_ahora(context, user_id: int, motivo: str = "cambio de nombre") -> bool:
+async def revisar_ahora(context, user_id: int, motivo: str = "cambio de nombre",
+                        forzar: bool = False) -> bool:
     """Revisa a una persona concreta fuera de turno. True si se actuó.
 
     Best-effort de principio a fin: esto lo llama un handler de Telethon, y un
     fallo aquí no puede tumbar el listener ni el bot.
+
+    `forzar` se salta la espera entre disparos: lo usa la vigilancia del armado,
+    que ya trae su propio tope por persona (`MAX_DISPAROS_ARMADO`) y no puede
+    perder el segundo cambio de una ráfaga (foto, y un minuto después la bio).
     """
     db: DB = context.bot_data.get("db")
     cfg: Config = context.bot_data.get("cfg")
@@ -682,7 +707,7 @@ async def revisar_ahora(context, user_id: int, motivo: str = "cambio de nombre")
 
     cache = context.bot_data.setdefault(_CLAVE_DISPARO, {})
     ahora = time.time()
-    if ahora - cache.get(user_id, 0.0) < DISPARO_CADA_S:
+    if not forzar and ahora - cache.get(user_id, 0.0) < DISPARO_CADA_S:
         return False
     cache[user_id] = ahora
     for clave, visto in list(cache.items()):
@@ -707,13 +732,161 @@ async def revisar_ahora(context, user_id: int, motivo: str = "cambio de nombre")
 
     actuado = False
     for fila in filas:
+        if actuado and db.is_banned(user_id):
+            break                      # el ban es federado: los demás grupos ya lo tienen
         espera = int(ahora - float(fila["join_ts"]))
         try:
             if await _revisar_perfil(context, db, cfg, fila, espera):
                 actuado = True
                 log.info("revisar_ahora: user=%s cazado por %s (%ds dentro)",
                          user_id, motivo, espera)
+                continue
+            # Las listas también, sin esperar a su hora: quien se arma el perfil
+            # suele haber soltado ya el spam en otro grupo (L63: lols fichó a las
+            # dos cuentas 4 minutos antes de que escribieran aquí).
+            context.bot_data.setdefault(_CLAVE_CACHE, {})[(fila["chat_id"], user_id)] = ahora
+            if await _revisar_listas(context, db, cfg, context.bot_data.get("http"), fila, espera):
+                actuado = True
+                log.info("revisar_ahora: user=%s fichado en las listas tras %s (%ds dentro)",
+                         user_id, motivo, espera)
         except Exception as exc:  # noqa: BLE001
             log.warning("revisar_ahora: fallo con user=%s chat=%s: %s",
                         user_id, fila["chat_id"], exc)
     return actuado
+
+
+# ---------------------------------------------------------------------------
+# El armado: entrar con el perfil vacío y ponérselo minutos antes de escribir
+#
+# Caso medido (13-nov-2026, Windows 10): «Cortney» entró a las 04:38 sin foto,
+# sin @ y sin bio, y lols.bot no la tenía. A las 07:56 ya llevaba la foto, el @
+# y la bio de la red, y lols la fichó (había escrito en otro grupo); a las 08:00
+# escribió aquí. El repaso había pasado a las 07:49 y volvía a las 08:04: la
+# cazó el primer mensaje, un segundo después de publicarlo. «Tabitha», igual 50 s
+# antes. Y dentro quedaban 24 cuentas más con el perfil vacío, esperando.
+#
+# Leer el perfil más a menudo con la cuenta secundaria no es el camino (regla 9),
+# pero no hace falta: `getChat` de la Bot API da la bio, la foto, el @ y el canal
+# personal de cualquier miembro, gratis y sin tocar esa cuenta (medido: 0,06-0,5 s
+# por llamada, también de una cuenta ya baneada). Con eso se mira cada minuto si
+# el perfil ha CAMBIADO, y solo entonces se gasta la lectura completa.
+#
+# El cambio NO decide nada, igual que `updateUserName` (que en cinco días no ha
+# llegado ni una vez): solo dice «mira a este ya», y deciden los criterios de
+# siempre en `_revisar_perfil`, más las listas.
+# ---------------------------------------------------------------------------
+
+# Cada cuánto corre la vigilancia del primer día. Los dos casos medidos dejaron
+# al menos 3,5 y 4,6 minutos entre armarse y escribir aquí.
+ARMADO_CADA_S = 60
+# Personas por pasada. Una llamada por persona: 80 al minuto son 1,3 por segundo
+# de techo, muy por debajo de lo que la Bot API admite.
+MAX_ARMADO_POR_PASADA = 80
+# Revisiones completas que puede provocar la misma persona. Quien juegue a
+# cambiarse el perfil en bucle no convierte esto en una lectura por minuto con
+# la cuenta secundaria: agotado el tope, vuelve al ritmo del repaso.
+MAX_DISPAROS_ARMADO = 6
+# Si Telegram pide frenar, la vigilancia se aparta este tiempo. Un 429 para
+# TODAS las peticiones del bot (L61): antes ciegos un rato aquí que lentos al banear.
+ARMADO_PAUSA_S = 900
+
+_CLAVE_HUELLAS = "_recien_llegados_huella"
+_CLAVE_ARMADO = "_recien_llegados_armado"
+_CAMPOS_HUELLA = ("nombre", "usuario", "bio", "foto", "canal")
+
+
+def _huella(chat) -> tuple[str, str, str, str, str]:
+    """Lo que se ve del perfil desde la Bot API, en el orden de `_CAMPOS_HUELLA`."""
+    foto = getattr(chat, "photo", None)
+    canal = getattr(chat, "personal_chat", None)
+    return (
+        " ".join(p for p in (getattr(chat, "first_name", None),
+                             getattr(chat, "last_name", None)) if p),
+        getattr(chat, "username", None) or "",
+        getattr(chat, "bio", None) or "",
+        str(getattr(foto, "big_file_unique_id", None) or "sí") if foto else "",
+        str(getattr(canal, "id", None) or "sí") if canal else "",
+    )
+
+
+async def vigilar_armado_job(context) -> None:
+    """Cada minuto: ¿alguien del primer día se ha cambiado el perfil?"""
+    try:
+        await _vigilar_armado(context, FRESCO_S, MAX_ARMADO_POR_PASADA)
+    except Exception as exc:  # noqa: BLE001 — un trabajo de fondo nunca tumba el bot
+        log.warning("armado: fallo en la pasada: %s", exc)
+
+
+async def _vigilar_armado(context, ventana_s: int, limite: int) -> int:
+    """Compara el perfil de cada vigilado con el de la pasada anterior. Devuelve los cambios."""
+    import asyncio
+    db: DB = context.bot_data.get("db")
+    if db is None or context.bot_data.get("cfg") is None:
+        return 0
+    # El primer latido sale a los 5 minutos de arrancar (y después, uno por hora):
+    # tras un reinicio se ve enseguida que la vigilancia corre y puede leer.
+    estado = context.bot_data.setdefault(_CLAVE_ARMADO, {
+        "pausa": 0.0, "latido": time.time() - 3300, "consultas": 0, "cambios": 0,
+        "fallos": 0, "disparos": {}, "cerrojo": asyncio.Lock(),
+    })
+    # La pasada del minuto y la del repaso comparten las huellas: de una en una,
+    # o el mismo cambio dispararía dos revisiones.
+    async with estado["cerrojo"]:
+        ahora = time.time()
+        if ahora < estado["pausa"]:
+            return 0
+        huellas = context.bot_data.setdefault(_CLAVE_HUELLAS, {})
+        cambios = 0
+        vistos: set[int] = set()
+        for fila in db.recien_llegados_callados(ahora - ventana_s, limite=limite * 2):
+            user_id = fila["user_id"]
+            if user_id in vistos or len(vistos) >= limite:
+                continue
+            vistos.add(user_id)
+            if db.is_banned(user_id):
+                continue
+            try:
+                chat = await context.bot.get_chat(user_id)
+            except RetryAfter as exc:
+                pide = getattr(exc, "retry_after", 0)
+                pide = pide.total_seconds() if hasattr(pide, "total_seconds") else float(pide or 0)
+                estado["pausa"] = time.time() + max(ARMADO_PAUSA_S, pide)
+                log.warning("armado: Telegram pide frenar %.0f s: vigilancia en pausa %d min",
+                            pide, int(max(ARMADO_PAUSA_S, pide) // 60))
+                break
+            except TelegramError as exc:
+                estado["fallos"] += 1
+                log.debug("armado: no se pudo leer a %s: %s", user_id, exc)
+                continue
+            estado["consultas"] += 1
+            nueva = _huella(chat)
+            previa = huellas.get(user_id)
+            huellas[user_id] = (nueva, ahora)
+            if previa is None or previa[0] == nueva:
+                continue
+            campos = "+".join(c for c, a, b in zip(_CAMPOS_HUELLA, previa[0], nueva) if a != b)
+            hechos = estado["disparos"].get(user_id, 0)
+            if hechos >= MAX_DISPAROS_ARMADO:
+                continue
+            estado["disparos"][user_id] = hechos + 1
+            estado["cambios"] += 1
+            cambios += 1
+            log.info("armado: user=%s ha cambiado %s a los %ds de entrar → se revisa ya",
+                     user_id, campos, int(ahora - float(fila["join_ts"])))
+            await revisar_ahora(context, user_id, motivo=f"cambio de perfil ({campos})", forzar=True)
+
+        for user_id, (_h, visto) in list(huellas.items()):
+            if ahora - visto > VENTANA_S:
+                del huellas[user_id]
+                estado["disparos"].pop(user_id, None)
+        # Latido, una línea a la hora: sin ella «no hay líneas» no distingue entre
+        # «nadie cambió nada» y «lleva días sin correr o sin poder leer a nadie».
+        if ahora - estado["latido"] >= 3600:
+            log.info("armado: %d perfiles vigilados, %d consultas, %d sin respuesta y %d cambios desde el último latido",
+                     len(huellas), estado["consultas"], estado["fallos"], estado["cambios"])
+            if estado["fallos"] and not estado["consultas"]:
+                # No poder mirar no es «nadie cambió nada».
+                log.warning("armado: ninguna consulta ha respondido en la última hora (%d fallos): "
+                            "no se está vigilando a nadie", estado["fallos"])
+            estado.update(latido=ahora, consultas=0, cambios=0, fallos=0)
+        return cambios

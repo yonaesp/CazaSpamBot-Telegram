@@ -5,6 +5,15 @@ cada commit: para el detalle está el historial de git. Desde la v1.0.0 cada ver
 publicada lleva su número (`stable` apunta a la última); los hitos de antes, solo
 la fecha.
 
+## 2026-11 · La cuenta que entra vacía y se arma antes de escribir
+
+- Una cuenta que entra con el perfil vacío y, ya dentro, se pone la foto, el @ o la bio de spam cae en cuanto lo hace,
+  sin esperar a que escriba: el bot mira cada minuto si ha cambiado el perfil de quien entró en las últimas 24 horas y
+  aún no ha escrito, y entonces lo revisa entero y consulta las listas. Antes el perfil se releía una vez por hora.
+- Esa vigilancia usa la Bot API y no gasta la cuenta secundaria; la revisión completa sigue necesitándola.
+- Una bio entera en un alfabeto no permitido, puesta después de entrar, banea aunque no lleve enlace.
+- El log del join dice cuánto perfil había al entrar (`bio=`, `fotos=`, `usuario=`).
+
 ## 2026-11 · Un enlace privado a un grupo en otro alfabeto es ban
 
 - Quien entra con un enlace privado en la bio que lleva a un grupo escrito en un alfabeto que tu grupo no permite (un

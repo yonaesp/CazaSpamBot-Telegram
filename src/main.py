@@ -191,6 +191,11 @@ async def _post_init(app: Application) -> None:
         # da tiempo a un spammer a que lols.bot lo fiche (medido: de 1 h 35 min a
         # 27 h después de entrar) o a cambiarse el nombre una vez verificado.
         app.job_queue.run_repeating(recien_llegados.revisar_job, interval=900, first=180)
+        # Cada minuto: ¿alguien que entró en las últimas 24 h y no ha escrito se ha
+        # puesto foto, @ o bio? Es Bot API (`getChat`), no gasta la cuenta
+        # secundaria; el cambio solo dispara la revisión de siempre (L63).
+        app.job_queue.run_repeating(recien_llegados.vigilar_armado_job,
+                                    interval=recien_llegados.ARMADO_CADA_S, first=90)
         # Cada 5 min: sugerencias «¿quizás te referías a @x?» vencidas que un
         # reinicio dejó sin su borrado programado.
         app.job_queue.run_repeating(errata_mencion.barrido_job, interval=300, first=120)

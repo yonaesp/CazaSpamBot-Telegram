@@ -1135,11 +1135,16 @@ async def on_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             # para resolver una entidad recién creada (de ahí los reintentos de
             # `_resolve_entity`). Con esto, ante el próximo caso que se cuele se
             # puede distinguir «se lo puso después» de «no lo miramos».
+            # Y cuánto había: una cuenta que entra vacía (bio=0 fotos=0 usuario=no)
+            # y escribe horas después con todo puesto se armó dentro (L63).
             log.info(
-                "join user=%s chat=%s señales=%s canal=%s",
+                "join user=%s chat=%s señales=%s canal=%s bio=%s fotos=%s usuario=%s",
                 user.id, cmu.chat.id, "sí" if sig_pre else "NO",
                 (sig_pre.personal_channel_title[:40]
                  if sig_pre and sig_pre.personal_channel_title else "-"),
+                len(sig_pre.bio or "") if sig_pre else "?",
+                sig_pre.photo_count if sig_pre else "?",
+                "sí" if user.username else "no",
             )
         obvious_spam, obv_reasons = verification._is_obvious_spam_profile(
             sig_pre, user.username, user.first_name, user.last_name,

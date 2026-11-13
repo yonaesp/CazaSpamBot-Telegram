@@ -68,6 +68,7 @@ Una lección nueva va al final, con el número siguiente y su línea en el índi
 - [L60](#l60) · Un test que escribió en el repositorio de verdad
 - [L61](#l61) · Auditoría de estabilidad: lo que solo se ve mirando producción
 - [L62](#l62) · El enlace privado de la bio que lleva a un grupo en un alfabeto prohibido
+- [L63](#l63) · La cuenta que entra vacía y se arma minutos antes de escribir
 
 ---
 
@@ -1609,3 +1610,51 @@ saliendo «decorativo» (las letras cirílicas sí son confundibles con las lati
 
 **La regla.** Una guarda contra falsos positivos también se prueba con los positivos reales: esta anulaba la regla del
 alfabeto ante cualquier texto con una cifra y una letra latina. Tests: `tests/test_destino_alfabeto_l62.py`.
+
+## L63 · La cuenta que entra vacía y se arma minutos antes de escribir
+
+**El caso (13-nov-2026, Windows 10).** «Cortney» (9159287262) entró a las 04:38:38 y pulsó el botón en 4 s. El join leyó
+su perfil (`señales=sí`) y no vio nada; lols.bot tampoco la tenía. A las 08:00:46 escribió «来码 挣1W» con una foto con
+letras chinas, un @ de letras al azar y la bio «https://t.me/+… 新人有码进群 私信老板日入8000+»; el primer mensaje la baneó
+en un segundo (`non_allowed_script+lols_match+obvious_spam_profile`, 400). «Tabitha», igual 50 s antes. La pregunta del
+admin: «estaba en lols.bot y con descripción en chino + enlace a canal y ha podido escribir?».
+
+**Lo que se pudo saber.** lols las fichó a las 07:56:07 y 07:56:26 (su campo `when`), unos 4 minutos antes de que
+escribieran aquí y más de tres horas después de entrar: ya habían escrito en otro grupo. El repaso había pasado a las
+07:49 y volvía a las 08:04. Y dentro había 24 cuentas más del mismo molde (cuenta recién creada, nombre de pila inglés,
+botón en 4-5 s), todas con el perfil vacío: sin foto, sin @ y sin bio. En 90 días, de 308 cuentas nuevas sin @ que
+pulsaron el botón en 6 s o menos, 122 acabaron baneadas, 186 no han escrito nunca y ninguna ha escrito un mensaje normal.
+
+**Lo que no se pudo saber.** Qué tenía el perfil al entrar: la traza del join decía que se leyó, no qué había. Que entró
+vacía se deduce de que el criterio que la baneó a las 08:00 corrió también a las 04:38, con el mismo código, y de las
+24 gemelas. Ahora la traza lo dice: `bio=0 fotos=0 usuario=no`.
+
+**Por qué leer más a menudo no era el camino.** El perfil completo se lee con la cuenta secundaria, una vez por hora y
+persona (regla 9). Para cazar un armado de 4 minutos habría que leer cada minuto a unas 35 personas. Y `updateUserName`,
+que iba a avisar de los cambios de nombre, no ha llegado ni una vez en cinco días de log.
+
+**Lo que sí.** `getChat` de la Bot API devuelve de cualquier miembro (y de un baneado) nombre, @, bio, foto y canal
+personal: gratis, sin la cuenta secundaria, 0,06-0,5 s por llamada. El proyecto daba por hecho que la bio solo se veía
+por MTProto. `recien_llegados.vigilar_armado_job` (cada 60 s, quien entró en las últimas 24 h y no ha escrito; el repaso
+de 15 min lo hace para la semana entera) guarda una huella de esos cinco campos y, si cambia, lanza `revisar_ahora`: la
+lectura completa de siempre con los criterios de siempre, más lols y CAS sin esperar a su hora. El cambio no decide nada.
+Frenos: 80 personas por pasada, 6 disparos por persona, y si Telegram contesta 429 la vigilancia se aparta 15 minutos
+(un 429 para todas las peticiones del bot, L61). Una línea de latido a la hora, y un aviso si en esa hora no respondió
+ninguna consulta. La primera vez que se ve a alguien (también tras un reinicio) solo se toma nota.
+
+**Un hueco que salió al mirar.** En el repaso, el criterio del alfabeto para la bio y el título del canal solo se
+evaluaba si el NOMBRE ya disparaba: una bio entera en chino y sin enlace, puesta después de entrar, no caía hasta el
+primer mensaje. Ahora `_revisar_perfil` aplica `_is_obvious_spam_profile` con el perfil leído siempre que lo hay. Dejar
+mudo un nombre Han con salvoconducto sigue siendo solo para un nombre que dispara: si no, a quien el admin dejó pasar
+se le silenciaría otra vez en cada lectura.
+
+**Medido antes de tocar** (base viva, en seco): 76 vigilados en la ventana, 33 del primer día; leerlos todos por la Bot
+API tardó 6,2 s, sin ningún 429; 12 dieron «Chat not found»; 46 de los 64 legibles tienen el perfil vacío del todo. Con
+el criterio completo en el repaso no cae nadie de los que están dentro.
+
+**Lo que no se tocó.** Las 24 cuentas dormidas: el molde no es prueba (quien acaba de instalar Telegram también entra
+sin foto ni @ y pulsa el botón al momento), y banear por él sería una acción masiva sobre cuentas que aún no han hecho
+nada. Caen al armarse. Tampoco se cambia la lectura por Telethon del join por `getChat`: es otro cambio, con su medida.
+
+**La regla.** Antes de espaciar una comprobación porque es cara, mirar si hay una forma gratis de saber cuándo toca
+hacerla. Tests: `tests/test_armado_l63.py`.
