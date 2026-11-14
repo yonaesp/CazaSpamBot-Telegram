@@ -5,7 +5,7 @@ cada commit: para el detalle está el historial de git. Desde la v1.0.0 cada ver
 publicada lleva su número (`stable` apunta a la última); los hitos de antes, solo
 la fecha.
 
-## 2026-11 · Un enlace privado a un grupo en otro alfabeto es ban
+## v1.4.2 · 2026-11-14 · Un enlace privado a un grupo en otro alfabeto es ban
 
 - Quien entra con un enlace privado en la bio que lleva a un grupo escrito en un alfabeto que tu grupo no permite (un
   grupo en chino, si solo permites el latino) queda baneado en cuanto el bot lee el destino. Antes iba a revisión.
