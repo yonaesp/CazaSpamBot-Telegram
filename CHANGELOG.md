@@ -5,14 +5,7 @@ cada commit: para el detalle está el historial de git. Desde la v1.0.0 cada ver
 publicada lleva su número (`stable` apunta a la última); los hitos de antes, solo
 la fecha.
 
-## 2026-11 · Un sticker como primer mensaje ya no expulsa
-
-- Quien estrena el grupo con un sticker, una foto o un vídeo sin texto ya no queda expulsado si su perfil no tiene
-  nada de sospechoso: el mensaje se queda y te llega un aviso con botones por si quieres banearlo. Con un perfil
-  sospechoso, un enlace, una mención, botones o un reenvío, y cuando salta además otra regla, todo sigue igual.
-- El aviso de esa regla dice «un adjunto (foto, vídeo, sticker…)» y el registro guarda de qué paquete era el sticker.
-
-## 2026-11 · La cuenta que entra vacía y se arma antes de escribir
+## v1.4.3 · 2026-11-15 · La cuenta que entra vacía y se arma antes de escribir, y un sticker ya no expulsa
 
 - Una cuenta que entra con el perfil vacío y, ya dentro, se pone la foto, el @ o la bio de spam cae en cuanto lo hace,
   sin esperar a que escriba: el bot mira cada minuto si ha cambiado el perfil de quien entró en las últimas 24 horas y
@@ -20,6 +13,10 @@ la fecha.
 - Esa vigilancia usa la Bot API y no gasta la cuenta secundaria; la revisión completa sigue necesitándola.
 - Una bio entera en un alfabeto no permitido, puesta después de entrar, banea aunque no lleve enlace.
 - El log del join dice cuánto perfil había al entrar (`bio=`, `fotos=`, `usuario=`).
+- Quien estrena el grupo con un sticker, una foto o un vídeo sin texto ya no queda expulsado si su perfil no tiene
+  nada de sospechoso: el mensaje se queda y te llega un aviso con botones por si quieres banearlo. Con un perfil
+  sospechoso, un enlace, una mención, botones o un reenvío, y cuando salta además otra regla, todo sigue igual.
+- El aviso de esa regla dice «un adjunto (foto, vídeo, sticker…)» y el registro guarda de qué paquete era el sticker.
 
 ## v1.4.2 · 2026-11-14 · Un enlace privado a un grupo en otro alfabeto es ban
 
