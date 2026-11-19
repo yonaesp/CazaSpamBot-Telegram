@@ -167,7 +167,9 @@ async def test_sin_clave_avisa_una_sola_vez(tmp_db):
     await cas_vigia.comprobar_job(ctx)  # otro arranque, mismo motivo
     assert len(_textos(ctx)) == 1
     assert "CAS_API_KEY" in _textos(ctx)[0] and "combot.org" in _textos(ctx)[0]
-    assert ctx.bot.send_message.await_args.kwargs["disable_notification"] is False  # suena
+    assert "opcional" in _textos(ctx)[0]
+    # La clave es opcional (admin, 19-nov-2026): no tenerla no es una alarma, llega callado.
+    assert ctx.bot.send_message.await_args.kwargs["disable_notification"] is True
 
 
 @pytest.mark.asyncio
@@ -185,6 +187,8 @@ async def test_clave_rechazada_avisa_con_el_motivo(tmp_db, con_clave):
     await cas_vigia.comprobar_job(ctx)
     assert len(_textos(ctx)) == 1
     assert "Invalid &lt;key&gt;" in _textos(ctx)[0] and CLAVE not in _textos(ctx)[0]
+    # Aquí sí hay un fallo: el admin puso una clave y no funciona. Suena.
+    assert ctx.bot.send_message.await_args.kwargs["disable_notification"] is False
 
 
 @pytest.mark.asyncio

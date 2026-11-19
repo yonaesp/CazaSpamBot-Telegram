@@ -5,15 +5,16 @@ cada commit: para el detalle está el historial de git. Desde la v1.0.0 cada ver
 publicada lleva su número (`stable` apunta a la última); los hitos de antes, solo
 la fecha.
 
-## 2026-11 · CAS pide clave, y el aviso de versión se apaga con un botón
+## 2026-11 · CAS pide clave (opcional), y el aviso de versión se apaga con un botón
 
-- La lista CAS exige ahora una clave en cada consulta. Ponla en el `.env` como `CAS_API_KEY` (entra en
-  https://combot.org/u/settings con tu cuenta de Telegram y copia la API key) y recrea el contenedor. Sin ella las consultas a CAS quedan apagadas
-  y el bot te lo dice por privado una vez, en vez de dar a todo el mundo por limpio sin avisar. Si CAS rechaza la
-  clave, también te avisa.
-- `/scanuser` dice «CAS: apagado» o «no responde» cuando no ha podido consultar, en vez de «limpio».
-- El aviso de versión nueva trae un botón para dejar de recibirlo. Se vuelve a activar en `/alertas`.
-- El asistente de instalación y el paso 0 del README piden la clave de CAS y dicen dónde se saca.
+- La lista CAS pide ahora una clave en cada consulta. La clave es opcional: sin ella, el bot funciona igual y no
+  consulta CAS. Antes daba a todo el mundo por limpio sin avisar. Ahora te lo dice una vez por privado, en silencio.
+- Para usar CAS, entra en https://combot.org/u/settings con tu cuenta de Telegram y copia la API key. Ponla en el `.env`
+  como `CAS_API_KEY` y ejecuta `docker compose up -d`. Si CAS rechaza la clave, el bot te avisa.
+- `/scanuser` ya no dice «limpio» cuando no ha podido consultar CAS.
+- El aviso de versión nueva trae un botón para dejar de recibirlo. Se reactiva en `/alertas`.
+- El asistente de instalación y el paso 0 del README explican dónde se saca la clave. El tutorial de instalación está
+  reescrito con frases cortas: una idea por frase y un paso por acción.
 
 ## v1.4.3 · 2026-11-15 · La cuenta que entra vacía y se arma antes de escribir, y un sticker ya no expulsa
 

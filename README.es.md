@@ -127,15 +127,15 @@ Y además: perfil evidente de spam (nombre entero en otro alfabeto, letras disfr
 
 ## 🚀 Instalación en 5 minutos
 
-Necesitas un Linux siempre encendido (un VPS barato, un mini PC o un servidor en casa). El bot gasta menos de 100 MB de RAM.
+Necesitas un Linux siempre encendido. Vale un VPS barato, un mini PC o un servidor en casa. El bot gasta menos de 100 MB de RAM.
 
 ### Paso 0 · Prepara Telegram (2 minutos)
 
-1. Abre [@BotFather](https://t.me/BotFather), envía `/newbot` y ponle nombre. Te da el **token**: guárdalo.
-2. En @BotFather, `/setprivacy` → tu bot → **Disable**, para que vea todos los mensajes y no solo los comandos.
-3. Escribe a [@userinfobot](https://t.me/userinfobot): te dice tu **user_id** (un número).
-4. *(Recomendado)* Para la cuenta secundaria: con **otro** número de Telegram, entra en [my.telegram.org](https://my.telegram.org) → **API development tools**, crea una app y apunta el **api_id** y el **api_hash**.
-5. *(Recomendado)* Para la lista de spammers CAS: entra en [combot.org/u/settings](https://combot.org/u/settings) con tu cuenta de Telegram y copia tu **API key** (si no hay ninguna, pulsa **Reset API key**). CAS la pide en cada consulta.
+1. Abre [@BotFather](https://t.me/BotFather) y envía `/newbot`. Ponle un nombre al bot. BotFather te da el **token**. Guárdalo.
+2. En @BotFather, envía `/setprivacy`, elige tu bot y elige **Disable**. Así el bot ve todos los mensajes, no solo los comandos.
+3. Escribe a [@userinfobot](https://t.me/userinfobot). Te dice tu **user_id**, que es un número.
+4. *(Recomendado)* La cuenta secundaria. Usa **otro** número de Telegram. Entra en [my.telegram.org](https://my.telegram.org) y abre **API development tools**. Crea una app. Apunta el **api_id** y el **api_hash**.
+5. *(Opcional)* La lista de spammers CAS. Entra en [combot.org/u/settings](https://combot.org/u/settings) con tu cuenta de Telegram. Copia tu **API key**. Si no hay ninguna, pulsa **Reset API key**. CAS pide la clave en cada consulta. Sin la clave, el bot funciona igual y no consulta CAS.
 
 ### Paso 1 · Instala Docker y descarga el bot
 
@@ -146,11 +146,11 @@ git clone -b stable https://github.com/yonaesp/CazaSpamBot-Telegram.git
 cd CazaSpamBot-Telegram
 ```
 
-`stable` es la última versión publicada: cada una pasa al menos 48 horas en la instalación de referencia antes de salir. Si quieres cada cambio el mismo día, clona sin `-b stable` y seguirás `main`. En una Raspberry Pi es más fácil la imagen ya hecha: mira «Con la imagen ya hecha» más abajo.
+`stable` es la última versión publicada. Cada versión pasa al menos 48 horas en la instalación de referencia antes de salir. Si quieres cada cambio el mismo día, clona sin `-b stable`. Entonces sigues `main`. En una Raspberry Pi es más fácil la imagen ya hecha. Mira «Con la imagen ya hecha» más abajo.
 
 ### Paso 2 · Configúralo
 
-Te hace unas preguntas: pega el token, tu user_id y, si quieres, los datos de la cuenta secundaria y la clave de CAS. Lo demás, Enter.
+El asistente te hace unas preguntas. Pega el token y tu user_id. Los datos de la cuenta secundaria y la clave de CAS son opcionales. En lo demás, pulsa Enter.
 
 ```bash
 python3 scripts/setup.py
@@ -164,41 +164,43 @@ sudo docker compose up -d --build
 sudo docker compose logs -f
 ```
 
-Cuando veas `Bot @TuBot … listo`, ya está vivo (Ctrl+C sale del log; el bot sigue).
+Cuando veas `Bot @TuBot … listo`, el bot está en marcha. Pulsa Ctrl+C para salir del log. El bot sigue en marcha.
 
 ### Paso 4 · Ponlo en tus grupos
 
-1. En cada grupo: *Administradores* → *Añadir administrador* → tu bot, con **Eliminar mensajes** y **Banear usuarios**.
-2. Abre tu bot en Telegram y pulsa **Iniciar**. Sin eso, Telegram no le deja mandarte los avisos.
-3. Cuando esté en todos tus grupos, cierra la puerta para que nadie lo meta en los suyos: @BotFather → `/mybots` → tu bot → **Bot Settings** → **Allow Groups?** → **Turn groups off**.
+1. En cada grupo, abre *Administradores* → *Añadir administrador* y elige tu bot. Dale **Eliminar mensajes** y **Banear usuarios**.
+2. Abre tu bot en Telegram y pulsa **Iniciar**. Sin eso, Telegram no deja que el bot te mande avisos.
+3. Cuando el bot esté en todos tus grupos, impide que otros lo metan en los suyos. En @BotFather: `/mybots` → tu bot → **Bot Settings** → **Allow Groups?** → **Turn groups off**.
 
 ### Paso 5 · Conecta la cuenta secundaria *(si la configuraste)*
 
-Añádela también como administradora de tus grupos, con los mismos permisos, antes de iniciar sesión: al confirmar te enseña su privacidad y te ofrece corregir lo que esté abierto a todos, y desde entonces solo sus contactos pueden meterla en grupos. Luego:
+Primero, haz a la cuenta secundaria administradora de tus grupos, con los mismos permisos. Después pide el código de inicio de sesión:
 
 ```bash
 sudo docker compose exec antispam-bot python -m scripts.telethon_login request
 ```
 
-Telegram le manda un código a esa cuenta. Cámbialo por el `12345` (si tiene verificación en dos pasos, pon la contraseña detrás):
+Telegram manda un código a esa cuenta. Pon el código en lugar de `12345`. Si la cuenta tiene verificación en dos pasos, pon la contraseña detrás del código.
 
 ```bash
 sudo docker compose exec antispam-bot python -m scripts.telethon_login confirm 12345
 sudo docker compose restart
 ```
 
+Al confirmar, el inicio de sesión te enseña la privacidad de la cuenta. Te ofrece corregir lo que esté abierto a todos. Desde entonces, solo los contactos de la cuenta pueden meterla en grupos.
+
 En el log verás `Telethon=conectado`.
 
 ### Paso 6 · De prueba a real
 
-Arranca en **modo prueba**: lo mira todo y apunta lo que haría, sin banear a nadie. Cuando lleves unos días mirando el log y te fíes:
+El bot arranca en **modo prueba**. Lo mira todo y apunta lo que haría. No banea a nadie. Mira el log unos días. Cuando te fíes, ejecuta:
 
 ```bash
 sed -i 's/^MODE=.*/MODE=active/' .env && sudo docker compose up -d
 ```
 
 > [!NOTE]
-> Los reportes oficiales a Telegram vienen **apagados**. Actívalos con `REPORT_BEFORE_BAN=true` en el `.env` cuando confíes en los detectores: reportar a gente legítima puede hacer que Telegram limite la cuenta secundaria.
+> Los reportes oficiales a Telegram vienen **apagados**. Para activarlos, pon `REPORT_BEFORE_BAN=true` en el `.env`. Hazlo solo cuando confíes en los detectores. Reportar a gente legítima puede hacer que Telegram limite la cuenta secundaria.
 
 <details>
 <summary><b>El día a día: actualizar, ver el log, parar</b></summary>
@@ -281,7 +283,7 @@ TELEGRAM_BOT_TOKEN=8123456789:AAF-EsteTokenEsFalsoReemplazaloPorElTuyo00
 ADMIN_USER_ID=123456789
 ```
 
-Para la cuenta secundaria, `TG_API_ID`, `TG_API_HASH` y `TG_PHONE` (con prefijo, `+34600111222`). Para la lista CAS, `CAS_API_KEY` (paso 0). El `.env.example` explica cada variable con un ejemplo. Nunca subas tu `.env` a git (ya está en `.gitignore`).
+Para la cuenta secundaria, `TG_API_ID`, `TG_API_HASH` y `TG_PHONE` (con prefijo, `+34600111222`). La clave de CAS es opcional: `CAS_API_KEY` (paso 0). El `.env.example` explica cada variable con un ejemplo. Nunca subas tu `.env` a git (ya está en `.gitignore`).
 
 </details>
 
@@ -336,7 +338,7 @@ Por defecto el grupo queda **limpio y callado**: sin bienvenidas ni verificació
 | Grupos a moderar | `MODERATED_CHAT_IDS` (vacío = todos donde sea admin con permiso de banear) |
 | Dónde te llegan los avisos | `ADMIN_NOTIFY_CHAT_ID` (vacío = tu privado; o el `chat_id` de un grupo de moderación) |
 | Rigor con la lista CAS | `CAS_AUTOBAN_MIN`: `2` banea si está confirmado en 2+ grupos y te consulta el resto (recomendado); `1`, con cualquier señal |
-| Clave de CAS | `CAS_API_KEY`: CAS pide una clave en cada consulta. Entra en [combot.org/u/settings](https://combot.org/u/settings) con tu cuenta de Telegram y cópiala. Sin ella las consultas a CAS quedan apagadas, y el bot te lo dice una vez por privado |
+| Clave de CAS *(opcional)* | `CAS_API_KEY`. CAS pide una clave en cada consulta. Entra en [combot.org/u/settings](https://combot.org/u/settings) con tu cuenta de Telegram y cópiala. Sin la clave, el bot no consulta CAS y te lo dice una vez por privado |
 | Idiomas de las listas de palabras | `BLACKLIST_LANGS` (por defecto, el del bot + inglés, la lengua franca del spam) |
 | Idiomas que lee el OCR | `OCR_LANGS` (por defecto, los del bot) |
 | Acortadores bloqueados | `URL_BLOCKLIST` |

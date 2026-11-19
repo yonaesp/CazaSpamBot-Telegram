@@ -1711,9 +1711,10 @@ datos no se sabe desde cuándo pide clave: la caché solo tenía ceros. lols.bot
 **Lo que se hizo.** `CAS_API_KEY` (la clave de la API de Combot: https://combot.org/u/settings), enviada en la cabecera
 `Authorization` y nunca en la URL, que acaba en los logs. `cas.consultar` distingue tres respuestas: contestó (`ok: true`
 o la negativa «not found»), rechazó la clave (401 o 403) y no se entiende (red, 429, JSON raro); solo la primera se
-guarda en la caché. Sin clave no se llama. `cas_vigia.comprobar_job` prueba a los 90 s de arrancar y cada día: sin clave
-o con la clave rechazada, privado al admin una vez por motivo (suena: es una lista menos) y otro al volver; un corte de
-red ni avisa ni se da por bueno. `/scanuser` dice «apagado» o «no responde» en vez de «limpio».
+guarda en la caché. Sin clave no se llama. `cas_vigia.comprobar_job` prueba a los 90 s de arrancar y cada día. La clave
+es opcional (el admin, 19-nov: «lo del cas que sea opcional»): sin clave, un privado callado y una sola vez, con los
+pasos por si la quiere; con la clave rechazada, privado que suena, una vez por motivo; otro al volver. Un corte de red
+ni avisa ni se da por bueno. `/scanuser` dice «apagado» o «no responde» en vez de «limpio».
 
 **La regla.** Una lista externa que contesta «no» tiene que decirlo como esa lista dice «no»; cualquier otra negativa es
 «no lo sé»: no se guarda y se cuenta. `ok: false` era a la vez el «limpio» y el «no te atiendo». Tests:

@@ -265,10 +265,10 @@ def main() -> int:
     cas_key = ask(
         "Clave de la lista CAS (CAS_API_KEY, opcional)",
         help_text=(
-            "CAS es una lista mundial de spammers y su API pide una clave. Entra en\n"
-            "https://combot.org/u/settings con tu cuenta de Telegram y copia la «API key»\n"
-            "(si no hay ninguna, pulsa «Reset API key»). Con Enter lo dejas para después:\n"
-            "el bot funciona igual y te lo recuerda una vez por privado."
+            "CAS es una lista mundial de spammers. Su API pide una clave.\n"
+            "Para sacarla, entra en https://combot.org/u/settings con tu cuenta de Telegram.\n"
+            "Copia la «API key». Si no hay ninguna, pulsa «Reset API key».\n"
+            "Con Enter lo dejas para después. El bot funciona igual sin ella."
             + ("\nYa tienes una puesta: con Enter se conserva." if cas_actual else "")
         ),
         secret=True,

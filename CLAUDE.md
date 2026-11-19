@@ -175,7 +175,7 @@ Bienvenidas (L39): `config/welcomes/<chat_id>.txt` → `generic.<lang>.txt` → 
 - `barrido_bios.barrido_job` (sábado 11:00 Madrid) — relee la bio de cada miembro cada 90 días, primero a quien no está en `seen_users`, 600 por pasada; positivo (`bio_spam`, otro alfabeto con enlace o grupo enlazado que `link_target` da por spam, leído con `link_reader`) de un veterano callado → `cuenta_robada`, de los demás → privado con los botones de sospechosos. Una bio con enlace privado bajo el umbral se relee cada semana (L49, L50)
 - `errata_mencion.barrido_job` (5min) — borra las sugerencias de errata vencidas que dejó un reinicio (L26)
 - `actualizaciones.informar_job` (al minuto de arrancar) y `comprobar_job` (a los 10 min y cada 24 h) — cuenta cómo fue el último `update.sh` y avisa en silencio, una vez por versión, si GitHub tiene una más nueva (`UPDATE_CHECK`); el aviso lleva el botón de silenciar de `notify_prefs` (`version_nueva`, se reactiva en `/alertas`) y, apagado, ni se pregunta a GitHub (L51)
-- `cas_vigia.comprobar_job` (a los 90 s y cada 24 h) — prueba que CAS contesta de verdad: sin clave o con la clave rechazada, privado al admin una vez por motivo (suena) y otro al volver; un corte de red ni avisa ni se da por bueno (L65)
+- `cas_vigia.comprobar_job` (a los 90 s y cada 24 h) — prueba que CAS contesta de verdad. La clave es opcional (admin, 19-nov): sin clave, un privado callado y una sola vez; con la clave rechazada, privado que suena, una vez por motivo; otro al volver. Un corte de red ni avisa ni se da por bueno (L65)
 - `maintenance.cleanup_nightly_job` (24h) — **copia de seguridad** + limpieza + **reconciliación banned_users↔Telegram**
 - `topweekly.weekly_top_job` (domingo 20:00 Madrid)
 

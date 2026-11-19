@@ -98,7 +98,7 @@ async def check(
                 payload={"offenses": cached, "cached": True},
             )
         return Hit.none()
-    if not clave():  # sin clave no hay consulta que hacer; lo dice `cas_vigia` al arrancar
+    if not clave():  # la clave es opcional: sin ella no se consulta (lo cuenta `cas_vigia`)
         return Hit.none()
     resultado, offenses, motivo = await consultar(user_id, session)
     if resultado == RECHAZADA:
