@@ -390,13 +390,17 @@ async def escenas_posts(s: Sim, cid: int) -> None:
         _nuevo(53, "Daniel Ruiz", "druiz")["id"]: [_POST_IPTV],
         _nuevo(54, "Marta | Fire TV", "martaftv")["id"]: [
             "Mi lista IPTV ya no carga 😭", "Domingo de montaña"],
+        # Posts que no anuncian nada, pero CAS ya lo tenía: ban directo (admin, 19-nov).
+        _nuevo(55, "Jorge Salas", "jsalas")["id"]: ["Domingo de playa", "Mi setup nuevo 🖥️"],
     }
     bios = {
         _nuevo(52, "", None)["id"]: "🚀 Need a reliable IPTV service or reseller panel available",
         _nuevo(54, "", None)["id"]: "Tengo IPTV en el Fire TV y Alexa en toda la casa",
+        _nuevo(56, "", None)["id"]: "Tengo IPTV en el Fire TV y Alexa en toda la casa",
     }
-    # CAS ya los tenía con una infracción: al de los posts y a quien solo habla del tema.
-    for i in (53, 54):
+    # CAS ya los tenía con una infracción: a los dos de los posts, y a Elena, que no
+    # tiene posts y solo habla del tema. Marta tiene posts y no está en CAS.
+    for i in (53, 55, 56):
         s.db.cas_store(_nuevo(i, "")["id"], 1)
     fetch_real, leer_real, espera_real = user_signals.fetch, posts_reader.leer, rl._ESPERA_JOIN_S
     reporter_real = s.app.bot_data["reporter"]
@@ -416,7 +420,9 @@ async def escenas_posts(s: Sim, cid: int) -> None:
                                               (51, "Iván Ortega", "ivanort", None),
                                               (52, "BEST IPTV RESELLING PANEL", "bestpanel", "ban"),
                                               (53, "Daniel Ruiz", "druiz", "ban"),
-                                              (54, "Marta | Fire TV", "martaftv", None)):
+                                              (54, "Marta | Fire TV", "martaftv", None),
+                                              (55, "Jorge Salas", "jsalas", "ban"),
+                                              (56, "Elena Ríos", "erios", None)):
             print(f"\n== Posts del perfil: {nombre} entra y no escribe ==")
             u = _nuevo(i, nombre, username)
             t0, antes = RELOJ[0], len(LLAMADAS)

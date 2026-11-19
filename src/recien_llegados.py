@@ -382,14 +382,16 @@ async def _revisar_perfil(context, db: DB, cfg: Config, fila, espera: int) -> bo
                                      sig.bio, "recien_llegados"):
             return True
 
-    # El perfil como anuncio, con lo que ya está leído: el nombre, la bio y el canal,
-    # y lo que CAS dijo de esa persona (L66). Los posts los suma `_revisar_posts`.
+    # El perfil como anuncio, con lo que ya está leído: el nombre, la bio, el canal,
+    # si tiene posts, y lo que CAS dijo de esa persona (L66). Lo que dicen los posts
+    # lo suma `_revisar_posts`.
     if sig is not None:
         from .detectors import perfil_anuncio
         from .handlers import _cas_conocido
         hit = perfil_anuncio.check(
             perfil_anuncio.nombre_de(usuario.first_name, getattr(usuario, "last_name", None)),
             bio=sig.bio, canal=sig.personal_channel_title, cas=_cas_conocido(db, cfg, user_id),
+            tiene_posts=bool(getattr(sig, "tiene_posts", False)),
         )
         if hit:
             log.info("recien_llegados: user=%s su perfil es un anuncio (%ds tras entrar) → ban: %s",
@@ -541,7 +543,7 @@ async def _revisar_posts(context, db: DB, cfg: Config, fila, usuario, sig, clien
                                      getattr(usuario, "last_name", None)),
             bio=getattr(sig, "bio", None), posts=textos,
             canal=getattr(sig, "personal_channel_title", None),
-            cas=_cas_conocido(db, cfg, fila["user_id"]),
+            cas=_cas_conocido(db, cfg, fila["user_id"]), tiene_posts=True,
         )
     if not hit:
         return False

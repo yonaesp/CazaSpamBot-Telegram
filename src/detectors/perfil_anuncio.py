@@ -12,18 +12,26 @@ El bot solo preguntó. Cada cosa por separado no llegaba a nada:
 - El nombre no lo juzgaba nadie por lo que dice, solo por su alfabeto.
 
 Decisión del admin ese día: «si ya tiene un cas y todos esos posts debería ser
-motivo de ban porque suma dos cosas».
+motivo de ban porque suma dos cosas». Y al ver la primera versión, que pedía que
+los posts anunciaran algo: «no es solo por revender IPTV sino por tener posts +
+el cas, eso debería ser ban directo, la gente normal no suele usar posts y si
+además ya tiene un cas es más que sospechoso».
 
-Las «cosas» son los escaparates del perfil que anuncian un servicio (nombre, bio,
-posts, canal) y estar en CAS. Mismo molde que `investment_scam`: ninguna decide
-sola (hay test). Hay ban en dos casos:
+Las «cosas» son estar en CAS, tener posts en el perfil y cada escaparate que
+anuncia un servicio (nombre, bio, posts, canal). Mismo molde que
+`investment_scam`: ninguna decide sola (hay test). Hay ban en tres casos:
 
-- **CAS + un escaparate.** Dos fuentes que no se conocen: un admin de otro grupo
-  lo marcó, y su propio perfil vende algo.
+- **CAS + posts.** Digan lo que digan los posts. Medido ese día: 4 de 30 recién
+  llegados tienen posts y uno de nueve es un participante normal, así que los
+  posts solos no dicen nada. Pero ninguna de las 11 cuentas con CAS escribió
+  nunca nada legítimo.
+- **CAS + un escaparate que anuncia.** Dos fuentes que no se conocen: un admin
+  de otro grupo lo marcó, y su propio perfil vende algo.
 - **El nombre + otro escaparate.** Una persona no se llama como un servicio. Si
   además lo repite la bio, un post o el canal, la cuenta es un cartel.
 
-Lo que NO banea a propósito: bio y posts sin el nombre ni CAS. Un técnico con
+Lo que NO banea a propósito: tener posts sin estar en CAS, y bio y posts que
+anuncian sin el nombre ni CAS. Un técnico con
 «experto en seguridad» en la bio y un post sobre un spyware cumpliría, y es una
 persona normal. Eso lo siguen juzgando `bio_spam` y `posts_perfil` con sus
 umbrales.
@@ -81,28 +89,39 @@ def escaparates(nombre: str | None, bio: str | None = None,
 
 
 def check(nombre: str | None, bio: str | None = None, posts: list[str] | None = None,
-          canal: str | None = None, cas: int = 0) -> Hit:
-    """Juzga el perfil entero. `cas`: infracciones en CAS (0 si no está o no se sabe)."""
+          canal: str | None = None, cas: int = 0, tiene_posts: bool = False) -> Hit:
+    """Juzga el perfil entero.
+
+    `cas`: infracciones en CAS (0 si no está o no se sabe). `tiene_posts`: lo que
+    dice `GetFullUser`, sin leerlos; pasar `posts` ya cuenta como tenerlos.
+    """
     vistos = escaparates(nombre, bio, posts, canal)
-    if not vistos:
-        return Hit.none()
     en_cas = int(cas or 0) >= 1
+    hay_posts = bool(tiene_posts) or bool(posts)
+    por_cas = en_cas and (hay_posts or bool(vistos))
     por_nombre = "nombre" in vistos and len(vistos) >= 2
-    if not (en_cas or por_nombre):
+    if not (por_cas or por_nombre):
         return Hit.none()
 
-    cosas = len(vistos) + (1 if en_cas else 0)
-    donde = ", ".join(t(f"perfil_anuncio.{clave}") for clave in vistos)
-    servicio = next(iter(vistos.values()))[:60]
-    reason = t("reason.perfil_anuncio", servicio=servicio, donde=donde)
+    # Tener posts es una cosa más solo junto a CAS, y sin contarla dos veces.
+    posts_a_secas = en_cas and hay_posts and "posts" not in vistos
+    cosas = len(vistos) + (1 if en_cas else 0) + (1 if posts_a_secas else 0)
+    partes: list[str] = []
+    if vistos:
+        donde = ", ".join(t(f"perfil_anuncio.{clave}") for clave in vistos)
+        servicio = next(iter(vistos.values()))[:60]
+        partes.append(t("reason.perfil_anuncio", servicio=servicio, donde=donde))
+    if posts_a_secas:
+        partes.append(t("reason.perfil_anuncio_posts"))
     if en_cas:
-        reason += " + " + t("reason.perfil_anuncio_cas")
+        partes.append(t("reason.perfil_anuncio_cas"))
+    reason = " + ".join(partes)
     return Hit(
         rule=REGLA,
         score=min(200, SCORE_BASE + SCORE_EXTRA * (cosas - 2)),
         reason=reason,
         payload={
-            "escaparates": list(vistos), "cas": int(cas or 0),
+            "escaparates": list(vistos), "cas": int(cas or 0), "con_posts": hay_posts,
             "ejemplos": {clave: trozo[:60] for clave, trozo in vistos.items()},
         },
     )

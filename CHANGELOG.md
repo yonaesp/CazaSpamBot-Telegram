@@ -7,9 +7,10 @@ la fecha.
 
 ## 2026-11 · El perfil que es un anuncio: CAS con una infracción ya suma
 
-- Un perfil que anuncia un servicio ilegal cae al entrar si dos cosas lo dicen a la vez. Las cosas son el nombre, la bio,
-  los posts, el canal y estar en la lista CAS. Antes, una sola infracción en CAS solo preguntaba al admin.
-- Vale CAS más un escaparate del perfil, o el nombre más otro escaparate. Ninguna cosa decide sola.
+- Una cuenta que está en la lista CAS con una infracción y tiene posts fijados en el perfil cae al entrar. Antes, una
+  sola infracción en CAS solo preguntaba al admin. Tener posts sin estar en CAS no cuenta.
+- También cae si está en CAS y su perfil anuncia un servicio ilegal, o si el nombre lo anuncia y la bio, los posts o el
+  canal lo repiten. Ninguna cosa decide sola.
 - El bot reconoce la reventa de IPTV como servicio ilegal. Hablar de IPTV no cuenta: solo venderlo.
 - El aviso de revisión de CAS trae ahora el nombre visible, la bio y las fotos. Ya no hace falta abrir el perfil.
 

@@ -1400,18 +1400,18 @@ async def on_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 )
                 return
             else:
-                # CAS con una infracción no banea sola, pero SUMA: si además el
-                # perfil anuncia un servicio (nombre, bio o canal), son dos cosas y
-                # es ban (decisión del admin, 19-nov-2026, L66). Los posts los suma
-                # la tarea aparte, que ya encuentra a CAS en la caché.
+                # CAS con una infracción no banea sola, pero SUMA: si además tiene
+                # posts en el perfil o anuncia un servicio (nombre, bio o canal), son
+                # dos cosas y es ban directo (decisión del admin, 19-nov-2026, L66).
+                # Que tiene posts lo dice `GetFullUser`: no hace falta leerlos.
                 anuncio_hit = perfil_anuncio_det.check(
                     perfil_anuncio_det.nombre_de(user.first_name, user.last_name),
                     bio=getattr(sig_pre, "bio", None),
                     canal=getattr(sig_pre, "personal_channel_title", None),
-                    cas=offenses,
+                    cas=offenses, tiene_posts=bool(getattr(sig_pre, "tiene_posts", False)),
                 ) if rejoin_trust < 70 else None
                 if anuncio_hit:
-                    log.info("CAS (%d) + perfil que anuncia user=%s → ban: %s",
+                    log.info("CAS (%d) + perfil user=%s → ban: %s",
                              offenses, user.id, anuncio_hit.reason[:200])
                     await _ban_join_direct(
                         context, db, cfg, cmu, user, score=anuncio_hit.score,
@@ -2155,6 +2155,7 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
                     perfil_anuncio_det.nombre_de(user.first_name, user.last_name),
                     bio=sig_perfil.bio, canal=sig_perfil.personal_channel_title,
                     cas=_cas_conocido(db, cfg, user.id),
+                    tiene_posts=bool(getattr(sig_perfil, "tiene_posts", False)),
                 ), "perfil_anuncio"))
             if sig_perfil is not None and sig_perfil.personal_channel_title:
                 try:

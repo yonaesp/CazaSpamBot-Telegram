@@ -9,7 +9,7 @@
 [![python-telegram-bot](https://img.shields.io/badge/PTB-22.8-26A5E4?logo=telegram&logoColor=white)](https://python-telegram-bot.org/)
 [![Telethon](https://img.shields.io/badge/Telethon-1.44-blueviolet)](https://docs.telethon.dev/)
 [![Languages](https://img.shields.io/badge/languages-es%20%7C%20en%20%7C%20add%20yours-orange)](src/locales/README.md)
-[![Tests](https://img.shields.io/badge/tests-2272%20passing-success)](#tests)
+[![Tests](https://img.shields.io/badge/tests-2279%20passing-success)](#tests)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 
 🌍 **English** · [**Español**](README.es.md)
@@ -115,7 +115,7 @@ The account **doesn't give itself away**: reading a story or a channel doesn't c
 | `bio_spam` 🔑 | Bio promoting porn, commercial or hacking services |
 | `personal_channel` 🔑 | The profile's channel used as a spam shopfront |
 | `posts_perfil` 🔑 | The profile's «Posts» (pinned stories, also read inside the pictures) used as a catalogue of illegal services |
-| `perfil_anuncio` 🔑 | The whole profile is an advert: it offers an illegal service (for example, IPTV reselling) in the name, bio, posts or channel, and repeats it in another one or is already on the CAS list |
+| `perfil_anuncio` 🔑 | Two things at once on the profile: it is on the CAS list and also has pinned posts or advertises an illegal service (for example, IPTV reselling); or the name advertises a service and the bio, posts or channel repeat it |
 | `photos_batch` 🔑 | Several profile photos uploaded within minutes: a built account |
 | `cas` · `lols_bot` | Spammers flagged on the worldwide lists |
 
@@ -426,7 +426,7 @@ Telling us about a legitimate member it banned is as useful as code: [CONTRIBUTI
 ## 🧪 Tests
 
 ```bash
-.venv/bin/python -m pytest tests/ -q     # 2272 tests
+.venv/bin/python -m pytest tests/ -q     # 2279 tests
 ```
 
 Every detector has tests for what it must catch **and what it must not**, built from real cases. A false positive is worse than a false negative.

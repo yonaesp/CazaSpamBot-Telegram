@@ -1742,17 +1742,25 @@ una infracción, por regla, pregunta. De 19.612 personas vistas, es la única co
 con una sola infracción en CAS, 6 acabaron baneadas, 23 expulsadas por no verificar y 19 no hicieron nada: ninguna
 escribió un mensaje sin acabar baneada.
 
-**Lo que se hizo.** Detector `perfil_anuncio`: las «cosas» son cada escaparate que anuncia un servicio (nombre, bio,
-posts, canal) y estar en CAS. Banea con CAS más un escaparate, o con el nombre más otro escaparate. Se mira en el join
+**La corrección del admin.** La primera versión pedía que los posts anunciaran algo. Él: «no es solo por revender IPTV
+sino por tener posts + el cas, eso debería ser ban directo, la gente normal no suele usar posts y si además ya tiene un
+cas es más que sospechoso». Medido con los logs de cuatro días: 4 de 30 recién llegados tienen posts, y de 9 personas
+con posts, 3 acabaron baneadas, 5 no escribieron y 1 es un participante normal. Los posts solos no dicen nada. De las 11
+cuentas con CAS en la caché, ninguna escribió nada legítimo. La suma sí aguanta.
+
+**Lo que se hizo.** Detector `perfil_anuncio`: las «cosas» son estar en CAS, tener posts (lo dice `GetFullUser`, sin
+leerlos) y cada escaparate que anuncia un servicio (nombre, bio, posts, canal). Banea con CAS más posts, con CAS más un
+escaparate que anuncia, o con el nombre más otro escaparate. Se mira en el join
 (con el perfil ya leído, y otra vez en la rama de CAS antes de preguntar), en la tarea de los posts, en el repaso y en
 el primer mensaje. CAS se lee de la caché (`_cas_conocido`, 7 días): no cuesta una llamada. La reventa de IPTV entra en
 `bio_illegal_services.txt` como venta («IPTV reseller», «reseller panel», «suscripción IPTV», «restream connections»).
 La revisión de CAS enseña el nombre visible y el perfil leído.
 
-**Lo que no banea, a propósito.** Bio y posts sin el nombre ni CAS: un técnico con «experto en seguridad» en la bio y un
+**Lo que no banea, a propósito.** Tener posts sin estar en CAS, y estar en CAS sin nada más (sigue yendo a revisión). Bio
+y posts que anuncian sin el nombre ni CAS: un técnico con «experto en seguridad» en la bio y un
 post sobre un spyware cumpliría. «IPTV» a secas, «lista IPTV» o «app de IPTV» no son un servicio: en un grupo de Alexa y
 Fire TV se habla de eso. «Hacker» a secas tampoco, como en `posts_perfil`.
 
 **La regla.** Una señal que no basta sola no se tira: se guarda para sumarla. Una lista externa con una infracción y un
 perfil que vende algo son dos fuentes que no se conocen. Y el aviso que pide decidir tiene que llevar lo que el bot ya
-leyó. Tests: `tests/test_perfil_anuncio.py` y tres escenas en `scripts/simular.py`.
+leyó. Tests: `tests/test_perfil_anuncio.py` y cinco escenas en `scripts/simular.py`.
