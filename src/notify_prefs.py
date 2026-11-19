@@ -22,6 +22,7 @@ NOTIFY_TYPES: dict[str, str] = {
     "bot_overlap": "notify.bot_overlap",
     "trust_skip": "notify.trust_skip",
     "ocr_review": "notify.ocr_review",
+    "version_nueva": "notify.version_nueva",
 }
 
 
@@ -49,6 +50,9 @@ def default_for(key: str, cfg=None) -> bool:
         return os.getenv("NOTIFY_SELF_DELETES", "false").strip().lower() in ("1", "true", "yes", "on")
     if key == "bot_removed":
         return bool(getattr(cfg, "notify_bot_removed", True))
+    if key == "version_nueva":  # UPDATE_CHECK del .env; el botón del aviso manda sobre él
+        from . import actualizaciones
+        return actualizaciones.activado()
     return True  # manual_ban y demás: activados por defecto
 
 

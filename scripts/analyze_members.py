@@ -44,13 +44,13 @@ from telethon.tl.types import (
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from src.db import DB  # noqa: E402
 from src import quips  # noqa: E402
+from src.detectors import cas as cas_det  # noqa: E402
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s — %(message)s")
 log = logging.getLogger("analyze")
 
 
-CAS_URL = "https://api.cas.chat/check"
 
 
 # ============== Modelo ==============
@@ -197,17 +197,9 @@ async def _iter_members(
 
 
 async def _cas_check(session: aiohttp.ClientSession, db: DB, user_id: int, ttl: int) -> int:
-    cached = db.cas_lookup(user_id, ttl)
-    if cached is not None:
-        return cached
-    try:
-        async with session.get(CAS_URL, params={"user_id": user_id}, timeout=aiohttp.ClientTimeout(total=5)) as r:
-            data = await r.json(content_type=None)
-        offenses = int(data.get("result", {}).get("offenses", 0)) if data.get("ok") else 0
-    except Exception:
-        offenses = 0
-    db.cas_store(user_id, offenses)
-    return offenses
+    """Por el detector del bot: lleva la clave (`CAS_API_KEY`) y no guarda un rechazo como limpio."""
+    hit = await cas_det.check(user_id, session, db, ttl)
+    return int((hit.payload or {}).get("offenses", 0)) if hit else 0
 
 
 # ============== Ban federado ==============

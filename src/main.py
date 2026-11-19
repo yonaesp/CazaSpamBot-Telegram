@@ -19,7 +19,7 @@ from telegram.ext import (
     filters,
 )
 
-from . import actualizaciones, admin, barrido_bios, borrado_diferido, chat_picker, cuenta_robada, cuenta_secundaria, chat_settings_cmd, config_panel, errata_mencion, group_clean, lang_cmd, maintenance, notify_prefs, quienfue_cmd, recien_llegados, scan_cmd, scanuser_cmd, telethon_bridge, topweekly, verification, vigia_cuelgue, warns_mod
+from . import actualizaciones, admin, barrido_bios, borrado_diferido, cas_vigia, chat_picker, cuenta_robada, cuenta_secundaria, chat_settings_cmd, config_panel, errata_mencion, group_clean, lang_cmd, maintenance, notify_prefs, quienfue_cmd, recien_llegados, scan_cmd, scanuser_cmd, telethon_bridge, topweekly, verification, vigia_cuelgue, warns_mod
 from .config import load_config
 from .db import DB
 from .handlers import (
@@ -204,6 +204,10 @@ async def _post_init(app: Application) -> None:
         app.job_queue.run_once(actualizaciones.informar_job, when=60)
         app.job_queue.run_repeating(actualizaciones.comprobar_job, interval=86400, first=600,
                                     name="actualizaciones")
+        # CAS (L65): a los 90 s y cada día, que la lista contesta de verdad. Su API pide
+        # clave desde nov-2026 y un rechazo se tomaba por «limpio» sin avisar a nadie.
+        app.job_queue.run_repeating(cas_vigia.comprobar_job, interval=86400, first=90,
+                                    name="cas_vigia")
         # Cada 24h: cleanup nightly de tablas viejas (reaction_events, gentle_warnings,
         # pending_verifications, cas_cache, suppressions)
         app.job_queue.run_repeating(maintenance.cleanup_nightly_job, interval=86400, first=3600)

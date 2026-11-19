@@ -70,6 +70,7 @@ Una lección nueva va al final, con el número siguiente y su línea en el índi
 - [L62](#l62) · El enlace privado de la bio que lleva a un grupo en un alfabeto prohibido
 - [L63](#l63) · La cuenta que entra vacía y se arma minutos antes de escribir
 - [L64](#l64) · Un sticker como primer mensaje: la regla de forma que expulsaba sola
+- [L65](#l65) · CAS empezó a pedir clave y el bot lo tomó por «limpio»
 
 ---
 
@@ -1693,3 +1694,30 @@ caído no se sabe si el perfil es sospechoso y cuenta como normal; ya era así (
 
 **La regla.** Una señal que «solo suma» tiene que quedar por debajo del umbral más bajo o tener su perdón: se comprueba
 contra los umbrales, no contra el docstring. Tests: `tests/test_adjunto_solo_l64.py`.
+
+<a id="l65"></a>
+## L65 · CAS empezó a pedir clave y el bot lo tomó por «limpio»
+
+**El caso (19-nov-2026).** Revisando los logs tras la v1.4.3 había 75 «CAS lookup falló … Name or service not known» el
+16-nov, de 00:00 a 14:23, y después silencio. El silencio no era que CAS hubiera vuelto: `api.cas.chat/check` contestaba
+ya `401 {"ok": false, "error_code": 401, "description": "API key required"}` a todo. `cas.check` leía `ok: false`, lo
+tomaba por «no está en la lista» (así dice CAS que alguien está limpio: `ok: false`, «Record not found») y guardaba 0
+antecedentes en `cas_cache` durante 24 h.
+
+**La medida.** 60 personas apuntadas como limpias desde el 16-nov a las 14:24 sin que CAS hubiera dicho nada de ellas, y
+ni una línea de aviso. El último positivo de CAS es del 25-oct (2 bans al mes en septiembre y octubre), así que por los
+datos no se sabe desde cuándo pide clave: la caché solo tenía ceros. lols.bot siguió funcionando (3 bans esos días).
+
+**Lo que se hizo.** `CAS_API_KEY` (la clave de la API de Combot: combot.org, Settings, API key), enviada en la cabecera
+`Authorization` y nunca en la URL, que acaba en los logs. `cas.consultar` distingue tres respuestas: contestó (`ok: true`
+o la negativa «not found»), rechazó la clave (401 o 403) y no se entiende (red, 429, JSON raro); solo la primera se
+guarda en la caché. Sin clave no se llama. `cas_vigia.comprobar_job` prueba a los 90 s de arrancar y cada día: sin clave
+o con la clave rechazada, privado al admin una vez por motivo (suena: es una lista menos) y otro al volver; un corte de
+red ni avisa ni se da por bueno. `/scanuser` dice «apagado» o «no responde» en vez de «limpio».
+
+**La regla.** Una lista externa que contesta «no» tiene que decirlo como esa lista dice «no»; cualquier otra negativa es
+«no lo sé»: no se guarda y se cuenta. `ok: false` era a la vez el «limpio» y el «no te atiendo». Tests:
+`tests/test_cas_clave.py`.
+
+**No se sabe.** Qué contesta hoy CAS para alguien limpio con una clave válida (su documentación no lo dice): se asume el
+«Record not found» de siempre, y si fuera otra cosa caería en «no se entiende», con su línea en el log y sin guardar nada.

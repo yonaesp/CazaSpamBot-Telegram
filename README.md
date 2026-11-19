@@ -9,7 +9,7 @@
 [![python-telegram-bot](https://img.shields.io/badge/PTB-22.8-26A5E4?logo=telegram&logoColor=white)](https://python-telegram-bot.org/)
 [![Telethon](https://img.shields.io/badge/Telethon-1.44-blueviolet)](https://docs.telethon.dev/)
 [![Languages](https://img.shields.io/badge/languages-es%20%7C%20en%20%7C%20add%20yours-orange)](src/locales/README.md)
-[![Tests](https://img.shields.io/badge/tests-2194%20passing-success)](#tests)
+[![Tests](https://img.shields.io/badge/tests-2217%20passing-success)](#tests)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 
 🌍 **English** · [**Español**](README.es.md)
@@ -336,6 +336,7 @@ By default the group stays **clean and quiet**: no welcomes, no verification, an
 | Groups to moderate | `MODERATED_CHAT_IDS` (empty = every group where it's an admin allowed to ban) |
 | Where your alerts go | `ADMIN_NOTIFY_CHAT_ID` (empty = your private chat; or a moderation group's `chat_id`) |
 | CAS strictness | `CAS_AUTOBAN_MIN`: `2` bans when confirmed in 2+ groups and asks you about the rest (recommended); `1`, on any signal |
+| CAS key | `CAS_API_KEY`: CAS requires an API key on every request. Sign in to combot.org with Telegram, open Settings and copy it. Without it CAS lookups stay off, and the bot tells you once in private |
 | Word list languages | `BLACKLIST_LANGS` (defaults to the bot's language + English, spam's lingua franca) |
 | Languages the OCR reads | `OCR_LANGS` (defaults to the bot's languages) |
 | Blocked shorteners | `URL_BLOCKLIST` |
@@ -396,7 +397,7 @@ That's what it tries hardest to avoid. Members with history in the group are pro
 A captcha only stops dumb bots at the door. Here verification is optional and ships off, because today's spam gets past it and then posts at leisure. What matters is looking at who they are and what they post, days later too.
 
 **Does my data leave my server?**
-No. Learning and OCR run locally. Outside Telegram, the only things that go out are lookups to the CAS and lols.bot lists (with the user's id), a daily check on GitHub for new versions (anonymous; `UPDATE_CHECK=false` turns it off) and, if you turn them on, reports to Telegram.
+No. Learning and OCR run locally. Outside Telegram, the only things that go out are lookups to the CAS and lols.bot lists (with the user's id), a daily check on GitHub for new versions (anonymous; the button on the notice, `/alertas` or `UPDATE_CHECK=false` turn it off) and, if you turn them on, reports to Telegram.
 
 **Is it free? Does it work in other languages?**
 Yes, free and open source (GPL-3.0). Detection doesn't depend on the group's language, the interface ships in Spanish and English, and adding a language is one JSON file ([translator guide](src/locales/README.md)).
@@ -421,7 +422,7 @@ Telling us about a legitimate member it banned is as useful as code: [CONTRIBUTI
 ## 🧪 Tests
 
 ```bash
-.venv/bin/python -m pytest tests/ -q     # 2194 tests
+.venv/bin/python -m pytest tests/ -q     # 2217 tests
 ```
 
 Every detector has tests for what it must catch **and what it must not**, built from real cases. A false positive is worse than a false negative.

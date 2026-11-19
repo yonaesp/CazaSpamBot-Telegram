@@ -1,6 +1,6 @@
 # CazaSpamBot — Bot Antispam Telegram
 
-Bot de moderación antispam **en producción 24/7**, multi-grupo, federado y **bilingüe** (es/en). ~25.500 LOC en `src/`, Podman, **2194 tests**, 28 detectores (un módulo cada uno en `src/detectors/`).
+Bot de moderación antispam **en producción 24/7**, multi-grupo, federado y **bilingüe** (es/en). ~25.500 LOC en `src/`, Podman, **2217 tests**, 28 detectores (un módulo cada uno en `src/detectors/`).
 
 > **Estado: PRODUCCIÓN.** No es un esqueleto. Cualquier cambio afecta grupos reales con miles de usuarios. **Investiga > Confirma > Actúa.**
 
@@ -37,7 +37,7 @@ La cuenta secundaria no entra en grupos ajenos (`cuenta_secundaria.py`, al arran
 
 ## Idiomas (i18n)
 
-Todo el texto que ve el usuario vive en `src/locales/<código>.json` (`es.json` / `en.json`, **1.279 claves** cada uno), nunca en el código. Idioma global de la instancia: `/idioma` (persiste) o `BOT_LANG`/`LC_ALL`/`LANG` al arrancar. Soltar un `fr.json` basta para que `/idioma fr` funcione; fallback por clave al español (un idioma al 40 % ya es usable); un JSON roto se ignora con un log (por eso JSON y no `.py`: un `.py` con una comilla mal puesta tumbaba el arranque). Guía para traductores: `src/locales/README.md`.
+Todo el texto que ve el usuario vive en `src/locales/<código>.json` (`es.json` / `en.json`, **1.284 claves** cada uno), nunca en el código. Idioma global de la instancia: `/idioma` (persiste) o `BOT_LANG`/`LC_ALL`/`LANG` al arrancar. Soltar un `fr.json` basta para que `/idioma fr` funcione; fallback por clave al español (un idioma al 40 % ya es usable); un JSON roto se ignora con un log (por eso JSON y no `.py`: un `.py` con una comilla mal puesta tumbaba el arranque). Guía para traductores: `src/locales/README.md`.
 
 1. **Toda clave nueva va a `es.json` y `en.json`** (test de paridad lo exige).
 2. `t(key, _lang=None, **fmt)`. El selector se llama **`_lang` con guion bajo a propósito**: con el nombre `lang` colisionaba con un placeholder llamado igual y el usuario veía `{lang}` literal (bug real).
@@ -56,7 +56,7 @@ Todo el texto que ve el usuario vive en `src/locales/<código>.json` (`es.json` 
 4. `bio_spam` (bio con invite link + emojis sexuales/comerciales + keywords)
 5. `photos_batch_upload` (≥3 fotos en ≤2min = identidad robada; bypass si cuenta >1 año)
 6. `lols.bot` lookup → ban (con trust≥90, revisión humana al privado con los botones de sospechosos, `_revision_humana`, L57)
-7. `cas` lookup → ban si offenses≥2 (con =1 o trust≥90, revisión humana igual; hay test que exige el aviso en cada rama, también en `recien_llegados`)
+7. `cas` lookup → ban si offenses≥2 (con =1 o trust≥90, revisión humana igual; hay test que exige el aviso en cada rama, también en `recien_llegados`). La API pide clave (`CAS_API_KEY`, la de Combot, en la cabecera y nunca en la URL): un rechazo (401) no es «limpio» ni se guarda en `cas_cache`; solo cuenta como limpio el «Record not found» (del 16 al 19-nov, 60 personas apuntadas como limpias sin que CAS las mirara; hay test) (L65)
 8. `verification.on_join` — por defecto verificación, bienvenida y avisos de sospechosos, **los tres OFF** (los avisos por «sin foto» llenaban el privado). Encendidos, tres niveles por chat (`chat_settings.review_level`, NULL = el más callado): `alto` (defecto: otro alfabeto, homoglifos, cuenta nueva sin fotos), `medio` (una señal fuerte o dos cualesquiera) y `bajo` (cualquier indicio, también no tener @usuario). Todo por chat vía `/config` (L6).
 
 **`on_message`** — recolecta hits, `decide()`, luego trust score:
@@ -174,7 +174,8 @@ Bienvenidas (L39): `config/welcomes/<chat_id>.txt` → `generic.<lang>.txt` → 
 - `recien_llegados.vigilar_armado_job` (1min) — cambios de perfil (nombre, @, bio, foto, canal) de quien entró hace menos de 24 h y no ha escrito, por Bot API; el repaso lo hace para la semana entera. Una línea de latido a la hora, y aviso si en esa hora no respondió ninguna consulta (L63)
 - `barrido_bios.barrido_job` (sábado 11:00 Madrid) — relee la bio de cada miembro cada 90 días, primero a quien no está en `seen_users`, 600 por pasada; positivo (`bio_spam`, otro alfabeto con enlace o grupo enlazado que `link_target` da por spam, leído con `link_reader`) de un veterano callado → `cuenta_robada`, de los demás → privado con los botones de sospechosos. Una bio con enlace privado bajo el umbral se relee cada semana (L49, L50)
 - `errata_mencion.barrido_job` (5min) — borra las sugerencias de errata vencidas que dejó un reinicio (L26)
-- `actualizaciones.informar_job` (al minuto de arrancar) y `comprobar_job` (a los 10 min y cada 24 h) — cuenta cómo fue el último `update.sh` y avisa en silencio, una vez por versión, si GitHub tiene una más nueva (`UPDATE_CHECK`) (L51)
+- `actualizaciones.informar_job` (al minuto de arrancar) y `comprobar_job` (a los 10 min y cada 24 h) — cuenta cómo fue el último `update.sh` y avisa en silencio, una vez por versión, si GitHub tiene una más nueva (`UPDATE_CHECK`); el aviso lleva el botón de silenciar de `notify_prefs` (`version_nueva`, se reactiva en `/alertas`) y, apagado, ni se pregunta a GitHub (L51)
+- `cas_vigia.comprobar_job` (a los 90 s y cada 24 h) — prueba que CAS contesta de verdad: sin clave o con la clave rechazada, privado al admin una vez por motivo (suena) y otro al volver; un corte de red ni avisa ni se da por bueno (L65)
 - `maintenance.cleanup_nightly_job` (24h) — **copia de seguridad** + limpieza + **reconciliación banned_users↔Telegram**
 - `topweekly.weekly_top_job` (domingo 20:00 Madrid)
 
@@ -272,4 +273,4 @@ GitHub guarda solo 14 días: `scripts/traffic_log.py` los acumula en `traffic/hi
 
 Lo nuevo va en su apartado temático de este fichero como invariante de 1-3 líneas (qué no hacer, el número medido, el test que lo fija), nunca al final por fecha. El relato (el caso, la medida, lo que se probó) va a `docs/lecciones.md` como lección nueva, con su línea en el índice, y aquí se cita con `(Ln)`. Un procedimiento de varios pasos que se usa a veces, a una skill en `.claude/skills/`. Las preferencias del admin y el estado del trabajo, a la memoria.
 
-*Actualizado: 2026-11-13 — 28 detectores, 2194 tests, 1.279 claves por idioma.*
+*Actualizado: 2026-11-19 — 28 detectores, 2217 tests, 1.284 claves por idioma.*

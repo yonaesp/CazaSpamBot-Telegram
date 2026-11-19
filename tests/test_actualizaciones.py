@@ -105,6 +105,9 @@ async def test_avisa_una_sola_vez_por_version(tmp_db, monkeypatch):
     assert kw["chat_id"] == 42 and "v1.1.0" in kw["text"] and "v1.0.0" in kw["text"]
     assert "./update.sh" in kw["text"] and ultima["url"] in kw["text"]
     assert kw["disable_notification"] is True  # informativo: llega en silencio
+    # El propio aviso trae el botón para dejar de recibirlos (el genérico de /alertas).
+    (boton,), = kw["reply_markup"].inline_keyboard
+    assert boton.callback_data == "npref:off:version_nueva"
     # La siguiente versión sí se avisa.
     ultima["tag"] = "v1.2.0"
     await act.comprobar_job(ctx)
@@ -183,3 +186,23 @@ async def test_informa_si_se_quedo_la_nueva_o_volvio_atras(tmp_db, tmp_path, mon
     # Una sola vez: el fichero ya no está.
     await act.informar_job(ctx)
     ctx.bot.send_message.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_el_boton_del_aviso_lo_apaga_y_alertas_lo_vuelve_a_encender(tmp_db, monkeypatch):
+    """Apagado desde el aviso no se pregunta ni a GitHub; encendido a mano gana al .env."""
+    from src import notify_prefs
+    monkeypatch.setattr(act, "__version__", "1.0.0")
+    consulta = AsyncMock(return_value={"tag": "v1.1.0", "url": "https://x"})
+    monkeypatch.setattr(act, "ultima_version", consulta)
+    ctx = _ctx(tmp_db)
+    assert "version_nueva" in notify_prefs.NOTIFY_TYPES, "no aparece en /alertas"
+    tmp_db.set_pref("notify_version_nueva", False)       # lo que hace el botón «No recibir más»
+    await act.comprobar_job(ctx)
+    consulta.assert_not_awaited()
+    ctx.bot.send_message.assert_not_awaited()
+    monkeypatch.setenv("UPDATE_CHECK", "false")
+    tmp_db.set_pref("notify_version_nueva", True)        # lo que hace /alertas
+    await act.comprobar_job(ctx)
+    ctx.bot.send_message.assert_awaited_once()
+

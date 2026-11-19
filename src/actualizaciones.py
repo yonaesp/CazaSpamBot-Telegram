@@ -4,7 +4,7 @@ El admin (1-nov-2026) quiere que el bot lo use cuanta más gente mejor y que act
 sea fácil. Una vez al día se pregunta a GitHub cuál es la última versión publicada (una
 consulta anónima a api.github.com, sin nada del bot ni de los grupos) y, si es más nueva
 que la que corre, se avisa por privado, en silencio y una sola vez por versión. Se apaga
-con UPDATE_CHECK=false.
+con el botón del propio aviso, con /alertas o con UPDATE_CHECK=false.
 
 Instalar no lo hace el bot: no puede (ni debe) tocar su propio contenedor. Lo hace
 `update.sh` en el servidor, a mano o cada noche con `./update.sh --auto`. Antes de
@@ -22,6 +22,7 @@ import time
 from pathlib import Path
 
 import aiohttp
+from telegram import InlineKeyboardMarkup
 from telegram.error import TelegramError
 
 from . import notify_prefs, publico
@@ -78,9 +79,11 @@ async def ultima_version(session: aiohttp.ClientSession, url: str) -> dict | Non
 
 async def comprobar_job(context) -> None:
     """Una vez al día: si hay una versión más nueva, se avisa al admin (una vez por versión)."""
-    if not activado():
-        return
     cfg, db = context.bot_data["cfg"], context.bot_data["db"]
+    # Apagado con el botón del propio aviso, con /alertas o con UPDATE_CHECK=false:
+    # entonces ni siquiera se pregunta a GitHub.
+    if not notify_prefs.effective(db, "version_nueva", cfg):
+        return
     session = context.bot_data.get("http")
     actual = version_tupla(__version__)
     if session is None or not cfg.admin_notify_chat_id or not actual:
@@ -100,6 +103,7 @@ async def comprobar_job(context) -> None:
             chat_id=cfg.admin_notify_chat_id, text=texto, parse_mode="HTML",
             disable_web_page_preview=True,
             disable_notification=notify_prefs.sin_sonido(db, importante=False),
+            reply_markup=InlineKeyboardMarkup([[notify_prefs.mute_button("version_nueva")]]),
         )
     except TelegramError as exc:
         log.warning("actualizaciones: no se pudo avisar de %s: %s", ultima["tag"], exc)

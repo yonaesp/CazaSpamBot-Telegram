@@ -91,10 +91,19 @@ async def _listas_externas(context, cfg: Config, user_id: int) -> list[str]:
         return [t("scanuser.lists_unavailable")]
     lineas = []
     if cfg.cas_enabled:
+        db = context.bot_data["db"]
         try:
-            hit = await cas_det.check(user_id, session, context.bot_data["db"],
-                                      cfg.cas_cache_ttl_seconds)
-            lineas.append(t("scanuser.cas_hit") if hit else t("scanuser.cas_clean"))
+            if not cas_det.clave():
+                lineas.append(t("scanuser.cas_sin_clave"))
+            else:
+                hit = await cas_det.check(user_id, session, db, cfg.cas_cache_ttl_seconds)
+                if hit:
+                    lineas.append(t("scanuser.cas_hit"))
+                # Solo se guarda lo que CAS contestó: sin nada guardado, no dijo «limpio» (L65).
+                elif db.cas_lookup(user_id, cfg.cas_cache_ttl_seconds) is None:
+                    lineas.append(t("scanuser.cas_error"))
+                else:
+                    lineas.append(t("scanuser.cas_clean"))
         except Exception:  # noqa: BLE001
             lineas.append(t("scanuser.cas_error"))
     if cfg.lols_enabled:
