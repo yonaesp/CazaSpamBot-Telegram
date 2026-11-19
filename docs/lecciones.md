@@ -1708,7 +1708,7 @@ antecedentes en `cas_cache` durante 24 h.
 ni una línea de aviso. El último positivo de CAS es del 25-oct (2 bans al mes en septiembre y octubre), así que por los
 datos no se sabe desde cuándo pide clave: la caché solo tenía ceros. lols.bot siguió funcionando (3 bans esos días).
 
-**Lo que se hizo.** `CAS_API_KEY` (la clave de la API de Combot: combot.org, Settings, API key), enviada en la cabecera
+**Lo que se hizo.** `CAS_API_KEY` (la clave de la API de Combot: https://combot.org/u/settings), enviada en la cabecera
 `Authorization` y nunca en la URL, que acaba en los logs. `cas.consultar` distingue tres respuestas: contestó (`ok: true`
 o la negativa «not found»), rechazó la clave (401 o 403) y no se entiende (red, 429, JSON raro); solo la primera se
 guarda en la caché. Sin clave no se llama. `cas_vigia.comprobar_job` prueba a los 90 s de arrancar y cada día: sin clave
@@ -1719,5 +1719,7 @@ red ni avisa ni se da por bueno. `/scanuser` dice «apagado» o «no responde» 
 «no lo sé»: no se guarda y se cuenta. `ok: false` era a la vez el «limpio» y el «no te atiendo». Tests:
 `tests/test_cas_clave.py`.
 
-**No se sabe.** Qué contesta hoy CAS para alguien limpio con una clave válida (su documentación no lo dice): se asume el
-«Record not found» de siempre, y si fuera otra cosa caería en «no se entiende», con su línea en el log y sin guardar nada.
+**Comprobado con una clave válida (19-nov).** A quien no está en la lista, CAS sigue contestando 200 con `ok: false` y
+«Record not found.»; a quien está, `ok: true` con sus `offenses` (cinco cuentas que el bot ya tenía fichadas, las cinco
+con 1). Con una clave inventada, 401 «Invalid API key». Otra negativa cae en «no se entiende»: línea en el log y nada
+guardado.

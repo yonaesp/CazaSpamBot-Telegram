@@ -9,7 +9,7 @@
 [![python-telegram-bot](https://img.shields.io/badge/PTB-22.8-26A5E4?logo=telegram&logoColor=white)](https://python-telegram-bot.org/)
 [![Telethon](https://img.shields.io/badge/Telethon-1.44-blueviolet)](https://docs.telethon.dev/)
 [![Languages](https://img.shields.io/badge/languages-es%20%7C%20en%20%7C%20add%20yours-orange)](src/locales/README.md)
-[![Tests](https://img.shields.io/badge/tests-2217%20passing-success)](#tests)
+[![Tests](https://img.shields.io/badge/tests-2219%20passing-success)](#tests)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 
 🌍 **English** · [**Español**](README.es.md)
@@ -136,6 +136,7 @@ You need a Linux machine that stays on (a cheap VPS, a mini PC or a home server)
 2. In @BotFather, `/setprivacy` → your bot → **Disable**, so it sees every message and not just commands.
 3. Message [@userinfobot](https://t.me/userinfobot): it tells you your **user_id** (a number).
 4. *(Recommended)* For the secondary account: with **another** Telegram number, log in to [my.telegram.org](https://my.telegram.org) → **API development tools**, create an app, and note down the **api_id** and **api_hash**.
+5. *(Recommended)* For the CAS spammer list: sign in at [combot.org/u/settings](https://combot.org/u/settings) with your Telegram account and copy your **API key** (if there is none, press **Reset API key**). CAS requires it on every lookup.
 
 ### Step 1 · Install Docker and get the bot
 
@@ -150,7 +151,7 @@ cd CazaSpamBot-Telegram
 
 ### Step 2 · Configure it
 
-It asks a few questions: paste the token, your user_id and, if you want, the secondary account's details. For everything else, press Enter.
+It asks a few questions: paste the token, your user_id and, if you want, the secondary account's details and the CAS key. For everything else, press Enter.
 
 ```bash
 python3 scripts/setup.py
@@ -281,7 +282,7 @@ TELEGRAM_BOT_TOKEN=8123456789:AAF-ThisTokenIsFakeReplaceItWithYours00
 ADMIN_USER_ID=123456789
 ```
 
-For the secondary account, `TG_API_ID`, `TG_API_HASH` and `TG_PHONE` (with country code, `+34600111222`). `.env.example` explains every variable with a sample. Never commit your `.env` (it's already in `.gitignore`).
+For the secondary account, `TG_API_ID`, `TG_API_HASH` and `TG_PHONE` (with country code, `+34600111222`). For the CAS list, `CAS_API_KEY` (step 0). `.env.example` explains every variable with a sample. Never commit your `.env` (it's already in `.gitignore`).
 
 </details>
 
@@ -336,7 +337,7 @@ By default the group stays **clean and quiet**: no welcomes, no verification, an
 | Groups to moderate | `MODERATED_CHAT_IDS` (empty = every group where it's an admin allowed to ban) |
 | Where your alerts go | `ADMIN_NOTIFY_CHAT_ID` (empty = your private chat; or a moderation group's `chat_id`) |
 | CAS strictness | `CAS_AUTOBAN_MIN`: `2` bans when confirmed in 2+ groups and asks you about the rest (recommended); `1`, on any signal |
-| CAS key | `CAS_API_KEY`: CAS requires an API key on every request. Sign in to combot.org with Telegram, open Settings and copy it. Without it CAS lookups stay off, and the bot tells you once in private |
+| CAS key | `CAS_API_KEY`: CAS requires an API key on every request. Sign in at [combot.org/u/settings](https://combot.org/u/settings) with your Telegram account and copy it. Without it CAS lookups stay off, and the bot tells you once in private |
 | Word list languages | `BLACKLIST_LANGS` (defaults to the bot's language + English, spam's lingua franca) |
 | Languages the OCR reads | `OCR_LANGS` (defaults to the bot's languages) |
 | Blocked shorteners | `URL_BLOCKLIST` |
@@ -422,7 +423,7 @@ Telling us about a legitimate member it banned is as useful as code: [CONTRIBUTI
 ## 🧪 Tests
 
 ```bash
-.venv/bin/python -m pytest tests/ -q     # 2217 tests
+.venv/bin/python -m pytest tests/ -q     # 2219 tests
 ```
 
 Every detector has tests for what it must catch **and what it must not**, built from real cases. A false positive is worse than a false negative.

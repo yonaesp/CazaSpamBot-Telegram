@@ -9,7 +9,7 @@
 [![python-telegram-bot](https://img.shields.io/badge/PTB-22.8-26A5E4?logo=telegram&logoColor=white)](https://python-telegram-bot.org/)
 [![Telethon](https://img.shields.io/badge/Telethon-1.44-blueviolet)](https://docs.telethon.dev/)
 [![Idiomas](https://img.shields.io/badge/idiomas-es%20%7C%20en%20%7C%20a%C3%B1ade%20el%20tuyo-orange)](src/locales/README.md)
-[![Tests](https://img.shields.io/badge/tests-2217%20passing-success)](#tests)
+[![Tests](https://img.shields.io/badge/tests-2219%20passing-success)](#tests)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 
 🌍 [**English**](README.md) · **Español**
@@ -135,6 +135,7 @@ Necesitas un Linux siempre encendido (un VPS barato, un mini PC o un servidor en
 2. En @BotFather, `/setprivacy` → tu bot → **Disable**, para que vea todos los mensajes y no solo los comandos.
 3. Escribe a [@userinfobot](https://t.me/userinfobot): te dice tu **user_id** (un número).
 4. *(Recomendado)* Para la cuenta secundaria: con **otro** número de Telegram, entra en [my.telegram.org](https://my.telegram.org) → **API development tools**, crea una app y apunta el **api_id** y el **api_hash**.
+5. *(Recomendado)* Para la lista de spammers CAS: entra en [combot.org/u/settings](https://combot.org/u/settings) con tu cuenta de Telegram y copia tu **API key** (si no hay ninguna, pulsa **Reset API key**). CAS la pide en cada consulta.
 
 ### Paso 1 · Instala Docker y descarga el bot
 
@@ -149,7 +150,7 @@ cd CazaSpamBot-Telegram
 
 ### Paso 2 · Configúralo
 
-Te hace unas preguntas: pega el token, tu user_id y, si quieres, los datos de la cuenta secundaria. Lo demás, Enter.
+Te hace unas preguntas: pega el token, tu user_id y, si quieres, los datos de la cuenta secundaria y la clave de CAS. Lo demás, Enter.
 
 ```bash
 python3 scripts/setup.py
@@ -280,7 +281,7 @@ TELEGRAM_BOT_TOKEN=8123456789:AAF-EsteTokenEsFalsoReemplazaloPorElTuyo00
 ADMIN_USER_ID=123456789
 ```
 
-Para la cuenta secundaria, `TG_API_ID`, `TG_API_HASH` y `TG_PHONE` (con prefijo, `+34600111222`). El `.env.example` explica cada variable con un ejemplo. Nunca subas tu `.env` a git (ya está en `.gitignore`).
+Para la cuenta secundaria, `TG_API_ID`, `TG_API_HASH` y `TG_PHONE` (con prefijo, `+34600111222`). Para la lista CAS, `CAS_API_KEY` (paso 0). El `.env.example` explica cada variable con un ejemplo. Nunca subas tu `.env` a git (ya está en `.gitignore`).
 
 </details>
 
@@ -335,7 +336,7 @@ Por defecto el grupo queda **limpio y callado**: sin bienvenidas ni verificació
 | Grupos a moderar | `MODERATED_CHAT_IDS` (vacío = todos donde sea admin con permiso de banear) |
 | Dónde te llegan los avisos | `ADMIN_NOTIFY_CHAT_ID` (vacío = tu privado; o el `chat_id` de un grupo de moderación) |
 | Rigor con la lista CAS | `CAS_AUTOBAN_MIN`: `2` banea si está confirmado en 2+ grupos y te consulta el resto (recomendado); `1`, con cualquier señal |
-| Clave de CAS | `CAS_API_KEY`: CAS pide una clave en cada consulta. Entra en combot.org con tu Telegram, abre Settings y cópiala. Sin ella las consultas a CAS quedan apagadas, y el bot te lo dice una vez por privado |
+| Clave de CAS | `CAS_API_KEY`: CAS pide una clave en cada consulta. Entra en [combot.org/u/settings](https://combot.org/u/settings) con tu cuenta de Telegram y cópiala. Sin ella las consultas a CAS quedan apagadas, y el bot te lo dice una vez por privado |
 | Idiomas de las listas de palabras | `BLACKLIST_LANGS` (por defecto, el del bot + inglés, la lengua franca del spam) |
 | Idiomas que lee el OCR | `OCR_LANGS` (por defecto, los del bot) |
 | Acortadores bloqueados | `URL_BLOCKLIST` |
@@ -421,7 +422,7 @@ Contarnos que baneó a alguien legítimo vale tanto como el código: [CONTRIBUTI
 ## 🧪 Tests
 
 ```bash
-.venv/bin/python -m pytest tests/ -q     # 2217 tests
+.venv/bin/python -m pytest tests/ -q     # 2219 tests
 ```
 
 Cada detector tiene tests de lo que debe cazar **y de lo que no**, con casos reales. Un falso positivo es peor que un falso negativo.

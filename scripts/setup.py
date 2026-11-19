@@ -260,13 +260,29 @@ def main() -> int:
         text = set_var(text, "TELETHON_ENABLED", "true")
         telethon_nuevo = True
 
+    # La lista CAS pide una clave en cada consulta (L65): sin ella se queda apagada.
+    cas_actual = _read_var(text, "CAS_API_KEY")
+    cas_key = ask(
+        "Clave de la lista CAS (CAS_API_KEY, opcional)",
+        help_text=(
+            "CAS es una lista mundial de spammers y su API pide una clave. Entra en\n"
+            "https://combot.org/u/settings con tu cuenta de Telegram y copia la «API key»\n"
+            "(si no hay ninguna, pulsa «Reset API key»). Con Enter lo dejas para después:\n"
+            "el bot funciona igual y te lo recuerda una vez por privado."
+            + ("\nYa tienes una puesta: con Enter se conserva." if cas_actual else "")
+        ),
+        secret=True,
+    )
+    if cas_key:
+        text = set_var(text, "CAS_API_KEY", cas_key)
+
     text = set_var(text, "TELEGRAM_BOT_TOKEN", token)
     text = set_var(text, "ADMIN_USER_ID", admin)
     text = set_var(text, "MODERATED_CHAT_IDS", chats)
     text = set_var(text, "ADMIN_NOTIFY_CHAT_ID", notify)
     text = set_var(text, "MODE", mode)
     ENV.write_text(text)
-    # Lleva el token del bot y, si la hay, la clave de la cuenta secundaria.
+    # Lleva el token del bot y, si las hay, las claves de la cuenta secundaria y de CAS.
     ENV.chmod(0o600)
 
     print(f"\n{GREEN}{BOLD}✅ .env guardado en {ENV}{RESET}")

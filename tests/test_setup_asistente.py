@@ -83,3 +83,20 @@ def test_un_api_hash_mal_copiado_se_vuelve_a_pedir(entorno, monkeypatch):
                               "0123456789abcdef0123456789abcdef", "+34600111222"])
     assert asistente.main() == 0
     assert _vars(entorno)["TG_API_HASH"] == "0123456789abcdef0123456789abcdef"
+
+
+def test_la_clave_de_cas_se_pregunta_y_se_guarda(entorno, monkeypatch, capsys):
+    """CAS pide clave desde nov-2026 (L65): el asistente dice dónde se saca y no la enseña entera."""
+    clave = "clave-inventada-de-cas-0123456789"
+    _respuestas(monkeypatch, [TOKEN, "123456789", "", "", "shadow", "", clave])
+    assert asistente.main() == 0
+    assert _vars(entorno)["CAS_API_KEY"] == clave
+    salida = capsys.readouterr().out
+    assert "https://combot.org/u/settings" in salida and clave not in salida
+
+
+def test_sin_clave_de_cas_no_se_inventa_nada(entorno, monkeypatch):
+    _respuestas(monkeypatch, [TOKEN, "123456789", "", "", "shadow", "", ""])
+    assert asistente.main() == 0
+    assert not _vars(entorno).get("CAS_API_KEY")
+
