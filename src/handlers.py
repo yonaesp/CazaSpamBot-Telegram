@@ -49,6 +49,7 @@ from .detectors import calentamiento as calentamiento_det
 from .detectors import external_reply as extreply_det
 from .detectors import photos_batch as photos_batch_det
 from .detectors import bio_spam as bio_spam_det
+from .detectors import perfil_anuncio as perfil_anuncio_det
 from .detectors import personal_channel as personal_channel_det
 from .detectors import dormant_bot_mention as dormant_bot_det
 from .detectors import emoji_only as emoji_only_det
@@ -71,6 +72,9 @@ log = logging.getLogger(__name__)
 # El umbral de los detectores es 60; aquí exigimos bastante más para que solo caigan
 # los casos evidentes y los borderline (trabajo/dinero legítimo dudoso) pasen.
 _LOLS_CACHE_MAX = 5000
+# Cuánto vale lo que CAS dijo de alguien para SUMARLO a su perfil (`perfil_anuncio`):
+# la semana que se vigila a un recién llegado. El repaso lo refresca en cada vuelta.
+CAS_SUMA_S = 7 * 24 * 3600
 _LOLS_CACHE_TTL = 3600  # segundos; el mismo plazo que se comprueba al leerla
 
 _MONEY_SOFT_MIN_SCORE = 100
@@ -1277,6 +1281,24 @@ async def on_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                     update=None,
                 )
 
+        # El perfil como anuncio: el NOMBRE ofrece un servicio y la bio o el canal lo
+        # repiten. Caso real: «BEST IPTV RESELLING PANEL», con la bio «…IPTV service
+        # or reseller panel available» y sin un solo enlace (L66). Los posts los
+        # mira la tarea de abajo, y CAS, su rama.
+        if sig_pre is not None:
+            anuncio_hit = perfil_anuncio_det.check(
+                perfil_anuncio_det.nombre_de(user.first_name, user.last_name),
+                bio=sig_pre.bio, canal=sig_pre.personal_channel_title,
+            )
+            if anuncio_hit:
+                log.info("perfil_anuncio user=%s score=%d → ban directo: %s",
+                         user.id, anuncio_hit.score, anuncio_hit.reason[:200])
+                await _ban_join_direct(
+                    context, db, cfg, cmu, user, score=anuncio_hit.score,
+                    rule=anuncio_hit.rule, reason=anuncio_hit.reason, payload=anuncio_hit.payload,
+                )
+                return
+
         # NUEVO: fotos de perfil en ráfaga (≤2 min) → cuenta construida con
         # identidad robada. Caso real Javier (5 fotos en 18s). Ban directo.
         if client_pre is not None:
@@ -1334,7 +1356,8 @@ async def on_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                     payload={"trust": rejoin_trust, "would_be": "ban", "lols": lols_hit.payload},
                 )
                 await _revision_humana(context, db, cfg, cmu.chat, user,
-                                       [("lista_externa_veterano", {"lista": "lols.bot", "trust": rejoin_trust})])
+                                       [("lista_externa_veterano", {"lista": "lols.bot", "trust": rejoin_trust})],
+                                       sig=sig_pre)
             else:
                 decision = decide(
                     [lols_hit], cfg.ban_score, cfg.kick_score, cfg.mute_score,
@@ -1363,7 +1386,8 @@ async def on_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                     payload={"trust": rejoin_trust, "offenses": offenses, "would_be": "ban"},
                 )
                 await _revision_humana(context, db, cfg, cmu.chat, user,
-                                       [("lista_externa_veterano", {"lista": "CAS", "trust": rejoin_trust})])
+                                       [("lista_externa_veterano", {"lista": "CAS", "trust": rejoin_trust})],
+                                       sig=sig_pre)
             elif offenses >= cfg.cas_autoban_min:
                 decision = decide(
                     [hit], cfg.ban_score, cfg.kick_score, cfg.mute_score,
@@ -1376,7 +1400,25 @@ async def on_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 )
                 return
             else:
-                # CAS=1 → no ban, solo log + notificación al admin
+                # CAS con una infracción no banea sola, pero SUMA: si además el
+                # perfil anuncia un servicio (nombre, bio o canal), son dos cosas y
+                # es ban (decisión del admin, 19-nov-2026, L66). Los posts los suma
+                # la tarea aparte, que ya encuentra a CAS en la caché.
+                anuncio_hit = perfil_anuncio_det.check(
+                    perfil_anuncio_det.nombre_de(user.first_name, user.last_name),
+                    bio=getattr(sig_pre, "bio", None),
+                    canal=getattr(sig_pre, "personal_channel_title", None),
+                    cas=offenses,
+                ) if rejoin_trust < 70 else None
+                if anuncio_hit:
+                    log.info("CAS (%d) + perfil que anuncia user=%s → ban: %s",
+                             offenses, user.id, anuncio_hit.reason[:200])
+                    await _ban_join_direct(
+                        context, db, cfg, cmu, user, score=anuncio_hit.score,
+                        rule=anuncio_hit.rule, reason=anuncio_hit.reason, payload=anuncio_hit.payload,
+                    )
+                    return
+                # CAS=1 y nada más → no ban, solo log + notificación al admin
                 db.log_action(
                     chat_id=cmu.chat.id, user_id=user.id, username=user.username,
                     message_id=None, rule="cas_low_offense", action="noop",
@@ -1387,7 +1429,8 @@ async def on_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                     "CAS match user=%s offenses=%d < autoban_min=%d → revisión manual",
                     user.id, offenses, cfg.cas_autoban_min,
                 )
-                await _revision_humana(context, db, cfg, cmu.chat, user, [("cas_low_offense", {})])
+                await _revision_humana(context, db, cfg, cmu.chat, user,
+                                       [("cas_low_offense", {})], sig=sig_pre)
 
     # Verification AL FINAL: si lols/cas no bannearon, ahora publicamos welcome
     # (con botón o amistoso según trust + perfil legítimo).
@@ -2107,6 +2150,12 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
                         verification.render_reason_list(_razones)[:3]),
                     payload={"reasons": _razones, "via": "primer_mensaje"},
                 ))
+            if sig_perfil is not None:
+                hits.append(_sin_tumbar(lambda: perfil_anuncio_det.check(
+                    perfil_anuncio_det.nombre_de(user.first_name, user.last_name),
+                    bio=sig_perfil.bio, canal=sig_perfil.personal_channel_title,
+                    cas=_cas_conocido(db, cfg, user.id),
+                ), "perfil_anuncio"))
             if sig_perfil is not None and sig_perfil.personal_channel_title:
                 try:
                     hits.append(await _mirar_canal_personal(
@@ -3910,13 +3959,23 @@ def _aviso_admin_limpio(db: DB, cfg: Config, msg) -> bool:
     return True
 
 
-async def _revision_humana(context, db: DB, cfg: Config, chat, user, motivos) -> None:
+def _cas_conocido(db: DB, cfg: Config, user_id: int) -> int:
+    """Infracciones en CAS que ya constan en la caché (sin llamar a nadie); 0 si no se sabe."""
+    if not getattr(cfg, "cas_enabled", False):
+        return 0
+    try:
+        return int(db.cas_lookup(user_id, CAS_SUMA_S) or 0)
+    except Exception:  # noqa: BLE001 — sin el dato, CAS no suma
+        return 0
+
+
+async def _revision_humana(context, db: DB, cfg: Config, chat, user, motivos, sig=None) -> None:
     """Revisión humana de una lista externa (CAS con 1 infracción, o lols/CAS sobre un
     veterano): al privado con los botones de sospechosos. Antes solo quedaba una fila
     `noop` y nadie la veía: 49 así, y 6 acabaron baneados después (decisión del admin
     tras la auditoría del 7-nov-2026, L57). Nunca lanza."""
     try:
-        await verification._send_suspicious_review(context, db, cfg, chat, user, motivos, None)
+        await verification._send_suspicious_review(context, db, cfg, chat, user, motivos, sig)
     except Exception as exc:  # noqa: BLE001
         log.warning("revisión humana: no se pudo avisar de user=%s: %s", getattr(user, "id", "?"), exc)
 

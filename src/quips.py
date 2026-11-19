@@ -62,6 +62,7 @@ _RULES: tuple[str, ...] = (
     "bio_spam",
     "personal_channel_spam",
     "posts_spam",
+    "perfil_anuncio",
     "obvious_spam_profile",
     "forward_first_msg",
     "first_msg_media",

@@ -382,6 +382,30 @@ async def _revisar_perfil(context, db: DB, cfg: Config, fila, espera: int) -> bo
                                      sig.bio, "recien_llegados"):
             return True
 
+    # El perfil como anuncio, con lo que ya está leído: el nombre, la bio y el canal,
+    # y lo que CAS dijo de esa persona (L66). Los posts los suma `_revisar_posts`.
+    if sig is not None:
+        from .detectors import perfil_anuncio
+        from .handlers import _cas_conocido
+        hit = perfil_anuncio.check(
+            perfil_anuncio.nombre_de(usuario.first_name, getattr(usuario, "last_name", None)),
+            bio=sig.bio, canal=sig.personal_channel_title, cas=_cas_conocido(db, cfg, user_id),
+        )
+        if hit:
+            log.info("recien_llegados: user=%s su perfil es un anuncio (%ds tras entrar) → ban: %s",
+                     user_id, espera, hit.reason[:200])
+            from .scoring import Decision
+            await _apply_action(
+                context, db, cfg, chat_id=chat_id, chat_title=fila["chat_title"],
+                user_id=user_id, username=usuario.username, message_id=None,
+                decision=Decision(
+                    action="ban", score=hit.score, rule=hit.rule, reason=hit.reason,
+                    payload={**hit.payload, "via": "recien_llegados", "espera_s": espera},
+                ),
+                original_text=None, first_name=usuario.first_name,
+            )
+            return True
+
     # Los «Posts» del perfil, el escaparate que más cabe (pie + OCR de la foto).
     if await _revisar_posts(context, db, cfg, fila, usuario, sig, client, espera):
         return True
@@ -504,8 +528,21 @@ async def _revisar_posts(context, db: DB, cfg: Config, fila, usuario, sig, clien
     if not posts:
         return False
     # `modo_ocr` es un indicador global: dentro no puede haber ningún await.
+    textos = [p.texto for p in posts]
     with modo_ocr():
-        hit = posts_perfil.check([p.texto for p in posts])
+        hit = posts_perfil.check(textos)
+    if not hit:
+        # Los posts solos no llegan: se juzga el perfil entero con ellos dentro. Un
+        # post que anuncia un servicio suma con el nombre o con CAS (L66).
+        from .detectors import perfil_anuncio
+        from .handlers import _cas_conocido
+        hit = perfil_anuncio.check(
+            perfil_anuncio.nombre_de(getattr(usuario, "first_name", None),
+                                     getattr(usuario, "last_name", None)),
+            bio=getattr(sig, "bio", None), posts=textos,
+            canal=getattr(sig, "personal_channel_title", None),
+            cas=_cas_conocido(db, cfg, fila["user_id"]),
+        )
     if not hit:
         return False
     if db.is_banned(user_id):

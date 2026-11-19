@@ -87,7 +87,7 @@ es casi siempre más seguro que una palabra suelta.
 | `investment_testimony.txt` | `investment_scam` | fórmulas de testimonio en primera persona ("I'm in shock", "saw your post", "no me lo puedo creer"). **Nunca deciden solas**: hacen falta dos señales, así que sin un ancla no puntúan |
 | `story_source.txt` | `story_share` | Nombres de canal típicos de las historias de spam. Se contrasta contra el **título y el @username del canal de origen**, no contra el mensaje. **Se carga sin límites de palabra**: cada patrón pone sus propios `\b`, y van en PAREJAS («crypto signals»), nunca palabras sueltas. «insider» a secas casaba con «Windows Insider Program» |
 | `bio_spam_keywords.txt` | `bio_spam` | spam adulto/cripto/casino/préstamo en la bio del perfil |
-| `bio_illegal_services.txt` | `bio_spam` | servicios de hacking/piratería declarados en la bio |
+| `bio_illegal_services.txt` | `bio_spam`, `posts_perfil`, `perfil_anuncio` | servicios de hacking/piratería y reventa de IPTV declarados en el perfil (bio, posts, nombre) |
 | `bio_cta.txt` | `bio_spam` | llamadas a la acción promocionales en la bio (escríbeme, DM me...) |
 | `personal_channel_keywords.txt` | `personal_channel` | vocabulario ilícito en el **título del canal** enlazado en el perfil. **Se carga sin `\b(?:...)\b`** (el chino no separa palabras): pon tú los `\b` en los patrones latinos. No se gestiona desde el panel de Telegram |
 | `link_target_keywords.txt` | `link_target` | vocabulario del **chat al que lleva un enlace `t.me`**, leído de su título y su descripción públicas. Se le SUMAN los de `personal_channel_keywords.txt`. **Se carga sin `\b(?:...)\b`**: pon tú los `\b`. Ojo: aquí no se juzga el mensaje de nadie, sino el escaparate que ha escrito quien monta el canal |

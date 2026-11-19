@@ -876,7 +876,14 @@ async def _send_suspicious_review(context, db, cfg, chat, user, reasons, sig) ->
     con botones Permitir / Banear. El user ya está dentro (permitido por defecto)."""
     if not cfg.admin_notify_chat_id:
         return
-    label = f"@{user.username}" if user.username else (user.first_name or str(user.id))
+    # El nombre visible además del @: es lo primero que delata a un perfil que anuncia
+    # («BEST IPTV RESELLING PANEL» llegó con su @ a secas, L66).
+    nombre = " ".join(x for x in (getattr(user, "first_name", None),
+                                  getattr(user, "last_name", None)) if x)
+    if user.username:
+        label = f"{nombre} · @{user.username}" if nombre else f"@{user.username}"
+    else:
+        label = nombre or str(user.id)
     reasons_str = render_reasons(reasons)
     extra = ""
     if sig is not None:

@@ -71,6 +71,7 @@ Una lección nueva va al final, con el número siguiente y su línea en el índi
 - [L63](#l63) · La cuenta que entra vacía y se arma minutos antes de escribir
 - [L64](#l64) · Un sticker como primer mensaje: la regla de forma que expulsaba sola
 - [L65](#l65) · CAS empezó a pedir clave y el bot lo tomó por «limpio»
+- [L66](#l66) · El perfil que era un anuncio entero y solo mereció una pregunta
 
 ---
 
@@ -1724,3 +1725,34 @@ ni avisa ni se da por bueno. `/scanuser` dice «apagado» o «no responde» en v
 «Record not found.»; a quien está, `ok: true` con sus `offenses` (cinco cuentas que el bot ya tenía fichadas, las cinco
 con 1). Con una clave inventada, 401 «Invalid API key». Otra negativa cae en «no se entiende»: línea en el log y nada
 guardado.
+
+<a id="l66"></a>
+## L66 · El perfil que era un anuncio entero y solo mereció una pregunta
+
+**El caso (19-nov-2026, Domótica).** El admin pegó un aviso de revisión: «aparece en CAS con una sola infracción (no
+basta para banear): decide tú». La cuenta se llamaba «BEST IPTV RESELLING PANEL 🎁». Era Premium, con tres fotos, la bio
+«Need a reliable IPTV service or reseller panel available» y nueve posts con el catálogo. El aviso llegó con el @ y nada
+más: ni nombre, ni bio. Hubo que abrir el perfil para verlo. Su respuesta: «si ya tiene un cas y todos esos posts
+debería ser motivo de ban porque suma dos cosas».
+
+**La medida.** Releído el perfil con una copia de la sesión, todos los detectores de perfil daban 0. La bio no lleva
+enlace, así que `bio_spam` no suma nada. `posts_perfil` no encontró ningún servicio en los nueve posts: en `src/` y en
+las listas no existía la palabra «IPTV». El nombre no lo juzgaba nadie por lo que dice, solo por su alfabeto. Y CAS con
+una infracción, por regla, pregunta. De 19.612 personas vistas, es la única con «IPTV» en el nombre o el @. De 48 cuentas
+con una sola infracción en CAS, 6 acabaron baneadas, 23 expulsadas por no verificar y 19 no hicieron nada: ninguna
+escribió un mensaje sin acabar baneada.
+
+**Lo que se hizo.** Detector `perfil_anuncio`: las «cosas» son cada escaparate que anuncia un servicio (nombre, bio,
+posts, canal) y estar en CAS. Banea con CAS más un escaparate, o con el nombre más otro escaparate. Se mira en el join
+(con el perfil ya leído, y otra vez en la rama de CAS antes de preguntar), en la tarea de los posts, en el repaso y en
+el primer mensaje. CAS se lee de la caché (`_cas_conocido`, 7 días): no cuesta una llamada. La reventa de IPTV entra en
+`bio_illegal_services.txt` como venta («IPTV reseller», «reseller panel», «suscripción IPTV», «restream connections»).
+La revisión de CAS enseña el nombre visible y el perfil leído.
+
+**Lo que no banea, a propósito.** Bio y posts sin el nombre ni CAS: un técnico con «experto en seguridad» en la bio y un
+post sobre un spyware cumpliría. «IPTV» a secas, «lista IPTV» o «app de IPTV» no son un servicio: en un grupo de Alexa y
+Fire TV se habla de eso. «Hacker» a secas tampoco, como en `posts_perfil`.
+
+**La regla.** Una señal que no basta sola no se tira: se guarda para sumarla. Una lista externa con una infracción y un
+perfil que vende algo son dos fuentes que no se conocen. Y el aviso que pide decidir tiene que llevar lo que el bot ya
+leyó. Tests: `tests/test_perfil_anuncio.py` y tres escenas en `scripts/simular.py`.

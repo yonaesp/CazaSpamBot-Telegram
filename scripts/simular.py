@@ -364,6 +364,10 @@ async def escenas(s: Sim) -> None:
                    not any(ep == "banChatMember" for ep, _ in ll))
 
 
+_POST_IPTV = ("✨ BEST IPTV SUB, RESELLER PANEL ✨\n🔥 PREMIUM IPTV SERVICES AVAILABLE\n"
+              "✅ VIP IPTV Subscriptions\n✅ IPTV Reseller Panels\n✅ Restream Connections")
+
+
 async def escenas_posts(s: Sim, cid: int) -> None:
     """Los «Posts» del perfil (L52): entra y no escribe nada; lo que cuenta es lo que
     tiene fijado en el perfil. Telethon está apagado en la simulación, así que aquí
@@ -381,12 +385,24 @@ async def escenas_posts(s: Sim, cid: int) -> None:
         _nuevo(51, "Iván Ortega", "ivanort")["id"]: [
             "Mi setup nuevo 🖥️", "Cuando el hacker de la peli entra en el Pentágono con 3 líneas",
             "Nuestros servicios: reparación de ordenadores. Contáctanos", "Domingo de playa"],
+        # El perfil que es un anuncio (L66, 19-nov-2026): pie real, recortado.
+        _nuevo(52, "BEST IPTV RESELLING PANEL", "bestpanel")["id"]: [_POST_IPTV],
+        _nuevo(53, "Daniel Ruiz", "druiz")["id"]: [_POST_IPTV],
+        _nuevo(54, "Marta | Fire TV", "martaftv")["id"]: [
+            "Mi lista IPTV ya no carga 😭", "Domingo de montaña"],
     }
+    bios = {
+        _nuevo(52, "", None)["id"]: "🚀 Need a reliable IPTV service or reseller panel available",
+        _nuevo(54, "", None)["id"]: "Tengo IPTV en el Fire TV y Alexa en toda la casa",
+    }
+    # CAS ya los tenía con una infracción: al de los posts y a quien solo habla del tema.
+    for i in (53, 54):
+        s.db.cas_store(_nuevo(i, "")["id"], 1)
     fetch_real, leer_real, espera_real = user_signals.fetch, posts_reader.leer, rl._ESPERA_JOIN_S
     reporter_real = s.app.bot_data["reporter"]
 
     async def fetch(client, user_id, **kw):
-        return user_signals.UserSignals(user_id=user_id, photo_count=1,
+        return user_signals.UserSignals(user_id=user_id, photo_count=1, bio=bios.get(user_id),
                                         tiene_posts=user_id in posts_de, entidad=object())
 
     async def leer(client, entidad, user_id):
@@ -397,7 +413,10 @@ async def escenas_posts(s: Sim, cid: int) -> None:
                                                        is_ready=lambda: False)
     try:
         for i, nombre, username, esperada in ((50, "ZERO", "zerotrace505", "ban"),
-                                              (51, "Iván Ortega", "ivanort", None)):
+                                              (51, "Iván Ortega", "ivanort", None),
+                                              (52, "BEST IPTV RESELLING PANEL", "bestpanel", "ban"),
+                                              (53, "Daniel Ruiz", "druiz", "ban"),
+                                              (54, "Marta | Fire TV", "martaftv", None)):
             print(f"\n== Posts del perfil: {nombre} entra y no escribe ==")
             u = _nuevo(i, nombre, username)
             t0, antes = RELOJ[0], len(LLAMADAS)

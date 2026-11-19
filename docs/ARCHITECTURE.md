@@ -29,8 +29,8 @@ cuando solo queda el código. No hace falta leerlo entero, salta a lo que toques
 
 Bot de moderación antispam para Telegram, multi-grupo y federado, en producción 24/7.
 
-- **27.769 líneas** en `src/` (96 módulos), **23.507** en `tests/` (154 ficheros, 2219 tests).
-- **28 detectores**, tres capas de listas negras, clasificador propio, panel de ajustes
+- **28.176 líneas** en `src/` (97 módulos), **24.089** en `tests/` (155 ficheros, 2272 tests).
+- **29 detectores**, tres capas de listas negras, clasificador propio, panel de ajustes
   por chat, i18n con autodescubrimiento de idiomas.
 - Un solo proceso Python, una sola base SQLite, un contenedor Docker.
 
@@ -600,7 +600,7 @@ Prefijos registrados: `cfg:`, `pick:`, `verify:`, `prev:`, `flood:`, `abuse:`, `
 
 ## 10. Detección y listas
 
-### Los 28 detectores
+### Los 29 detectores
 
 Cada `check()` devuelve un `Hit(rule, score, reason, payload)`. Agrupados por lo que miran:
 
@@ -608,6 +608,8 @@ Cada `check()` devuelve un `Hit(rule, score, reason, payload)`. Agrupados por lo
 `bio_spam` (60-200), `personal_channel_spam` (100-200), `photos_batch_upload` (100),
 `posts_spam` (100-200; los «Posts» del perfil con OCR, en una tarea aparte en el join, el primer
 mensaje y el repaso de recién llegados),
+`perfil_anuncio` (100-200; dos cosas a la vez: CAS y un escaparate del perfil que anuncia un servicio, o
+el nombre y otro escaparate),
 `premium_new_link` (80), `dormant_bot_mention` (120).
 
 **Contenido**: `commercial_ad` (60+), `inline_buttons` (90), `external_mention_or_link` (40-130),
@@ -907,7 +909,7 @@ capturaba como error genérico y **el ban se perdía en silencio, sin reintento*
 
 ## 13. Tests
 
-**2219 tests en unos 40 segundos**, sin red ni base real. Cada detector tiene sus casos positivos y
+**2272 tests en unos 40 segundos**, sin red ni base real. Cada detector tiene sus casos positivos y
 negativos, con foco en los negativos: un falso positivo es peor que un falso negativo.
 
 Aparte de los tests de lógica, hay **tests meta que protegen invariantes del proyecto**. Cada uno

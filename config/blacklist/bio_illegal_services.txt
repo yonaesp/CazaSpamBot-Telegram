@@ -30,3 +30,12 @@ recupera(?:r|ci[oó]n\s+de)\s+(?:tu\s+|su\s+)?(?:cuenta\s+de\s+)?(?:facebook|ins
 (?:facebook|instagram|whatsapp|tiktok|snapchat|twitter|messenger|gmail|telegram)\s+hackead[oa]s?
 (?:tu|su)\s+pareja\s+(?:te|le)\s+(?:engaña|es\s+infiel|miente)
 est[aá]\s+(?:tu|su)\s+pareja[\s\S]{0,12}minti[eé]ndo(?:te|le)
+
+# --- Reventa de IPTV pirata (19-nov-2026, «BEST IPTV RESELLING PANEL») ---
+# Solo la VENTA. Nunca «IPTV» a secas ni «lista IPTV», «app de IPTV» o «IPTV en el
+# Fire TV»: en un grupo de Alexa o de Windows es un tema de conversación normal.
+iptv[\s_-]*(?:re)?sell(?:ers?|ing)
+resell(?:ers?|ing)[\s_-]*(?:iptv|panels?)
+iptv[\s_-]*(?:panels?|subs?|subscriptions?|restream(?:ing)?|services?\s+available)
+(?:panel(?:es)?|suscripci[oó]n(?:es)?|subscriptions?|revendedor(?:es)?|reventa|distribuidor(?:es)?)\s+(?:de\s+)?iptv
+restream(?:ing)?\s+(?:connections?|panels?)
