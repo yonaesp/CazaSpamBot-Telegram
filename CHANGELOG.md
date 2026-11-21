@@ -14,7 +14,7 @@ la fecha.
 - El bot reconoce la reventa de IPTV como servicio ilegal. Hablar de IPTV no cuenta: solo venderlo.
 - El aviso de revisión de CAS trae ahora el nombre visible, la bio y las fotos. Ya no hace falta abrir el perfil.
 
-## 2026-11 · CAS pide clave (opcional), y el aviso de versión se apaga con un botón
+## v1.4.4 · 2026-11-21 · CAS pide clave (opcional), y el aviso de versión se apaga con un botón
 
 - La lista CAS pide ahora una clave en cada consulta. La clave es opcional: sin ella, el bot funciona igual y no
   consulta CAS. Antes daba a todo el mundo por limpio sin avisar. Ahora te lo dice una vez por privado, en silencio.
