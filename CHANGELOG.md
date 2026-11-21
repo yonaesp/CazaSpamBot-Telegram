@@ -5,7 +5,7 @@ cada commit: para el detalle está el historial de git. Desde la v1.0.0 cada ver
 publicada lleva su número (`stable` apunta a la última); los hitos de antes, solo
 la fecha.
 
-## 2026-11 · CAS pide clave (opcional), y el aviso de versión se apaga con un botón
+## v1.4.4 · 2026-11-21 · CAS pide clave (opcional), y el aviso de versión se apaga con un botón
 
 - La lista CAS pide ahora una clave en cada consulta. La clave es opcional: sin ella, el bot funciona igual y no
   consulta CAS. Antes daba a todo el mundo por limpio sin avisar. Ahora te lo dice una vez por privado, en silencio.
