@@ -5,6 +5,12 @@ cada commit: para el detalle está el historial de git. Desde la v1.0.0 cada ver
 publicada lleva su número (`stable` apunta a la última); los hitos de antes, solo
 la fecha.
 
+## 2026-11 · Un adjunto de alguien sin @ ni foto ya no se banea solo
+
+- Una foto, un vídeo o un sticker como primer mensaje banea solo si el perfil es sospechoso de verdad: el nombre en
+  otro alfabeto o una cuenta reciente. No tener @usuario ni foto de perfil ya no cuenta, porque mucha gente normal no
+  los tiene. Si la imagen no lleva enlaces ni texto de spam, llega un aviso con botones y decides tú.
+
 ## v1.5.0 · 2026-11-22 · El perfil que es un anuncio: CAS con una infracción ya suma
 
 - Una cuenta que está en la lista CAS con una infracción y tiene posts fijados en el perfil cae al entrar. Antes, una

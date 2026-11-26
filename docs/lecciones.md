@@ -72,6 +72,7 @@ Una lección nueva va al final, con el número siguiente y su línea en el índi
 - [L64](#l64) · Un sticker como primer mensaje: la regla de forma que expulsaba sola
 - [L65](#l65) · CAS empezó a pedir clave y el bot lo tomó por «limpio»
 - [L66](#l66) · El perfil que era un anuncio entero y solo mereció una pregunta
+- [L67](#l67) · Un meme de bienvenida: sin @ ni foto no es «cuenta sospechosa»
 
 ---
 
@@ -1764,3 +1765,34 @@ Fire TV se habla de eso. «Hacker» a secas tampoco, como en `posts_perfil`.
 **La regla.** Una señal que no basta sola no se tira: se guarda para sumarla. Una lista externa con una infracción y un
 perfil que vende algo son dos fuentes que no se conocen. Y el aviso que pide decidir tiene que llevar lo que el bot ya
 leyó. Tests: `tests/test_perfil_anuncio.py` y cinco escenas en `scripts/simular.py`.
+
+<a id="l67"></a>
+## L67 · Un meme de bienvenida: sin @ ni foto no es «cuenta sospechosa»
+
+**El caso (24-nov-2026, Windows 11).** Una cuenta llamada «A», sin @usuario y sin foto de perfil, entró el 20-nov,
+se cambió el nombre dos veces y su primer mensaje, cuatro días después, fue un meme sin texto: un clip y un USB («tienes
+que intentarlo 3 veces antes de enchufarlo bien»). `first_msg_media` dio 70 + 20 (sin pie) + 50 (cuenta sospechosa:
+«sin username, sin foto») = 140: ban en los cuatro grupos y el meme borrado. El admin: «no parece nada ilegítimo,
+quizás quería caer bien». Los logs de ese día se perdieron al recrearse el contenedor el 26-nov; el porqué estaba
+entero en el payload de `moderation_log`.
+
+**La causa.** L64 perdonó el adjunto solo de un perfil normal, pero «sospechoso» seguía siendo `_is_suspicious_profile`,
+que cuenta cualquier indicio: basta no tener @ o no tener foto. Es la lista pensada para el nivel `bajo` de avisos, y el
+propio `CLAUDE.md` dice que `no_username` no es señal fuerte (29 % de Windows 11 no tiene @, L8). Una cuenta sin fotos,
+además, no deja medir su antigüedad.
+
+**Medido** (todo `moderation_log`, 19 filas con `first_msg_media`): la regla sola con el perfil sospechoso baneó 6
+veces. Con un motivo de verdad (nombre en otro alfabeto), 1, en pie. Solo por no tener @ o foto, 5: dos eran gente
+normal (este caso y uno desbaneado en agosto) y de los otros tres no consta nada, ni queja ni prueba de spam.
+
+**El arreglo.** `verification.sospecha_para_adjunto`: la misma comprobación sin `no_username` ni `no_photo`. La usa
+solo `first_msg_media` en `on_message`; el aviso de sospechosos al entrar y `/scanuser` siguen con la de siempre.
+Sin la sospecha, el adjunto da 90 y pasa por el perdón de L64: si no lleva enlace, mención, botones, reenvío ni
+`via_bot`, y el OCR de la imagen no dispara nada, `noop_solo_forma` y aviso con botones al privado.
+
+**Lo que se pierde.** Una imagen sin texto legible (una foto, un sticker, un vídeo) de una cuenta sin @ ni foto, con
+el nombre en el alfabeto del grupo, ya no se banea sola: llega el aviso con «Banear». El cartel de spam con letras lo
+sigue parando el OCR, y la prisa (`jfm_*`) o cualquier otra regla siguen sumando como antes.
+
+**La regla.** Antes de usar una lista de señales para castigar, mirar para qué se escribió: la de «cualquier indicio»
+vale para preguntar, no para banear. Tests: `tests/test_adjunto_discreto_l67.py`.

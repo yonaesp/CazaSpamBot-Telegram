@@ -496,6 +496,31 @@ def _is_suspicious_profile(
     return (bool(reasons), reasons)
 
 
+# Lo que tiene la gente discreta: no tener @usuario ni foto de perfil. El 29 % de
+# Windows 11 no tiene @ (L8), y una cuenta sin fotos no deja medir su antigüedad.
+_DISCRETO = {REASON_NO_USERNAME, REASON_NO_PHOTO}
+
+
+def sospecha_para_adjunto(
+    sig: Optional[user_signals.UserSignals],
+    username: Optional[str],
+    first_name: Optional[str],
+    last_name: Optional[str] = None,
+) -> tuple[bool, list]:
+    """¿Es sospechoso el perfil de quien manda un adjunto como primer mensaje?
+
+    Lo mismo que `_is_suspicious_profile`, pero sin lo que tiene la gente discreta.
+    Con la sospecha, `first_msg_media` suma 50 y banea sola (120-140); sin ella,
+    el adjunto limpio se perdona y llega un aviso (L64). Medido el 26-nov-2026: de
+    los 5 bans de la regla sola por no tener @ ni foto, 2 eran gente normal (un meme
+    de un USB en Windows 11 y una cuenta desbaneada en agosto). El nombre en otro
+    alfabeto o la cuenta reciente siguen contando (L67).
+    """
+    _, motivos = _is_suspicious_profile(sig, username, first_name, last_name)
+    motivos = [m for m in motivos if m[0] not in _DISCRETO]
+    return bool(motivos), motivos
+
+
 # Razones "fuertes": por sí solas justifican avisar al admin en el modo revisión.
 _STRONG_SUSP_REASONS = {
     REASON_NON_LATIN_NAME, REASON_NON_LATIN_USERNAME, REASON_NO_PHOTO, REASON_RECENT_ACCOUNT,

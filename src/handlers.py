@@ -568,7 +568,8 @@ def _solo_adjunto_de_perfil_normal(msg, msg_txt, real: list[Hit]) -> bool:
     13-nov-2026 sobre todo `moderation_log`: como regla única y con el perfil normal
     expulsó 3 veces y **las 3 eran gente legítima** (una foto, un vídeo y un sticker;
     el último, una cuenta de 2013 con foto y @ que llevaba 44 días en el grupo). Con
-    el perfil sospechoso, 4 de sus 5 bans siguen en pie.
+    el perfil sospechoso, 4 de sus 5 bans siguen en pie. «Sospechoso» aquí es
+    `verification.sospecha_para_adjunto`: no tener @ ni foto no cuenta (L67).
 
     Sigue cayendo como siempre: el adjunto con enlace, mención, botones, reenvío o
     mandado vía bot, y toda combinación con otra regla (la prisa incluida: el caso
@@ -2215,14 +2216,15 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
             or msg.voice or msg.audio or msg.document or msg.video_note
         )
         if has_media and bot_saw_join:
-            # Calcular sospecha: reusamos verification._is_suspicious_profile
+            # La sospecha del perfil, sin lo que tiene la gente discreta (sin @, sin
+            # foto): con solo eso, 2 de 5 bans fueron gente normal (L67).
             sig_local, _ = await _senales()
             # Si Telethon no pudo dar señales, NO marcar suspicious por defecto
             # (provocaba falsos positivos cuando el reporter estaba desconectado)
             if sig_local is None:
                 suspicious, susp_reasons = False, []
             else:
-                suspicious, susp_reasons = verification._is_suspicious_profile(
+                suspicious, susp_reasons = verification.sospecha_para_adjunto(
                     sig_local, user.username, user.first_name, user.last_name,
                 )
             hits.append(_sin_tumbar(lambda: media_det.check(
