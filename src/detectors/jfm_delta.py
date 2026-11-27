@@ -15,7 +15,13 @@ from . import Hit
 def check(
     is_first_msg: bool,
     delta_seconds: float | None,
+    cron: bool = True,
 ) -> Hit:
+    """`delta_seconds` es lo que tardó ESTE mensaje desde la entrada (L69).
+
+    `cron=False` en el 2.º y 3.er mensaje: el patrón de «justo 24 h» es del primero,
+    y mirarlo en cada uno multiplicaría las coincidencias por azar.
+    """
     if not is_first_msg or delta_seconds is None:
         return Hit.none()
     if delta_seconds < 5:
@@ -32,6 +38,8 @@ def check(
             reason=t("reason.jfm_fast", seconds=int(delta_seconds)),
             payload={"delta_s": int(delta_seconds)},
         )
+    if not cron:
+        return Hit.none()
     # Detector de cron pattern: cerca de múltiplos exactos de 24h
     hours = delta_seconds / 3600
     near_day_multiple = abs(hours - round(hours / 24) * 24) < 0.05  # ±3 min

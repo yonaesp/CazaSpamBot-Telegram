@@ -74,6 +74,7 @@ Una lección nueva va al final, con el número siguiente y su línea en el índi
 - [L66](#l66) · El perfil que era un anuncio entero y solo mereció una pregunta
 - [L67](#l67) · Un meme de bienvenida: sin @ ni foto no es «cuenta sospechosa»
 - [L68](#l68) · El casino de MrBeast: una foto torcida de una pantalla y un timo sin ancla
+- [L69](#l69) · La prisa de hace 46 días: `jfm_*` medía siempre el primer mensaje
 
 ---
 
@@ -1834,3 +1835,26 @@ que hable del timo con la palabra «bonus» saltaría: a un veterano lo protege 
 **La regla.** Ante «el OCR no lo leyó», separar las dos preguntas: si leyéndolo bien lo habría cazado algún detector, y
 qué hace falta para leerlo. Aquí fallaban las dos. Y medir cada paso de preparación por separado antes de añadir nada.
 Tests: `tests/test_foto_de_pantalla_l68.py`.
+
+<a id="l69"></a>
+## L69 · La prisa de hace 46 días: `jfm_*` medía siempre el primer mensaje
+
+**El caso (27-nov-2026, Windows 11).** La cuenta del casino de MrBeast (L68) entró el 12-oct, escribió a los 21 s y otra
+vez enseguida, y 46 días después mandó la foto: su tercer mensaje. El ban (120) fue `jfm_fast` («primer mensaje a los
+21 s») + `first_msg_media`. Era spam, pero la prisa no era de ese mensaje.
+
+**La causa.** `on_message` calculaba `first_msg_ts - join_ts` y lo pasaba a `jfm_delta` en cada uno de los
+`FIRST_MSG_WINDOW` (3) primeros mensajes. El 2.º y el 3.º heredaban la prisa del 1.º, llegaran cuando llegaran. Y la
+prisa combinada con un adjunto no tiene perdón (L64): una persona que saluda a los 20 s y semanas después manda una foto
+habría caído.
+
+**Medido** (todo `moderation_log`): 4 acciones con la prisa heredada. 3 `noop` sin efecto y este ban, que era spam.
+Ningún ban injusto todavía.
+
+**El arreglo.** `_retraso_desde_la_entrada(seen_row, msg)`: la hora de ESTE mensaje (`msg.date`) menos `join_ts`, las
+dos de Telegram (`join_ts` ya era la hora del evento por el caso Yorscluni). Un bot que suelta tres mensajes en 10 s
+sigue teniendo prisa en los tres. `jfm_cron` («justo 24 h») solo se mira en el primero (`cron=msg_count <= 1`): en cada
+mensaje multiplicaría por tres las coincidencias por azar.
+
+**La regla.** Una señal de tiempo se mide sobre el mensaje que se juzga. Tests:
+`tests/test_prisa_de_este_mensaje_l69.py`.

@@ -370,6 +370,16 @@ def _ocr_activo(db: DB, chat_id: int) -> bool:
         return True
 
 
+def _retraso_desde_la_entrada(seen_row, msg) -> float | None:
+    """Segundos entre la entrada y ESTE mensaje, con la hora de Telegram en los dos lados.
+
+    `join_ts` es la hora del evento (caso Yorscluni): la de este mensaje, igual.
+    """
+    if not seen_row or not seen_row["join_ts"] or not getattr(msg, "date", None):
+        return None
+    return max(0.0, msg.date.timestamp() - float(seen_row["join_ts"]))
+
+
 # Lo que dio cada imagen, unos minutos: la misma foto la leen la regla y el perdón, y
 # con la segunda lectura enderezada (L68) cada pasada puede costar un par de segundos.
 _IMAGENES_LEIDAS: dict[tuple, tuple[float, list]] = {}
@@ -1984,12 +1994,15 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
                 user_signals_age_days=sig.account_age_days,
                 user_signals_photo_count=sig.photo_count,
             ), "premium_new_link"))
-    # 3d) Join-to-First-Message delta
+    # 3d) Prisa: lo que tardó ESTE mensaje desde la entrada (L69). Antes se medía
+    # siempre el primero, y el 3.er mensaje llegaba con la prisa de aquel: una foto
+    # 46 días después de entrar contaba como «escribió a los 21 s».
     if is_first:
         seen_row = db.get_seen(chat_id, user.id)
-        if seen_row and seen_row["join_ts"] and seen_row["first_msg_ts"]:
-            delta = float(seen_row["first_msg_ts"]) - float(seen_row["join_ts"])
-            hits.append(_sin_tumbar(lambda: jfm_det.check(is_first_msg=True, delta_seconds=delta), "jfm"))
+        delta = _retraso_desde_la_entrada(seen_row, msg)
+        if delta is not None:
+            hits.append(_sin_tumbar(lambda: jfm_det.check(
+                is_first_msg=True, delta_seconds=delta, cron=msg_count <= 1), "jfm"))
     # 3d-pre) Mensaje con botones inline → users normales no pueden enviarlos.
     # Casi siempre es forward desde canal/bot promocional.
     hits.append(_sin_tumbar(lambda: buttons_det.check(msg), "buttons"))

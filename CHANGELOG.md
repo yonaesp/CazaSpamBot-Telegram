@@ -5,6 +5,11 @@ cada commit: para el detalle está el historial de git. Desde la v1.0.0 cada ver
 publicada lleva su número (`stable` apunta a la última); los hitos de antes, solo
 la fecha.
 
+## 2026-11 · La prisa se mide en cada mensaje
+
+- «Escribió muy rápido tras entrar» ya solo cuenta en el mensaje que de verdad llegó rápido. Antes, el segundo y el
+  tercer mensaje heredaban la prisa del primero aunque llegaran semanas después.
+
 ## 2026-11 · La foto de una pantalla se lee enderezada, y el timo del casino con código
 
 - El bot lee mejor la foto que alguien hace con el móvil a una pantalla. Si la primera lectura no dice nada, la vuelve a
