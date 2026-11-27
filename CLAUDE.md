@@ -1,6 +1,6 @@
 # CazaSpamBot — Bot Antispam Telegram
 
-Bot de moderación antispam **en producción 24/7**, multi-grupo, federado y **bilingüe** (es/en). ~25.500 LOC en `src/`, Podman, **2286 tests**, 29 detectores (un módulo cada uno en `src/detectors/`).
+Bot de moderación antispam **en producción 24/7**, multi-grupo, federado y **bilingüe** (es/en). ~25.500 LOC en `src/`, Podman, **2303 tests**, 29 detectores (un módulo cada uno en `src/detectors/`).
 
 > **Estado: PRODUCCIÓN.** No es un esqueleto. Cualquier cambio afecta grupos reales con miles de usuarios. **Investiga > Confirma > Actúa.**
 
@@ -91,6 +91,7 @@ Todo el texto que ve el usuario vive en `src/locales/<código>.json` (`es.json` 
 **OCR** (`ocr.py`, Tesseract: 0,61 s por imagen y sin GPU) (L17):
 - **No decide nada**: aporta texto que juzgan los mismos detectores (test: `ocr.py` no menciona `Hit`, `score` ni `rule`).
 - Solo primeros mensajes con imagen y sin texto propio (única excepción: `_perdon_por_contenido_limpio` lee también la imagen de un mensaje con texto antes de perdonar); corre en un hilo (`run_in_executor`) con tope duro; sin tesseract el bot funciona igual.
+- **La foto de una pantalla** (L68): si la primera lectura no dispara nada, `ocr.leer(..., preparar=True)` la relee en grises, invertida si es oscura, agrandada y enderezada (perfil de proyección, ±12°; con Pillow, y sin él no se hace). Solo si hay inversión o giro: agrandar sin más no ganaba nada. El caso, torcido 5° y en modo oscuro: de 9 frases clave, 3 → 9; `tessdata_best` no aportaba. La regla y el perdón leen la misma foto: `_IMAGENES_LEIDAS` la recuerda 5 min.
 - Por chat en `/config` (`chat_settings.ocr_enabled`, defecto 1; ilegible = encendido). Idiomas: `wordlists.active_langs()` filtrados por los instalados (pedir uno que falta tumba la llamada entera); `OCR_LANGS` los fija.
 - El aviso de imagen dudosa (`ocr_review`) solo avisa, con freno de 30 min por persona, y sale **después de decidir y solo si no se actúa** (`diferido` + `_soltar_aviso_imagen`; caso Joka).
 - Mismo vocabulario que el texto; `config/blacklist/ocr/` se suma y está vacía. `wordlists.modo_ocr()` entra en la clave de la caché de patrones. Patrones con `[\s\S]{0,N}` porque el OCR parte palabras; «activar», «instalación» o «licencia» nunca van sueltas en grupos de Windows.
@@ -122,7 +123,7 @@ Todo el texto que ve el usuario vive en `src/locales/<código>.json` (`es.json` 
 Tres capas que se acumulan: `*.txt` genéricas versionadas, `<lang>/*.txt` (idioma activo + `BLACKLIST_LANGS`) y `custom/*.txt` (las del admin desde Telegram, gitignored, donde todo se escapa: no se puede colar un regex activo, `custom_terms.py`). Añadir un término desde el panel pasa siempre por la vista previa (`custom_terms.preview_term()`: «oferta» cazaba 3 de cada 4 mensajes de un grupo de informática) (L30).
 - `compile_alternation` envuelve con `(?<!\w)…(?!\w)`, **nunca `\b`**: con `\b`, ni `$500` ni `500€` casaban y la señal de dinero estuvo muerta en silencio (L31).
 - Monedas que son palabras comunes (`peso`, `real`, `sol`, `libra`, `corona`) solo pegadas a una cifra (hay tests). `500€`, `$500` y `$2000`; español de América («por día», voseo) (L32).
-- `investment_scam` es el molde de un detector de contenido: la señal fuerte es la **discordancia**, no el tema (anclas `_GIVE_BACK_RE` con retorno ≥1.5×, `_SKEPTIC_FLIP_RE` con conector de reversión obligatorio y `_GIVEAWAY_RE` con el canje a ≤160 caracteres, 45 cada una, estructurales y no externalizadas); **ninguna señal decide sola** (`señales_estafa < 2 → none()`), los refuerzos no deciden, y el trozo del ancla no cuenta además como vocabulario (L33).
+- `investment_scam` es el molde de un detector de contenido: la señal fuerte es la **discordancia**, no el tema (anclas `_GIVE_BACK_RE` con retorno ≥1.5×, `_SKEPTIC_FLIP_RE` con conector de reversión obligatorio y `_GIVEAWAY_RE` con el canje a ≤160 caracteres, 45 cada una, estructurales y no externalizadas; y `_bono_con_codigo`, 60 y vale por dos señales: código de canje + dinero + «bono/bonus» + casino, cripto o «withdraw» a ≤300 caracteres; sin «reward», «premio» ni «retirar», que en Windows son Microsoft Rewards y el pendrive, hay test) (L68); **ninguna señal decide sola** (`señales_estafa < 2 → none()`), los refuerzos no deciden, y el trozo del ancla no cuenta además como vocabulario (L33).
 
 ### Convenciones al escribir/editar patrones de detección
 
@@ -274,4 +275,4 @@ GitHub guarda solo 14 días: `scripts/traffic_log.py` los acumula en `traffic/hi
 
 Lo nuevo va en su apartado temático de este fichero como invariante de 1-3 líneas (qué no hacer, el número medido, el test que lo fija), nunca al final por fecha. El relato (el caso, la medida, lo que se probó) va a `docs/lecciones.md` como lección nueva, con su línea en el índice, y aquí se cita con `(Ln)`. Un procedimiento de varios pasos que se usa a veces, a una skill en `.claude/skills/`. Las preferencias del admin y el estado del trabajo, a la memoria.
 
-*Actualizado: 2026-11-19 — 29 detectores, 2286 tests, 1.296 claves por idioma.*
+*Actualizado: 2026-11-19 — 29 detectores, 2303 tests, 1.296 claves por idioma.*

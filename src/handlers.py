@@ -370,47 +370,22 @@ def _ocr_activo(db: DB, chat_id: int) -> bool:
         return True
 
 
-async def _hits_de_la_imagen(context, db: DB, cfg: Config, msg, user,
-                             avisar: bool = True,
-                             diferido: list | None = None) -> list[Hit]:
-    """Pasa el texto que el OCR saca de la imagen por los detectores de contenido.
+# Lo que dio cada imagen, unos minutos: la misma foto la leen la regla y el perdón, y
+# con la segunda lectura enderezada (L68) cada pasada puede costar un par de segundos.
+_IMAGENES_LEIDAS: dict[tuple, tuple[float, list]] = {}
 
-    Devuelve los hits tal cual, sin inventar ninguna regla propia: si el cartel
-    dice lo que dice un anuncio, lo caza `commercial_ad` con sus umbrales de
-    siempre. Así el OCR no puede banear por su cuenta ni desviarse del resto.
 
-    Con `diferido`, el aviso de imagen dudosa NO se manda: se deja ahí para que
-    quien llama lo suelte cuando sepa la decisión final. Ver `_soltar_aviso_imagen`.
-    """
-    from . import ocr
-    if not ocr.disponible() or not _ocr_activo(db, msg.chat_id):
-        return []
-    foto = msg.photo[-1] if msg.photo else msg.document
-    if foto is None:
-        return []
-    # Un `document` puede ser CUALQUIER cosa: un ZIP, un PDF, un instalador. Se
-    # mira el tipo declarado antes de bajar nada; Tesseract no va a leer un ZIP.
-    if not msg.photo and not (getattr(foto, "mime_type", None) or "").startswith("image/"):
-        return []
-    # Y el tamaño ANTES de descargar, no después. `ocr.leer` descarta lo que pasa
-    # de MAX_BYTES, pero para entonces ya se han bajado: la Bot API deja hasta
-    # 20 MB por fichero y PTB procesa los updates de UNO EN UNO, así que bajar un
-    # adjunto que se va a tirar son segundos sin moderar el grupo.
-    tam = getattr(foto, "file_size", None)
-    if tam is not None and tam > ocr.MAX_BYTES:
-        log.debug("OCR: imagen de %d bytes, por encima del tope; no se descarga", tam)
-        return []
-    try:
-        fichero = await asyncio.wait_for(context.bot.get_file(foto.file_id), 10.0)
-        datos = bytes(await asyncio.wait_for(fichero.download_as_bytearray(), 15.0))
-    except Exception as exc:  # noqa: BLE001 — incluye el TimeoutError del tope
-        log.debug("OCR: no se pudo descargar la imagen: %s", exc)
-        return []
-    texto = await ocr.leer(datos)
-    if not texto:
-        return []
-    log.info("OCR: user=%s imagen con texto (%d caracteres)", user.id, len(texto))
+def _recordar_lectura(clave: tuple, hits: list) -> None:
+    ahora = time.time()
+    if len(_IMAGENES_LEIDAS) > 200:
+        for k, (ts, _h) in list(_IMAGENES_LEIDAS.items()):
+            if ahora - ts > 300:
+                del _IMAGENES_LEIDAS[k]
+    _IMAGENES_LEIDAS[clave] = (ahora, list(hits))
 
+
+def _juzgar_texto_de_imagen(db: DB, cfg: Config, msg, texto: str) -> list[Hit]:
+    """Los detectores de contenido sobre el texto que el OCR sacó de una imagen."""
     # El texto va en un objeto con la misma forma que un mensaje, para que los
     # detectores no tengan que saber de dónde salió.
     leido = SimpleNamespace(text=texto, caption=None, entities=(), caption_entities=(),
@@ -433,6 +408,67 @@ async def _hits_de_la_imagen(context, db: DB, cfg: Config, msg, user,
             _sin_tumbar(lambda: offplat_det.check(leido, is_first_msg=True),
                         "offplatform_contact/ocr"),
         ]
+    return hits
+
+
+async def _hits_de_la_imagen(context, db: DB, cfg: Config, msg, user,
+                             avisar: bool = True,
+                             diferido: list | None = None) -> list[Hit]:
+    """Pasa el texto que el OCR saca de la imagen por los detectores de contenido.
+
+    Devuelve los hits tal cual, sin inventar ninguna regla propia: si el cartel
+    dice lo que dice un anuncio, lo caza `commercial_ad` con sus umbrales de
+    siempre. Así el OCR no puede banear por su cuenta ni desviarse del resto.
+
+    Con `diferido`, el aviso de imagen dudosa NO se manda: se deja ahí para que
+    quien llama lo suelte cuando sepa la decisión final. Ver `_soltar_aviso_imagen`.
+    """
+    from . import ocr
+    if not ocr.disponible() or not _ocr_activo(db, msg.chat_id):
+        return []
+    clave = (msg.chat_id, msg.message_id)
+    ya = _IMAGENES_LEIDAS.get(clave)
+    if ya is not None and time.time() - ya[0] < 300:
+        return list(ya[1])
+    foto = msg.photo[-1] if msg.photo else msg.document
+    if foto is None:
+        return []
+    # Un `document` puede ser CUALQUIER cosa: un ZIP, un PDF, un instalador. Se
+    # mira el tipo declarado antes de bajar nada; Tesseract no va a leer un ZIP.
+    if not msg.photo and not (getattr(foto, "mime_type", None) or "").startswith("image/"):
+        return []
+    # Y el tamaño ANTES de descargar, no después. `ocr.leer` descarta lo que pasa
+    # de MAX_BYTES, pero para entonces ya se han bajado: la Bot API deja hasta
+    # 20 MB por fichero y PTB procesa los updates de UNO EN UNO, así que bajar un
+    # adjunto que se va a tirar son segundos sin moderar el grupo.
+    tam = getattr(foto, "file_size", None)
+    if tam is not None and tam > ocr.MAX_BYTES:
+        log.debug("OCR: imagen de %d bytes, por encima del tope; no se descarga", tam)
+        return []
+    try:
+        fichero = await asyncio.wait_for(context.bot.get_file(foto.file_id), 10.0)
+        datos = bytes(await asyncio.wait_for(fichero.download_as_bytearray(), 15.0))
+    except Exception as exc:  # noqa: BLE001 — incluye el TimeoutError del tope
+        log.debug("OCR: no se pudo descargar la imagen: %s", exc)
+        return []
+    texto = await ocr.leer(datos)
+    if texto:
+        log.info("OCR: user=%s imagen con texto (%d caracteres)", user.id, len(texto))
+    hits = _juzgar_texto_de_imagen(db, cfg, msg, texto) if texto else []
+    if not any(hits):
+        # La foto de una pantalla, torcida o en modo oscuro (L68): se lee otra vez,
+        # enderezada e invertida. Solo si la primera no dio nada: así nunca se pierde
+        # un hit que ya salía, y la imagen normal no paga una segunda lectura.
+        texto2 = await ocr.leer(datos, preparar=True)
+        if texto2:
+            hits2 = _juzgar_texto_de_imagen(db, cfg, msg, texto2)
+            log.info("OCR: user=%s imagen enderezada con texto (%d caracteres)",
+                     user.id, len(texto2))
+            if any(hits2) or not texto:
+                texto, hits = texto2, hits2
+    _recordar_lectura(clave, hits if texto else [])
+    if not texto:
+        return []
     reales = [h for h in hits if h]
     if reales:
         log.info("OCR: user=%s la imagen dispara %s", user.id,

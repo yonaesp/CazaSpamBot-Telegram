@@ -5,6 +5,14 @@ cada commit: para el detalle está el historial de git. Desde la v1.0.0 cada ver
 publicada lleva su número (`stable` apunta a la última); los hitos de antes, solo
 la fecha.
 
+## 2026-11 · La foto de una pantalla se lee enderezada, y el timo del casino con código
+
+- El bot lee mejor la foto que alguien hace con el móvil a una pantalla. Si la primera lectura no dice nada, la vuelve a
+  leer enderezada, y con el modo oscuro invertido. En el caso real pasó de entender 3 de 9 frases clave a entenderlas
+  todas.
+- Caza el timo del casino falso de un famoso: un código promocional, un bono en dinero y un casino, una cripto o la
+  promesa de retirarlo. Un código de descuento de una tienda, o los de Microsoft Rewards, no cuentan.
+
 ## 2026-11 · Un adjunto de alguien sin @ ni foto ya no se banea solo
 
 - Una foto, un vídeo o un sticker como primer mensaje banea solo si el perfil es sospechoso de verdad: el nombre en

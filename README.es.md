@@ -9,7 +9,7 @@
 [![python-telegram-bot](https://img.shields.io/badge/PTB-22.8-26A5E4?logo=telegram&logoColor=white)](https://python-telegram-bot.org/)
 [![Telethon](https://img.shields.io/badge/Telethon-1.44-blueviolet)](https://docs.telethon.dev/)
 [![Idiomas](https://img.shields.io/badge/idiomas-es%20%7C%20en%20%7C%20a%C3%B1ade%20el%20tuyo-orange)](src/locales/README.md)
-[![Tests](https://img.shields.io/badge/tests-2286%20passing-success)](#tests)
+[![Tests](https://img.shields.io/badge/tests-2303%20passing-success)](#tests)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 
 🌍 [**English**](README.md) · **Español**
@@ -61,7 +61,7 @@ La cuenta **no se delata**: leer una historia o un canal no cuenta como visualiz
 
 ## ✨ Lo que lo hace distinto
 
-🖼️ **Lee el texto de las imágenes (OCR).** Un cartel con «Windows, Office, Photoshop, AutoCAD… escríbeme por privado» no lleva ni una letra escrita, así que para un bot normal es un mensaje vacío. CazaSpamBot lo lee con Tesseract y lo juzga como si fuera texto. Lo mismo con la captura de un falso sorteo de cripto de Elon Musk. Sin GPU: 0,6 segundos por imagen.
+🖼️ **Lee el texto de las imágenes (OCR).** Un cartel con «Windows, Office, Photoshop, AutoCAD… escríbeme por privado» no lleva ni una letra escrita, así que para un bot normal es un mensaje vacío. CazaSpamBot lo lee con Tesseract y lo juzga como si fuera texto. Lo mismo con la captura de un falso sorteo de cripto de Elon Musk, o de un falso casino de un famoso que regala un bono con un código promocional. La foto de una pantalla hecha con el móvil se endereza antes, y el modo oscuro se invierte. Sin GPU: 0,6 segundos por imagen.
 
 🎭 **Desmonta el disfraz.** El truco de moda es entrar con un nombre normal y ponerse el de verdad justo antes de escribir. El bot vigila el nombre de cada recién llegado **durante 7 días** y vuelve a mirarle el perfil entero en su primer mensaje.
 
@@ -425,7 +425,7 @@ Contarnos que baneó a alguien legítimo vale tanto como el código: [CONTRIBUTI
 ## 🧪 Tests
 
 ```bash
-.venv/bin/python -m pytest tests/ -q     # 2286 tests
+.venv/bin/python -m pytest tests/ -q     # 2303 tests
 ```
 
 Cada detector tiene tests de lo que debe cazar **y de lo que no**, con casos reales. Un falso positivo es peor que un falso negativo.

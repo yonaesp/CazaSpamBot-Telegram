@@ -27,6 +27,10 @@ structlog==24.4.0
 # UTS#39 confusables (detección de nombres decorativos/homográficos anti-FP)
 confusable-homoglyphs==3.3.1
 
+# Pillow: preparar para el OCR la foto de una pantalla (enderezarla e invertirla si
+# está en modo oscuro, L68). Sin él, el OCR lee la imagen tal cual y nada más cambia.
+pillow==13.0.0
+
 # SDK de Anthropic. OPCIONAL: solo lo usa `llm_veto.py`, que viene APAGADO
 # (LLM_VETO=false) y ademas exige ANTHROPIC_API_KEY. Sin el paquete el bot arranca
 # y funciona igual: el import va dentro de la funcion y su fallo se traga.

@@ -73,6 +73,7 @@ Una lección nueva va al final, con el número siguiente y su línea en el índi
 - [L65](#l65) · CAS empezó a pedir clave y el bot lo tomó por «limpio»
 - [L66](#l66) · El perfil que era un anuncio entero y solo mereció una pregunta
 - [L67](#l67) · Un meme de bienvenida: sin @ ni foto no es «cuenta sospechosa»
+- [L68](#l68) · El casino de MrBeast: una foto torcida de una pantalla y un timo sin ancla
 
 ---
 
@@ -1796,3 +1797,40 @@ sigue parando el OCR, y la prisa (`jfm_*`) o cualquier otra regla siguen sumando
 
 **La regla.** Antes de usar una lista de señales para castigar, mirar para qué se escribió: la de «cualquier indicio»
 vale para preguntar, no para banear. Tests: `tests/test_adjunto_discreto_l67.py`.
+
+<a id="l68"></a>
+## L68 · El casino de MrBeast: una foto torcida de una pantalla y un timo sin ancla
+
+**El caso (27-nov-2026, Windows 11).** Una cuenta que entró el 12-oct y había escrito dos veces mandó una foto hecha con
+el móvil a una pantalla: un post falso de MrBeast, en modo oscuro y torcido 5°. «Lanzo mi casino de criptomonedas;
+regalo $3,200 a quien se registre; el bono se retira al momento; código promocional FAST en weazex.com; el post se borra
+en una hora». Cayó con 120 por `jfm_fast` + `first_msg_media`, señales de pura forma, no por lo que decía. El admin:
+«efectivamente era spam […] pero no conseguiste leer lo que pone por el OCR local? puedes mejorarlo actualizándolo?».
+
+**Lo que se midió.** El OCR sí leyó (562 caracteres), pero del párrafo clave solo «on A amped een on Srthdrave the bonus
+immediately». Con 9 frases clave del timo como vara: tal cual, 3. Tesseract ya estaba al día (5.5.0) y los modelos
+precisos (`tessdata_best`, 15 MB frente a 4) daban lo mismo, 3. Probado cada paso por separado: agrandar e invertir sin
+enderezar, 3; enderezar solo, 8; enderezar e invertir, 9. Las opciones de umbral de Tesseract (`thresholding_method`),
+peor. Lo que importa es el giro. Y lo segundo: **con el texto entero y perfecto, ningún detector saltaba**. No es un
+testimonio ni dice «crypto giveaway» (el ancla 3 de `investment_scam` pide esas dos palabras juntas).
+
+**El arreglo, en dos partes.**
+- `ocr.leer(..., preparar=True)`: grises, inversión si la media es oscura (< 110), agrandada hasta 1400 px de ancho y
+  enderezada. La inclinación sale de un perfil de proyección: se gira una copia pequeña de −12° a +12° en pasos de 0,5°
+  y se queda el giro con más varianza entre filas (las medias por fila, reduciendo la imagen a 1 px de ancho con Pillow,
+  en C). Si no hay inversión ni giro de al menos 1°, no hay segunda lectura. `_hits_de_la_imagen` la pide solo si la
+  primera no dispara nada, así que nunca se pierde un hit que ya salía. En el caso: 0,74 s de preparar y 1,48 s de
+  Tesseract. La regla y el perdón leen la misma foto: `_IMAGENES_LEIDAS` guarda lo que dio 5 min. Hace falta Pillow
+  (13.0.0, en `requirements.txt`); sin él la segunda lectura no se hace y todo sigue como antes.
+- Ancla 4 de `investment_scam`, `_bono_con_codigo`: un código de canje con, a ≤300 caracteres, una cantidad de dinero,
+  «bono/bonus» y un casino, una cripto o «withdraw/cash out». Vale 60 y por dos señales: ya junta cuatro cosas que no van
+  juntas en un mensaje normal. La primera versión cazó una frase de prueba de Windows («código de regalo de Microsoft
+  Rewards, 5 € de premio… para retirar el pendrive»): fuera «reward», «premio» y «retirar». El dinero, sin «K»: en una
+  captura «24K» son los «me gusta». Sobre los 623 textos guardados de los grupos, 0 disparos.
+
+**Lo que no cubre.** Una foto girada más de 12° o con perspectiva fuerte, y las letras sobre fondos de colores. Un aviso
+que hable del timo con la palabra «bonus» saltaría: a un veterano lo protege la confianza.
+
+**La regla.** Ante «el OCR no lo leyó», separar las dos preguntas: si leyéndolo bien lo habría cazado algún detector, y
+qué hace falta para leerlo. Aquí fallaban las dos. Y medir cada paso de preparación por separado antes de añadir nada.
+Tests: `tests/test_foto_de_pantalla_l68.py`.

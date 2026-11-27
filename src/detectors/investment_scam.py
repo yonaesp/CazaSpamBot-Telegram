@@ -117,6 +117,42 @@ _GIVEAWAY_RE = re.compile(
 )
 
 
+# --- Ancla 4: el bono de casino o cripto que se canjea con un código (L68) ---
+# Caso real (27-nov-2026, Windows 11): captura de un famoso que «lanza su casino de
+# criptomonedas» y regala $3,200 a quien se registre con un código promocional,
+# «retirable al momento». Ni con el texto leído entero saltaba nada: no dice
+# «crypto giveaway» (ancla 3) y no es un testimonio. Lo propio del timo es juntar,
+# a poca distancia, un código de canje, una cantidad de dinero, la palabra bono y un
+# casino, una cripto o una retirada («withdraw», «cash out»). Un código de descuento de una
+# tienda no habla de casinos ni de retirar el dinero.
+_CODIGO_RE = re.compile(
+    r"\b(?:promo|bonus|referral|gift|claim|redeem)\s*code"
+    r"|\bc[oó]digo\s+(?:promocional|de\s+(?:bono|regalo|referido|canje))",
+    re.IGNORECASE)
+# Sin «K»: en una captura, «24K» son los «me gusta», no dinero.
+_DINERO_RE = re.compile(
+    rf"(?:[$€£]|\b(?:USDT?|USD|EUR)\b)\s*{_NUMCORE}"
+    rf"|{_NUMCORE}\s*(?:[$€£]|\b(?:USDT?|USD|EUR|dollars?|d[oó]lares|euros?)\b)",
+    re.IGNORECASE)
+# Ni «reward» ni «premio» ni «retirar»: en un grupo de Windows se habla de Microsoft
+# Rewards, de sus códigos de regalo y de retirar un pendrive (hay test).
+_BONO_RE = re.compile(r"\b(?:bonus(?:es)?|bonos?)\b", re.IGNORECASE)
+_JUEGO_RE = re.compile(
+    r"\b(?:casinos?|crypto(?:currency)?|cripto(?:monedas?)?|bitcoin|usdt|betting|apuestas?"
+    r"|withdraw(?:al|n)?|cash\s*out)\b",
+    re.IGNORECASE)
+_VENTANA_BONO = 300
+
+
+def _bono_con_codigo(text: str):
+    """El código de canje, si a su alrededor hay dinero, bono y casino, cripto o retirada."""
+    for m in _CODIGO_RE.finditer(text):
+        ventana = text[max(0, m.start() - _VENTANA_BONO): m.end() + _VENTANA_BONO]
+        if _DINERO_RE.search(ventana) and _BONO_RE.search(ventana) and _JUEGO_RE.search(ventana):
+            return m
+    return None
+
+
 # --- Señales propias de la estafa (una es obligatoria además del ancla) ------
 # Las tres listas de vocabulario que siguen son EDITABLES por el admin desde
 # config/blacklist/ (genéricas + por idioma + custom), igual que las de
@@ -289,7 +325,14 @@ def check(msg: Message, is_first_msg: bool = False) -> Hit:
     if tiene_giveaway:
         score += 45
         reasons.append(t("reason.invscam_giveaway", q=_cita(m_give)))
-    tiene_ancla = tiene_ancla_num or tiene_flip or tiene_giveaway
+    # ANCLA 4: bono de casino o cripto con código. Ya junta cuatro cosas que en un
+    # mensaje normal no van juntas, así que vale por dos señales (L68).
+    m_bono = _bono_con_codigo(text)
+    tiene_bono = bool(m_bono)
+    if tiene_bono:
+        score += 60
+        reasons.append(t("reason.invscam_bono", q=_cita(m_bono)))
+    tiene_ancla = tiene_ancla_num or tiene_flip or tiene_giveaway or tiene_bono
 
     m_testimony = _testimony_re().search(text)
     tiene_testimony = bool(m_testimony)
@@ -332,7 +375,7 @@ def check(msg: Message, is_first_msg: bool = False) -> Hit:
     # 1000 y ahora vale 1500" (solo ancla) no llega, y "gracias John, me
     # ayudaste" (solo un gracias suelto) tampoco.
     señales_estafa = sum((tiene_ancla_num, tiene_flip, tiene_giveaway, tiene_praise,
-                          tiene_cta, tiene_vocab, tiene_testimony))
+                          tiene_cta, tiene_vocab, tiene_testimony)) + 2 * tiene_bono
     if señales_estafa < 2:
         return Hit.none()
 
@@ -347,6 +390,7 @@ def check(msg: Message, is_first_msg: bool = False) -> Hit:
             "multiplier": round(mult, 1),
             "skeptic_flip": tiene_flip,
             "crypto_giveaway": tiene_giveaway,
+            "casino_bonus": tiene_bono,
             "testimony": tiene_testimony,
             "praise": tiene_praise,
             "cta": tiene_cta,

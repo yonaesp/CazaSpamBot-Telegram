@@ -28,10 +28,21 @@ día**, así que aunque todos llevaran foto serían **~1 segundo de CPU diario**
   vuelve a intentar. Es una mejora opcional, no una dependencia dura.
 - **Solo donde importa**: primeros mensajes con imagen, que es donde llega este
   spam. No se pasa OCR a cada foto del grupo.
+
+## La foto de una pantalla (L68)
+
+Una foto hecha con el móvil a una pantalla sale torcida y, si la web está en modo
+oscuro, con letra clara sobre fondo negro: lo peor para Tesseract. Caso real
+(27-nov-2026): el timo del «casino de MrBeast», torcido 5°; de 9 frases clave se
+leían 3. `leer(..., preparar=True)` la pasa a grises, la invierte si es oscura, la
+agranda si es pequeña y la endereza antes de leer: 9 de 9. Con los modelos precisos
+de Tesseract (`tessdata_best`) no se ganaba nada. Hace falta Pillow; sin él, la
+segunda lectura no se hace y todo sigue como antes.
 """
 from __future__ import annotations
 
 import asyncio
+import io
 import logging
 import os
 import shutil
@@ -133,18 +144,117 @@ def _leer_sincrono(datos: bytes) -> str:
             return ""
 
 
-async def leer(datos: bytes) -> str:
+# Preparar la imagen (L68). Un ancho menor que este se agranda: Tesseract lee mejor
+# letras de unos 30 píxeles de alto, y una captura de móvil comprimida no llega.
+ANCHO_MIN = 1400
+# Más oscura que esto (0 negro, 255 blanco) = modo oscuro: se invierte.
+OSCURA = 110
+# Inclinación que se busca, en grados, y el paso. Una foto a una pantalla no pasa
+# de unos 10°; lo que esté más torcido es otra cosa y se deja como está.
+GIRO_MAX = 12.0
+GIRO_PASO = 0.5
+# Por debajo de esto no se endereza: el giro emborrona más de lo que arregla.
+GIRO_MIN = 1.0
+
+
+def _inclinacion(gris) -> float:
+    """Grados que hay que girar la imagen para que las líneas queden horizontales.
+
+    Perfil de proyección: con las líneas rectas, la media de cada fila alterna entre
+    filas de letra (oscuras) y huecos (claros), y la varianza entre filas es máxima.
+    La media por fila sale de reducir la imagen a 1 píxel de ancho (en C, rápido).
+    """
+    from PIL import Image
+    peque = gris.copy()
+    peque.thumbnail((700, 700))
+    mejor, mejor_var = 0.0, -1.0
+    var_recta = None
+    pasos = int(GIRO_MAX / GIRO_PASO)
+    for i in range(-pasos, pasos + 1):
+        angulo = i * GIRO_PASO
+        girada = peque.rotate(angulo, resample=Image.BILINEAR, fillcolor=255)
+        # `tobytes` y no `getdata`, que Pillow quita en la 14: en grises, un byte por fila.
+        filas = list(girada.resize((1, girada.height), Image.BOX).tobytes())
+        media = sum(filas) / len(filas)
+        var = sum((f - media) ** 2 for f in filas)
+        if angulo == 0:
+            var_recta = var
+        if var > mejor_var:
+            mejor, mejor_var = angulo, var
+    # Si girar apenas mejora sobre dejarla recta, es ruido: no se toca.
+    if var_recta and mejor_var < var_recta * 1.05:
+        return 0.0
+    return mejor
+
+
+def _preparar_sincrono(datos: bytes) -> bytes | None:
+    """La imagen en grises, invertida si es oscura, agrandada y enderezada.
+
+    None si no hay nada que cambiar o no se puede (sin Pillow, formato raro): la
+    segunda lectura solo vale la pena si la imagen es distinta de la primera.
+    """
+    try:
+        from PIL import Image, ImageOps, ImageStat
+    except ImportError:
+        return None
+    try:
+        with Image.open(io.BytesIO(datos)) as im:
+            if im.width * im.height > 40_000_000:
+                return None
+            im = im.convert("RGBA")
+            fondo = Image.new("RGBA", im.size, (255, 255, 255, 255))
+            gris = ImageOps.grayscale(Image.alpha_composite(fondo, im))
+        cambios = []
+        if ImageStat.Stat(gris).mean[0] < OSCURA:
+            gris = ImageOps.invert(gris)
+            cambios.append("invertida")
+        angulo = _inclinacion(gris)
+        if abs(angulo) < GIRO_MIN:
+            angulo = 0.0
+        # Solo agrandar no cambia nada (medido: 3 de 9 frases, igual que sin tocarla),
+        # y una segunda lectura cuesta un segundo: sin inversión ni giro, no se hace.
+        if not cambios and not angulo:
+            return None
+        if gris.width < ANCHO_MIN:
+            factor = min(3.0, ANCHO_MIN / gris.width)
+            gris = gris.resize((round(gris.width * factor), round(gris.height * factor)),
+                               Image.LANCZOS)
+            cambios.append(f"x{factor:.1f}")
+        if angulo:
+            gris = gris.rotate(angulo, resample=Image.BICUBIC, expand=True, fillcolor=255)
+            cambios.append(f"{angulo:+.1f}°")
+        log.info("OCR: imagen preparada (%s)", ", ".join(cambios))
+        salida = io.BytesIO()
+        gris.save(salida, "PNG")
+        return salida.getvalue()
+    except Exception as exc:  # noqa: BLE001 — una imagen rara no puede tumbar nada
+        log.info("OCR: no se pudo preparar la imagen (%s)", exc)
+        return None
+
+
+def _leer_preparada_sincrono(datos: bytes) -> str:
+    preparada = _preparar_sincrono(datos)
+    return _leer_sincrono(preparada) if preparada else ""
+
+
+async def leer(datos: bytes, *, preparar: bool = False) -> str:
     """Texto de la imagen, o cadena vacía. Nunca lanza.
 
     Vacío significa «no hay texto que juzgar», y quien llama debe tratarlo como
     ausencia de información: jamás como «la imagen está limpia».
+
+    Con `preparar=True` la lee enderezada e invertida si hace falta (L68), y da
+    vacío si la imagen no necesitaba nada: esa lectura sería la misma que la normal.
     """
     if not datos or len(datos) > MAX_BYTES or not disponible():
         return ""
+    trabajo = _leer_preparada_sincrono if preparar else _leer_sincrono
+    # Preparar la imagen cuesta menos de un segundo, pero va fuera del tope de Tesseract.
+    tope = TIMEOUT_S + (4 if preparar else 2)
     try:
         bucle = asyncio.get_running_loop()
         texto = await asyncio.wait_for(
-            bucle.run_in_executor(None, _leer_sincrono, datos), TIMEOUT_S + 2)
+            bucle.run_in_executor(None, trabajo, datos), tope)
     except asyncio.TimeoutError:
         log.info("OCR: se agotó el tiempo leyendo una imagen")
         return ""

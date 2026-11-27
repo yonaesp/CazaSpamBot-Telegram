@@ -9,7 +9,7 @@
 [![python-telegram-bot](https://img.shields.io/badge/PTB-22.8-26A5E4?logo=telegram&logoColor=white)](https://python-telegram-bot.org/)
 [![Telethon](https://img.shields.io/badge/Telethon-1.44-blueviolet)](https://docs.telethon.dev/)
 [![Languages](https://img.shields.io/badge/languages-es%20%7C%20en%20%7C%20add%20yours-orange)](src/locales/README.md)
-[![Tests](https://img.shields.io/badge/tests-2286%20passing-success)](#tests)
+[![Tests](https://img.shields.io/badge/tests-2303%20passing-success)](#tests)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 
 🌍 **English** · [**Español**](README.es.md)
@@ -61,7 +61,7 @@ The account **doesn't give itself away**: reading a story or a channel doesn't c
 
 ## ✨ What makes it different
 
-🖼️ **Reads the text inside images (OCR).** A poster saying "Windows, Office, Photoshop, AutoCAD… message me privately" carries not one typed letter, so to a regular bot it's an empty message. CazaSpamBot reads it with Tesseract and judges it as if it were text. Same with a screenshot of a fake Elon Musk crypto giveaway. No GPU: 0.6 seconds per image.
+🖼️ **Reads the text inside images (OCR).** A poster saying "Windows, Office, Photoshop, AutoCAD… message me privately" carries not one typed letter, so to a regular bot it's an empty message. CazaSpamBot reads it with Tesseract and judges it as if it were text. Same with a screenshot of a fake Elon Musk crypto giveaway, or a fake celebrity casino handing out a bonus with a promo code. A phone photo of a screen gets straightened first, and dark mode inverted. No GPU: 0.6 seconds per image.
 
 🎭 **Sees through the disguise.** The trick of the moment is joining with a normal name and switching to the real one right before posting. The bot watches every newcomer's name **for 7 days** and checks their whole profile again on their first message.
 
@@ -426,7 +426,7 @@ Telling us about a legitimate member it banned is as useful as code: [CONTRIBUTI
 ## 🧪 Tests
 
 ```bash
-.venv/bin/python -m pytest tests/ -q     # 2286 tests
+.venv/bin/python -m pytest tests/ -q     # 2303 tests
 ```
 
 Every detector has tests for what it must catch **and what it must not**, built from real cases. A false positive is worse than a false negative.

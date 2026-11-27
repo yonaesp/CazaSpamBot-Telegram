@@ -95,10 +95,18 @@ def test_el_ocr_no_inventa_ninguna_regla():
         assert prohibido not in fuente, f"el OCR no puede decidir ({prohibido})"
 
 
+def _cuerpo_del_juicio(fuente: str) -> str:
+    """Los detectores viven en `_juzgar_texto_de_imagen`, que usan las dos lecturas (L68)."""
+    i = fuente.index("def _juzgar_texto_de_imagen(")
+    j = fuente.index("async def _hits_de_la_imagen(")
+    lectura = fuente[j:fuente.index("\nasync def ", j + 10)]
+    assert lectura.count("_juzgar_texto_de_imagen(") == 2, "la lectura normal y la enderezada"
+    return fuente[i:j]
+
+
 def test_el_enganche_usa_los_detectores_normales():
     fuente = Path("src/handlers.py").read_text()
-    i = fuente.index("async def _hits_de_la_imagen(")
-    cuerpo = fuente[i:fuente.index("\nasync def ", i + 10)]
+    cuerpo = _cuerpo_del_juicio(fuente)
     assert "comad_det.check" in cuerpo
     assert "is_first_msg=True" in cuerpo
     assert "_apply_money_guard" in cuerpo, "debe respetar el ajuste del chat"
@@ -309,8 +317,7 @@ def test_el_modo_se_desactiva_aunque_algo_falle():
 def test_el_enganche_evalua_dentro_del_modo():
     from pathlib import Path
     fuente = Path("src/handlers.py").read_text()
-    i = fuente.index("async def _hits_de_la_imagen(")
-    cuerpo = fuente[i:fuente.index("\nasync def ", i + 10)]
+    cuerpo = _cuerpo_del_juicio(fuente)
     assert "with modo_ocr():" in cuerpo
 
 
